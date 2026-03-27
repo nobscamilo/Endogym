@@ -52,3 +52,18 @@ Smoke test de motor de cálculo:
 ```bash
 npm run smoke
 ```
+
+
+## Deploy en Vercel
+
+Se añadió `vercel.json` con configuración base para Next.js y API routes.
+
+Pasos recomendados:
+
+```bash
+vercel login
+vercel link --project Endogym
+vercel --prod
+```
+
+Guía completa en `docs/DEPLOYMENT.md`.
