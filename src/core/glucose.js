@@ -3,6 +3,9 @@
  * Fórmula: GL = (GI * carbohidratos disponibles en gramos) / 100
  */
 export function glycemicLoad(glycemicIndex, availableCarbsGrams) {
+  if (!Number.isFinite(glycemicIndex) || !Number.isFinite(availableCarbsGrams)) {
+    throw new Error('GI y carbohidratos deben ser valores numéricos finitos.');
+  }
   if (glycemicIndex < 0 || availableCarbsGrams < 0) {
     throw new Error('GI y carbohidratos deben ser valores no negativos.');
   }
@@ -22,6 +25,9 @@ export function classifyGlycemicLoad(gl) {
  * Estima impacto glucémico diario a partir de GL acumulada.
  */
 export function estimateDailyGlycemicImpact(totalDailyGl) {
+  if (!Number.isFinite(totalDailyGl)) {
+    throw new Error('La GL diaria debe ser un valor numérico finito.');
+  }
   if (totalDailyGl < 0) {
     throw new Error('La GL diaria no puede ser negativa.');
   }
@@ -35,6 +41,9 @@ export function estimateDailyGlycemicImpact(totalDailyGl) {
  * basada en GL, proteína y procesamiento del alimento.
  */
 export function estimateInsulinIndex({ gl, proteinGrams, processedLevel = 1 }) {
+  if (!Number.isFinite(gl) || !Number.isFinite(proteinGrams)) {
+    throw new Error('GL y proteína deben ser valores numéricos finitos.');
+  }
   const normalizedGl = Math.min(100, gl * 2);
   const proteinFactor = Math.min(25, proteinGrams * 0.8);
   const processedFactor = Math.min(20, Math.max(0, processedLevel) * 5);

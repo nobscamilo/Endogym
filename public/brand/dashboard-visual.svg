@@ -1,0 +1,20 @@
+<svg width="360" height="200" viewBox="0 0 360 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dashBg" x1="0" y1="0" x2="360" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E6F4FF"/>
+      <stop offset="1" stop-color="#CDE9FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="200" rx="24" fill="url(#dashBg)"/>
+  <rect x="18" y="24" width="204" height="96" rx="14" fill="#FFFFFF" stroke="#B2D8F6"/>
+  <path d="M34 90L72 74L106 80L142 56L180 62L206 46" stroke="#0F7BE9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="206" cy="46" r="6" fill="#0F7BE9"/>
+  <rect x="18" y="132" width="96" height="44" rx="12" fill="#0F7BE9"/>
+  <rect x="126" y="132" width="96" height="44" rx="12" fill="#1AB3FF"/>
+  <rect x="236" y="24" width="106" height="152" rx="18" fill="#0D2F4F"/>
+  <rect x="252" y="48" width="74" height="10" rx="5" fill="#8FDFFF"/>
+  <rect x="252" y="68" width="54" height="10" rx="5" fill="#8FDFFF"/>
+  <circle cx="289" cy="132" r="28" fill="#1AB3FF"/>
+  <path d="M276 132H302" stroke="#DDF5FF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M289 119V145" stroke="#DDF5FF" stroke-width="8" stroke-linecap="round"/>
+</svg>
