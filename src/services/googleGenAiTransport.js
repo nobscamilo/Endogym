@@ -169,19 +169,27 @@ export async function requestGoogleGenerateContent({
     headers['x-goog-api-key'] = apiKey;
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts,
-        },
-      ],
-      generationConfig,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts,
+          },
+        ],
+        generationConfig,
+      }),
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   return {
     backend,

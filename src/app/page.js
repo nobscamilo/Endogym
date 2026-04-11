@@ -246,6 +246,8 @@ export default function HomePage() {
         <div className="auth-tabs" role="tablist" aria-label="Autenticación">
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === 'login'}
             className={mode === 'login' ? 'active' : 'secondary'}
             onClick={() => setMode('login')}
           >
@@ -253,6 +255,8 @@ export default function HomePage() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === 'register'}
             className={mode === 'register' ? 'active' : 'secondary'}
             onClick={() => setMode('register')}
           >

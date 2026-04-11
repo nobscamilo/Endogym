@@ -492,6 +492,92 @@ function buildProfilePayload(profile) {
   };
 }
 
+const GOAL_LABELS = {
+  weight_loss: 'Bajar peso',
+  maintain_weight: 'Mantener peso',
+  endurance: 'Resistencia',
+  hypertrophy: 'Hipertrofia',
+  strength: 'Fuerza',
+  recomposition: 'Recomposición',
+  glycemic_control: 'Control glucémico',
+};
+
+const DIETARY_PATTERN_LABELS = {
+  omnivore: 'Omnívoro',
+  vegetarian: 'Vegetariano',
+  vegan: 'Vegano',
+};
+
+const MODALITY_LABELS = {
+  full_gym: 'Gimnasio completo',
+  home: 'Entrenamiento en casa',
+  yoga: 'Yoga',
+  trx: 'TRX',
+  calisthenics: 'Calistenia',
+  running: 'Running',
+  cycling: 'Ciclismo',
+  pilates: 'Pilates',
+  mixed: 'Mixto',
+};
+
+const METABOLIC_LABELS = {
+  none: 'Sin condición declarada',
+  insulin_resistance: 'Resistencia a la insulina',
+  prediabetes: 'Prediabetes',
+  type2_diabetes: 'Diabetes tipo 2',
+  hypothyroidism: 'Hipotiroidismo',
+  pcos: 'SOP / PCOS',
+};
+
+const CATEGORY_LABELS = {
+  lower_body_strength: 'Pierna principal',
+  lower_body_unilateral: 'Pierna unilateral',
+  lower_body_accessory: 'Pierna accesorio',
+  posterior_chain: 'Cadena posterior',
+  upper_push: 'Empuje superior',
+  upper_pull: 'Tracción superior',
+  core: 'Core',
+  conditioning: 'Acondicionamiento',
+  mobility: 'Movilidad',
+  mobility_strength: 'Movilidad con fuerza',
+  core_mobility: 'Core y movilidad',
+  neuromotor: 'Neuromotor',
+  recovery: 'Recuperación',
+  cardio_base: 'Cardio base',
+  cardio_threshold: 'Cardio umbral',
+  cardio_interval: 'Cardio intervalos',
+  cardio_skill: 'Cardio técnico',
+};
+
+const DIFFICULTY_LABELS = {
+  foundation: 'Base',
+  build: 'Construcción',
+  performance: 'Avanzado',
+};
+
+const MODALITY_SPOTLIGHTS = {
+  home: {
+    title: 'Home Lab',
+    description: 'Fuerza, core y acondicionamiento serio sin depender de máquinas.',
+    signatureIds: ['home-band-overhead-press', 'home-cossack-squat', 'home-suitcase-carry'],
+  },
+  trx: {
+    title: 'TRX Engine',
+    description: 'Suspensión con progresiones reales, no solo filas y sentadillas básicas.',
+    signatureIds: ['trx-chest-fly', 'trx-rollout', 'trx-single-leg-squat'],
+  },
+  yoga: {
+    title: 'Yoga Control',
+    description: 'Movilidad con fuerza, equilibrio y posturas útiles para prescripción real.',
+    signatureIds: ['yoga-triangle-pose', 'yoga-dancer-pose', 'yoga-revolved-chair'],
+  },
+  pilates: {
+    title: 'Pilates Precision',
+    description: 'Core, control segmentario y cadena posterior con más profundidad técnica.',
+    signatureIds: ['pilates-criss-cross', 'pilates-open-leg-rocker', 'pilates-bridge-march'],
+  },
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const firebaseClient = useMemo(() => getFirebaseClient(), []);
@@ -2093,88 +2179,6 @@ export default function DashboardPage() {
     };
   }, [calculatorInput]);
 
-  const GOAL_LABELS = {
-    weight_loss: 'Bajar peso',
-    maintain_weight: 'Mantener peso',
-    endurance: 'Resistencia',
-    hypertrophy: 'Hipertrofia',
-    strength: 'Fuerza',
-    recomposition: 'Recomposición',
-    glycemic_control: 'Control glucémico',
-  };
-
-  const DIETARY_PATTERN_LABELS = {
-    omnivore: 'Omnívoro',
-    vegetarian: 'Vegetariano',
-    vegan: 'Vegano',
-  };
-
-  const MODALITY_LABELS = {
-    full_gym: 'Gimnasio completo',
-    home: 'Entrenamiento en casa',
-    yoga: 'Yoga',
-    trx: 'TRX',
-    calisthenics: 'Calistenia',
-    running: 'Running',
-    cycling: 'Ciclismo',
-    pilates: 'Pilates',
-    mixed: 'Mixto',
-  };
-
-  const METABOLIC_LABELS = {
-    none: 'Sin condición declarada',
-    insulin_resistance: 'Resistencia a la insulina',
-    prediabetes: 'Prediabetes',
-    type2_diabetes: 'Diabetes tipo 2',
-    hypothyroidism: 'Hipotiroidismo',
-    pcos: 'SOP / PCOS',
-  };
-  const CATEGORY_LABELS = {
-    lower_body_strength: 'Pierna principal',
-    lower_body_unilateral: 'Pierna unilateral',
-    lower_body_accessory: 'Pierna accesorio',
-    posterior_chain: 'Cadena posterior',
-    upper_push: 'Empuje superior',
-    upper_pull: 'Traccion superior',
-    core: 'Core',
-    conditioning: 'Acondicionamiento',
-    mobility: 'Movilidad',
-    mobility_strength: 'Movilidad con fuerza',
-    core_mobility: 'Core y movilidad',
-    neuromotor: 'Neuromotor',
-    recovery: 'Recuperacion',
-    cardio_base: 'Cardio base',
-    cardio_threshold: 'Cardio umbral',
-    cardio_interval: 'Cardio intervalos',
-    cardio_skill: 'Cardio tecnico',
-  };
-  const DIFFICULTY_LABELS = {
-    foundation: 'Base',
-    build: 'Construccion',
-    performance: 'Avanzado',
-  };
-  const MODALITY_SPOTLIGHTS = {
-    home: {
-      title: 'Home Lab',
-      description: 'Fuerza, core y acondicionamiento serio sin depender de máquinas.',
-      signatureIds: ['home-band-overhead-press', 'home-cossack-squat', 'home-suitcase-carry'],
-    },
-    trx: {
-      title: 'TRX Engine',
-      description: 'Suspensión con progresiones reales, no solo filas y sentadillas básicas.',
-      signatureIds: ['trx-chest-fly', 'trx-rollout', 'trx-single-leg-squat'],
-    },
-    yoga: {
-      title: 'Yoga Control',
-      description: 'Movilidad con fuerza, equilibrio y posturas útiles para prescripción real.',
-      signatureIds: ['yoga-triangle-pose', 'yoga-dancer-pose', 'yoga-revolved-chair'],
-    },
-    pilates: {
-      title: 'Pilates Precision',
-      description: 'Core, control segmentario y cadena posterior con más profundidad técnica.',
-      signatureIds: ['pilates-criss-cross', 'pilates-open-leg-rocker', 'pilates-bridge-march'],
-    },
-  };
   const nutritionPatternValue = weeklyPlan?.nutritionPlan?.dietaryPattern || profile.nutritionPreferences?.dietaryPattern || 'omnivore';
   const nutritionPatternLabel = DIETARY_PATTERN_LABELS[nutritionPatternValue] || nutritionPatternValue;
   const exerciseLibraryCatalog = useMemo(() => getExerciseLibraryCatalog(), []);
@@ -2466,10 +2470,12 @@ export default function DashboardPage() {
       <section className="app-body">
         <aside className="side-nav" aria-label="Navegación de vistas">
           <p className="side-nav-title">Navegación</p>
-          <div className="side-nav-list">
+          <div className="side-nav-list" role="tablist" aria-label="Secciones del dashboard">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
                 className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -3247,7 +3253,8 @@ export default function DashboardPage() {
                   </Field>
                 </div>
                 <Field label="Notas (opcional)">
-                  <input
+                  <textarea
+                    rows={2}
                     value={metricInput.notes}
                     onChange={(event) => setMetricInput((prev) => ({ ...prev, notes: event.target.value }))}
                     placeholder="Estado general, hora de medición, etc."
@@ -3341,7 +3348,8 @@ export default function DashboardPage() {
                   </select>
                 </Field>
                 <Field label="Notas (opcional)">
-                  <input
+                  <textarea
+                    rows={2}
                     value={workoutCheckin.notes}
                     onChange={(event) => setWorkoutCheckin((prev) => ({ ...prev, notes: event.target.value }))}
                     placeholder="Dolor, molestias, percepción de rendimiento..."

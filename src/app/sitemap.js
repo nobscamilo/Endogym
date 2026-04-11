@@ -3,6 +3,7 @@ import { getPublicSiteUrl } from '../lib/siteUrl.js';
 export default function sitemap() {
   const siteUrl = getPublicSiteUrl();
   const now = new Date();
+  const legalLastModified = new Date('2025-06-01');
 
   return [
     {
@@ -13,19 +14,19 @@ export default function sitemap() {
     },
     {
       url: `${siteUrl}/legal/terms`,
-      lastModified: now,
+      lastModified: legalLastModified,
       changeFrequency: 'monthly',
       priority: 0.4,
     },
     {
       url: `${siteUrl}/legal/privacy`,
-      lastModified: now,
+      lastModified: legalLastModified,
       changeFrequency: 'monthly',
       priority: 0.4,
     },
     {
       url: `${siteUrl}/legal/data-protection`,
-      lastModified: now,
+      lastModified: legalLastModified,
       changeFrequency: 'monthly',
       priority: 0.4,
     },

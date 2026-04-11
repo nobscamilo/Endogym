@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 const REGION_HOTSPOTS = {
   front: {
     front_shoulders: [
@@ -73,19 +75,19 @@ const REGION_HOTSPOTS = {
 const REGION_LABELS = {
   front_shoulders: 'Hombro anterior',
   chest: 'Pecho',
-  biceps: 'Biceps',
+  biceps: 'Bíceps',
   forearms: 'Antebrazo',
   abs: 'Core anterior',
   obliques: 'Oblicuos',
-  quadriceps: 'Cuadriceps',
+  quadriceps: 'Cuadríceps',
   adductors: 'Aductores',
   calves: 'Pantorrillas',
   rear_shoulders: 'Hombro posterior',
   upper_back: 'Espalda alta',
   lats: 'Dorsales',
-  triceps: 'Triceps',
+  triceps: 'Tríceps',
   lower_back: 'Zona lumbar',
-  glutes: 'Gluteos',
+  glutes: 'Glúteos',
   hamstrings: 'Isquios',
 };
 
@@ -186,12 +188,13 @@ function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
     <article className="muscle-atlas-card">
       <div className="muscle-atlas-stage" role="img" aria-label={`Vista ${viewLabel.toLowerCase()} del mapa muscular`}>
         <div className="muscle-atlas-stage-glow" aria-hidden="true" />
-        <img
+        <Image
           src={imageHref}
           alt=""
+          width={180}
+          height={380}
           className={`anatomy-base-image is-${view}`}
-          loading="eager"
-          decoding="async"
+          priority
         />
         <svg viewBox="0 0 180 380" aria-hidden="true">
           <defs>
@@ -237,8 +240,8 @@ export default function MuscleMapFigure({
       <div className="muscle-map-header">
         <div>
           <p className="muscle-map-kicker">Atlas muscular</p>
-          <h5>Activacion anatomica</h5>
-          <p className="muscle-map-subtitle">Vista tecnica con focos primarios y apoyo secundario.</p>
+          <h5>Activación anatómica</h5>
+          <p className="muscle-map-subtitle">Vista técnica con focos primarios y apoyo secundario.</p>
         </div>
         <div className="muscle-map-legend-inline">
           <span><i className="legend-swatch primary" /> Primario</span>

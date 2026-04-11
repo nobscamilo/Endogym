@@ -40,9 +40,11 @@ export function buildMacroPlan(targetCalories, strategy = 'recomposition') {
   const proteinGrams = Math.round((targetCalories * distribution.protein) / 4);
   const carbsGrams = Math.round((targetCalories * distribution.carbs) / 4);
   const fatGrams = Math.round((targetCalories * distribution.fat) / 9);
+  const actualCalories = proteinGrams * 4 + carbsGrams * 4 + fatGrams * 9;
 
   return {
     targetCalories,
+    actualCalories,
     strategy: resolvedStrategy,
     proteinGrams,
     carbsGrams,

@@ -444,8 +444,8 @@ function adjustMacroTargetForDay(baseTarget, day, goal) {
     fatFactor += 0.08;
   }
   if (goal === GoalType.GLYCEMIC_CONTROL) {
-    carbsFactor -= 0.08;
-    fatFactor += 0.06;
+    carbsFactor -= 0.14;
+    fatFactor += 0.10;
   }
 
   const proteinGrams = Math.max(30, Math.round(baseTarget.proteinGrams));

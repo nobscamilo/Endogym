@@ -248,7 +248,10 @@ const BANK = {
 
 function includesRestrictedWords(option, blockedWords) {
   const haystack = `${option.dish} ${option.ingredients.join(' ')}`.toLowerCase();
-  return Array.from(blockedWords).some((word) => haystack.includes(word));
+  return Array.from(blockedWords).some((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(haystack);
+  });
 }
 
 function resolveMealType(slot, index, total) {

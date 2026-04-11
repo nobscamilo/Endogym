@@ -168,11 +168,24 @@ export async function GET(request) {
       }
 
       const url = `${OPEN_FOOD_FACTS_BASE}/${barcode}.json?fields=code,product_name,product_name_es,brands,image_front_url,image_front_small_url,serving_size,serving_quantity,serving_quantity_unit,nutriments,nova_group,nutriscore_grade,nutrition_grades`;
-      const response = await fetch(url, {
-        headers: {
-          'user-agent': 'Endogym/1.0 (nutrition barcode lookup)',
-        },
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: {
+            'user-agent': 'Endogym/1.0 (nutrition barcode lookup)',
+          },
+          signal: controller.signal,
+        });
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return errorResponse('La consulta al catálogo de productos excedió el tiempo límite.', 504);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         return errorResponse('No se pudo consultar la base de productos comerciales.', 502);
