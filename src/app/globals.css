@@ -2570,7 +2570,7 @@ button.exercise-selector-item.active {
 
 .muscle-atlas-stage {
   position: relative;
-  min-height: 320px;
+  min-height: 340px;
   border: 1px solid rgba(31, 38, 50, 0.18);
   border-radius: 18px;
   background:
@@ -2627,36 +2627,36 @@ button.exercise-selector-item.active {
 }
 
 .atlas-spot-glow {
-  opacity: 0.52;
+  opacity: 0.6;
 }
 
 .atlas-spot-glow.primary {
-  fill: rgba(255, 96, 118, 0.32);
+  fill: rgba(15, 123, 233, 0.25);
 }
 
 .atlas-spot-glow.secondary {
-  fill: rgba(245, 189, 141, 0.18);
+  fill: rgba(80, 200, 160, 0.15);
 }
 
 .atlas-spot-core.primary {
-  fill: rgba(255, 92, 112, 0.54);
+  fill: rgba(15, 123, 233, 0.45);
 }
 
 .atlas-spot-core.secondary {
-  fill: rgba(255, 176, 106, 0.32);
+  fill: rgba(80, 200, 160, 0.28);
 }
 
 .atlas-spot-ring {
   fill: none;
-  stroke-width: 1.25;
+  stroke-width: 1.5;
 }
 
 .atlas-spot-ring.primary {
-  stroke: rgba(255, 189, 198, 0.66);
+  stroke: rgba(15, 123, 233, 0.5);
 }
 
 .atlas-spot-ring.secondary {
-  stroke: rgba(255, 214, 173, 0.36);
+  stroke: rgba(80, 200, 160, 0.3);
 }
 
 .muscle-atlas-footer {
@@ -2719,11 +2719,11 @@ button.exercise-selector-item.active {
 }
 
 .legend-swatch.primary {
-  background: #d54057;
+  background: #0f7be9;
 }
 
 .legend-swatch.secondary {
-  background: #92515b;
+  background: #50c8a0;
 }
 
 .muscle-region-chip-row {
@@ -2743,15 +2743,15 @@ button.exercise-selector-item.active {
 }
 
 .muscle-region-chip.primary {
-  border: 1px solid rgba(241, 170, 182, 0.78);
-  background: rgba(255, 235, 239, 0.96);
-  color: #8c3040;
+  border: 1px solid rgba(15, 123, 233, 0.3);
+  background: rgba(217, 235, 255, 0.9);
+  color: #0053b6;
 }
 
 .muscle-region-chip.secondary {
-  border: 1px solid rgba(234, 205, 175, 0.84);
-  background: rgba(255, 245, 231, 0.96);
-  color: #8a5b21;
+  border: 1px solid rgba(80, 200, 160, 0.35);
+  background: rgba(220, 250, 238, 0.9);
+  color: #0d6b4f;
 }
 
 .exercise-audit-filters {

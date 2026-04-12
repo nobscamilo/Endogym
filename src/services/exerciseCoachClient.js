@@ -200,7 +200,7 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) 
           temperature: 0.2,
           topK: 32,
           topP: 0.9,
-          maxOutputTokens: 1200,
+          maxOutputTokens: 4096,
           responseMimeType: 'application/json',
           responseJsonSchema: COACH_SCHEMA,
         },

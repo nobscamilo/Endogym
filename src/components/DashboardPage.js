@@ -2325,55 +2325,51 @@ export default function DashboardPage() {
   ];
   const activeTabMeta = {
     dashboard: {
-      eyebrow: 'Panel de rendimiento',
-      title: 'Tu día en una vista',
-      description: 'Entrena, registra y ajusta.',
-      context: dashboardFocusDay
+      eyebrow: 'Inicio',
+      title: 'Tu día',
+      description: dashboardFocusDay
         ? `${formatDayNameFromIso(dashboardFocusDay.date)} · ${dashboardFocusDay.workout?.title || 'Sesión'} · ${dashboardFocusDay.workout?.durationMinutes || 0} min`
-        : 'Genera tu semana para activar métricas, rutina y nutrición.',
+        : 'Genera tu semana para empezar.',
     },
     user: {
-      eyebrow: 'Perfil y control',
-      title: needsOnboarding ? 'Configura tu base' : 'Tu perfil operativo',
+      eyebrow: 'Perfil',
+      title: needsOnboarding ? 'Setup inicial' : 'Tu perfil',
       description: needsOnboarding
-        ? 'Completa el setup inicial y deja de repetir datos en cada sesión.'
-        : 'Biometría, cribado, consentimiento y ajustes personales en un solo sitio.',
-      context: hasValidScreeningDate
-        ? `Cribado vigente · ${screeningDaysRemaining} días restantes`
-        : 'Cribado pendiente de actualización.',
+        ? 'Configura tus datos para personalizar tu plan.'
+        : hasValidScreeningDate
+          ? `Cribado vigente · ${screeningDaysRemaining} días`
+          : 'Cribado pendiente.',
     },
     daily: {
-      eyebrow: 'Sesión del día',
-      title: 'Plan diario',
-      description: 'Técnica, carga y sustituciones rápidas sin perder la lógica del plan.',
-      context: selectedDay
-        ? `${formatDayNameFromIso(selectedDay.date)} · ${selectedDay.workout?.title || 'Sesión'} · ${selectedDay.workout?.intensityRpe || 'RPE n/d'}`
-        : 'Genera tu semana para desbloquear la sesión diaria.',
+      eyebrow: 'Hoy',
+      title: 'Sesión del día',
+      description: selectedDay
+        ? `${formatDayNameFromIso(selectedDay.date)} · ${selectedDay.workout?.title || 'Sesión'} · ${selectedDay.workout?.intensityRpe || ''}`
+        : 'Genera tu semana para ver la sesión.',
     },
     weekly: {
-      eyebrow: 'Plan semanal',
-      title: 'Semana completa',
-      description: 'Calendario, alertas y volumen total de la semana en una sola vista.',
-      context: weeklyPlan
+      eyebrow: 'Semana',
+      title: 'Plan semanal',
+      description: weeklyPlan
         ? `${plannedDays.length} días · ${weeklyMinutesTotal || 0} min · ${weeklyCaloriesTotal || 0} kcal`
-        : 'Aún no hay una semana cargada.',
+        : 'Sin plan activo.',
     },
     library: {
-      eyebrow: 'Base de ejercicios',
-      title: 'Biblioteca auditada',
-      description: 'Revisa cobertura por modalidad, técnica, músculos y schema del catálogo.',
-      context: `${filteredExerciseCatalog.length} visibles · ${activeExerciseLibraryCatalog.length} totales`,
+      eyebrow: 'Biblioteca',
+      title: 'Ejercicios',
+      description: `${activeExerciseLibraryCatalog.length} ejercicios · ${filteredExerciseCatalog.length} visibles`,
     },
     nutrition: {
-      eyebrow: 'Nutrición inteligente',
+      eyebrow: 'Nutrición',
       title: 'Plan nutricional',
-      description: 'Escaneo, análisis IA y control diario con menos fricción.',
-      context: `${nutritionDays.length || 0} días · ${weeklyMeals || 0} comidas · ${averageNutritionKcal || 0} kcal promedio`,
+      description: weeklyMeals
+        ? `${weeklyMeals} comidas · ${averageNutritionKcal || 0} kcal promedio`
+        : 'Analiza platos con IA y registra comidas.',
     },
   }[activeTab] || {
     eyebrow: 'Endogym',
     title: 'Panel',
-    description: 'Control integral de entrenamiento y nutrición.',
+    description: '',
     context: 'Vista activa.',
   };
   const topbarExpanded = activeTab === 'dashboard';
@@ -2417,8 +2413,7 @@ export default function DashboardPage() {
           </div>
           <p className="eyebrow">{activeTabMeta.eyebrow}</p>
           <h1>{activeTabMeta.title}</h1>
-          <p>{activeTabMeta.description}</p>
-          {activeTabMeta.context ? <p className="topbar-context">{activeTabMeta.context}</p> : null}
+          {activeTabMeta.description ? <p className="topbar-context">{activeTabMeta.description}</p> : null}
         </div>
         <div className="status-row">
           <span className="chip">
@@ -2440,40 +2435,24 @@ export default function DashboardPage() {
           ) : null}
         </div>
         {topbarExpanded ? (
-          <>
-            <div className="topbar-visual" aria-hidden="true">
-              <Image src="/brand/canva/dashboard-canva-alt.png" alt="" width={250} height={312} />
-            </div>
-            <section className="kpi-strip" aria-label="Resumen rápido">
-              <article className="kpi">
-                <span>Objetivo</span>
-                <strong>{GOAL_LABELS[profile.goal] || profile.goal || 'No definido'}</strong>
-              </article>
-              <article className="kpi">
-                <span>Perfil metabólico</span>
-                <strong>{METABOLIC_LABELS[profile.metabolicProfile] || 'No definido'}</strong>
-              </article>
-              <article className="kpi">
-                <span>Sesiones semanales</span>
-                <strong>{plannedDays.length || 0}</strong>
-              </article>
-              <article className="kpi">
-                <span>Comidas planificadas</span>
-                <strong>{weeklyMeals || 0}</strong>
-              </article>
-            </section>
-            <section className="media-strip" aria-label="Vista visual del sistema">
-              <article className="media-tile">
-                <Image src="/brand/canva/dashboard-canva-alt.png" alt="Analítica de progreso" width={180} height={225} />
-              </article>
-              <article className="media-tile">
-                <Image src="/brand/canva/hero-canva-clean.png" alt="Integración fitness y nutrición" width={180} height={67} />
-              </article>
-              <article className="media-tile">
-                <Image src="/brand/canva/logo-canva-crop.png" alt="Marca Endogym" width={180} height={75} />
-              </article>
-            </section>
-          </>
+          <section className="kpi-strip" aria-label="Resumen rápido">
+            <article className="kpi">
+              <span>Objetivo</span>
+              <strong>{GOAL_LABELS[profile.goal] || profile.goal || '—'}</strong>
+            </article>
+            <article className="kpi">
+              <span>Sesiones</span>
+              <strong>{plannedDays.length || 0}</strong>
+            </article>
+            <article className="kpi">
+              <span>Comidas</span>
+              <strong>{weeklyMeals || 0}</strong>
+            </article>
+            <article className="kpi">
+              <span>Modalidad</span>
+              <strong>{MODALITY_LABELS[profile.trainingModality] || '—'}</strong>
+            </article>
+          </section>
         ) : null}
       </header>
 
@@ -3788,7 +3767,7 @@ export default function DashboardPage() {
 
                               {Array.isArray(activeExercise.cues) && activeExercise.cues.length ? (
                                 <section className="exercise-cue-panel">
-                                  <h5>Tecnica clave</h5>
+                                  <h5>Técnica clave</h5>
                                   <ul>
                                     {activeExercise.cues.map((cue, cueIndex) => (
                                       <li key={`${activeExercise.id || 'cue'}-${cueIndex}`}>{cue}</li>
@@ -4033,7 +4012,7 @@ export default function DashboardPage() {
         <section className="panel">
           <SectionLabel
             title="Biblioteca de ejercicios"
-            subtitle="Base de datos actual para auditar nombre, modalidad, tecnica y grupos musculares."
+            subtitle="Audita nombre, modalidad, técnica y grupos musculares."
           />
 
           <section className="tab-hero">
