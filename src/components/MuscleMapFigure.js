@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { FrontSilhouette, BackSilhouette } from './BodySilhouette';
 
 const REGION_HOTSPOTS = {
   front: {
@@ -180,32 +180,34 @@ function renderHotspots(view, regionNames, tone) {
 }
 
 function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
-  const imageHref = view === 'front' ? '/anatomy/gymbro-front-base.png' : '/anatomy/gymbro-back-base.png';
   const viewLabel = view === 'front' ? 'Frontal' : 'Posterior';
   const activeLabels = toUniqueLabels([...primaryRegions, ...secondaryRegions]);
+  const SilhouetteComponent = view === 'front' ? FrontSilhouette : BackSilhouette;
 
   return (
     <article className="muscle-atlas-card">
       <div className="muscle-atlas-stage" role="img" aria-label={`Vista ${viewLabel.toLowerCase()} del mapa muscular`}>
-        <div className="muscle-atlas-stage-glow" aria-hidden="true" />
-        <Image
-          src={imageHref}
-          alt=""
-          width={180}
-          height={380}
-          className={`anatomy-base-image is-${view}`}
-          priority
-        />
-        <svg viewBox="0 0 180 380" aria-hidden="true">
+        <svg viewBox="0 0 180 400" aria-hidden="true">
           <defs>
             <filter id={`atlas-blur-${view}`} x="-40%" y="-40%" width="180%" height="180%">
               <feGaussianBlur stdDeviation="8" />
             </filter>
+            <linearGradient id={`body-grad-${view}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(200,215,235,0.9)" />
+              <stop offset="100%" stopColor="rgba(160,180,210,0.7)" />
+            </linearGradient>
           </defs>
+
+          {/* Body silhouette */}
+          <SilhouetteComponent className="body-silhouette" />
+
+          {/* Muscle highlight layer — blurred glow behind */}
           <g filter={`url(#atlas-blur-${view})`}>
             {renderHotspots(view, secondaryRegions, 'secondary')}
             {renderHotspots(view, primaryRegions, 'primary')}
           </g>
+
+          {/* Muscle highlight layer — crisp on top */}
           <g>
             {renderHotspots(view, secondaryRegions, 'secondary')}
             {renderHotspots(view, primaryRegions, 'primary')}
@@ -214,7 +216,7 @@ function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
       </div>
       <div className="muscle-atlas-footer">
         <span>{viewLabel}</span>
-        <p>{activeLabels.length ? activeLabels.join(' · ') : 'Sin regiones destacadas'}</p>
+        {activeLabels.length > 0 && <p>{activeLabels.join(' · ')}</p>}
       </div>
     </article>
   );
@@ -239,9 +241,7 @@ export default function MuscleMapFigure({
     <section className="muscle-map-shell">
       <div className="muscle-map-header">
         <div>
-          <p className="muscle-map-kicker">Atlas muscular</p>
-          <h5>Activación anatómica</h5>
-          <p className="muscle-map-subtitle">Vista técnica con focos primarios y apoyo secundario.</p>
+          <h5>Activación muscular</h5>
         </div>
         <div className="muscle-map-legend-inline">
           <span><i className="legend-swatch primary" /> Primario</span>
@@ -267,26 +267,26 @@ export default function MuscleMapFigure({
           <span className="legend-swatch primary" />
           <strong>Primarios</strong>
           <p>{primaryMuscles.length ? primaryMuscles.join(', ') : 'Sin datos'}</p>
-          {primaryRegionLabels.length ? (
+          {primaryRegionLabels.length > 0 && (
             <div className="muscle-region-chip-row">
               {primaryRegionLabels.map((label) => (
                 <span key={label} className="muscle-region-chip primary">{label}</span>
               ))}
             </div>
-          ) : null}
+          )}
         </article>
 
         <article className="muscle-legend-item">
           <span className="legend-swatch secondary" />
           <strong>Secundarios</strong>
           <p>{secondaryMuscles.length ? secondaryMuscles.join(', ') : 'Sin datos'}</p>
-          {secondaryRegionLabels.length ? (
+          {secondaryRegionLabels.length > 0 && (
             <div className="muscle-region-chip-row">
               {secondaryRegionLabels.map((label) => (
                 <span key={label} className="muscle-region-chip secondary">{label}</span>
               ))}
             </div>
-          ) : null}
+          )}
         </article>
       </div>
     </section>
