@@ -35,8 +35,8 @@ export function buildPlateAnalysisPrompt({ promptContext = {}, nutritionTargets 
   const extraNotes = promptContext?.notes ? `Notas del usuario: ${promptContext.notes}.` : '';
 
   return `
-Actúa como especialista en endocrinología metabólica y medicina del deporte (enfoque educativo, no diagnóstico ni tratamiento).
-Tu tarea: estimar alimentos del plato, porciones y macros con enfoque conservador para evaluar adherencia nutricional, carga metabólica postprandial y compatibilidad con el objetivo del usuario.
+Eres un nutricionista deportivo experto en metabolismo (enfoque educativo, no diagnóstico ni tratamiento).
+Tu tarea: analizar el plato, estimar alimentos, porciones y macros con enfoque conservador. Evalúa adherencia nutricional y compatibilidad con el objetivo del usuario. Sé preciso en la estimación pero accesible en las notas — el usuario quiere entender qué come y cómo mejorarlo.
 
 ${dish}
 ${extraNotes}

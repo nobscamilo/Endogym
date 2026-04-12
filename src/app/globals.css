@@ -4245,3 +4245,300 @@ small {
 .legal-actions {
   margin-top: 0.4rem;
 }
+
+/* ── Evolution v2: Micro-animations ── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(15, 123, 233, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(15, 123, 233, 0.1); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes count-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-10px) scale(0.96); }
+}
+
+/* ── Loading skeleton ── */
+
+.skeleton {
+  background: linear-gradient(90deg, #e8eef5 25%, #f4f8fd 50%, #e8eef5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 8px;
+  min-height: 1em;
+}
+
+.skeleton-line { height: 0.8rem; width: 60%; margin: 0.35rem 0; }
+.skeleton-line.short { width: 35%; }
+.skeleton-line.long { width: 85%; }
+.skeleton-block { height: 5rem; width: 100%; }
+.skeleton-circle { width: 40px; height: 40px; border-radius: 50%; }
+
+.loading-shell {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.2rem;
+  animation: rise-in 400ms ease-out;
+}
+
+/* ── Card hover depth ── */
+
+.panel {
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-strong);
+}
+
+/* ── Button press effect ── */
+
+button:active:not(:disabled) {
+  transform: scale(0.97) !important;
+  transition-duration: 60ms;
+}
+
+/* ── Nav tab improvements ── */
+
+.nav-tab {
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.nav-tab:hover:not(.active) {
+  background: rgba(15, 123, 233, 0.06);
+  transform: translateX(3px);
+}
+
+.nav-tab.active {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.nav-icon svg {
+  transition: transform 200ms ease;
+}
+
+.nav-tab:hover .nav-icon svg {
+  transform: scale(1.12);
+}
+
+/* ── KPI card improvements ── */
+
+.kpi {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 123, 233, 0.1);
+}
+
+.kpi strong {
+  transition: color 200ms ease;
+}
+
+.kpi:hover strong {
+  color: var(--accent);
+}
+
+/* ── Streak & Progress indicators ── */
+
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, #ff9500 0%, #ff5e3a 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 94, 58, 0.25);
+}
+
+.streak-badge.cold {
+  background: linear-gradient(135deg, #8e8e93 0%, #636366 100%);
+  box-shadow: 0 4px 12px rgba(99, 99, 102, 0.2);
+}
+
+.streak-flame {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.progress-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.progress-ring svg {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-label {
+  position: absolute;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+/* ── Toast notifications ── */
+
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: grid;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-radius: 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  animation: toast-in 300ms ease-out forwards;
+  max-width: 340px;
+}
+
+.toast.leaving {
+  animation: toast-out 200ms ease-in forwards;
+}
+
+.toast-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error { border-left: 3px solid var(--danger); }
+.toast.info { border-left: 3px solid var(--accent); }
+
+/* ── Chip improvements ── */
+
+.chip {
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+}
+
+/* ── Day card hover ── */
+
+.day-card {
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.day-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(15, 123, 233, 0.12);
+  border-color: var(--accent-soft);
+}
+
+/* ── Exercise card hover ── */
+
+.exercise-item, .nutrition-meal-card, .exercise-audit-card {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.exercise-item:hover, .nutrition-meal-card:hover, .exercise-audit-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 123, 233, 0.08);
+}
+
+/* ── Smooth tab transitions ── */
+
+.main-content > section {
+  animation: slide-up 280ms ease-out;
+}
+
+/* ── Empty state ── */
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-state-icon {
+  font-size: 2.5rem;
+  opacity: 0.4;
+}
+
+.empty-state p {
+  font-size: 0.85rem;
+  max-width: 280px;
+}
+
+/* ── Signal dot animation ── */
+
+.signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.signal-dot.warn { background: var(--warn); }
+.signal-dot.danger { background: var(--danger); }
+
+/* ── Mobile bottom bar improvements ── */
+
+@media (max-width: 860px) {
+  .mobile-tabbar button {
+    transition: color 160ms ease, transform 160ms ease;
+  }
+
+  .mobile-tabbar button.active {
+    animation: count-pop 300ms ease;
+  }
+
+  .mobile-tabbar button svg {
+    transition: transform 180ms ease;
+  }
+
+  .mobile-tabbar button.active svg {
+    transform: scale(1.1);
+  }
+}

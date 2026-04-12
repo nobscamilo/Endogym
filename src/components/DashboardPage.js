@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   onAuthStateChanged,
@@ -587,6 +587,12 @@ export default function DashboardPage() {
 
   const [authReady, setAuthReady] = useState(devAuthMode || authConfigMissing);
   const [authUser, setAuthUser] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const showToast = useCallback((message, type = 'info') => {
+    const id = Date.now();
+    setToasts((prev) => [...prev.slice(-4), { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
 
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [profileStatus, setProfileStatus] = useState('');
@@ -1149,8 +1155,10 @@ export default function DashboardPage() {
         }));
       }
       setProfileStatus(`Perfil guardado. Objetivo: ${data.profile.targetMacros?.targetCalories || 'n/d'} kcal`);
+      showToast('Perfil actualizado correctamente', 'success');
     } catch (error) {
       setProfileStatus(`Error al guardar perfil: ${error.message}`);
+      showToast('Error al guardar perfil', 'error');
     } finally {
       setProfileLoading(false);
     }
@@ -1220,8 +1228,10 @@ export default function DashboardPage() {
       setSelectedDate(matchingDay?.date || data.plan?.startDate || null);
       applyPlanCustomizationState(data.plan || null);
       setPlanStatus(`Plan generado (${data.plan.startDate} → ${data.plan.endDate}).`);
+      showToast('Plan semanal generado', 'success');
     } catch (error) {
       setPlanStatus(`Error al generar plan: ${error.message}`);
+      showToast('Error generando plan', 'error');
     } finally {
       setPlanLoading(false);
     }
@@ -2306,12 +2316,12 @@ export default function DashboardPage() {
   };
 
   const tabs = [
-    { id: 'dashboard', label: 'Inicio', icon: '◎' },
-    { id: 'user', label: 'Usuario', icon: '◌' },
-    { id: 'daily', label: 'Hoy', icon: '◉' },
-    { id: 'weekly', label: 'Semana', icon: '◈' },
-    { id: 'library', label: 'Biblioteca', icon: '▣' },
-    { id: 'nutrition', label: 'Nutrición', icon: '◍' },
+    { id: 'dashboard', label: 'Inicio', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> },
+    { id: 'user', label: 'Perfil', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+    { id: 'daily', label: 'Hoy', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> },
+    { id: 'weekly', label: 'Semana', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
+    { id: 'library', label: 'Biblioteca', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> },
+    { id: 'nutrition', label: 'Nutrición', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
   ];
   const activeTabMeta = {
     dashboard: {
@@ -2371,10 +2381,17 @@ export default function DashboardPage() {
   if (!authReady) {
     return (
       <main className="app-shell">
-        <section className="hero">
-          <h1>Endogym</h1>
-          <p>Cargando sesión...</p>
-        </section>
+        <div className="loading-shell">
+          <div className="skeleton" style={{ height: '3rem', width: '160px' }} />
+          <div className="skeleton skeleton-line long" />
+          <div className="skeleton skeleton-line short" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginTop: '0.8rem' }}>
+            <div className="skeleton skeleton-block" />
+            <div className="skeleton skeleton-block" />
+            <div className="skeleton skeleton-block" />
+            <div className="skeleton skeleton-block" />
+          </div>
+        </div>
       </main>
     );
   }
@@ -2382,10 +2399,11 @@ export default function DashboardPage() {
   if (!devAuthMode && !authUser) {
     return (
       <main className="app-shell">
-        <section className="hero">
-          <h1>Endogym</h1>
-          <p>Redirigiendo al inicio de sesión...</p>
-        </section>
+        <div className="loading-shell">
+          <div className="skeleton" style={{ height: '3rem', width: '160px' }} />
+          <div className="skeleton skeleton-line" />
+          <div className="skeleton skeleton-line short" />
+        </div>
       </main>
     );
   }
@@ -2409,11 +2427,17 @@ export default function DashboardPage() {
               : authConfigMissing
                 ? 'Configurar Firebase'
                 : authUser
-                  ? 'Sesión activa'
+                  ? <><span className="signal-dot" /> Activo</>
                   : 'Sin sesión'}
           </span>
-          <span className="chip subtle">{weeklyPlan ? 'Plan activo' : 'Sin plan'}</span>
-          <span className="chip subtle">{MODALITY_LABELS[profile.trainingModality] || 'Modalidad no definida'}</span>
+          <span className="chip subtle">{weeklyPlan ? <><span className="signal-dot" /> Plan activo</> : 'Sin plan'}</span>
+          <span className="chip subtle">{MODALITY_LABELS[profile.trainingModality] || 'Sin modalidad'}</span>
+          {weeklyPlan && plannedDays.length > 0 ? (
+            <span className="streak-badge">
+              <span className="streak-flame">🔥</span>
+              {plannedDays.length} sesiones
+            </span>
+          ) : null}
         </div>
         {topbarExpanded ? (
           <>
@@ -4822,6 +4846,19 @@ export default function DashboardPage() {
           </button>
         ))}
       </nav>
+
+      {toasts.length > 0 ? (
+        <div className="toast-container" aria-live="polite">
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast ${toast.type}`}>
+              <span className="toast-icon">
+                {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'}
+              </span>
+              {toast.message}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </main>
   );
 }
