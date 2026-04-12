@@ -1,4 +1,4 @@
-import './globals.css';
+import './styles.css';
 import { Space_Grotesk, Plus_Jakarta_Sans } from 'next/font/google';
 import { getPublicSiteUrl } from '../lib/siteUrl.js';
 
