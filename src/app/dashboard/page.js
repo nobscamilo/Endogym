@@ -1,5 +1,7 @@
 import DashboardPage from '../../components/DashboardPage.js';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Dashboard',
   robots: {
