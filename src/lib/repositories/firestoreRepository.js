@@ -30,7 +30,7 @@ function sanitizeTotals(totals) {
 }
 
 export async function createMeal(userId, payload) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('meals').doc();
 
   const record = {
@@ -51,7 +51,7 @@ export async function createMeal(userId, payload) {
 }
 
 export async function listMeals(userId, limit = 20) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const snapshot = await db
     .collection('users')
     .doc(userId)
@@ -64,7 +64,7 @@ export async function listMeals(userId, limit = 20) {
 }
 
 export async function listMealsSince(userId, sinceIso, limit = 200) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   let query = db
     .collection('users')
     .doc(userId)
@@ -94,7 +94,7 @@ function sanitizeExercise(exercise) {
 }
 
 export async function createWorkout(userId, payload) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('workouts').doc();
 
   const safeNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
@@ -122,7 +122,7 @@ export async function createWorkout(userId, payload) {
 }
 
 export async function listWorkouts(userId, limit = 20) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const snapshot = await db
     .collection('users')
     .doc(userId)
@@ -135,7 +135,7 @@ export async function listWorkouts(userId, limit = 20) {
 }
 
 export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   let query = db
     .collection('users')
     .doc(userId)
@@ -151,7 +151,7 @@ export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
 }
 
 export async function createMetricLog(userId, payload) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('metrics').doc();
 
   const record = {
@@ -170,7 +170,7 @@ export async function createMetricLog(userId, payload) {
 }
 
 export async function listMetrics(userId, limit = 30) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const snapshot = await db
     .collection('users')
     .doc(userId)
@@ -183,7 +183,7 @@ export async function listMetrics(userId, limit = 30) {
 }
 
 export async function listMetricsSince(userId, sinceIso, limit = 200) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   let query = db
     .collection('users')
     .doc(userId)
@@ -199,14 +199,14 @@ export async function listMetricsSince(userId, sinceIso, limit = 200) {
 }
 
 export async function getUserProfile(userId) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('profile').doc(PROFILE_DOC_ID);
   const snapshot = await ref.get();
   return snapshot.exists ? snapshot.data() : null;
 }
 
 export async function upsertUserProfile(userId, payload) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('profile').doc(PROFILE_DOC_ID);
   const now = new Date().toISOString();
 
@@ -231,7 +231,7 @@ export async function upsertUserProfile(userId, payload) {
 }
 
 export async function createWeeklyPlan(userId, payload) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('weeklyPlans').doc();
   const now = new Date().toISOString();
 
@@ -248,7 +248,7 @@ export async function createWeeklyPlan(userId, payload) {
 }
 
 export async function listWeeklyPlans(userId, limit = 4) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const snapshot = await db
     .collection('users')
     .doc(userId)
@@ -270,7 +270,7 @@ export async function updateWeeklyPlanCustomizations(userId, planId, customizati
     return null;
   }
 
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('weeklyPlans').doc(planId);
   const now = new Date().toISOString();
 
@@ -300,7 +300,7 @@ export async function updateWeeklyPlanCustomizations(userId, planId, customizati
 }
 
 async function deleteCollectionInChunks(collectionRef, chunkSize = 200) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   let deleted = 0;
 
   while (true) {
@@ -319,7 +319,7 @@ async function deleteCollectionInChunks(collectionRef, chunkSize = 200) {
 }
 
 async function deleteUserStorageFiles(userId) {
-  const { storage } = getAdminServices();
+  const { storage } = await getAdminServices();
   const bucket = storage.bucket();
   const prefix = `plates/${userId}/`;
 
@@ -348,7 +348,7 @@ async function deleteUserStorageFiles(userId) {
 }
 
 export async function exportUserAccountData(userId, options = {}) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const userRef = db.collection('users').doc(userId);
   const maxDocsPerCollection = Number.isInteger(options.maxDocsPerCollection)
     ? Math.min(Math.max(options.maxDocsPerCollection, 1), 20000)
@@ -381,7 +381,7 @@ export async function exportUserAccountData(userId, options = {}) {
 }
 
 export async function deleteUserAccountData(userId) {
-  const { db } = getAdminServices();
+  const { db } = await getAdminServices();
   const userRef = db.collection('users').doc(userId);
 
   const deletedCollections = {};

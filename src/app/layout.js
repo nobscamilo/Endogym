@@ -1,18 +1,5 @@
 import './styles.css';
-import { Space_Grotesk, Plus_Jakarta_Sans } from 'next/font/google';
 import { getPublicSiteUrl } from '../lib/siteUrl.js';
-
-const brandFont = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-brand',
-  display: 'swap',
-});
-
-const bodyFont = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-body',
-  display: 'swap',
-});
 
 export const metadata = {
   metadataBase: new URL(getPublicSiteUrl()),
@@ -69,7 +56,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body className={`${brandFont.variable} ${bodyFont.variable}`}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

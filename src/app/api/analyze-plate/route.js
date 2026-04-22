@@ -48,7 +48,7 @@ function getFileExtension(contentType) {
 }
 
 async function uploadPlateImage({ userId, imageBuffer, contentType, traceId }) {
-  const { storage } = getAdminServices();
+  const { storage } = await getAdminServices();
   const bucket = storage.bucket();
   const extension = getFileExtension(contentType);
   const filePath = `plates/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;

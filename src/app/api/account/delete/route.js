@@ -32,7 +32,7 @@ export async function DELETE(request) {
       let authDeleted = false;
 
       if (!user.dev) {
-        const { auth } = getAdminServices();
+        const { auth } = await getAdminServices();
         try {
           await auth.deleteUser(user.uid);
           authDeleted = true;

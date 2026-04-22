@@ -27,7 +27,7 @@ export async function getAuthenticatedUser(request) {
     throw new AuthenticationError('No se encontró token de autenticación.');
   }
 
-  const { auth } = getAdminServices();
+  const { auth } = await getAdminServices();
   try {
     return await auth.verifyIdToken(token);
   } catch {

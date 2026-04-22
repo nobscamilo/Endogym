@@ -1,74 +1,83 @@
-import { FrontSilhouette, BackSilhouette } from './BodySilhouette';
-
 const REGION_HOTSPOTS = {
   front: {
     front_shoulders: [
-      { cx: 52, cy: 88, rx: 16, ry: 21, rotate: -22 },
-      { cx: 128, cy: 88, rx: 16, ry: 21, rotate: 22 },
+      { cx: 34, cy: 34, rx: 8, ry: 10, rotate: -24 },
+      { cx: 66, cy: 34, rx: 8, ry: 10, rotate: 24 },
     ],
     chest: [
-      { cx: 72, cy: 114, rx: 23, ry: 21, rotate: -10 },
-      { cx: 108, cy: 114, rx: 23, ry: 21, rotate: 10 },
+      { cx: 39, cy: 44, rx: 11, ry: 9, rotate: -10 },
+      { cx: 61, cy: 44, rx: 11, ry: 9, rotate: 10 },
     ],
     biceps: [
-      { cx: 39, cy: 149, rx: 12, ry: 20, rotate: -10 },
-      { cx: 141, cy: 149, rx: 12, ry: 20, rotate: 10 },
+      { cx: 24, cy: 53, rx: 5, ry: 12, rotate: -14 },
+      { cx: 76, cy: 53, rx: 5, ry: 12, rotate: 14 },
     ],
     forearms: [
-      { cx: 32, cy: 198, rx: 11, ry: 24, rotate: -12 },
-      { cx: 148, cy: 198, rx: 11, ry: 24, rotate: 12 },
+      { cx: 15, cy: 73, rx: 5, ry: 14, rotate: -18 },
+      { cx: 85, cy: 73, rx: 5, ry: 14, rotate: 18 },
     ],
     abs: [
-      { cx: 90, cy: 147, rx: 22, ry: 31, rotate: 0 },
-      { cx: 90, cy: 190, rx: 19, ry: 26, rotate: 0 },
+      { cx: 50, cy: 60, rx: 11, ry: 16, rotate: 0 },
+      { cx: 50, cy: 76, rx: 9, ry: 12, rotate: 0 },
     ],
     obliques: [
-      { cx: 62, cy: 170, rx: 13, ry: 29, rotate: -8 },
-      { cx: 118, cy: 170, rx: 13, ry: 29, rotate: 8 },
+      { cx: 39, cy: 62, rx: 6, ry: 14, rotate: -8 },
+      { cx: 61, cy: 62, rx: 6, ry: 14, rotate: 8 },
     ],
     quadriceps: [
-      { cx: 75, cy: 280, rx: 16, ry: 42, rotate: -4 },
-      { cx: 105, cy: 280, rx: 16, ry: 42, rotate: 4 },
+      { cx: 42, cy: 101, rx: 7, ry: 21, rotate: -3 },
+      { cx: 58, cy: 101, rx: 7, ry: 21, rotate: 3 },
     ],
     adductors: [
-      { cx: 90, cy: 274, rx: 12, ry: 34, rotate: 0 },
+      { cx: 50, cy: 99, rx: 6, ry: 17, rotate: 0 },
     ],
     calves: [
-      { cx: 76, cy: 340, rx: 12, ry: 22, rotate: 0 },
-      { cx: 104, cy: 340, rx: 12, ry: 22, rotate: 0 },
+      { cx: 43, cy: 129, rx: 6, ry: 14, rotate: 0 },
+      { cx: 57, cy: 129, rx: 6, ry: 14, rotate: 0 },
     ],
   },
   back: {
     rear_shoulders: [
-      { cx: 52, cy: 88, rx: 16, ry: 21, rotate: -22 },
-      { cx: 128, cy: 88, rx: 16, ry: 21, rotate: 22 },
+      { cx: 32, cy: 36, rx: 8, ry: 10, rotate: -20 },
+      { cx: 68, cy: 36, rx: 8, ry: 10, rotate: 20 },
     ],
     upper_back: [
-      { cx: 90, cy: 116, rx: 26, ry: 24, rotate: 0 },
+      { cx: 50, cy: 41, rx: 15, ry: 13, rotate: 0 },
     ],
     lats: [
-      { cx: 61, cy: 154, rx: 17, ry: 34, rotate: -8 },
-      { cx: 119, cy: 154, rx: 17, ry: 34, rotate: 8 },
+      { cx: 39, cy: 52, rx: 8, ry: 17, rotate: -9 },
+      { cx: 61, cy: 52, rx: 8, ry: 17, rotate: 9 },
     ],
     triceps: [
-      { cx: 39, cy: 149, rx: 12, ry: 20, rotate: -10 },
-      { cx: 141, cy: 149, rx: 12, ry: 20, rotate: 10 },
+      { cx: 24, cy: 57, rx: 5, ry: 12, rotate: -14 },
+      { cx: 76, cy: 57, rx: 5, ry: 12, rotate: 14 },
     ],
     lower_back: [
-      { cx: 90, cy: 187, rx: 16, ry: 24, rotate: 0 },
+      { cx: 50, cy: 70, rx: 8, ry: 13, rotate: 0 },
     ],
     glutes: [
-      { cx: 74, cy: 234, rx: 18, ry: 20, rotate: -4 },
-      { cx: 106, cy: 234, rx: 18, ry: 20, rotate: 4 },
+      { cx: 42, cy: 84, rx: 8, ry: 10, rotate: -3 },
+      { cx: 58, cy: 84, rx: 8, ry: 10, rotate: 3 },
     ],
     hamstrings: [
-      { cx: 75, cy: 286, rx: 15, ry: 39, rotate: -3 },
-      { cx: 105, cy: 286, rx: 15, ry: 39, rotate: 3 },
+      { cx: 42, cy: 108, rx: 7, ry: 20, rotate: -3 },
+      { cx: 58, cy: 108, rx: 7, ry: 20, rotate: 3 },
     ],
     calves: [
-      { cx: 76, cy: 340, rx: 12, ry: 22, rotate: 0 },
-      { cx: 104, cy: 340, rx: 12, ry: 22, rotate: 0 },
+      { cx: 43, cy: 130, rx: 6, ry: 14, rotate: 0 },
+      { cx: 57, cy: 130, rx: 6, ry: 14, rotate: 0 },
     ],
+  },
+};
+
+const VIEW_CONFIG = {
+  front: {
+    label: 'Frontal',
+    src: '/anatomy/gray-front.png',
+  },
+  back: {
+    label: 'Posterior',
+    src: '/anatomy/gray-back.png',
   },
 };
 
@@ -157,8 +166,8 @@ function renderHotspots(view, regionNames, tone) {
           className={`atlas-spot-glow ${tone}`}
           cx={spot.cx}
           cy={spot.cy}
-          rx={spot.rx * 1.28}
-          ry={spot.ry * 1.28}
+          rx={spot.rx * 1.45}
+          ry={spot.ry * 1.45}
         />
         <ellipse
           className={`atlas-spot-core ${tone}`}
@@ -180,39 +189,32 @@ function renderHotspots(view, regionNames, tone) {
 }
 
 function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
-  const viewLabel = view === 'front' ? 'Frontal' : 'Posterior';
+  const viewConfig = VIEW_CONFIG[view];
+  const viewLabel = viewConfig.label;
   const activeLabels = toUniqueLabels([...primaryRegions, ...secondaryRegions]);
-  const SilhouetteComponent = view === 'front' ? FrontSilhouette : BackSilhouette;
 
   return (
     <article className="muscle-atlas-card">
       <div className="muscle-atlas-stage" role="img" aria-label={`Vista ${viewLabel.toLowerCase()} del mapa muscular`}>
-        <svg viewBox="0 0 180 400" aria-hidden="true">
+        <img className="muscle-atlas-base" src={viewConfig.src} alt="" aria-hidden="true" />
+        <svg className="muscle-atlas-overlay" viewBox="0 0 100 160" aria-hidden="true">
           <defs>
             <filter id={`atlas-blur-${view}`} x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="8" />
+              <feGaussianBlur stdDeviation="2.8" />
             </filter>
-            <linearGradient id={`body-grad-${view}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(200,215,235,0.9)" />
-              <stop offset="100%" stopColor="rgba(160,180,210,0.7)" />
-            </linearGradient>
           </defs>
 
-          {/* Body silhouette */}
-          <SilhouetteComponent className="body-silhouette" />
-
-          {/* Muscle highlight layer — blurred glow behind */}
           <g filter={`url(#atlas-blur-${view})`}>
             {renderHotspots(view, secondaryRegions, 'secondary')}
             {renderHotspots(view, primaryRegions, 'primary')}
           </g>
 
-          {/* Muscle highlight layer — crisp on top */}
           <g>
             {renderHotspots(view, secondaryRegions, 'secondary')}
             {renderHotspots(view, primaryRegions, 'primary')}
           </g>
         </svg>
+        <div className="muscle-atlas-vignette" aria-hidden="true" />
       </div>
       <div className="muscle-atlas-footer">
         <span>{viewLabel}</span>

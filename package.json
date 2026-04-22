@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "smoke": "node scripts/smoke-test.mjs",
     "test": "vitest run",
@@ -13,13 +13,16 @@
   },
   "dependencies": {
     "@zxing/browser": "^0.1.5",
-    "firebase": "^12.0.0",
-    "firebase-admin": "^13.5.0",
-    "next": "^16.2.2",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "firebase": "^12.12.1",
+    "firebase-admin": "^13.8.0",
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.5"
+  },
+  "overrides": {
+    "protobufjs": "^7.5.5"
   }
 }

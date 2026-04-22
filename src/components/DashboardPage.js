@@ -76,6 +76,15 @@ const DEFAULT_PROFILE = {
 
 const DASHBOARD_UI_STATE_KEY = 'endogym-ui-state-v1';
 const DASHBOARD_TAB_IDS = ['dashboard', 'user', 'daily', 'weekly', 'library', 'nutrition'];
+const importBrowserOnly = (specifier) => {
+  if (typeof window === 'undefined') {
+    throw new Error('El escáner de códigos solo está disponible en navegador.');
+  }
+
+  // ZXing is camera-only. Hiding this import from Next prevents the whole
+  // barcode library from being bundled into the server-rendered dashboard.
+  return Function('specifier', 'return import(specifier)')(specifier);
+};
 const SESSION_FOCUS_LABELS = {
   upper: 'Torso',
   push: 'Empuje',
@@ -1419,8 +1428,8 @@ export default function DashboardPage() {
 
   async function loadZxingScanner() {
     const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType, NotFoundException }] = await Promise.all([
-      import('@zxing/browser'),
-      import('@zxing/library'),
+      importBrowserOnly('@zxing/browser'),
+      importBrowserOnly('@zxing/library'),
     ]);
 
     const hints = new Map();

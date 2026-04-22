@@ -200,9 +200,9 @@ export default function HomePage() {
         <div className="hero-brand">
           <Image src="/brand/canva/logo-canva-crop.png" alt="Endogym" width={215} height={90} priority />
         </div>
-        <p className="eyebrow">Tu coach con IA</p>
-        <h1>Entrena. Come bien. Evoluciona.</h1>
-        <p>Planes adaptativos, análisis nutricional por foto y coaching con Gemini AI.</p>
+        <p className="eyebrow">Coach metabólico y entrenamiento</p>
+        <h1>Tu semana de fuerza y nutrición, sin ruido.</h1>
+        <p>Plan diario, plato con IA y ajustes de progreso en una sola pantalla.</p>
         <div className="hero-media" aria-hidden="true">
           <Image src="/brand/canva/hero-canva-clean.png" alt="" width={720} height={268} priority />
         </div>
@@ -220,12 +220,12 @@ export default function HomePage() {
             <span>ejercicios</span>
           </article>
           <article>
-            <strong>4</strong>
-            <span>vistas clave</span>
+            <strong>IA</strong>
+            <span>coach y plato</span>
           </article>
           <article>
-            <strong>24/7</strong>
-            <span>IA activa</span>
+            <strong>7d</strong>
+            <span>plan semanal</span>
           </article>
         </div>
         <div className="hero-links">

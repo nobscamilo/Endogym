@@ -1,5 +1,7 @@
 /* Endogym v0.3.1 — 2026-04-13 */
 :root {
+  --font-brand: "Avenir Next Condensed", "DIN Alternate", "Futura", "Arial Narrow", sans-serif;
+  --font-body: "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
   --bg: #f4f8fd;
   --bg-strong: #e7eef6;
   --surface: #ffffff;
@@ -40,7 +42,7 @@ body {
     radial-gradient(1200px 680px at 100% -5%, rgba(18, 123, 233, 0.16), transparent 70%),
     radial-gradient(900px 500px at -8% -20%, rgba(18, 123, 233, 0.1), transparent 72%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-strong) 100%);
-  font-family: var(--font-body), "Plus Jakarta Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   line-height: 1.35;
 }
 
@@ -104,7 +106,7 @@ body {
 
 .topbar h1 {
   margin: 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-weight: 650;
   letter-spacing: -0.025em;
   font-size: clamp(1.45rem, 3.2vw, 2.15rem);
@@ -340,7 +342,7 @@ button.nav-tab.active {
 
 .hero h1 {
   margin: 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
 }
 
 @media (max-width: 1099px) {
@@ -712,7 +714,7 @@ button.dashboard-day-pill.active {
 
 .section-label h2 {
   margin: 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-size: 1.1rem;
   letter-spacing: -0.01em;
 }
@@ -1936,7 +1938,7 @@ button.nutrition-day-chip.active {
 }
 
 .day-badge strong {
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-size: 1rem;
   color: #123e6a;
 }
@@ -2446,15 +2448,15 @@ button.exercise-selector-item.active {
 }
 
 .muscle-chip.primary {
-  border: 1px solid rgba(237, 126, 125, 0.42);
-  background: rgba(255, 233, 233, 0.9);
-  color: #8a2938;
+  border: 1px solid rgba(255, 69, 58, 0.34);
+  background: rgba(255, 235, 232, 0.92);
+  color: #9d251e;
 }
 
 .muscle-chip.secondary {
-  border: 1px solid rgba(202, 187, 190, 0.5);
-  background: rgba(245, 240, 241, 0.9);
-  color: #645863;
+  border: 1px solid rgba(255, 159, 10, 0.34);
+  background: rgba(255, 245, 224, 0.92);
+  color: #8a4f00;
 }
 
 .exercise-cue-panel h5 {
@@ -2493,12 +2495,13 @@ button.exercise-selector-item.active {
 }
 
 .muscle-map-shell {
-  border: 1px solid rgba(193, 211, 232, 0.9);
-  border-radius: 22px;
+  border: 1px solid rgba(37, 49, 66, 0.12);
+  border-radius: 24px;
   background:
-    radial-gradient(120% 120% at 100% 0%, rgba(20, 31, 48, 0.05), transparent 48%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 249, 255, 0.94));
-  box-shadow: 0 16px 30px rgba(94, 126, 160, 0.12);
+    radial-gradient(120% 100% at 86% 0%, rgba(255, 69, 58, 0.08), transparent 46%),
+    radial-gradient(110% 120% at 0% 100%, rgba(15, 123, 233, 0.07), transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.95));
+  box-shadow: 0 18px 34px rgba(68, 92, 121, 0.14);
   padding: 0.92rem;
   display: grid;
   gap: 0.78rem;
@@ -2546,79 +2549,95 @@ button.exercise-selector-item.active {
 }
 
 .muscle-atlas-card {
-  border: 1px solid rgba(203, 217, 236, 0.88);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(252, 253, 255, 0.96), rgba(244, 249, 255, 0.94));
+  border: 1px solid rgba(31, 38, 50, 0.1);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 252, 0.94));
   padding: 0.62rem;
   display: grid;
   gap: 0.48rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .muscle-atlas-stage {
   position: relative;
-  border: 1px solid rgba(31, 38, 50, 0.12);
-  border-radius: 18px;
+  border: 1px solid rgba(31, 38, 50, 0.14);
+  border-radius: 20px;
   background:
-    radial-gradient(70% 50% at 50% 10%, rgba(15, 123, 233, 0.08), transparent 56%),
-    radial-gradient(80% 60% at 50% 90%, rgba(100, 140, 190, 0.1), transparent 70%),
-    linear-gradient(180deg, #161b24, #0e1118 84%);
+    radial-gradient(85% 56% at 50% 8%, rgba(255, 255, 255, 0.95), rgba(238, 243, 249, 0.82) 62%, transparent 66%),
+    linear-gradient(180deg, #f8fafc, #e6edf6 84%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -8px 16px rgba(0, 0, 0, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    inset 0 -12px 22px rgba(30, 50, 76, 0.08);
   overflow: hidden;
-  padding: 0.5rem 0;
+  aspect-ratio: 10 / 16;
+  min-height: 330px;
 }
 
-.muscle-atlas-stage svg {
+.muscle-atlas-base,
+.muscle-atlas-overlay,
+.muscle-atlas-vignette {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+}
+
+.muscle-atlas-base {
+  object-fit: contain;
   display: block;
+  filter: grayscale(0.86) contrast(1.12) brightness(1.04);
+  opacity: 0.92;
 }
 
-.body-silhouette ellipse,
-.body-silhouette rect,
-.body-silhouette path {
-  fill: rgba(180, 200, 225, 0.12);
-  stroke: rgba(180, 200, 225, 0.35);
-  stroke-width: 0.8;
-  stroke-linejoin: round;
+.muscle-atlas-overlay {
+  z-index: 2;
+  overflow: visible;
 }
 
-.body-silhouette line {
-  stroke: rgba(180, 200, 225, 0.25);
+.muscle-atlas-vignette {
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(246, 250, 255, 0.16), transparent 18%, transparent 78%, rgba(216, 226, 240, 0.26)),
+    radial-gradient(90% 120% at 50% 50%, transparent 62%, rgba(21, 35, 54, 0.08) 100%);
 }
 
 .atlas-spot-glow {
-  opacity: 0.6;
+  opacity: 0.85;
+  mix-blend-mode: multiply;
 }
 
 .atlas-spot-glow.primary {
-  fill: rgba(15, 123, 233, 0.25);
+  fill: rgba(255, 59, 48, 0.24);
 }
 
 .atlas-spot-glow.secondary {
-  fill: rgba(80, 200, 160, 0.15);
+  fill: rgba(255, 159, 10, 0.18);
 }
 
 .atlas-spot-core.primary {
-  fill: rgba(15, 123, 233, 0.45);
+  fill: rgba(255, 59, 48, 0.38);
+  mix-blend-mode: multiply;
 }
 
 .atlas-spot-core.secondary {
-  fill: rgba(80, 200, 160, 0.28);
+  fill: rgba(255, 159, 10, 0.26);
+  mix-blend-mode: multiply;
 }
 
 .atlas-spot-ring {
   fill: none;
-  stroke-width: 1.5;
+  stroke-width: 0.62;
+  vector-effect: non-scaling-stroke;
 }
 
 .atlas-spot-ring.primary {
-  stroke: rgba(15, 123, 233, 0.5);
+  stroke: rgba(255, 255, 255, 0.82);
 }
 
 .atlas-spot-ring.secondary {
-  stroke: rgba(80, 200, 160, 0.3);
+  stroke: rgba(255, 255, 255, 0.68);
 }
 
 .muscle-atlas-footer {
@@ -2681,11 +2700,11 @@ button.exercise-selector-item.active {
 }
 
 .legend-swatch.primary {
-  background: #0f7be9;
+  background: #ff453a;
 }
 
 .legend-swatch.secondary {
-  background: #50c8a0;
+  background: #ff9f0a;
 }
 
 .muscle-region-chip-row {
@@ -2705,15 +2724,15 @@ button.exercise-selector-item.active {
 }
 
 .muscle-region-chip.primary {
-  border: 1px solid rgba(15, 123, 233, 0.3);
-  background: rgba(217, 235, 255, 0.9);
-  color: #0053b6;
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  background: rgba(255, 235, 232, 0.9);
+  color: #9d251e;
 }
 
 .muscle-region-chip.secondary {
-  border: 1px solid rgba(80, 200, 160, 0.35);
-  background: rgba(220, 250, 238, 0.9);
-  color: #0d6b4f;
+  border: 1px solid rgba(255, 159, 10, 0.35);
+  background: rgba(255, 246, 226, 0.92);
+  color: #8a4f00;
 }
 
 .exercise-audit-filters {
@@ -3255,7 +3274,7 @@ button.exercise-selector-item.active {
 
 .nutrition-hero-head h3 {
   margin: 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-size: 1.08rem;
 }
 
@@ -3423,7 +3442,7 @@ small {
 
 .auth-hero h1 {
   margin: 0.6rem 0 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-size: clamp(1.8rem, 4.8vw, 3rem);
   letter-spacing: -0.02em;
   max-width: 19ch;
@@ -3498,7 +3517,7 @@ small {
 }
 
 .hero-stats strong {
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-size: 1.05rem;
 }
 
@@ -3561,7 +3580,7 @@ small {
 
 .auth-card-head h2 {
   margin: 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
   font-size: 1.25rem;
   letter-spacing: -0.01em;
 }
@@ -4181,7 +4200,7 @@ small {
 
 .legal-card h1 {
   margin: 0;
-  font-family: var(--font-brand), "Space Grotesk", sans-serif;
+  font-family: var(--font-brand);
 }
 
 .legal-card h2 {

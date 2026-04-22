@@ -1,7 +1,5 @@
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+let appPromise = null;
+let servicesPromise = null;
 
 function getPrivateKey() {
   const key = process.env.FIREBASE_PRIVATE_KEY;
@@ -9,34 +7,54 @@ function getPrivateKey() {
   return key.replace(/\\n/g, '\n');
 }
 
-function getFirebaseApp() {
-  if (getApps().length) {
-    return getApps()[0];
-  }
+async function getFirebaseApp() {
+  if (appPromise) return appPromise;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = getPrivateKey();
+  appPromise = (async () => {
+    const { cert, getApps, initializeApp } = await import('firebase-admin/app');
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Firebase Admin no está configurado. Revisa FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY.');
-  }
+    if (getApps().length) {
+      return getApps()[0];
+    }
 
-  return initializeApp({
-    credential: cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    }),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  });
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = getPrivateKey();
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error('Firebase Admin no está configurado. Revisa FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY.');
+    }
+
+    return initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    });
+  })();
+
+  return appPromise;
 }
 
-export function getAdminServices() {
-  const app = getFirebaseApp();
-  return {
-    auth: getAuth(app),
-    db: getFirestore(app),
-    storage: getStorage(app),
-  };
+export async function getAdminServices() {
+  if (servicesPromise) return servicesPromise;
+
+  servicesPromise = (async () => {
+    const [app, authModule, firestoreModule, storageModule] = await Promise.all([
+      getFirebaseApp(),
+      import('firebase-admin/auth'),
+      import('firebase-admin/firestore'),
+      import('firebase-admin/storage'),
+    ]);
+
+    return {
+      auth: authModule.getAuth(app),
+      db: firestoreModule.getFirestore(app),
+      storage: storageModule.getStorage(app),
+    };
+  })();
+
+  return servicesPromise;
 }
