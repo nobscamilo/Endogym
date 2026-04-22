@@ -1,71 +1,72 @@
-const REGION_HOTSPOTS = {
+const REGION_MASKS = {
   front: {
     front_shoulders: [
-      { cx: 34, cy: 34, rx: 8, ry: 10, rotate: -24 },
-      { cx: 66, cy: 34, rx: 8, ry: 10, rotate: 24 },
+      'M25.5 36.5 C26.4 31.5 30.7 28.8 35.8 29.7 C39.4 31.1 40.8 35.2 39.2 40.4 C37.7 45.1 33.4 47.4 28.4 45.4 C25.3 43.1 24.4 40.1 25.5 36.5 Z',
+      'M74.5 36.5 C73.6 31.5 69.3 28.8 64.2 29.7 C60.6 31.1 59.2 35.2 60.8 40.4 C62.3 45.1 66.6 47.4 71.6 45.4 C74.7 43.1 75.6 40.1 74.5 36.5 Z',
     ],
     chest: [
-      { cx: 39, cy: 44, rx: 11, ry: 9, rotate: -10 },
-      { cx: 61, cy: 44, rx: 11, ry: 9, rotate: 10 },
+      'M30.2 43.2 C34.7 37.6 43.7 37.3 49.6 41.3 L49.6 52.8 C43.4 55.1 35.5 53.8 31.1 49.7 C29 47.6 28.5 45.1 30.2 43.2 Z',
+      'M69.8 43.2 C65.3 37.6 56.3 37.3 50.4 41.3 L50.4 52.8 C56.6 55.1 64.5 53.8 68.9 49.7 C71 47.6 71.5 45.1 69.8 43.2 Z',
     ],
     biceps: [
-      { cx: 24, cy: 53, rx: 5, ry: 12, rotate: -14 },
-      { cx: 76, cy: 53, rx: 5, ry: 12, rotate: 14 },
+      'M21.2 47.6 C25.4 47.8 27.1 53.1 25.8 60.1 C24.8 66.3 21.5 70.1 17.8 68.4 C18.2 61.5 18.9 52.5 21.2 47.6 Z',
+      'M78.8 47.6 C74.6 47.8 72.9 53.1 74.2 60.1 C75.2 66.3 78.5 70.1 82.2 68.4 C81.8 61.5 81.1 52.5 78.8 47.6 Z',
     ],
     forearms: [
-      { cx: 15, cy: 73, rx: 5, ry: 14, rotate: -18 },
-      { cx: 85, cy: 73, rx: 5, ry: 14, rotate: 18 },
+      'M13.5 66.6 C17.2 67.1 19.2 71.9 18.3 79.8 C17.4 88.5 13.4 96.7 9.6 96.4 C9.8 85.5 10.7 74.3 13.5 66.6 Z',
+      'M86.5 66.6 C82.8 67.1 80.8 71.9 81.7 79.8 C82.6 88.5 86.6 96.7 90.4 96.4 C90.2 85.5 89.3 74.3 86.5 66.6 Z',
     ],
     abs: [
-      { cx: 50, cy: 60, rx: 11, ry: 16, rotate: 0 },
-      { cx: 50, cy: 76, rx: 9, ry: 12, rotate: 0 },
+      'M42.1 56.2 C44.8 52.9 55.2 52.9 57.9 56.2 C59.2 64.6 58.7 73.2 55.8 79.5 C53.9 83.6 46.1 83.6 44.2 79.5 C41.3 73.2 40.8 64.6 42.1 56.2 Z',
+      'M43.6 80.2 C47.7 83.1 52.3 83.1 56.4 80.2 C57.6 87.6 55.2 94.8 50 99.5 C44.8 94.8 42.4 87.6 43.6 80.2 Z',
     ],
     obliques: [
-      { cx: 39, cy: 62, rx: 6, ry: 14, rotate: -8 },
-      { cx: 61, cy: 62, rx: 6, ry: 14, rotate: 8 },
+      'M35.2 57.2 C39.1 61.7 40 71.8 38 82.6 C34.1 80.6 31.3 75.1 31.1 68.4 C31.1 63.2 32.5 59.3 35.2 57.2 Z',
+      'M64.8 57.2 C60.9 61.7 60 71.8 62 82.6 C65.9 80.6 68.7 75.1 68.9 68.4 C68.9 63.2 67.5 59.3 64.8 57.2 Z',
     ],
     quadriceps: [
-      { cx: 42, cy: 101, rx: 7, ry: 21, rotate: -3 },
-      { cx: 58, cy: 101, rx: 7, ry: 21, rotate: 3 },
+      'M36.8 88.3 C43 87.5 47.2 95.3 47.1 107.8 C47 120.1 43.8 131.1 39.5 132.3 C34.8 119.1 33.6 101.3 36.8 88.3 Z',
+      'M63.2 88.3 C57 87.5 52.8 95.3 52.9 107.8 C53 120.1 56.2 131.1 60.5 132.3 C65.2 119.1 66.4 101.3 63.2 88.3 Z',
     ],
     adductors: [
-      { cx: 50, cy: 99, rx: 6, ry: 17, rotate: 0 },
+      'M48.2 89.6 C50.6 95.3 51.3 109.8 49.8 124.4 C45.2 113.4 44.6 99.1 48.2 89.6 Z',
+      'M51.8 89.6 C49.4 95.3 48.7 109.8 50.2 124.4 C54.8 113.4 55.4 99.1 51.8 89.6 Z',
     ],
     calves: [
-      { cx: 43, cy: 129, rx: 6, ry: 14, rotate: 0 },
-      { cx: 57, cy: 129, rx: 6, ry: 14, rotate: 0 },
+      'M40.1 120.8 C45.3 125 45.6 140.2 42.3 150.2 C37.5 145.5 36.5 130.4 40.1 120.8 Z',
+      'M59.9 120.8 C54.7 125 54.4 140.2 57.7 150.2 C62.5 145.5 63.5 130.4 59.9 120.8 Z',
     ],
   },
   back: {
     rear_shoulders: [
-      { cx: 32, cy: 36, rx: 8, ry: 10, rotate: -20 },
-      { cx: 68, cy: 36, rx: 8, ry: 10, rotate: 20 },
+      'M24.4 37.4 C26.2 31.7 31.4 28.9 36.9 30.7 C39.7 33.5 39.4 38.3 36.4 42.3 C32.4 44.2 27.6 43.3 24.4 39.7 Z',
+      'M75.6 37.4 C73.8 31.7 68.6 28.9 63.1 30.7 C60.3 33.5 60.6 38.3 63.6 42.3 C67.6 44.2 72.4 43.3 75.6 39.7 Z',
     ],
     upper_back: [
-      { cx: 50, cy: 41, rx: 15, ry: 13, rotate: 0 },
+      'M36.2 35.2 C41.6 30.9 58.4 30.9 63.8 35.2 C61.3 44.6 56.9 51.5 50 55.6 C43.1 51.5 38.7 44.6 36.2 35.2 Z',
     ],
     lats: [
-      { cx: 39, cy: 52, rx: 8, ry: 17, rotate: -9 },
-      { cx: 61, cy: 52, rx: 8, ry: 17, rotate: 9 },
+      'M35.2 45.8 C42.3 49.2 45.2 59.9 43.1 76.2 C37 74.6 32.1 66.2 31.2 56.5 C30.9 51.5 32.3 47.5 35.2 45.8 Z',
+      'M64.8 45.8 C57.7 49.2 54.8 59.9 56.9 76.2 C63 74.6 67.9 66.2 68.8 56.5 C69.1 51.5 67.7 47.5 64.8 45.8 Z',
     ],
     triceps: [
-      { cx: 24, cy: 57, rx: 5, ry: 12, rotate: -14 },
-      { cx: 76, cy: 57, rx: 5, ry: 12, rotate: 14 },
+      'M20.1 47.2 C24.8 48.5 27.5 55 26.1 64 C24.9 70.6 21.2 74.8 17.4 73 C17.6 62.9 18.3 53.4 20.1 47.2 Z',
+      'M79.9 47.2 C75.2 48.5 72.5 55 73.9 64 C75.1 70.6 78.8 74.8 82.6 73 C82.4 62.9 81.7 53.4 79.9 47.2 Z',
     ],
     lower_back: [
-      { cx: 50, cy: 70, rx: 8, ry: 13, rotate: 0 },
+      'M43.4 65.4 C46.5 62.5 53.5 62.5 56.6 65.4 C57 72.9 54.8 80.9 50 87 C45.2 80.9 43 72.9 43.4 65.4 Z',
     ],
     glutes: [
-      { cx: 42, cy: 84, rx: 8, ry: 10, rotate: -3 },
-      { cx: 58, cy: 84, rx: 8, ry: 10, rotate: 3 },
+      'M35.3 82.4 C39 76.9 47.7 77.5 50 83.6 C48.8 91.1 43.4 96.1 36.9 95.1 C33.2 91.8 32.6 86.4 35.3 82.4 Z',
+      'M64.7 82.4 C61 76.9 52.3 77.5 50 83.6 C51.2 91.1 56.6 96.1 63.1 95.1 C66.8 91.8 67.4 86.4 64.7 82.4 Z',
     ],
     hamstrings: [
-      { cx: 42, cy: 108, rx: 7, ry: 20, rotate: -3 },
-      { cx: 58, cy: 108, rx: 7, ry: 20, rotate: 3 },
+      'M37.2 94.2 C43.5 96.5 46.1 106.7 45 121.2 C43.9 132.7 40.5 141.2 36.2 143 C33.4 128.6 33.7 106.4 37.2 94.2 Z',
+      'M62.8 94.2 C56.5 96.5 53.9 106.7 55 121.2 C56.1 132.7 59.5 141.2 63.8 143 C66.6 128.6 66.3 106.4 62.8 94.2 Z',
     ],
     calves: [
-      { cx: 43, cy: 130, rx: 6, ry: 14, rotate: 0 },
-      { cx: 57, cy: 130, rx: 6, ry: 14, rotate: 0 },
+      'M40.2 119.6 C45.9 124.6 45.2 141.8 41.9 150.7 C37.2 145.5 36.4 128.8 40.2 119.6 Z',
+      'M59.8 119.6 C54.1 124.6 54.8 141.8 58.1 150.7 C62.8 145.5 63.6 128.8 59.8 119.6 Z',
     ],
   },
 };
@@ -158,51 +159,16 @@ function toUniqueLabels(regionNames = []) {
   );
 }
 
-function scaleSpot(spot, viewConfig) {
-  return {
-    cx: (spot.cx / 100) * viewConfig.width,
-    cy: (spot.cy / 160) * viewConfig.height,
-    rx: (spot.rx / 100) * viewConfig.width,
-    ry: (spot.ry / 160) * viewConfig.height,
-    rotate: spot.rotate || 0,
-  };
-}
-
-function renderHotspots(view, regionNames, tone, viewConfig) {
+function renderRegionMasks(view, regionNames, tone) {
   return regionNames.flatMap((regionName) => {
-    const hotspots = REGION_HOTSPOTS[view][regionName] || [];
-    return hotspots.map((rawSpot, index) => {
-      const spot = scaleSpot(rawSpot, viewConfig);
-
-      return (
-        <g
-          key={`${view}-${regionName}-${tone}-${index}`}
-          transform={`rotate(${spot.rotate} ${spot.cx} ${spot.cy})`}
-        >
-          <ellipse
-            className={`atlas-spot-glow ${tone}`}
-            cx={spot.cx}
-            cy={spot.cy}
-            rx={spot.rx * 1.45}
-            ry={spot.ry * 1.45}
-          />
-          <ellipse
-            className={`atlas-spot-core ${tone}`}
-            cx={spot.cx}
-            cy={spot.cy}
-            rx={spot.rx}
-            ry={spot.ry}
-          />
-          <ellipse
-            className={`atlas-spot-ring ${tone}`}
-            cx={spot.cx}
-            cy={spot.cy}
-            rx={spot.rx + 2}
-            ry={spot.ry + 2}
-          />
-        </g>
-      );
-    });
+    const masks = REGION_MASKS[view][regionName] || [];
+    return masks.map((path, index) => (
+      <path
+        key={`${view}-${regionName}-${tone}-${index}`}
+        className={`atlas-region-mask ${tone}`}
+        d={path}
+      />
+    ));
   });
 }
 
@@ -212,9 +178,13 @@ function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
   const primaryRegionSet = new Set(primaryRegions);
   const secondaryOnlyRegions = secondaryRegions.filter((regionName) => !primaryRegionSet.has(regionName));
   const activeLabels = toUniqueLabels([...primaryRegions, ...secondaryOnlyRegions]);
+  const maskScale = `${viewConfig.width / 100}, ${viewConfig.height / 160}`;
 
   return (
-    <article className="muscle-atlas-card">
+    <article
+      className={`muscle-atlas-card ${activeLabels.length ? 'is-active' : 'is-muted'}`}
+      style={{ '--atlas-ratio': `${viewConfig.width} / ${viewConfig.height}` }}
+    >
       <div className="muscle-atlas-stage" role="img" aria-label={`Vista ${viewLabel.toLowerCase()} del mapa muscular`}>
         <img className="muscle-atlas-base" src={viewConfig.src} alt="" aria-hidden="true" />
         <svg
@@ -222,16 +192,16 @@ function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
           viewBox={`0 0 ${viewConfig.width} ${viewConfig.height}`}
           aria-hidden="true"
         >
-          <g>
-            {renderHotspots(view, secondaryOnlyRegions, 'secondary', viewConfig)}
-            {renderHotspots(view, primaryRegions, 'primary', viewConfig)}
+          <g transform={`scale(${maskScale})`}>
+            {renderRegionMasks(view, secondaryOnlyRegions, 'secondary')}
+            {renderRegionMasks(view, primaryRegions, 'primary')}
           </g>
         </svg>
         <div className="muscle-atlas-vignette" aria-hidden="true" />
       </div>
       <div className="muscle-atlas-footer">
         <span>{viewLabel}</span>
-        {activeLabels.length > 0 && <p>{activeLabels.join(' · ')}</p>}
+        <strong>{activeLabels.length || 0}</strong>
       </div>
     </article>
   );
@@ -243,13 +213,14 @@ export default function MuscleMapFigure({
   secondaryMuscles = [],
 }) {
   const inferredSecondaryRegions = inferSecondaryRegions(secondaryMuscles);
+  const primaryRegionSet = new Set([...(anatomyRegions.front || []), ...(anatomyRegions.back || [])]);
   const primaryRegionLabels = toUniqueLabels([
     ...(anatomyRegions.front || []),
     ...(anatomyRegions.back || []),
   ]);
   const secondaryRegionLabels = toUniqueLabels([
-    ...(inferredSecondaryRegions.front || []),
-    ...(inferredSecondaryRegions.back || []),
+    ...(inferredSecondaryRegions.front || []).filter((regionName) => !primaryRegionSet.has(regionName)),
+    ...(inferredSecondaryRegions.back || []).filter((regionName) => !primaryRegionSet.has(regionName)),
   ]);
 
   return (
@@ -277,7 +248,7 @@ export default function MuscleMapFigure({
         />
       </div>
 
-      <div className="muscle-map-insights">
+      <div className="muscle-map-insights" aria-label="Resumen de grupos musculares">
         <article className="muscle-legend-item emphasis">
           <span className="legend-swatch primary" />
           <strong>Primarios</strong>

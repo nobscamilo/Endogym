@@ -2495,39 +2495,38 @@ button.exercise-selector-item.active {
 }
 
 .muscle-map-shell {
-  border: 1px solid rgba(37, 49, 66, 0.12);
-  border-radius: 24px;
+  border: 1px solid rgba(37, 49, 66, 0.1);
+  border-radius: 26px;
   background:
-    radial-gradient(120% 100% at 86% 0%, rgba(255, 69, 58, 0.08), transparent 46%),
-    radial-gradient(110% 120% at 0% 100%, rgba(15, 123, 233, 0.07), transparent 52%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.95));
-  box-shadow: 0 18px 34px rgba(68, 92, 121, 0.14);
-  padding: 0.92rem;
+    radial-gradient(130% 92% at 94% 4%, rgba(231, 76, 60, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 255, 0.94));
+  box-shadow: 0 18px 36px rgba(68, 92, 121, 0.12);
+  padding: 0.84rem;
   display: grid;
-  gap: 0.78rem;
-  color: #123a60;
+  gap: 0.68rem;
+  color: #172f4a;
 }
 
 .muscle-map-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.8rem;
   flex-wrap: wrap;
 }
 
 .muscle-map-header h5 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
   letter-spacing: -0.02em;
 }
 
 .muscle-map-legend-inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.5rem;
   color: #68819d;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 
 .muscle-map-legend-inline span {
@@ -2537,41 +2536,48 @@ button.exercise-selector-item.active {
 }
 
 .muscle-atlas-grid {
+  position: relative;
   display: grid;
-  gap: 0.72rem;
+  align-items: end;
+  gap: 0.6rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid rgba(31, 38, 50, 0.1);
+  border-radius: 24px;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(31, 38, 50, 0.08) calc(50% - 0.5px), rgba(31, 38, 50, 0.08) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    radial-gradient(78% 68% at 50% 14%, rgba(255, 255, 255, 0.96), rgba(244, 248, 253, 0.78) 58%, rgba(229, 237, 248, 0.7) 100%);
+  overflow: hidden;
+  padding: 0.74rem 0.62rem 0.62rem;
 }
 
 @media (max-width: 760px) {
   .muscle-atlas-grid {
     grid-template-columns: 1fr;
+    background:
+      radial-gradient(80% 52% at 50% 10%, rgba(255, 255, 255, 0.98), rgba(242, 247, 254, 0.82) 62%, rgba(229, 237, 248, 0.72));
   }
 }
 
 .muscle-atlas-card {
-  border: 1px solid rgba(31, 38, 50, 0.1);
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 252, 0.94));
-  padding: 0.62rem;
+  position: relative;
+  min-width: 0;
+  padding: 0;
   display: grid;
-  gap: 0.48rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  justify-items: center;
+  gap: 0.36rem;
+  isolation: isolate;
+}
+
+.muscle-atlas-card.is-muted {
+  opacity: 0.58;
 }
 
 .muscle-atlas-stage {
   position: relative;
-  border: 1px solid rgba(31, 38, 50, 0.14);
-  border-radius: 20px;
-  background:
-    radial-gradient(85% 56% at 50% 8%, rgba(255, 255, 255, 0.95), rgba(238, 243, 249, 0.82) 62%, transparent 66%),
-    linear-gradient(180deg, #f8fafc, #e6edf6 84%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    inset 0 -12px 22px rgba(30, 50, 76, 0.08);
-  overflow: hidden;
-  aspect-ratio: 10 / 16;
-  min-height: 330px;
+  width: min(100%, 228px);
+  aspect-ratio: var(--atlas-ratio);
+  overflow: visible;
+  filter: drop-shadow(0 18px 24px rgba(28, 45, 68, 0.15));
 }
 
 .muscle-atlas-base,
@@ -2586,8 +2592,8 @@ button.exercise-selector-item.active {
 .muscle-atlas-base {
   object-fit: contain;
   display: block;
-  filter: grayscale(0.86) contrast(1.12) brightness(1.04);
-  opacity: 0.92;
+  filter: grayscale(1) contrast(1.18) brightness(1.02);
+  opacity: 0.84;
 }
 
 .muscle-atlas-overlay {
@@ -2598,51 +2604,35 @@ button.exercise-selector-item.active {
 .muscle-atlas-vignette {
   z-index: 3;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(246, 250, 255, 0.16), transparent 18%, transparent 78%, rgba(216, 226, 240, 0.26)),
-    radial-gradient(90% 120% at 50% 50%, transparent 62%, rgba(21, 35, 54, 0.08) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 20%, transparent 82%, rgba(234, 240, 249, 0.18));
 }
 
-.atlas-spot-glow {
-  opacity: 0.85;
-  mix-blend-mode: multiply;
-}
-
-.atlas-spot-glow.primary {
-  fill: rgba(255, 59, 48, 0.24);
-}
-
-.atlas-spot-glow.secondary {
-  fill: rgba(255, 159, 10, 0.18);
-}
-
-.atlas-spot-core.primary {
-  fill: rgba(255, 59, 48, 0.38);
-  mix-blend-mode: multiply;
-}
-
-.atlas-spot-core.secondary {
-  fill: rgba(255, 159, 10, 0.26);
-  mix-blend-mode: multiply;
-}
-
-.atlas-spot-ring {
-  fill: none;
-  stroke-width: 0.62;
+.atlas-region-mask {
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-width: 0.8;
   vector-effect: non-scaling-stroke;
+  mix-blend-mode: multiply;
+  transition: opacity 180ms ease, filter 180ms ease;
 }
 
-.atlas-spot-ring.primary {
-  stroke: rgba(255, 255, 255, 0.82);
+.atlas-region-mask.primary {
+  fill: rgba(231, 76, 60, 0.42);
+  stroke: rgba(169, 44, 36, 0.72);
+  filter: drop-shadow(0 0 5px rgba(231, 76, 60, 0.2));
 }
 
-.atlas-spot-ring.secondary {
-  stroke: rgba(255, 255, 255, 0.68);
+.atlas-region-mask.secondary {
+  fill: rgba(236, 151, 52, 0.24);
+  stroke: rgba(177, 107, 28, 0.46);
 }
 
 .muscle-atlas-footer {
-  display: grid;
-  gap: 0.18rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
 }
 
 .muscle-atlas-footer span {
@@ -2653,31 +2643,40 @@ button.exercise-selector-item.active {
   letter-spacing: 0.06em;
 }
 
-.muscle-atlas-footer p {
-  margin: 0;
-  color: #48627f;
-  font-size: 0.8rem;
-  line-height: 1.4;
+.muscle-atlas-footer strong {
+  min-width: 1.45rem;
+  height: 1.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(237, 246, 255, 0.92);
+  color: #274c74;
+  font-size: 0.72rem;
+  box-shadow: inset 0 0 0 1px rgba(179, 204, 232, 0.82);
 }
 
 .muscle-map-insights {
   display: grid;
-  gap: 0.58rem;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.44rem;
+  grid-template-columns: 1fr;
 }
 
 .muscle-legend-item {
-  border: 1px solid rgba(197, 214, 236, 0.9);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 0.68rem 0.72rem;
+  border: 1px solid rgba(197, 214, 236, 0.72);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 0.58rem 0.64rem;
   display: grid;
-  gap: 0.22rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.5rem;
+  row-gap: 0.14rem;
+  align-items: start;
 }
 
 .muscle-legend-item.emphasis {
-  background: linear-gradient(180deg, rgba(240, 248, 255, 0.98), rgba(228, 240, 255, 0.94));
-  border-color: rgba(180, 210, 245, 0.92);
+  background: linear-gradient(180deg, rgba(246, 251, 255, 0.94), rgba(236, 246, 255, 0.82));
+  border-color: rgba(180, 210, 245, 0.82);
 }
 
 .muscle-legend-item strong,
@@ -2685,41 +2684,52 @@ button.exercise-selector-item.active {
   margin: 0;
 }
 
+.muscle-legend-item > .legend-swatch {
+  margin-top: 0.2rem;
+}
+
+.muscle-legend-item strong {
+  color: #193653;
+  font-size: 0.86rem;
+}
+
 .muscle-legend-item p {
+  grid-column: 2;
   color: #627b97;
-  font-size: 0.8rem;
-  line-height: 1.45;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .legend-swatch {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
   display: inline-block;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .legend-swatch.primary {
-  background: #ff453a;
+  background: #e74c3c;
 }
 
 .legend-swatch.secondary {
-  background: #ff9f0a;
+  background: #ec9734;
 }
 
 .muscle-region-chip-row {
+  grid-column: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 0.34rem;
-  margin-top: 0.22rem;
+  margin-top: 0.18rem;
 }
 
 .muscle-region-chip {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 0.22rem 0.56rem;
-  font-size: 0.72rem;
+  padding: 0.2rem 0.52rem;
+  font-size: 0.68rem;
   font-weight: 650;
 }
 
