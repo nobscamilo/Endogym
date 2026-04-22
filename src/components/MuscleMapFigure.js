@@ -74,10 +74,14 @@ const VIEW_CONFIG = {
   front: {
     label: 'Frontal',
     src: '/anatomy/gray-front.png',
+    width: 791,
+    height: 1342,
   },
   back: {
     label: 'Posterior',
     src: '/anatomy/gray-back.png',
+    width: 978,
+    height: 1297,
   },
 };
 
@@ -154,64 +158,73 @@ function toUniqueLabels(regionNames = []) {
   );
 }
 
-function renderHotspots(view, regionNames, tone) {
+function scaleSpot(spot, viewConfig) {
+  return {
+    cx: (spot.cx / 100) * viewConfig.width,
+    cy: (spot.cy / 160) * viewConfig.height,
+    rx: (spot.rx / 100) * viewConfig.width,
+    ry: (spot.ry / 160) * viewConfig.height,
+    rotate: spot.rotate || 0,
+  };
+}
+
+function renderHotspots(view, regionNames, tone, viewConfig) {
   return regionNames.flatMap((regionName) => {
     const hotspots = REGION_HOTSPOTS[view][regionName] || [];
-    return hotspots.map((spot, index) => (
-      <g
-        key={`${view}-${regionName}-${tone}-${index}`}
-        transform={`rotate(${spot.rotate || 0} ${spot.cx} ${spot.cy})`}
-      >
-        <ellipse
-          className={`atlas-spot-glow ${tone}`}
-          cx={spot.cx}
-          cy={spot.cy}
-          rx={spot.rx * 1.45}
-          ry={spot.ry * 1.45}
-        />
-        <ellipse
-          className={`atlas-spot-core ${tone}`}
-          cx={spot.cx}
-          cy={spot.cy}
-          rx={spot.rx}
-          ry={spot.ry}
-        />
-        <ellipse
-          className={`atlas-spot-ring ${tone}`}
-          cx={spot.cx}
-          cy={spot.cy}
-          rx={spot.rx + 2}
-          ry={spot.ry + 2}
-        />
-      </g>
-    ));
+    return hotspots.map((rawSpot, index) => {
+      const spot = scaleSpot(rawSpot, viewConfig);
+
+      return (
+        <g
+          key={`${view}-${regionName}-${tone}-${index}`}
+          transform={`rotate(${spot.rotate} ${spot.cx} ${spot.cy})`}
+        >
+          <ellipse
+            className={`atlas-spot-glow ${tone}`}
+            cx={spot.cx}
+            cy={spot.cy}
+            rx={spot.rx * 1.45}
+            ry={spot.ry * 1.45}
+          />
+          <ellipse
+            className={`atlas-spot-core ${tone}`}
+            cx={spot.cx}
+            cy={spot.cy}
+            rx={spot.rx}
+            ry={spot.ry}
+          />
+          <ellipse
+            className={`atlas-spot-ring ${tone}`}
+            cx={spot.cx}
+            cy={spot.cy}
+            rx={spot.rx + 2}
+            ry={spot.ry + 2}
+          />
+        </g>
+      );
+    });
   });
 }
 
 function AtlasFigure({ view, primaryRegions = [], secondaryRegions = [] }) {
   const viewConfig = VIEW_CONFIG[view];
   const viewLabel = viewConfig.label;
-  const activeLabels = toUniqueLabels([...primaryRegions, ...secondaryRegions]);
+  const primaryRegionSet = new Set(primaryRegions);
+  const secondaryOnlyRegions = secondaryRegions.filter((regionName) => !primaryRegionSet.has(regionName));
+  const activeLabels = toUniqueLabels([...primaryRegions, ...secondaryOnlyRegions]);
 
   return (
     <article className="muscle-atlas-card">
       <div className="muscle-atlas-stage" role="img" aria-label={`Vista ${viewLabel.toLowerCase()} del mapa muscular`}>
         <img className="muscle-atlas-base" src={viewConfig.src} alt="" aria-hidden="true" />
-        <svg className="muscle-atlas-overlay" viewBox="0 0 100 160" aria-hidden="true">
-          <defs>
-            <filter id={`atlas-blur-${view}`} x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="2.8" />
-            </filter>
-          </defs>
-
-          <g filter={`url(#atlas-blur-${view})`}>
-            {renderHotspots(view, secondaryRegions, 'secondary')}
-            {renderHotspots(view, primaryRegions, 'primary')}
-          </g>
-
+        <svg
+          className="muscle-atlas-overlay"
+          viewBox={`0 0 ${viewConfig.width} ${viewConfig.height}`}
+          aria-hidden="true"
+        >
           <g>
-            {renderHotspots(view, secondaryRegions, 'secondary')}
-            {renderHotspots(view, primaryRegions, 'primary')}
+            {renderHotspots(view, secondaryOnlyRegions, 'secondary', viewConfig)}
+            {renderHotspots(view, primaryRegions, 'primary', viewConfig)}
           </g>
         </svg>
         <div className="muscle-atlas-vignette" aria-hidden="true" />
