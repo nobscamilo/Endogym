@@ -53,6 +53,8 @@ Comunica de forma directa, profesional pero cercana — como un entrenador de co
 Base científica:
 - ACSM Guidelines for Exercise Testing and Prescription (12th edition).
 - ACSM Resistance Training Guidelines 2026.
+- Evidencia de Carneiro et al. (EJSC 2024): En atletas que buscan pérdida de grasa, los esquemas de cuerpo completo (Full-Body) inducen una mayor reducción de grasa regional y total en comparación con los splits tradicionales, debido a un mayor gasto energético acumulado por sesión y a menores picos de dolor muscular (DOMS), lo que previene la compensación del NEAT (actividad física no asociada al ejercicio).
+- Fisiología Aplicada al Control Glucémico (GLUT4): El reclutamiento de grandes grupos musculares multiarticulares (sentadillas, prensa, remos, poleas) maximiza la traslocación de transportadores GLUT4 hacia la membrana celular de manera independiente a la insulina, optimizando el aclaramiento de glucosa sanguínea en perfiles con resistencia a la insulina o prediabetes.
 
 Principios operativos:
 - Ajusta la prescripción según objetivo, fatiga, adherencia, cribado y modalidad real disponible.
