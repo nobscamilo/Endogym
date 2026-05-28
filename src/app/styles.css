@@ -1,28 +1,28 @@
-/* Endogym v0.3.1 — 2026-04-13 */
+/* Endogym v0.3.2 — 2026-05-29 */
 :root {
-  --font-brand: "Avenir Next Condensed", "DIN Alternate", "Futura", "Arial Narrow", sans-serif;
-  --font-body: "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
-  --bg: #f4f8fd;
-  --bg-strong: #e7eef6;
+  --font-brand: var(--font-brand), "Avenir Next Condensed", "DIN Alternate", "Futura", "Arial Narrow", sans-serif;
+  --font-body: var(--font-body), "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
+  --bg: #f5f9fe;
+  --bg-strong: #eaf1f8;
   --surface: #ffffff;
-  --surface-muted: #f8fbff;
-  --line: #d6e0ec;
+  --surface-muted: #f9fcff;
+  --line: rgba(214, 224, 236, 0.6);
   --line-strong: #b8c8dc;
-  --text: #102235;
-  --muted: #5a6f87;
+  --text: #0e1e2d;
+  --muted: #5e738b;
   --accent: #0f7be9;
   --accent-strong: #0053b6;
-  --accent-soft: #d9ebff;
-  --success: #17734a;
-  --warn: #b66514;
-  --danger: #c63a2b;
-  --glass-surface: rgba(255, 255, 255, 0.72);
-  --glass-surface-strong: rgba(255, 255, 255, 0.82);
-  --glass-border: rgba(255, 255, 255, 0.54);
-  --glass-shadow: 0 18px 40px rgba(14, 34, 53, 0.12);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.42);
-  --shadow-soft: 0 10px 30px rgba(14, 34, 53, 0.07);
-  --shadow-strong: 0 18px 42px rgba(14, 34, 53, 0.11);
+  --accent-soft: #e3efff;
+  --success: #147246;
+  --warn: #b86612;
+  --danger: #c93b2a;
+  --glass-surface: rgba(255, 255, 255, 0.76);
+  --glass-surface-strong: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-shadow: 0 20px 48px rgba(14, 34, 53, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --shadow-soft: 0 12px 32px rgba(14, 34, 53, 0.05);
+  --shadow-strong: 0 20px 48px rgba(14, 34, 53, 0.09);
 }
 
 * {
@@ -396,14 +396,22 @@ button.nav-tab.active {
 }
 
 .panel {
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.94));
-  border-radius: 18px;
-  padding: 1.05rem;
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(247, 252, 255, 0.76));
+  border-radius: 22px;
+  padding: 1.25rem;
   display: grid;
-  gap: 0.9rem;
-  box-shadow: var(--shadow-soft);
-  animation: rise-in 380ms ease-out both;
+  gap: 0.95rem;
+  box-shadow: var(--shadow-soft), var(--glass-highlight);
+  backdrop-filter: blur(14px) saturate(140%);
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 280ms cubic-bezier(0.16, 1, 0.3, 1), border-color 280ms ease;
+  animation: rise-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-strong), var(--glass-highlight);
+  border-color: rgba(15, 123, 233, 0.25);
 }
 
 .dashboard-hub {

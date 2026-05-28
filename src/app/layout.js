@@ -1,5 +1,18 @@
+import { Inter, Outfit } from 'next/font/google';
 import './styles.css';
 import { getPublicSiteUrl } from '../lib/siteUrl.js';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+});
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-brand',
+  display: 'swap',
+});
 
 export const metadata = {
   metadataBase: new URL(getPublicSiteUrl()),
@@ -55,8 +68,9 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${inter.variable} ${outfit.variable}`}>
       <body>{children}</body>
     </html>
   );
 }
+

@@ -111,7 +111,8 @@ export function isGeminiConfigured() {
 }
 
 export function resolveGeminiPlateModel() {
-  return process.env.GEMINI_MODEL_PLATE || process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+  const model = process.env.GEMINI_MODEL_PLATE || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  return typeof model === 'string' ? model.trim() : model;
 }
 
 export async function callGeminiPlateModel({

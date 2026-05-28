@@ -169,11 +169,8 @@ export function isGeminiConfigured() {
 }
 
 export function resolveGeminiCoachModel() {
-  if (process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL) {
-    return process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL;
-  }
-
-  return 'gemini-3.1-pro-preview';
+  const model = process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+  return typeof model === 'string' ? model.trim() : model;
 }
 
 export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) {
