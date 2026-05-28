@@ -344,11 +344,11 @@ describe('gemini model routing', () => {
     expect(coach.diagnostics.backend).toBe('vertex');
   });
 
-  it('uses Gemini 3.1 Pro as the default coach model for Vertex when no override exists', () => {
+  it('uses Gemini 2.5 Pro as the default coach model when no override exists', () => {
     process.env.GOOGLE_AI_BACKEND = 'vertex';
     process.env.GEMINI_MODEL = '';
     process.env.GEMINI_MODEL_COACH = '';
 
-    expect(resolveGeminiCoachModel()).toBe('gemini-3.1-pro-preview');
+    expect(resolveGeminiCoachModel()).toBe('gemini-2.5-pro');
   });
 });
