@@ -160,7 +160,7 @@ export default function MuscleMapFigure({
         role="img"
         aria-label="Mapa anatómico frontal y posterior con músculos activos de la sesión"
       >
-        <img className="muscle-atlas-base" src={ATLAS.src} alt="" aria-hidden="true" />
+        <img className="muscle-atlas-base" src={ATLAS.src} alt="" aria-hidden="true" style={{ opacity: 0.95, filter: 'contrast(1.02) brightness(1.01)' }} />
         <div className="muscle-atlas-layer-stack" aria-hidden="true">
           {renderAtlasLayers('front', secondaryFrontRegions, 'secondary')}
           {renderAtlasLayers('back', secondaryBackRegions, 'secondary')}

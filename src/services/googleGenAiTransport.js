@@ -172,6 +172,21 @@ export async function requestGoogleGenerateContent({
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   let response;
+  
+  // Normalize schema names dynamically based on selected backend
+  const normalizedConfig = { ...generationConfig };
+  if (backend === 'gemini') {
+    if (normalizedConfig.responseJsonSchema && !normalizedConfig.responseSchema) {
+      normalizedConfig.responseSchema = normalizedConfig.responseJsonSchema;
+      delete normalizedConfig.responseJsonSchema;
+    }
+  } else if (backend === 'vertex') {
+    if (normalizedConfig.responseSchema && !normalizedConfig.responseJsonSchema) {
+      normalizedConfig.responseJsonSchema = normalizedConfig.responseSchema;
+      delete normalizedConfig.responseSchema;
+    }
+  }
+
   try {
     response = await fetch(endpoint, {
       method: 'POST',
@@ -184,7 +199,7 @@ export async function requestGoogleGenerateContent({
             parts,
           },
         ],
-        generationConfig,
+        generationConfig: normalizedConfig,
       }),
     });
   } finally {
