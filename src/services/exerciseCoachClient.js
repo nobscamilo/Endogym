@@ -180,7 +180,7 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) 
     });
   }
 
-  const model = resolveGeminiCoachModel();
+  const baseModel = resolveGeminiCoachModel();
   const prompt = buildExerciseCoachPrompt({ profile, weeklyPlan });
   const maxRetries = toPositiveInteger(process.env.GEMINI_COACH_MAX_RETRIES, 2, 0, 5);
   const retryBaseMs = toPositiveInteger(process.env.GEMINI_COACH_RETRY_BASE_MS, 350, 100, 5_000);
@@ -188,6 +188,13 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) 
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let model = baseModel;
+    // Dynamic high-availability fallback: if attempt > 1, downgrade from gemini-2.5-pro (2 RPM limit)
+    // to gemini-2.5-flash (15 RPM limit) to bypass resource exhaustion under load.
+    if (attempt > 1 && baseModel === 'gemini-2.5-pro') {
+      model = 'gemini-2.5-flash';
+    }
+
     try {
       const { backend, response } = await requestGoogleGenerateContent({
         model,
