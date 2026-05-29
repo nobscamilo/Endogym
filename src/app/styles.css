@@ -4539,3 +4539,294 @@ button:active:not(:disabled) {
     transform: scale(1.1);
   }
 }
+
+/* ── Premium Exercise Spotlight & Sets Tracker ── */
+
+.exercise-spotlight.premium {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 255, 0.95)) !important;
+  border: 1px solid rgba(137, 183, 241, 0.35) !important;
+  box-shadow: 0 24px 50px rgba(108, 141, 178, 0.12) !important;
+  transition: all 0.3s ease;
+}
+
+.exercise-difficulty-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.meter-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #607997;
+}
+
+.meter-bar-container {
+  width: 80px;
+  height: 6px;
+  background: rgba(220, 230, 242, 0.8);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.meter-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.4s ease;
+}
+
+.meter-bar.beginner { width: 33%; background: linear-gradient(90deg, #2ecc71, #27ae60); }
+.meter-bar.intermediate { width: 66%; background: linear-gradient(90deg, #f1c40f, #f39c12); }
+.meter-bar.advanced { width: 100%; background: linear-gradient(90deg, #e74c3c, #c0392b); }
+
+.premium-prescription-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: rgba(15, 123, 233, 0.04);
+  border: 1px solid rgba(15, 123, 233, 0.08);
+  border-radius: 18px;
+  padding: 0.95rem;
+  margin: 1rem 0;
+  backdrop-filter: blur(10px);
+}
+
+.prescription-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+}
+
+.metric-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #607997;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.18rem;
+}
+
+.metric-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #173e67;
+  font-family: var(--font-brand), sans-serif;
+}
+
+.metric-val.text-brand {
+  color: #0f7be9;
+  background: linear-gradient(135deg, #0f7be9, #0a56a4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.prescription-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(15, 123, 233, 0.12);
+}
+
+/* Premium Set Tracker */
+.premium-set-tracker {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(197, 214, 236, 0.7);
+  border-radius: 20px;
+  padding: 1.1rem;
+  margin: 1.1rem 0;
+  box-shadow: inset 0 2px 4px rgba(108, 141, 178, 0.03);
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.tracker-header h5 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #173e67;
+}
+
+.tracker-progress {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f7be9;
+  background: rgba(15, 123, 233, 0.08);
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+}
+
+.premium-set-row {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.2rem 0;
+}
+
+.premium-set-bubble {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(15, 123, 233, 0.2);
+  background: #ffffff;
+  color: #173e67;
+  font-weight: 800;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 250ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 10px rgba(108, 141, 178, 0.06);
+}
+
+.premium-set-bubble:hover {
+  transform: translateY(-2px) scale(1.05);
+  border-color: #0f7be9;
+  box-shadow: 0 6px 15px rgba(15, 123, 233, 0.15);
+}
+
+.premium-set-bubble .set-checkmark {
+  display: none;
+  font-size: 1.15rem;
+  color: #ffffff;
+}
+
+.premium-set-bubble.completed {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  border-color: #27ae60;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(46, 204, 113, 0.35);
+}
+
+.premium-set-bubble.completed .set-num {
+  display: none;
+}
+
+.premium-set-bubble.completed .set-checkmark {
+  display: block;
+  animation: scale-up-bounce 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scale-up-bounce {
+  0% { transform: scale(0.6); }
+  100% { transform: scale(1); }
+}
+
+.motivational-completed-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(39, 174, 96, 0.04));
+  border: 1px solid rgba(46, 204, 113, 0.22);
+  border-radius: 16px;
+  padding: 0.85rem;
+  margin-top: 1rem;
+  animation: slide-up 300ms ease;
+}
+
+.banner-emoji {
+  font-size: 1.8rem;
+  animation: shake-wobble 2s infinite ease;
+}
+
+.motivational-completed-banner h6 {
+  margin: 0 0 0.15rem 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #27ae60;
+}
+
+.motivational-completed-banner p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #3b5e47;
+}
+
+@keyframes shake-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+
+/* Premium Cues Cards Grid */
+.premium-cues h5 {
+  margin-bottom: 0.8rem !important;
+}
+
+.premium-cue-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .premium-cue-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.premium-cue-card {
+  display: flex;
+  gap: 0.72rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(197, 214, 236, 0.55);
+  border-radius: 16px;
+  padding: 0.78rem;
+  align-items: flex-start;
+  transition: all 200ms ease;
+}
+
+.premium-cue-card:hover {
+  background: #ffffff;
+  border-color: rgba(137, 183, 241, 0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(108, 141, 178, 0.05);
+}
+
+.premium-cue-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0f7be9, #0a56a4);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.premium-cue-card p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #2c4c70;
+  line-height: 1.4;
+}
+
+/* Card overrides for accent panels */
+.exercise-cue-panel.accent .premium-cue-number {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+}
+.exercise-cue-panel.soft .premium-cue-number {
+  background: linear-gradient(135deg, #f1c40f, #d68910);
+  color: #173e67;
+}
+.exercise-cue-panel.caution .premium-cue-number {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+.exercise-cue-panel.caution .premium-cue-card {
+  border-color: rgba(231, 76, 60, 0.22);
+  background: rgba(231, 76, 60, 0.02);
+}
+.exercise-cue-panel.caution .premium-cue-card p {
+  color: #8c261a;
+}

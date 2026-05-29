@@ -661,6 +661,7 @@ export default function DashboardPage() {
   const [exerciseSwapState, setExerciseSwapState] = useState({});
   const [openSwapTarget, setOpenSwapTarget] = useState(null);
   const [selectedExerciseKey, setSelectedExerciseKey] = useState(null);
+  const [completedSets, setCompletedSets] = useState({});
   const [workoutStatus, setWorkoutStatus] = useState('');
   const [workoutLoading, setWorkoutLoading] = useState(false);
   const [workoutCheckin, setWorkoutCheckin] = useState({
@@ -3731,92 +3732,184 @@ export default function DashboardPage() {
                         </div>
                       </aside>
 
-                      {activeExercise ? (
-                        <article className="exercise-spotlight">
-                          <header className="exercise-spotlight-head">
-                            <div>
-                              <p className="exercise-kicker">Trabajo muscular</p>
-                              <h4>
-                                {activeExercise.name}
-                                {activeExercise._replaced ? <span className="exercise-replaced-badge">Sustituido</span> : null}
-                              </h4>
-                              <p className="exercise-equipment">{activeExercise.equipment}</p>
-                            </div>
-                            <div className="exercise-badges">
-                              {activeExercise.difficulty ? <span>{DIFFICULTY_LABELS[activeExercise.difficulty] || activeExercise.difficulty}</span> : null}
-                              <span>{summarizePrescription(activeExercise.prescription)}</span>
-                              {activeExercise.prescription?.restSeconds ? <span>Descanso {activeExercise.prescription.restSeconds}s</span> : null}
-                            </div>
-                          </header>
+                      {activeExercise ? (() => {
+                        const setsCount = Number(activeExercise.prescription?.sets) || 3;
+                        const exerciseKey = `${selectedDay.date}-${activeExercise._swapKey}`;
+                        const currentSetsState = completedSets[exerciseKey] || Array(setsCount).fill(false);
+                        const isCompleted = currentSetsState.every(Boolean);
 
-                          <div className="exercise-spotlight-grid">
-                            <div className="exercise-detail-stack">
-                              <section className="exercise-muscle-list">
-                                <div>
-                                  <span>Primarios</span>
-                                  <div className="muscle-chip-row">
-                                    {(activeExercise.primaryMuscles || []).map((muscle, index) => (
-                                      <strong key={`${activeExercise._swapKey}-primary-${index}`} className="muscle-chip primary">
-                                        {muscle}
-                                      </strong>
-                                    ))}
+                        const toggleSet = (setIndex) => {
+                          const nextState = [...currentSetsState];
+                          nextState[setIndex] = !nextState[setIndex];
+                          setCompletedSets({
+                            ...completedSets,
+                            [exerciseKey]: nextState,
+                          });
+                        };
+
+                        return (
+                          <article className="exercise-spotlight premium">
+                            <header className="exercise-spotlight-head">
+                              <div>
+                                <p className="exercise-kicker">Trabajo muscular</p>
+                                <h4>
+                                  {activeExercise.name}
+                                  {activeExercise._replaced ? <span className="exercise-replaced-badge">Sustituido</span> : null}
+                                </h4>
+                                <p className="exercise-equipment">{activeExercise.equipment}</p>
+                              </div>
+                              <div className="exercise-difficulty-meter">
+                                <span className="meter-label">Dificultad:</span>
+                                <div className="meter-bar-container" title={DIFFICULTY_LABELS[activeExercise.difficulty] || activeExercise.difficulty}>
+                                  <div className={`meter-bar ${activeExercise.difficulty || 'intermediate'}`} />
+                                </div>
+                              </div>
+                            </header>
+
+                            {/* PRECRIPCIÓN DESTACADA */}
+                            <div className="premium-prescription-card">
+                              <div className="prescription-metric">
+                                <span className="metric-title">Series</span>
+                                <strong className="metric-val">{activeExercise.prescription?.sets || '3'}</strong>
+                              </div>
+                              <div className="prescription-divider" />
+                              <div className="prescription-metric">
+                                <span className="metric-title">Repeticiones</span>
+                                <strong className="metric-val">{activeExercise.prescription?.reps || '10'}</strong>
+                              </div>
+                              {activeExercise.prescription?.intensityRpe ? (
+                                <>
+                                  <div className="prescription-divider" />
+                                  <div className="prescription-metric">
+                                    <span className="metric-title">Intensidad</span>
+                                    <strong className="metric-val text-brand">{activeExercise.prescription.intensityRpe}</strong>
+                                  </div>
+                                </>
+                              ) : null}
+                              {activeExercise.prescription?.restSeconds ? (
+                                <>
+                                  <div className="prescription-divider" />
+                                  <div className="prescription-metric">
+                                    <span className="metric-title">Descanso</span>
+                                    <strong className="metric-val">{activeExercise.prescription.restSeconds}s</strong>
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+
+                            {/* LOG DE SERIES INTERACTIVO */}
+                            <section className="premium-set-tracker">
+                              <div className="tracker-header">
+                                <h5>Log de Series (Seguimiento Activo)</h5>
+                                <span className="tracker-progress">
+                                  {currentSetsState.filter(Boolean).length} de {setsCount} completadas
+                                </span>
+                              </div>
+                              <div className="premium-set-row">
+                                {currentSetsState.map((completed, setIndex) => (
+                                  <button
+                                    key={`set-track-${setIndex}`}
+                                    type="button"
+                                    className={`premium-set-bubble ${completed ? 'completed' : ''}`}
+                                    onClick={() => toggleSet(setIndex)}
+                                    title={`Marcar serie ${setIndex + 1} como completada`}
+                                  >
+                                    <span className="set-num">{setIndex + 1}</span>
+                                    <span className="set-checkmark">✓</span>
+                                  </button>
+                                ))}
+                              </div>
+                              {isCompleted && (
+                                <div className="motivational-completed-banner">
+                                  <span className="banner-emoji">🎉</span>
+                                  <div>
+                                    <h6>¡Bloque Completado!</h6>
+                                    <p>Prescripción completada con éxito. ¡Buen trabajo, mantén el ritmo!</p>
                                   </div>
                                 </div>
-                                <div>
-                                  <span>Secundarios</span>
-                                  <div className="muscle-chip-row">
-                                    {(activeExercise.secondaryMuscles || []).map((muscle, index) => (
-                                      <strong key={`${activeExercise._swapKey}-secondary-${index}`} className="muscle-chip secondary">
-                                        {muscle}
-                                      </strong>
-                                    ))}
+                              )}
+                            </section>
+
+                            <div className="exercise-spotlight-grid">
+                              <div className="exercise-detail-stack">
+                                <section className="exercise-muscle-list">
+                                  <div>
+                                    <span>Primarios</span>
+                                    <div className="muscle-chip-row">
+                                      {(activeExercise.primaryMuscles || []).map((muscle, index) => (
+                                        <strong key={`${activeExercise._swapKey}-primary-${index}`} className="muscle-chip primary">
+                                          {muscle}
+                                        </strong>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              </section>
-
-                              {Array.isArray(activeExercise.cues) && activeExercise.cues.length ? (
-                                <section className="exercise-cue-panel">
-                                  <h5>Técnica clave</h5>
-                                  <ul>
-                                    {activeExercise.cues.map((cue, cueIndex) => (
-                                      <li key={`${activeExercise.id || 'cue'}-${cueIndex}`}>{cue}</li>
-                                    ))}
-                                  </ul>
+                                  <div>
+                                    <span>Secundarios</span>
+                                    <div className="muscle-chip-row">
+                                      {(activeExercise.secondaryMuscles || []).map((muscle, index) => (
+                                        <strong key={`${activeExercise._swapKey}-secondary-${index}`} className="muscle-chip secondary">
+                                          {muscle}
+                                        </strong>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </section>
-                              ) : null}
 
-                              {Array.isArray(activeExercise.progressions) && activeExercise.progressions.length ? (
-                                <section className="exercise-cue-panel accent">
-                                  <h5>Progresar</h5>
-                                  <ul>
-                                    {activeExercise.progressions.map((item, itemIndex) => (
-                                      <li key={`${activeExercise.id || 'progression'}-${itemIndex}`}>{item}</li>
-                                    ))}
-                                  </ul>
-                                </section>
-                              ) : null}
+                                {Array.isArray(activeExercise.cues) && activeExercise.cues.length ? (
+                                  <section className="exercise-cue-panel premium-cues">
+                                    <h5>Técnica Clave & Cues</h5>
+                                    <div className="premium-cue-grid">
+                                      {activeExercise.cues.map((cue, cueIndex) => (
+                                        <div key={`${activeExercise.id || 'cue'}-${cueIndex}`} className="premium-cue-card">
+                                          <span className="premium-cue-number">{cueIndex + 1}</span>
+                                          <p>{cue}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                ) : null}
 
-                              {Array.isArray(activeExercise.regressions) && activeExercise.regressions.length ? (
-                                <section className="exercise-cue-panel soft">
-                                  <h5>Regresiones utiles</h5>
-                                  <ul>
-                                    {activeExercise.regressions.map((item, itemIndex) => (
-                                      <li key={`${activeExercise.id || 'regression'}-${itemIndex}`}>{item}</li>
-                                    ))}
-                                  </ul>
-                                </section>
-                              ) : null}
+                                {Array.isArray(activeExercise.progressions) && activeExercise.progressions.length ? (
+                                  <section className="exercise-cue-panel premium-cues accent">
+                                    <h5>Cómo Progresar (Sobrecarga Progresiva)</h5>
+                                    <div className="premium-cue-grid">
+                                      {activeExercise.progressions.map((item, itemIndex) => (
+                                        <div key={`${activeExercise.id || 'progression'}-${itemIndex}`} className="premium-cue-card">
+                                          <span className="premium-cue-number">▲</span>
+                                          <p>{item}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                ) : null}
 
-                              {Array.isArray(activeExercise.contraindications) && activeExercise.contraindications.length ? (
-                                <section className="exercise-cue-panel caution">
-                                  <h5>Precauciones</h5>
-                                  <ul>
-                                    {activeExercise.contraindications.map((item, itemIndex) => (
-                                      <li key={`${activeExercise.id || 'contra'}-${itemIndex}`}>{item}</li>
-                                    ))}
-                                  </ul>
-                                </section>
-                              ) : null}
+                                {Array.isArray(activeExercise.regressions) && activeExercise.regressions.length ? (
+                                  <section className="exercise-cue-panel premium-cues soft">
+                                    <h5>Regresiones & Alternativas Útiles</h5>
+                                    <div className="premium-cue-grid">
+                                      {activeExercise.regressions.map((item, itemIndex) => (
+                                        <div key={`${activeExercise.id || 'regression'}-${itemIndex}`} className="premium-cue-card">
+                                          <span className="premium-cue-number">▼</span>
+                                          <p>{item}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                ) : null}
+
+                                {Array.isArray(activeExercise.contraindications) && activeExercise.contraindications.length ? (
+                                  <section className="exercise-cue-panel premium-cues caution">
+                                    <h5>Precauciones & Contraindicaciones</h5>
+                                    <div className="premium-cue-grid">
+                                      {activeExercise.contraindications.map((item, itemIndex) => (
+                                        <div key={`${activeExercise.id || 'contra'}-${itemIndex}`} className="premium-cue-card">
+                                          <span className="premium-cue-number">⚠️</span>
+                                          <p>{item}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                ) : null}
 
                               <section className="exercise-action-panel compact">
                                 <div className="exercise-actions">
@@ -3886,8 +3979,9 @@ export default function DashboardPage() {
                               />
                             </aside>
                           </div>
-                        </article>
-                      ) : null}
+                          </article>
+                          );
+                        })() : null}
                     </section>
                   ) : null}
                   {Array.isArray(selectedDay.workout?.cooldown) && selectedDay.workout.cooldown.length ? (
