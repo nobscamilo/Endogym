@@ -169,7 +169,7 @@ export function isGeminiConfigured() {
 }
 
 export function resolveGeminiCoachModel() {
-  const model = process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+  const model = process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   return typeof model === 'string' ? model.trim() : model;
 }
 
