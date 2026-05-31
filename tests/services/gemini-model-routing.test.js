@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateKeyPairSync } from 'node:crypto';
-
 import {
   callGeminiExerciseCoach,
   resolveGeminiCoachModel,
 } from '../../src/services/exerciseCoachClient.js';
 import { callGeminiPlateModel } from '../../src/services/geminiClient.js';
+import {
+  resolveGoogleAiBackend,
+  sanitizeGoogleAiModelNameForLog,
+} from '../../src/services/googleGenAiTransport.js';
 
 describe('gemini model routing', () => {
   const envBackup = {
@@ -20,6 +22,7 @@ describe('gemini model routing', () => {
     GEMINI_MODEL_COACH: process.env.GEMINI_MODEL_COACH,
     GEMINI_COACH_MAX_RETRIES: process.env.GEMINI_COACH_MAX_RETRIES,
     GEMINI_COACH_RETRY_BASE_MS: process.env.GEMINI_COACH_RETRY_BASE_MS,
+    GEMINI_COACH_TIMEOUT_MS: process.env.GEMINI_COACH_TIMEOUT_MS,
   };
 
   beforeEach(() => {
@@ -34,6 +37,7 @@ describe('gemini model routing', () => {
     process.env.GEMINI_MODEL_COACH = 'gemini-coach-model';
     process.env.GEMINI_COACH_MAX_RETRIES = '2';
     process.env.GEMINI_COACH_RETRY_BASE_MS = '1';
+    process.env.GEMINI_COACH_TIMEOUT_MS = '1000';
   });
 
   afterEach(() => {
@@ -48,6 +52,7 @@ describe('gemini model routing', () => {
     process.env.GEMINI_MODEL_COACH = envBackup.GEMINI_MODEL_COACH;
     process.env.GEMINI_COACH_MAX_RETRIES = envBackup.GEMINI_COACH_MAX_RETRIES;
     process.env.GEMINI_COACH_RETRY_BASE_MS = envBackup.GEMINI_COACH_RETRY_BASE_MS;
+    process.env.GEMINI_COACH_TIMEOUT_MS = envBackup.GEMINI_COACH_TIMEOUT_MS;
     vi.restoreAllMocks();
   });
 
@@ -163,6 +168,9 @@ describe('gemini model routing', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain('/models/gemini-coach-model:generateContent');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.thinkingConfig).toEqual({
+      thinkingBudget: 0,
+    });
     expect(coach.diagnostics).toBeTruthy();
     expect(coach.diagnostics.modelRequested).toBe('gemini-coach-model');
   });
@@ -256,99 +264,32 @@ describe('gemini model routing', () => {
     expect(coach.diagnostics.modelResolved).toBe('gemini-2.5-pro');
   });
 
-  it('can route coach generation through Vertex AI when configured', async () => {
+  it('rejects Vertex AI because runtime only supports Gemini Developer API', () => {
     process.env.GOOGLE_AI_BACKEND = 'vertex';
-    process.env.GEMINI_API_KEY = '';
-    process.env.VERTEX_AI_PROJECT_ID = 'endogym-prod';
-    process.env.VERTEX_AI_LOCATION = 'global';
-    process.env.GOOGLE_CLIENT_EMAIL = 'vertex@endogym.iam.gserviceaccount.com';
-    const { privateKey } = generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-    });
-    process.env.GOOGLE_PRIVATE_KEY = privateKey.replace(/\n/g, '\\n');
 
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          access_token: 'vertex-token',
-          expires_in: 3600,
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          modelVersion: 'gemini-2.5-pro',
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    text: JSON.stringify({
-                      coachSummary: 'Resumen Vertex',
-                      acsmJustification: 'FITT conservador',
-                      prescriptionAdjustments: [
-                        {
-                          day: 'Lunes 2026-04-06',
-                          adjustment: 'Mantener RPE 6-7.',
-                          rationale: 'Adherencia estable.',
-                          evidence: 'completionRate=80%',
-                        },
-                      ],
-                      riskFlags: [],
-                      medicalDisclaimer: 'Educativo',
-                    }),
-                  },
-                ],
-              },
-            },
-          ],
-        }),
-      });
-
-    vi.stubGlobal('fetch', fetchMock);
-
-    const coach = await callGeminiExerciseCoach({
-      profile: {
-        sex: 'male',
-        age: 30,
-        weightKg: 75,
-        heightCm: 175,
-        activityLevel: 'moderate',
-      },
-      weeklyPlan: {
-        goal: 'strength',
-        trainingModality: 'full_gym',
-        metabolicProfile: 'none',
-        acsmPrescription: { fitt: { aerobic: '90-180 min', resistance: '3-5 días' } },
-        days: [
-          {
-            dayName: 'Lunes',
-            date: '2026-04-06',
-            sessionType: 'resistance',
-            workout: {
-              title: 'Torso A',
-              durationMinutes: 70,
-              intensityRpe: 'RPE 7-9',
-            },
-          },
-        ],
-      },
-    });
-
-    expect(fetchMock.mock.calls[0][0]).toBe('https://oauth2.googleapis.com/token');
-    expect(fetchMock.mock.calls[1][0]).toContain('/projects/endogym-prod/locations/global/publishers/google/models/gemini-coach-model:generateContent');
-    expect(coach.diagnostics.backend).toBe('vertex');
+    expect(() => resolveGoogleAiBackend()).toThrow(/Usa Gemini Developer API/);
   });
 
   it('uses Gemini 2.5 Flash as the default coach model when no override exists', () => {
-    process.env.GOOGLE_AI_BACKEND = 'vertex';
+    process.env.GOOGLE_AI_BACKEND = 'gemini';
     process.env.GEMINI_MODEL = '';
     process.env.GEMINI_MODEL_COACH = '';
 
     expect(resolveGeminiCoachModel()).toBe('gemini-2.5-flash');
+  });
+
+  it('rejects an opaque encrypted value before calling Gemini coach', async () => {
+    process.env.GEMINI_MODEL_COACH = 'AQ.encrypted-placeholder';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callGeminiExerciseCoach({
+      profile: {},
+      weeklyPlan: {},
+    })).rejects.toMatchObject({
+      code: 'GEMINI_COACH_INVALID_MODEL',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sanitizeGoogleAiModelNameForLog(process.env.GEMINI_MODEL_COACH)).toBe('<invalid-model>');
   });
 });

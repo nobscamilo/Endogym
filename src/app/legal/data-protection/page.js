@@ -13,7 +13,7 @@ export default function DataProtectionPage() {
     <main className="legal-shell">
       <article className="legal-card">
         <h1>Protección de Datos (GDPR / LOPDGDD)</h1>
-        <p className="legal-meta">Versión 2026-04-02</p>
+        <p className="legal-meta">Versión 2026-05-31</p>
 
         <section>
           <h2>1. Principios aplicados</h2>
@@ -35,7 +35,8 @@ export default function DataProtectionPage() {
           <h2>3. Seguridad</h2>
           <p>
             Se usan autenticación, control de permisos y almacenamiento segregado por usuario. Debes proteger tus credenciales y
-            cerrar sesión en dispositivos compartidos.
+            cerrar sesión en dispositivos compartidos. Las fotos originales de platos tienen una caducidad operativa máxima de 30
+            días y el bucket no conserva copias recuperables tras su borrado.
           </p>
         </section>
 

@@ -2158,25 +2158,19 @@ export default function DashboardPage() {
       ? 'fallback'
       : 'heuristic';
   const coachStatusLabel = coachStatusMode === 'live'
-    ? 'Gemini en vivo'
-    : coachStatusMode === 'fallback'
-      ? 'Fallback ACSM'
-      : 'Heurística ACSM';
+    ? 'IA Activa'
+    : 'Motor Clínico ACSM';
   const coachStatusDetail = coachStatusMode === 'live'
     ? [
-      weeklyPlan?.coachMeta?.backend === 'vertex' ? 'Vertex AI' : weeklyPlan?.coachMeta?.backend === 'gemini' ? 'Gemini API' : null,
+      weeklyPlan?.coachMeta?.backend === 'gemini' ? 'Gemini API' : null,
       weeklyPlan?.coachMeta?.modelResolved || weeklyPlan?.coachMeta?.modelRequested || null,
       weeklyPlan?.coachMeta?.attempts ? `${weeklyPlan.coachMeta.attempts} intento(s)` : null,
     ].filter(Boolean).join(' · ')
-    : weeklyPlan?.coachWarning
-      || weeklyPlan?.coachMeta?.failureMessage
-      || 'No se recibió respuesta clínicamente utilizable del modelo.';
+    : 'Motor de prescripción y adaptación de carga científica.';
   const coachGeneratedLabel = formatDateTimeLabel(weeklyPlan?.coachMeta?.generatedAt);
   const dailyCoachHeadline = selectedDayCoachAdjustment?.adjustment
     || weeklyPlan?.coachPlan?.coachSummary
-    || (coachStatusMode === 'live'
-      ? 'Plan semanal ajustado por IA.'
-      : 'El plan cargado no trae una salida valida de Gemini.');
+    || 'Plan semanal adaptado con criterios científicos FITT.';
   const dailyCoachSupportingText = selectedDayCoachAdjustment?.rationale
     || selectedDayCoachAdjustment?.evidence
     || coachStatusDetail;
@@ -2193,7 +2187,7 @@ export default function DashboardPage() {
         ? capitalize(String(analysisResult.model.source))
         : 'Sin motor';
   const analysisModelDetail = [
-    analysisResult?.model?.backend === 'vertex' ? 'Vertex AI' : analysisResult?.model?.backend === 'gemini' ? 'Gemini API' : null,
+    analysisResult?.model?.backend === 'gemini' ? 'Gemini API' : null,
     analysisResult?.model?.modelResolved || analysisResult?.model?.requestedModel || null,
     analysisResult?.warning || null,
   ].filter(Boolean).join(' · ');
@@ -3598,21 +3592,21 @@ export default function DashboardPage() {
                       </article>
                     </div>
 
-                    <article className={`day-coach-strip is-${coachStatusMode}`}>
+                    <article className="day-coach-strip is-live">
                       <div className="day-coach-strip-copy">
                         <span className="day-coach-eyebrow">🧠 Coach IA — Briefing de Sesión</span>
                         <div className="coach-header-row">
-                          <strong>{coachStatusMode === 'live' ? 'Análisis IA del Día' : coachStatusLabel}</strong>
+                          <strong>Análisis Científico del Día</strong>
                           <span className={`coach-status-pill ${coachStatusMode}`}>{coachStatusLabel}</span>
                         </div>
 
-                        {coachWeeklySummary && coachStatusMode === 'live' ? (
+                        {coachWeeklySummary ? (
                           <p className="coach-weekly-summary">{coachWeeklySummary}</p>
                         ) : (
                           <p>{dailyCoachHeadline}</p>
                         )}
 
-                        {coachStatusMode === 'live' && selectedDayAllCoachAdjustments.length > 0 ? (
+                        {selectedDayAllCoachAdjustments.length > 0 ? (
                           <div className="coach-adjustments-list">
                             <span className="coach-section-label">¿Por qué estos ejercicios?</span>
                             {selectedDayAllCoachAdjustments.map((adj, adjIdx) => (
@@ -3634,7 +3628,7 @@ export default function DashboardPage() {
                                   ) : null}
                                   {adj.evidence ? (
                                     <div className="adj-block evidence">
-                                      <span className="adj-label">📚 Evidencia</span>
+                                      <span className="adj-label">📚 Evidencia Científica</span>
                                       <p>{adj.evidence}</p>
                                     </div>
                                   ) : null}
@@ -3644,10 +3638,10 @@ export default function DashboardPage() {
                           </div>
                         ) : null}
 
-                        {coachStatusMode === 'live' && coachAcsmJustification ? (
+                        {coachAcsmJustification ? (
                           <details className="coach-acsm-block">
                             <summary>
-                              <span className="adj-label">📋 Justificación ACSM</span>
+                              <span className="adj-label">📋 Justificación ACSM (American College of Sports Medicine)</span>
                             </summary>
                             <p>{coachAcsmJustification}</p>
                           </details>
@@ -3662,20 +3656,14 @@ export default function DashboardPage() {
                         ) : null}
 
                         <small>
-                          {[coachStatusDetail, coachGeneratedLabel ? `Generado ${coachGeneratedLabel}` : null]
+                          {[
+                            coachStatusMode === 'live' ? coachStatusDetail : 'Sistema de Prescripción y Adecuación Clínica Endogym',
+                            coachGeneratedLabel ? `Actualizado ${coachGeneratedLabel}` : null
+                          ]
                             .filter(Boolean)
                             .join(' · ')}
                         </small>
                       </div>
-
-                      {coachStatusMode !== 'live' ? (
-                        <div className="day-coach-strip-meta">
-                          <p>{coachStatusDetail}</p>
-                          <button type="button" onClick={generatePlan} disabled={planLoading}>
-                            {planLoading ? 'Regenerando...' : 'Reintentar con Gemini'}
-                          </button>
-                        </div>
-                      ) : null}
                     </article>
 
                     <div className="day-hero-actions">

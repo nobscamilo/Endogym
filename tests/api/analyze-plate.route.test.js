@@ -9,7 +9,10 @@ const mocks = vi.hoisted(() => ({
   callGeminiPlateModel: vi.fn(),
   isGeminiConfigured: vi.fn(),
   resolveGeminiPlateModel: vi.fn(),
+  enforceUserRateLimit: vi.fn(),
+  getRateLimitHeaders: vi.fn(),
   logError: vi.fn(),
+  logInfo: vi.fn(),
 }));
 
 vi.mock('../../src/lib/auth.js', () => {
@@ -36,9 +39,18 @@ vi.mock('../../src/services/geminiClient.js', () => ({
   resolveGeminiPlateModel: mocks.resolveGeminiPlateModel,
 }));
 
+vi.mock('../../src/lib/rateLimit.js', () => ({
+  RATE_LIMIT_SCOPES: {
+    PLATE_ANALYSIS: 'plate-analysis',
+  },
+  enforceUserRateLimit: mocks.enforceUserRateLimit,
+  getRateLimitHeaders: mocks.getRateLimitHeaders,
+}));
+
 vi.mock('../../src/lib/logger.js', () => ({
   withTrace: async (_operation, handler) => handler({ traceId: 'trace-test' }),
   logError: mocks.logError,
+  logInfo: mocks.logInfo,
 }));
 
 const { POST } = await import('../../src/app/api/analyze-plate/route.js');
@@ -49,6 +61,11 @@ function todayIsoDate() {
 
 async function readJson(response) {
   return response.json();
+}
+
+function jpegDataUrl(payload = 'fake-image') {
+  const bytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from(payload)]);
+  return `data:image/jpeg;base64,${bytes.toString('base64')}`;
 }
 
 describe('/api/analyze-plate route', () => {
@@ -66,7 +83,10 @@ describe('/api/analyze-plate route', () => {
     mocks.callGeminiPlateModel.mockReset();
     mocks.isGeminiConfigured.mockReset();
     mocks.resolveGeminiPlateModel.mockReset();
+    mocks.enforceUserRateLimit.mockReset();
+    mocks.getRateLimitHeaders.mockReset();
     mocks.logError.mockReset();
+    mocks.logInfo.mockReset();
 
     mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1' });
     mocks.getLatestWeeklyPlan.mockResolvedValue({
@@ -115,6 +135,17 @@ describe('/api/analyze-plate route', () => {
       },
     });
     mocks.resolveGeminiPlateModel.mockReturnValue('gemini-plate-model');
+    mocks.enforceUserRateLimit.mockResolvedValue({
+      allowed: true,
+      limit: 10,
+      remaining: 9,
+      retryAfterSeconds: 600,
+    });
+    mocks.getRateLimitHeaders.mockReturnValue({
+      'ratelimit-limit': '10',
+      'ratelimit-remaining': '9',
+      'ratelimit-reset': '600',
+    });
 
     process.env.GEMINI_FORCE_MOCK = 'false';
     process.env.GEMINI_FALLBACK_TO_MOCK = 'true';
@@ -164,7 +195,7 @@ describe('/api/analyze-plate route', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: `data:image/jpeg;base64,${Buffer.from('fake-image').toString('base64')}`,
+          imageBase64: jpegDataUrl(),
           context: { dish: 'Pollo con arroz' },
           eatenAt: new Date().toISOString(),
         }),
@@ -189,7 +220,7 @@ describe('/api/analyze-plate route', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: `data:image/jpeg;base64,${Buffer.from('fake-image').toString('base64')}`,
+          imageBase64: jpegDataUrl(),
           context: { dish: 'Plato fallback' },
         }),
       })
@@ -213,7 +244,7 @@ describe('/api/analyze-plate route', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: `data:image/jpeg;base64,${Buffer.from('fake-image').toString('base64')}`,
+          imageBase64: jpegDataUrl(),
           context: { dish: 'No fallback' },
         }),
       })
@@ -261,7 +292,7 @@ describe('/api/analyze-plate route', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: `data:image/jpeg;base64,${Buffer.from('fake-image').toString('base64')}`,
+          imageBase64: jpegDataUrl(),
           context: { dish: 'Plato combinado' },
         }),
       })
@@ -272,5 +303,76 @@ describe('/api/analyze-plate route', () => {
     expect(json.analysis.totals.calories).toBe(540);
     expect(json.warning).toContain('No se pudo guardar la foto del plato');
     expect(json.storagePath).toBeNull();
+  });
+
+  it('rejects bytes that are not a supported image before Storage or Gemini', async () => {
+    mocks.isGeminiConfigured.mockReturnValue(true);
+
+    const response = await POST(
+      new Request('http://localhost/api/analyze-plate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: `data:image/jpeg;base64,${Buffer.from('not-an-image').toString('base64')}`,
+        }),
+      })
+    );
+    const json = await readJson(response);
+
+    expect(response.status).toBe(400);
+    expect(json.error).toContain('Formato de imagen');
+    expect(mocks.getAdminServices).not.toHaveBeenCalled();
+    expect(mocks.callGeminiPlateModel).not.toHaveBeenCalled();
+  });
+
+  it('rejects a declared MIME type that differs from the binary signature', async () => {
+    const jpegBytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from('fake-image')]);
+
+    const response = await POST(
+      new Request('http://localhost/api/analyze-plate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: `data:image/png;base64,${jpegBytes.toString('base64')}`,
+        }),
+      })
+    );
+    const json = await readJson(response);
+
+    expect(response.status).toBe(400);
+    expect(json.error).toContain('no coincide');
+    expect(mocks.getAdminServices).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 with Retry-After when the persistent limit is exhausted', async () => {
+    mocks.enforceUserRateLimit.mockResolvedValue({
+      allowed: false,
+      limit: 10,
+      remaining: 0,
+      retryAfterSeconds: 123,
+    });
+    mocks.getRateLimitHeaders.mockReturnValue({
+      'ratelimit-limit': '10',
+      'ratelimit-remaining': '0',
+      'ratelimit-reset': '123',
+      'retry-after': '123',
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/analyze-plate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ imageBase64: jpegDataUrl() }),
+      })
+    );
+    const json = await readJson(response);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('123');
+    expect(json.details.retryAfterSeconds).toBe(123);
+    expect(mocks.getLatestWeeklyPlan).not.toHaveBeenCalled();
+    expect(mocks.logInfo).toHaveBeenCalledWith('rate_limit_exceeded', expect.objectContaining({
+      scope: 'plate-analysis',
+    }));
   });
 });

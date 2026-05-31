@@ -13,7 +13,7 @@ export default function PrivacyPage() {
     <main className="legal-shell">
       <article className="legal-card">
         <h1>Política de Privacidad</h1>
-        <p className="legal-meta">Versión 2026-04-02</p>
+        <p className="legal-meta">Versión 2026-05-31</p>
 
         <section>
           <h2>1. Responsable del tratamiento</h2>
@@ -51,7 +51,8 @@ export default function PrivacyPage() {
           <h2>5. Conservación</h2>
           <p>
             Conservamos los datos mientras la cuenta esté activa o mientras sea necesario para obligaciones legales, seguridad y
-            trazabilidad.
+            trazabilidad. Las fotos originales de platos se eliminan automáticamente cuando superan 30 días. Si eliminas tu cuenta,
+            solicitamos el borrado de sus fotos y datos asociados sin conservar copias recuperables en el bucket operativo.
           </p>
         </section>
 

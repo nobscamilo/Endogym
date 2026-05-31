@@ -1,7 +1,7 @@
 import { getAdminServices } from '../firebaseAdmin.js';
 
 const PROFILE_DOC_ID = 'main';
-const ACCOUNT_COLLECTIONS = ['profile', 'meals', 'workouts', 'metrics', 'weeklyPlans'];
+const ACCOUNT_COLLECTIONS = ['profile', 'meals', 'workouts', 'metrics', 'weeklyPlans', 'rateLimits'];
 const DEFAULT_EXPORT_LIMIT = 5000;
 
 function sanitizeFood(food) {

@@ -21,12 +21,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Reject unresolved merge markers
+      run: |
+        if git grep -nE '^(<<<<<<< .+|=======|>>>>>>> .+)$' -- .; then
+          echo "Unresolved Git conflict markers found."
+          exit 1
+        fi
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
-    - run: npm run build --if-present
-    - run: npm run smoke --if-present
-    - run: npm test --if-present
+    - run: npm run audit
+    - run: npm run check:conflicts
+    - run: npm run smoke
+    - run: npm test
+    - run: npm run build

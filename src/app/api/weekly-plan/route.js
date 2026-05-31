@@ -7,6 +7,7 @@ import {
   isGeminiConfigured,
   resolveGeminiCoachModel,
 } from '../../../services/exerciseCoachClient.js';
+import { sanitizeGoogleAiModelNameForLog } from '../../../services/googleGenAiTransport.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import {
   createWeeklyPlan,
@@ -21,6 +22,7 @@ import {
 } from '../../../lib/repositories/firestoreRepository.js';
 import { errorResponse, jsonResponse } from '../../../lib/http.js';
 import { logError, logInfo, withTrace } from '../../../lib/logger.js';
+import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 
 function parseLimit(searchParams) {
   const raw = searchParams.get('limit');
@@ -252,6 +254,27 @@ export async function POST(request) {
   try {
     return await withTrace('weekly_plan_generate', async ({ traceId }) => {
       const user = await getAuthenticatedUser(request);
+      const rateLimit = await enforceUserRateLimit({
+        userId: user.uid,
+        scope: RATE_LIMIT_SCOPES.WEEKLY_PLAN_GENERATE,
+      });
+      const rateLimitHeaders = getRateLimitHeaders(rateLimit);
+
+      if (!rateLimit.allowed) {
+        logInfo('rate_limit_exceeded', {
+          traceId,
+          userId: user.uid,
+          scope: RATE_LIMIT_SCOPES.WEEKLY_PLAN_GENERATE,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        });
+        return errorResponse(
+          'Demasiadas generaciones de plan semanal. Espera antes de volver a intentarlo.',
+          429,
+          { retryAfterSeconds: rateLimit.retryAfterSeconds },
+          rateLimitHeaders
+        );
+      }
+
       const profile = await getUserProfile(user.uid);
 
       if (!profile) {
@@ -306,6 +329,7 @@ export async function POST(request) {
       const fallbackEnabled = parseBoolean(process.env.GEMINI_FALLBACK_TO_MOCK, true);
       const geminiConfigured = isGeminiConfigured();
       const coachModel = resolveGeminiCoachModel();
+      const coachModelForLog = sanitizeGoogleAiModelNameForLog(coachModel);
       let coachSource = 'heuristic';
       let coachWarning = null;
       let coachMeta = {
@@ -315,7 +339,7 @@ export async function POST(request) {
         source: 'heuristic',
         fallbackApplied: true,
         backend: null,
-        modelRequested: coachModel,
+        modelRequested: coachModelForLog,
         modelResolved: null,
         attempts: 0,
         failureCode: null,
@@ -347,7 +371,7 @@ export async function POST(request) {
             source: 'gemini',
             fallbackApplied: false,
             backend: aiCoach?.diagnostics?.backend || 'gemini',
-            modelResolved: aiCoach?.diagnostics?.modelResolved ?? coachModel,
+            modelResolved: sanitizeGoogleAiModelNameForLog(aiCoach?.diagnostics?.modelResolved ?? coachModel),
             attempts: Number.isInteger(aiCoach?.diagnostics?.attempts) ? aiCoach.diagnostics.attempts : 1,
             generatedAt: aiCoach?.diagnostics?.generatedAt || new Date().toISOString(),
           };
@@ -359,7 +383,7 @@ export async function POST(request) {
             source: 'heuristic',
             fallbackApplied: true,
             backend: null,
-            modelResolved: failure.model ?? coachModel,
+            modelResolved: sanitizeGoogleAiModelNameForLog(failure.model ?? coachModel),
             attempts: failure.attempt ?? coachMeta.attempts,
             failureCode: failure.code,
             failureMessage: failure.message,
@@ -383,11 +407,11 @@ export async function POST(request) {
           failureMessage: 'GEMINI_FORCE_MOCK=true',
         };
       } else if (!geminiConfigured) {
-        coachWarning = 'No hay backend Google AI/Vertex configurado; se usó prescripción heurística ACSM.';
+        coachWarning = 'No hay backend Gemini Developer API configurado; se usó prescripción heurística ACSM.';
         coachMeta = {
           ...coachMeta,
           failureCode: 'GEMINI_COACH_NOT_CONFIGURED',
-          failureMessage: 'Sin GEMINI_API_KEY ni credenciales Vertex AI',
+          failureMessage: 'Sin GEMINI_API_KEY',
         };
       }
 
@@ -443,7 +467,7 @@ export async function POST(request) {
         });
       }
 
-      return jsonResponse({ traceId, plan: createdPlan }, 201);
+      return jsonResponse({ traceId, plan: createdPlan }, 201, rateLimitHeaders);
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {

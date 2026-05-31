@@ -1,5 +1,10 @@
 import { buildExerciseCoachPrompt } from './exerciseCoachPrompt.js';
-import { isGoogleAiConfigured, requestGoogleGenerateContent, resolveGoogleAiBackend } from './googleGenAiTransport.js';
+import {
+  isGoogleAiConfigured,
+  isValidGoogleAiModelName,
+  requestGoogleGenerateContent,
+  resolveGoogleAiBackend,
+} from './googleGenAiTransport.js';
 const RETRIABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 const MAX_ERROR_SNIPPET = 500;
 
@@ -175,15 +180,22 @@ export function resolveGeminiCoachModel() {
 
 export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) {
   if (!isGeminiConfigured()) {
-    throw new GeminiCoachError('No existe configuración de Google AI ni Vertex AI.', {
+    throw new GeminiCoachError('No existe configuración de Gemini Developer API.', {
       code: 'GEMINI_COACH_NOT_CONFIGURED',
     });
   }
 
   const baseModel = resolveGeminiCoachModel();
+  if (!isValidGoogleAiModelName(baseModel)) {
+    throw new GeminiCoachError('GEMINI_MODEL_COACH no contiene un identificador gemini-* valido.', {
+      code: 'GEMINI_COACH_INVALID_MODEL',
+    });
+  }
+
   const prompt = buildExerciseCoachPrompt({ profile, weeklyPlan });
-  const maxRetries = toPositiveInteger(process.env.GEMINI_COACH_MAX_RETRIES, 2, 0, 5);
+  const maxRetries = toPositiveInteger(process.env.GEMINI_COACH_MAX_RETRIES, 1, 0, 2);
   const retryBaseMs = toPositiveInteger(process.env.GEMINI_COACH_RETRY_BASE_MS, 350, 100, 5_000);
+  const timeoutMs = toPositiveInteger(process.env.GEMINI_COACH_TIMEOUT_MS, 10_000, 1_000, 12_000);
   const maxAttempts = maxRetries + 1;
   let lastError = null;
 
@@ -199,14 +211,18 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) 
       const { backend, response } = await requestGoogleGenerateContent({
         model,
         traceId,
+        timeoutMs,
         parts: [{ text: prompt }],
         generationConfig: {
           temperature: 0.2,
           topK: 32,
           topP: 0.9,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 3072,
           responseMimeType: 'application/json',
           responseJsonSchema: COACH_SCHEMA,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         },
       });
 

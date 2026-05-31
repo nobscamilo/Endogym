@@ -1,14 +1,22 @@
 import crypto from 'node:crypto';
 import { analyzePlateWithGemini } from '../../../services/geminiPlateAnalyzer.js';
 import { callGeminiPlateModel, isGeminiConfigured, resolveGeminiPlateModel } from '../../../services/geminiClient.js';
+import { sanitizeGoogleAiModelNameForLog } from '../../../services/googleGenAiTransport.js';
 import { evaluateMealAdherence } from '../../../core/adherence.js';
 import { createMeal, getLatestWeeklyPlan, getUserProfile } from '../../../lib/repositories/firestoreRepository.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { errorResponse, jsonResponse } from '../../../lib/http.js';
-import { logError, withTrace } from '../../../lib/logger.js';
+import { logError, logInfo, withTrace } from '../../../lib/logger.js';
+import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function normalizeImageContentType(contentType) {
+  const normalized = String(contentType || '').trim().toLowerCase();
+  return normalized === 'image/jpg' ? 'image/jpeg' : normalized;
+}
 
 function normalizeBase64Image(imageBase64) {
   if (typeof imageBase64 !== 'string' || !imageBase64.trim()) {
@@ -20,25 +28,53 @@ function normalizeBase64Image(imageBase64) {
 
   if (dataUrlMatch) {
     return {
-      contentType: dataUrlMatch[1],
+      declaredContentType: normalizeImageContentType(dataUrlMatch[1]),
       rawBase64: dataUrlMatch[2],
     };
   }
 
   return {
-    contentType: 'image/jpeg',
+    declaredContentType: null,
     rawBase64: trimmed,
   };
 }
 
 function decodeBase64ToBuffer(rawBase64) {
   try {
-    const buffer = Buffer.from(rawBase64, 'base64');
+    const normalized = String(rawBase64 || '').replace(/\s+/g, '');
+    if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
+      return null;
+    }
+
+    const buffer = Buffer.from(normalized, 'base64');
     if (!buffer.length) return null;
     return buffer;
   } catch {
     return null;
   }
+}
+
+function detectImageContentType(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+
+  if (
+    buffer.length >= 8
+    && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return 'image/png';
+  }
+
+  if (
+    buffer.length >= 12
+    && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+    && buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+
+  return null;
 }
 
 function getFileExtension(contentType) {
@@ -145,6 +181,27 @@ export async function POST(request) {
   try {
     return await withTrace('plate_analysis', async ({ traceId }) => {
       const user = await getAuthenticatedUser(request);
+      const rateLimit = await enforceUserRateLimit({
+        userId: user.uid,
+        scope: RATE_LIMIT_SCOPES.PLATE_ANALYSIS,
+      });
+      const rateLimitHeaders = getRateLimitHeaders(rateLimit);
+
+      if (!rateLimit.allowed) {
+        logInfo('rate_limit_exceeded', {
+          traceId,
+          userId: user.uid,
+          scope: RATE_LIMIT_SCOPES.PLATE_ANALYSIS,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        });
+        return errorResponse(
+          'Demasiados análisis de plato. Espera antes de volver a intentarlo.',
+          429,
+          { retryAfterSeconds: rateLimit.retryAfterSeconds },
+          rateLimitHeaders
+        );
+      }
+
       let payload;
 
       try {
@@ -168,6 +225,34 @@ export async function POST(request) {
         return errorResponse('La imagen supera el límite de 5MB.', 413);
       }
 
+      const contentType = detectImageContentType(imageBuffer);
+      if (!contentType) {
+        logInfo('plate_image_rejected', {
+          traceId,
+          userId: user.uid,
+          reason: 'unsupported_signature',
+        });
+        return errorResponse('Formato de imagen no soportado. Usa JPEG, PNG o WEBP.', 400);
+      }
+
+      if (image.declaredContentType && !SUPPORTED_IMAGE_TYPES.has(image.declaredContentType)) {
+        logInfo('plate_image_rejected', {
+          traceId,
+          userId: user.uid,
+          reason: 'unsupported_content_type',
+        });
+        return errorResponse('Content-Type de imagen no soportado. Usa JPEG, PNG o WEBP.', 400);
+      }
+
+      if (image.declaredContentType && image.declaredContentType !== contentType) {
+        logInfo('plate_image_rejected', {
+          traceId,
+          userId: user.uid,
+          reason: 'content_type_mismatch',
+        });
+        return errorResponse('El Content-Type declarado no coincide con la firma real de la imagen.', 400);
+      }
+
       const [weeklyPlan, profile] = await Promise.all([getLatestWeeklyPlan(user.uid), getUserProfile(user.uid)]);
       const todayPlanTarget = weeklyPlan?.days?.find((day) => day.date === new Date().toISOString().slice(0, 10))?.nutritionTarget ?? null;
       const promptContext = buildPromptContext({
@@ -179,7 +264,7 @@ export async function POST(request) {
       const { storagePath, storageWarning } = await tryUploadPlateImage({
         userId: user.uid,
         imageBuffer,
-        contentType: image.contentType,
+        contentType,
         traceId,
       });
 
@@ -188,7 +273,7 @@ export async function POST(request) {
       let modelSource = 'mock';
       let fallbackReason = null;
       let modelResolved = null;
-      const modelRequested = resolveGeminiPlateModel();
+      const modelRequested = sanitizeGoogleAiModelNameForLog(resolveGeminiPlateModel());
 
       const callModel = async ({ imageBase64, promptContext: modelPromptContext }) => {
         if (forceMock || !isGeminiConfigured()) {
@@ -201,13 +286,13 @@ export async function POST(request) {
         try {
           const modelOutput = await callGeminiPlateModel({
             imageBase64,
-            contentType: image.contentType,
+            contentType,
             promptContext: modelPromptContext,
             nutritionTargets: todayPlanTarget,
             traceId,
           });
           modelSource = 'gemini';
-          modelResolved = modelOutput?.diagnostics?.modelResolved ?? modelRequested;
+          modelResolved = sanitizeGoogleAiModelNameForLog(modelOutput?.diagnostics?.modelResolved ?? modelRequested);
           return modelOutput;
         } catch (error) {
           logError('gemini_call_failed', error, { traceId, userId: user.uid });
@@ -248,6 +333,18 @@ export async function POST(request) {
         },
       });
 
+      logInfo('plate_analysis_result', {
+        traceId,
+        userId: user.uid,
+        mealId: mealRecord.id,
+        modelSource,
+        modelRequested,
+        modelResolved,
+        fallbackApplied: Boolean(fallbackReason),
+        storageSaved: Boolean(storagePath),
+        storageWarning: Boolean(storageWarning),
+      });
+
       return jsonResponse(
         {
           traceId,
@@ -267,7 +364,8 @@ export async function POST(request) {
           meal: mealRecord,
           warning: [fallbackReason, storageWarning].filter(Boolean).join(' · ') || null,
         },
-        201
+        201,
+        rateLimitHeaders
       );
     });
   } catch (error) {

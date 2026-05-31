@@ -8,12 +8,13 @@ export function jsonResponse(data, status = 200, headers = {}) {
   });
 }
 
-export function errorResponse(message, status = 400, details = undefined) {
+export function errorResponse(message, status = 400, details = undefined, headers = {}) {
   return jsonResponse(
     {
       error: message,
       details,
     },
-    status
+    status,
+    headers
   );
 }

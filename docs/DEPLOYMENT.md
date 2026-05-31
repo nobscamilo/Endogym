@@ -1,71 +1,122 @@
-# Guía de Despliegue en Vercel (Proyecto: Endogym)
+# Deploy de Endogym en Vercel
 
-## Estado y Diagnóstico de Despliegue
+## Estado verificado
 
-El proyecto está configurado para un flujo de **Integración Continua (CI/CD)** automático a través de GitHub. Cada vez que se realiza un push a la rama `main` de GitHub, Vercel compila e implementa la aplicación automáticamente.
+Verificacion realizada el **31 de mayo de 2026**:
 
-Si necesitas desplegar o vincular de forma manual utilizando el CLI de Vercel, sigue las instrucciones a continuación.
+- proyecto Vercel `endogym` con Production `Ready`;
+- `https://endogym.vercel.app/` responde HTTP `200` sin redirecciones;
+- `https://endogym.vercel.app/api/health` responde HTTP `200` sin redirecciones;
+- `/api/meals` sin token responde `401`;
+- `/api/profile`, `/api/meals` y `/api/analyze-plate` se probaron con usuario temporal autenticado.
 
----
+Auditoria posterior del **31 de mayo de 2026**:
 
-## Pasos para Despliegue Manual con Vercel CLI
+- la API key publica Firebase sigue operativa;
+- Firebase Auth autoriza `endogym.vercel.app` y Google OAuth devuelve URI de autenticacion;
+- `FIREBASE_PRIVATE_KEY` fue corregida en Vercel y parsea correctamente;
+- `/api/profile` y `/api/meals` autenticados responden `200`;
+- `/api/analyze-plate` responde `201`, guarda foto y usa Gemini live sin fallback;
+- `/api/weekly-plan` responde `201` y genera coaching Gemini live con `gemini-2.5-flash` sin fallback;
+- el bucket privado `endogym-vtety8-plates-eu` tiene acceso uniforme y prevencion publica;
+- las fotos `plates/` caducan a los 30 dias y soft delete esta deshabilitado;
+- la key Gemini expuesta fue revocada y reemplazada por una key restringida a `generativelanguage.googleapis.com`;
+- `firebasevertexai.googleapis.com` esta deshabilitado y `aiplatform.googleapis.com` no esta habilitado.
 
-### 1. Autenticar el CLI de Vercel
-Inicia sesión en tu cuenta de Vercel desde la terminal:
+## Variables
+
+Servidor:
+
+```text
+FIREBASE_PROJECT_ID
+FIREBASE_CLIENT_EMAIL
+FIREBASE_PRIVATE_KEY
+FIREBASE_STORAGE_BUCKET
+GOOGLE_AI_BACKEND=gemini
+GEMINI_API_KEY
+GEMINI_MODEL
+GEMINI_MODEL_PLATE
+GEMINI_MODEL_COACH
+GEMINI_COACH_MAX_RETRIES=1
+GEMINI_COACH_TIMEOUT_MS=10000
+GEMINI_FORCE_MOCK=false
+GEMINI_FALLBACK_TO_MOCK=true
+PLATE_ANALYSIS_RATE_LIMIT_MAX=10
+PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS=600
+WEEKLY_PLAN_RATE_LIMIT_MAX=4
+WEEKLY_PLAN_RATE_LIMIT_WINDOW_SECONDS=3600
+AUTH_DISABLED=false
+```
+
+Cliente:
+
+```text
+NEXT_PUBLIC_SITE_URL=https://endogym.vercel.app
+NEXT_PUBLIC_APP_URL=https://endogym.vercel.app
+NEXT_PUBLIC_AUTH_DISABLED=false
+NEXT_PUBLIC_FIREBASE_API_KEY
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+NEXT_PUBLIC_FIREBASE_PROJECT_ID
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+NEXT_PUBLIC_FIREBASE_APP_ID
+```
+
+## Pendientes antes de usuarios reales
+
+1. Completar revision legal humana de privacidad, consentimiento y disclaimer medico por mercado.
+2. Decidir si se sube Vercel desde `hobby` para activar Alerts y Log Drains.
+
+## Deploy
+
 ```bash
 npx vercel login
-```
-
-### 2. Vincular el Proyecto Local
-Vincula este repositorio local al proyecto en Vercel con el nombre **Endogym**:
-```bash
-npx vercel link --project Endogym
-```
-
-### 3. Configurar Variables de Entorno en el Panel de Vercel
-Es **crítico** configurar las siguientes variables de entorno en el panel de Vercel (Dashboard -> Settings -> Environment Variables) para que la API y la UI funcionen en producción. **No las incluyas en tu código ni en commits por razones de seguridad.**
-
-#### Variables del Servidor (Firebase Admin & Gemini IA)
-| Variable | Descripción | Valor Recomendado |
-|---|---|---|
-| `FIREBASE_PROJECT_ID` | ID de tu proyecto Firebase | Obtenido de Firebase Console |
-| `FIREBASE_CLIENT_EMAIL` | Email de la cuenta de servicio | Obtenido del JSON de credenciales |
-| `FIREBASE_PRIVATE_KEY` | Clave privada de la cuenta de servicio | Asegura mantener los saltos de línea `\n` |
-| `FIREBASE_STORAGE_BUCKET` | Nombre del bucket de Firebase Storage | `[id-proyecto].appspot.com` |
-| `GOOGLE_AI_BACKEND` | Selector del motor de inteligencia artificial | `gemini` o `vertex` |
-| `GEMINI_API_KEY` | API Key de Google AI Studio | Tu API Key real de Gemini |
-| `GEMINI_MODEL` | Modelo general para fallbacks | `gemini-3-flash-preview` |
-| `GEMINI_MODEL_PLATE` | Modelo para análisis multimodal de comidas | `gemini-3-flash-preview` |
-| `GEMINI_MODEL_COACH` | Modelo para el Coach IA interactivo | `gemini-3.1-pro-preview` |
-| `GEMINI_FORCE_MOCK` | Forzar simulación de IA (fines de prueba) | `false` |
-| `GEMINI_FALLBACK_TO_MOCK`| Permitir fallback heurístico si falla la IA | `true` |
-
-#### Variables Públicas de Frontend (Firebase Client)
-| Variable | Descripción |
-|---|---|
-| `NEXT_PUBLIC_APP_URL` | URL de producción de la app en Vercel (ej: `https://endogym.vercel.app`) |
-| `NEXT_PUBLIC_AUTH_DISABLED` | Habilitar/deshabilitar login real en UI (`false` para producción con login real) |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | API Key pública del cliente Firebase |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Dominio de Firebase Auth para redirección |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ID del proyecto para inicializar Firebase en cliente |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`| Bucket público de almacenamiento |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`| Sender ID para notificaciones (opcional) |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | ID de la App Web de Firebase |
-
-### 4. Lanzar Despliegue en Entorno de Desarrollo (Preview)
-```bash
-npx vercel
-```
-
-### 5. Lanzar Despliegue en Entorno de Producción
-```bash
+npx vercel link --project endogym
 npx vercel --prod
 ```
 
----
+Un deploy manual desde CLI puede servir cambios del working tree mientras Vercel muestra el ultimo commit GitHub como metadato de `Source`. Usa `npx vercel inspect https://endogym.vercel.app` y las sondas HTTP para comprobar el runtime. Commit y push son pasos separados necesarios para sincronizar el repositorio con otros colaboradores.
 
-## Recomendaciones Críticas de Producción
+## Checklist post-deploy
 
-1. **Seguridad de Firebase Key**: Al ingresar la variable `FIREBASE_PRIVATE_KEY` en el dashboard de Vercel, asegúrate de copiarla exactamente incluyendo las comillas y los saltos de línea `\n`. Si Vercel experimenta problemas al analizar la clave privada, puedes almacenarla directamente reemplazando los saltos de línea físicos por `\n` literal en una sola línea.
-2. **Autenticación en Producción**: Asegúrate de que `NEXT_PUBLIC_AUTH_DISABLED` esté configurada en `false` en Vercel. De lo contrario, cualquier persona podrá ingresar a la app sin autenticación y sin persistencia individualizada real de Firestore por UID.
-3. **Optimización de Build**: Next.js 15+ utiliza optimizaciones estrictas de Webpack. El proyecto incluye un archivo `vercel.json` configurado correctamente para Next.js en Vercel.
+```bash
+curl -i https://endogym.vercel.app/
+curl -i https://endogym.vercel.app/api/health
+curl -i https://endogym.vercel.app/api/meals
+```
+
+Esperado: `200`, `200`, `401`.
+
+Despues valida con ID token real:
+
+```bash
+curl -i https://endogym.vercel.app/api/meals \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
+```
+
+Confirma ademas:
+
+- login frontend;
+- dominio canonico `endogym.vercel.app` autorizado en Firebase Auth para Google OAuth;
+- escritura y lectura Firestore;
+- upload y borrado Storage;
+- inferencia Gemini real sin fallback;
+- coaching semanal Gemini live sin fallback;
+- `traceId` en respuestas y logs;
+- ausencia de secretos en logs.
+
+Sonda automatizada:
+
+```bash
+npm run e2e:production
+```
+
+La sonda valida Google OAuth para el dominio canonico, crea un usuario temporal, valida Auth, Firestore, coaching semanal Gemini live, firma MIME, Storage, analisis de plato Gemini live y ambos rate limits, y elimina sus datos al terminar.
+
+Bucket de fotos actual:
+
+```text
+endogym-vtety8-plates-eu
+```
+
+Es un bucket privado del mismo proyecto Firebase/GCP, usado desde Firebase Admin. No expongas URLs publicas ni dependas de acceso anonimo. Aplica [`../infra/storage-lifecycle.json`](../infra/storage-lifecycle.json): elimina fotos `plates/` al superar 30 dias.

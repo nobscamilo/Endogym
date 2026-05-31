@@ -1,44 +1,52 @@
-# Plan de Trabajo y Roadmap (v0.3.0 → v1.0.0)
+# Roadmap de Endogym
 
-Este documento detalla el estado actual del desarrollo de Endogym y la hoja de ruta para futuras iteraciones y mejoras.
+Ultima actualizacion: **31 de mayo de 2026**.
 
----
+## P0 - Recuperacion y seguridad inmediata
 
-## Estado de Fases de Desarrollo
+- [x] Resolver marcadores de conflicto en 22 archivos.
+- [x] Consolidar documentacion y memoria operativa.
+- [x] Añadir rechazo automatico de conflictos en CI.
+- [x] Corregir `FIREBASE_PRIVATE_KEY` de Vercel y redesplegar.
+- [x] Revocar cualquier API key Gemini expuesta y configurar una nueva key restringida.
+- [x] Auditar tokens Vercel y revocar cinco sesiones web listadas.
+- [x] Eliminar variables Vercel Flags no utilizadas.
+- [x] Provisionar bucket privado `endogym-vtety8-plates-eu`.
+- [x] Deshabilitar servicios Vertex no utilizados.
 
-### 🟢 Fase 0 — Fundación (Completada)
-- [x] Definir arquitectura y dominios clínicos.
-- [x] Implementar motor de cálculo nutricional y control glucémico básico (`src/core/nutrition.js`, `src/core/glucose.js`).
-- [x] Diseñar contratos base y conectores para integraciones con Inteligencia Artificial.
+## P1 - Estabilizacion verificable
 
-### 🟢 Fase 1 — Vertical End-to-End (Completada)
-- [x] Conectar persistencia gestionada con Firebase (`firebase-admin` para Auth, Firestore y Storage).
-- [x] Diseñar e implementar endpoints HTTP API (`/health`, `/meals`, `/workouts`, `/metrics`, `/profile`, `/weekly-plan`, `/analyze-plate`).
-- [x] Crear un Dashboard Web interactivo y responsive en Next.js (App Router, React 19).
-- [x] Integrar trazabilidad y observabilidad unificada mediante `withTrace()` y logs estructurados JSON (`src/lib/logger.js`).
+- [x] Ejecutar `npm install`.
+- [x] Ejecutar `npm run smoke`.
+- [x] Ejecutar `npm test`: 61 tests.
+- [x] Ejecutar `npm run build`.
+- [x] Actualizar Next a `16.2.6` y eliminar vulnerabilidades altas.
+- [x] Verificar Vercel `/` y `/api/health`.
+- [x] Verificar Firebase Auth y Firestore end-to-end.
+- [x] Verificar fallback desplegado de `/api/analyze-plate`.
+- [x] Rotar Gemini y verificar inferencia real sin fallback.
+- [x] Provisionar Storage y verificar upload/borrado.
+- [x] Corregir URL canonica Vercel y redesplegar.
+- [x] Autorizar `endogym.vercel.app` en Firebase Auth y verificar Google OAuth.
+- [x] Corregir `GEMINI_MODEL_COACH` y verificar coaching semanal Gemini live sin fallback.
+- [x] Resolver las 10 vulnerabilidades moderadas transitivas; `npm run audit`: 0.
 
-### 🟡 Fase 2 — Inteligencia Artificial Real & Avanzada (En Progreso)
-- [x] Sustituir el mock de Gemini por llamadas de producción reales usando `GEMINI_API_KEY` (soporta API de Google AI Studio y Vertex AI en GCP).
-- [x] Implementar el **Coach IA Científico** que analiza fatiga, calcula adaptaciones, genera cues de técnica detalladas y redacta justificaciones clínicas/ACSM.
-- [x] Diseñar e implementar un sistema de **fallback robusto y heurístico** para que la aplicación siga operativa si falla la IA (ej: límites de cuota excedidos).
-- [x] Crear la UI del **Coach IA Session Briefing** en el Dashboard, mostrando resúmenes motivacionales diarios, justificaciones de ejercicios y ACSM mediante tarjetas dinámicas interactivas.
-- [ ] Implementar la corrección manual en UI de alimentos/porciones detectados por IA ("humano en el loop").
-- [ ] Optimizar prompts multimodales para análisis de platos para calibrar con mayor precisión el peso visual de los alimentos.
+## P2 - Hardening
 
-### 🟢 Fase 3 — Planificación Inteligente e Interacciones (Completada)
-- [x] Generación de planes nutricionales semanales personalizados, filtrando alimentos según alergias, intolerancias y alimentos desagradables (no preferidos).
-- [x] Cribado Preparticipación ACSM automatizado para seguridad cardíaca y metabólica antes de iniciar rutinas.
-- [x] Ajuste automático de carga de volumen/intensidad semanal en base a la fatiga subjetiva y el historial de progreso.
-- [x] Biblioteca completa de ejercicios clasificados por modalidad deportiva:
-  - Gimnasio Completo (`full_gym`)
-  - Solo Casa / Calistenia (`home`)
-  - Yoga / Flexibilidad (`yoga`)
-  - TRX / Suspensión (`trx`)
-  - Cardio / Running (`running`)
-- [ ] Implementar recomendaciones pre/post entreno específicas según el nivel de glucemia y sensibilidad a la insulina estimadas para el usuario.
+- [x] Validar MIME por magic bytes.
+- [x] Añadir rate limiting persistente.
+- [x] Automatizar E2E controlado contra produccion.
+- [x] Añadir logs estructurados y runbook de observabilidad.
+- [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
+- [x] Aplicar retencion de fotos a 30 dias y deshabilitar soft delete.
+- [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.
+- [x] Bloquear vulnerabilidades moderadas en CI.
+- [x] Rechazar identificadores Gemini invalidos y acotar timeout del coach antes del limite Vercel.
+- [ ] Añadir E2E con emuladores para CI.
 
-### 🔴 Fase 4 — Calidad, Pruebas y Escalabilidad (Siguiente Paso)
-- [ ] Implementar batería completa de tests unitarios y de integración con **Vitest** (esqueleto base configurado en `vitest.config.js`).
-- [ ] Crear flujos de prueba E2E de análisis de platos (cargando fotos simuladas) y generación de planes.
-- [ ] Implementar dashboards de analíticas avanzados para ver la evolución a largo plazo del control glucémico (HbA1c estimada) y fatiga/volumen de entrenamiento.
-- [ ] Auditoría profunda de seguridad, cifrado de datos de salud sensibles y cumplimiento de normativas de privacidad de datos médicos.
+## P3 - Producto
+
+- [ ] Mejorar correccion manual de alimentos y porciones.
+- [ ] Calibrar confianza por tipo de plato.
+- [ ] Ampliar historial y progresion.
+- [ ] Mejorar recomendaciones pre/post entreno con limites clinicos claros.

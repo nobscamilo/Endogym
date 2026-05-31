@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   isGeminiConfigured: vi.fn(),
   callGeminiExerciseCoach: vi.fn(),
   resolveGeminiCoachModel: vi.fn(),
+  enforceUserRateLimit: vi.fn(),
+  getRateLimitHeaders: vi.fn(),
+  logInfo: vi.fn(),
 }));
 
 const envBackup = vi.hoisted(() => ({
@@ -43,8 +46,16 @@ vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
 
 vi.mock('../../src/lib/logger.js', () => ({
   withTrace: async (_operation, handler) => handler({ traceId: 'trace-test' }),
-  logInfo: vi.fn(),
+  logInfo: mocks.logInfo,
   logError: vi.fn(),
+}));
+
+vi.mock('../../src/lib/rateLimit.js', () => ({
+  RATE_LIMIT_SCOPES: {
+    WEEKLY_PLAN_GENERATE: 'weekly-plan-generate',
+  },
+  enforceUserRateLimit: mocks.enforceUserRateLimit,
+  getRateLimitHeaders: mocks.getRateLimitHeaders,
 }));
 
 vi.mock('../../src/services/exerciseCoachClient.js', () => ({
@@ -76,9 +87,23 @@ describe('/api/weekly-plan route', () => {
     mocks.isGeminiConfigured.mockReset();
     mocks.callGeminiExerciseCoach.mockReset();
     mocks.resolveGeminiCoachModel.mockReset();
+    mocks.enforceUserRateLimit.mockReset();
+    mocks.getRateLimitHeaders.mockReset();
+    mocks.logInfo.mockReset();
     mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1' });
     mocks.isGeminiConfigured.mockReturnValue(false);
     mocks.resolveGeminiCoachModel.mockReturnValue('gemini-coach-model');
+    mocks.enforceUserRateLimit.mockResolvedValue({
+      allowed: true,
+      limit: 4,
+      remaining: 3,
+      retryAfterSeconds: 3600,
+    });
+    mocks.getRateLimitHeaders.mockReturnValue({
+      'ratelimit-limit': '4',
+      'ratelimit-remaining': '3',
+      'ratelimit-reset': '3600',
+    });
     mocks.listMealsSince.mockResolvedValue([]);
     mocks.listMetricsSince.mockResolvedValue([]);
     mocks.listWorkoutsSince.mockResolvedValue([]);
@@ -118,6 +143,34 @@ describe('/api/weekly-plan route', () => {
 
     expect(response.status).toBe(409);
     expect(json.error).toContain('No existe perfil');
+  });
+
+  it('POST returns 429 with Retry-After when plan generation limit is exhausted', async () => {
+    mocks.enforceUserRateLimit.mockResolvedValue({
+      allowed: false,
+      limit: 4,
+      remaining: 0,
+      retryAfterSeconds: 321,
+    });
+    mocks.getRateLimitHeaders.mockReturnValue({
+      'ratelimit-limit': '4',
+      'ratelimit-remaining': '0',
+      'ratelimit-reset': '321',
+      'retry-after': '321',
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/weekly-plan', { method: 'POST', body: '{}' })
+    );
+    const json = await readJson(response);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('321');
+    expect(json.details.retryAfterSeconds).toBe(321);
+    expect(mocks.getUserProfile).not.toHaveBeenCalled();
+    expect(mocks.logInfo).toHaveBeenCalledWith('rate_limit_exceeded', expect.objectContaining({
+      scope: 'weekly-plan-generate',
+    }));
   });
 
   it('POST generates and persists weekly plan', async () => {
