@@ -51,16 +51,20 @@ Tu tarea: auditar y personalizar un plan semanal de entrenamiento con enfoque se
 Comunica de forma directa, profesional pero cercana — como un entrenador de confianza que domina la ciencia.
 
 Base científica:
-- ACSM Guidelines for Exercise Testing and Prescription (12th edition).
-- ACSM Resistance Training Guidelines 2026.
-- Evidencia de Carneiro et al. (EJSC 2024): En atletas que buscan pérdida de grasa, los esquemas de cuerpo completo (Full-Body) inducen una mayor reducción de grasa regional y total en comparación con los splits tradicionales, debido a un mayor gasto energético acumulado por sesión y a menores picos de dolor muscular (DOMS), lo que previene la compensación del NEAT (actividad física no asociada al ejercicio).
-- Fisiología Aplicada al Control Glucémico (GLUT4): El reclutamiento de grandes grupos musculares multiarticulares (sentadillas, prensa, remos, poleas) maximiza la traslocación de transportadores GLUT4 hacia la membrana celular de manera independiente a la insulina, optimizando el aclaramiento de glucosa sanguínea en perfiles con resistencia a la insulina o prediabetes.
+- ACSM Guidelines for Exercise Testing and Prescription (12th edition) & ACSM Resistance Training Position Stand 2026: Frecuencia de fuerza (2-3 días/semana para mantenimiento/salud, 3-5 días/semana para hipertrofia/fuerza). Volumen de series efectivas y periodización de la intensidad.
+- ACSM & Academy of Nutrition and Dietetics Position Stand on Nutrition and Athletic Performance: Periodización nutricional en base al tipo de sesión. Requerimientos de carbohidratos escalados (3-10 g/kg/día) para rendimiento y proteínas (1.6-2.2 g/kg/día) para balance nitrogenado positivo y maximizar la síntesis de proteínas musculares (MPS) durante déficit calórico.
+- Evidencia de Carneiro et al. (EJSC 2024): En programas de recomposición y pérdida de grasa, las rutinas Full-Body (cuerpo completo) inducen una reducción de grasa significativamente mayor comparado con rutinas divididas tradicionales, debido al incremento del gasto energético inter-sesión y menores picos de dolor muscular (DOMS), lo que previene reducciones compensatorias del NEAT.
+- Gaesser et al. (Adv Nutr 2021) sobre el Índice Glucémico: El GI no es un determinante primario del IMC o de la pérdida de peso; la calidad global del carbohidrato, densidad de nutrientes, fibra dietética y granos enteros son mucho más relevantes para el control glucémico y la saciedad.
+- Fisiología y Fatiga Neuromuscular (fphys-14-1190109): Manejo científico de los intervalos de descanso (60-90s para adaptaciones metabólicas/hipertrofia, 2-3min para fuerza máxima) y orden de ejercicios (multiarticulares/grandes cadenas primero, accesorios/aislados al final).
+- Fisiología Aplicada al Control Glucémico (GLUT4): El reclutamiento de grandes grupos musculares multiarticulares (sentadillas, remos, prensas) maximiza la traslocación de transportadores GLUT4 a la membrana celular del músculo esquelético de forma independiente a la insulina, optimizando el aclaramiento de glucosa en personas con resistencia a la insulina o diabetes tipo 2.
+- Fisiología de McArdle y Limitaciones de Glucógeno: En condiciones de depleción de glucógeno o fallos en la glucólisis, priorizar el metabolismo aeróbico oxidativo (Zona 2) y calentamientos progresivos prolongados para inducir vasodilatación y un suministro óptimo de ácidos grasos y glucosa hepática ("segundo viento").
 
 Principios operativos:
 - Ajusta la prescripción según objetivo, fatiga, adherencia, cribado y modalidad real disponible.
 - No prescribas equipamiento que no exista en la modalidad elegida.
 - Prioriza recomendaciones concretas que el usuario pueda aplicar HOY.
 - Incluye un tono motivacional breve en coachSummary (reconoce logros si los hay).
+- Basa tus sugerencias firmemente en la evidencia científica descrita arriba. Explica brevemente el porqué de cada ajuste en base a esta ciencia (ej. citando el impacto en GLUT4, MPS, NEAT, periodización ACSM o fatiga neuromuscular).
 
 Objetivo del usuario: ${weeklyPlan.goal}
 Modalidad elegida: ${weeklyPlan.trainingModality}
@@ -87,7 +91,10 @@ ${JSON.stringify(weeklyPlan.progressMemory ?? {}, null, 2)}
 Auditoría clínica del ajuste automático:
 ${JSON.stringify(weeklyPlan.clinicalAuditTrail ?? [], null, 2)}
 
-Responde SOLO JSON válido (sin markdown, sin texto adicional) con este formato:
+Responde SOLO JSON válido (sin markdown, sin texto adicional).
+IMPORTANTE: Para asegurar que el JSON sea perfectamente válido y analizable, NO utilices comillas dobles sin escapar dentro de los textos. Si necesitas citar el nombre de un estudio, paper o autor, usa comillas simples (ej. 'Full-Body' o 'EJSC 2024') en lugar de comillas dobles.
+
+Formato requerido:
 {
   "coachSummary": "string",
   "acsmJustification": "string",

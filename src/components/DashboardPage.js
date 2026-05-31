@@ -411,6 +411,24 @@ function findCoachAdjustmentForDay(adjustments = [], day = null) {
   }) || null;
 }
 
+function findAllCoachAdjustmentsForDay(adjustments = [], day = null) {
+  if (!Array.isArray(adjustments) || !day) return [];
+
+  const dayTokens = [
+    day.dayName,
+    day.date,
+    formatDayNameFromIso(day.date),
+    formatFullDateLabel(day.date),
+  ]
+    .map((token) => normalizeSearchToken(token))
+    .filter(Boolean);
+
+  return adjustments.filter((adjustment) => {
+    const label = normalizeSearchToken(adjustment?.day);
+    return label && dayTokens.some((token) => label.includes(token) || token.includes(label));
+  });
+}
+
 function mealTargetSummary(target) {
   if (!target) return 'Objetivo nutricional no disponible';
   return `${target.calories || 0} kcal · P ${target.proteinGrams || 0} · C ${target.carbsGrams || 0} · G ${target.fatGrams || 0}`;
@@ -2122,6 +2140,15 @@ export default function DashboardPage() {
     () => findCoachAdjustmentForDay(weeklyPlan?.coachPlan?.prescriptionAdjustments || [], selectedDay),
     [selectedDay, weeklyPlan?.coachPlan?.prescriptionAdjustments]
   );
+  const selectedDayAllCoachAdjustments = useMemo(
+    () => findAllCoachAdjustmentsForDay(weeklyPlan?.coachPlan?.prescriptionAdjustments || [], selectedDay),
+    [selectedDay, weeklyPlan?.coachPlan?.prescriptionAdjustments]
+  );
+  const coachWeeklySummary = weeklyPlan?.coachPlan?.coachSummary || null;
+  const coachAcsmJustification = weeklyPlan?.coachPlan?.acsmJustification || null;
+  const coachRiskFlags = Array.isArray(weeklyPlan?.coachPlan?.riskFlags)
+    ? weeklyPlan.coachPlan.riskFlags.filter((flag) => typeof flag === 'string' && flag.trim() && !flag.toLowerCase().includes('ninguno'))
+    : [];
   const weeklySessionCount = plannedDays.length;
   const weeklyMealsCount = weeklyMeals || 0;
   const weeklyKcal = weeklyCaloriesTotal || 0;
@@ -3573,25 +3600,82 @@ export default function DashboardPage() {
 
                     <article className={`day-coach-strip is-${coachStatusMode}`}>
                       <div className="day-coach-strip-copy">
-                        <span className="day-coach-eyebrow">Coach IA</span>
-                        <strong>{coachStatusLabel}</strong>
-                        <p>{dailyCoachHeadline}</p>
+                        <span className="day-coach-eyebrow">🧠 Coach IA — Briefing de Sesión</span>
+                        <div className="coach-header-row">
+                          <strong>{coachStatusMode === 'live' ? 'Análisis IA del Día' : coachStatusLabel}</strong>
+                          <span className={`coach-status-pill ${coachStatusMode}`}>{coachStatusLabel}</span>
+                        </div>
+
+                        {coachWeeklySummary && coachStatusMode === 'live' ? (
+                          <p className="coach-weekly-summary">{coachWeeklySummary}</p>
+                        ) : (
+                          <p>{dailyCoachHeadline}</p>
+                        )}
+
+                        {coachStatusMode === 'live' && selectedDayAllCoachAdjustments.length > 0 ? (
+                          <div className="coach-adjustments-list">
+                            <span className="coach-section-label">¿Por qué estos ejercicios?</span>
+                            {selectedDayAllCoachAdjustments.map((adj, adjIdx) => (
+                              <details
+                                key={`coach-adj-${adjIdx}`}
+                                className="coach-adjustment-card"
+                                open={adjIdx === 0}
+                              >
+                                <summary>
+                                  <span className="adj-number">{adjIdx + 1}</span>
+                                  <span className="adj-title">{adj.adjustment}</span>
+                                </summary>
+                                <div className="adj-body">
+                                  {adj.rationale ? (
+                                    <div className="adj-block">
+                                      <span className="adj-label">Fundamento fisiológico</span>
+                                      <p>{adj.rationale}</p>
+                                    </div>
+                                  ) : null}
+                                  {adj.evidence ? (
+                                    <div className="adj-block evidence">
+                                      <span className="adj-label">📚 Evidencia</span>
+                                      <p>{adj.evidence}</p>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {coachStatusMode === 'live' && coachAcsmJustification ? (
+                          <details className="coach-acsm-block">
+                            <summary>
+                              <span className="adj-label">📋 Justificación ACSM</span>
+                            </summary>
+                            <p>{coachAcsmJustification}</p>
+                          </details>
+                        ) : null}
+
+                        {coachRiskFlags.length > 0 ? (
+                          <div className="coach-risk-flags">
+                            {coachRiskFlags.map((flag, flagIdx) => (
+                              <p key={`risk-${flagIdx}`} className="coach-risk-flag">⚠️ {flag}</p>
+                            ))}
+                          </div>
+                        ) : null}
+
                         <small>
-                          {[dailyCoachSupportingText, coachGeneratedLabel ? `Generado ${coachGeneratedLabel}` : null]
+                          {[coachStatusDetail, coachGeneratedLabel ? `Generado ${coachGeneratedLabel}` : null]
                             .filter(Boolean)
                             .join(' · ')}
                         </small>
                       </div>
 
-                      <div className="day-coach-strip-meta">
-                        <span className={`coach-status-pill ${coachStatusMode}`}>{coachStatusLabel}</span>
-                        <p>{coachStatusDetail}</p>
-                        {coachStatusMode !== 'live' ? (
+                      {coachStatusMode !== 'live' ? (
+                        <div className="day-coach-strip-meta">
+                          <p>{coachStatusDetail}</p>
                           <button type="button" onClick={generatePlan} disabled={planLoading}>
                             {planLoading ? 'Regenerando...' : 'Reintentar con Gemini'}
                           </button>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : null}
                     </article>
 
                     <div className="day-hero-actions">
@@ -3832,29 +3916,6 @@ export default function DashboardPage() {
 
                             <div className="exercise-spotlight-grid">
                               <div className="exercise-detail-stack">
-                                <section className="exercise-muscle-list">
-                                  <div>
-                                    <span>Primarios</span>
-                                    <div className="muscle-chip-row">
-                                      {(activeExercise.primaryMuscles || []).map((muscle, index) => (
-                                        <strong key={`${activeExercise._swapKey}-primary-${index}`} className="muscle-chip primary">
-                                          {muscle}
-                                        </strong>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span>Secundarios</span>
-                                    <div className="muscle-chip-row">
-                                      {(activeExercise.secondaryMuscles || []).map((muscle, index) => (
-                                        <strong key={`${activeExercise._swapKey}-secondary-${index}`} className="muscle-chip secondary">
-                                          {muscle}
-                                        </strong>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </section>
-
                                 {Array.isArray(activeExercise.cues) && activeExercise.cues.length ? (
                                   <section className="exercise-cue-panel premium-cues">
                                     <h5>Técnica Clave & Cues</h5>
@@ -3910,75 +3971,98 @@ export default function DashboardPage() {
                                     </div>
                                   </section>
                                 ) : null}
+                              </div>
 
-                              <section className="exercise-action-panel compact">
-                                <div className="exercise-actions">
-                                  <button
-                                    className="secondary"
-                                    type="button"
-                                    onClick={() => toggleExerciseSwapMenu(
-                                      selectedDay,
-                                      activeExercise._originalExercise || activeExercise,
-                                      activeExerciseIndex
-                                    )}
-                                  >
-                                    {activeExerciseSwapOpen ? 'Cerrar swap 1:1' : 'Cambiar 1:1'}
-                                  </button>
-                                  {activeExercise._replaced ? (
+                              <aside className="exercise-muscle-panel">
+                                <MuscleMapFigure
+                                  anatomyRegions={activeExercise.anatomyRegions}
+                                  primaryMuscles={activeExercise.primaryMuscles}
+                                  secondaryMuscles={activeExercise.secondaryMuscles}
+                                />
+
+                                <section className="exercise-muscle-list">
+                                  <div>
+                                    <span>Primarios</span>
+                                    <div className="muscle-chip-row">
+                                      {(activeExercise.primaryMuscles || []).map((muscle, index) => (
+                                        <strong key={`${activeExercise._swapKey}-primary-${index}`} className="muscle-chip primary">
+                                          {muscle}
+                                        </strong>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span>Secundarios</span>
+                                    <div className="muscle-chip-row">
+                                      {(activeExercise.secondaryMuscles || []).map((muscle, index) => (
+                                        <strong key={`${activeExercise._swapKey}-secondary-${index}`} className="muscle-chip secondary">
+                                          {muscle}
+                                        </strong>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </section>
+
+                                <section className="exercise-action-panel compact">
+                                  <div className="exercise-actions">
                                     <button
                                       className="secondary"
                                       type="button"
-                                      onClick={() => clearExerciseSwap(selectedDay.date, activeExercise._swapKey)}
+                                      onClick={() => toggleExerciseSwapMenu(
+                                        selectedDay,
+                                        activeExercise._originalExercise || activeExercise,
+                                        activeExerciseIndex
+                                      )}
                                     >
-                                      Volver al original
+                                      {activeExerciseSwapOpen ? 'Cerrar swap 1:1' : 'Cambiar 1:1'}
                                     </button>
-                                  ) : null}
-                                  {activeExercise.videoUrl ? (
-                                    <a className="video-link" href={activeExercise.videoUrl} target="_blank" rel="noreferrer">
-                                      Ver técnica
-                                    </a>
-                                  ) : null}
-                                </div>
-
-                                {activeExerciseSwapOpen ? (
-                                  <div className="swap-panel">
-                                    {activeExerciseSwapOptions.length ? (
-                                      activeExerciseSwapOptions.map((option) => (
-                                        <article key={option.id} className="swap-option">
-                                          <div>
-                                            <h6>{option.name}</h6>
-                                            <p>{option.equipment}</p>
-                                            <p className="swap-option-meta">{summarizePrescription(option.prescription)}</p>
-                                            {Array.isArray(option.cues) && option.cues.length ? (
-                                              <p className="swap-option-cue">{compactText(option.cues[0], 92)}</p>
-                                            ) : null}
-                                          </div>
-                                          <button
-                                            type="button"
-                                            onClick={() => applyExerciseSwap(selectedDay.date, activeExercise._swapKey, option)}
-                                          >
-                                            Usar
-                                          </button>
-                                        </article>
-                                      ))
-                                    ) : (
-                                      <p className="empty-text">
-                                        No hay alternativas compatibles para esta sesión.
-                                      </p>
-                                    )}
+                                    {activeExercise._replaced ? (
+                                      <button
+                                        className="secondary"
+                                        type="button"
+                                        onClick={() => clearExerciseSwap(selectedDay.date, activeExercise._swapKey)}
+                                      >
+                                        Volver al original
+                                      </button>
+                                    ) : null}
+                                    {activeExercise.videoUrl ? (
+                                      <a className="video-link" href={activeExercise.videoUrl} target="_blank" rel="noreferrer">
+                                        Ver técnica
+                                      </a>
+                                    ) : null}
                                   </div>
-                                ) : null}
-                              </section>
-                            </div>
 
-                            <aside className="exercise-muscle-panel">
-                              <MuscleMapFigure
-                                anatomyRegions={activeExercise.anatomyRegions}
-                                primaryMuscles={activeExercise.primaryMuscles}
-                                secondaryMuscles={activeExercise.secondaryMuscles}
-                              />
-                            </aside>
-                          </div>
+                                  {activeExerciseSwapOpen ? (
+                                    <div className="swap-panel">
+                                      {activeExerciseSwapOptions.length ? (
+                                        activeExerciseSwapOptions.map((option) => (
+                                          <article key={option.id} className="swap-option">
+                                            <div>
+                                              <h6>{option.name}</h6>
+                                              <p>{option.equipment}</p>
+                                              <p className="swap-option-meta">{summarizePrescription(option.prescription)}</p>
+                                              {Array.isArray(option.cues) && option.cues.length ? (
+                                                <p className="swap-option-cue">{compactText(option.cues[0], 92)}</p>
+                                              ) : null}
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => applyExerciseSwap(selectedDay.date, activeExercise._swapKey, option)}
+                                            >
+                                              Usar
+                                            </button>
+                                          </article>
+                                        ))
+                                      ) : (
+                                        <p className="empty-text">
+                                          No hay alternativas compatibles para esta sesión.
+                                        </p>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </section>
+                              </aside>
+                            </div>
                           </article>
                           );
                         })() : null}

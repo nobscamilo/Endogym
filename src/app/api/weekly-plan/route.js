@@ -449,7 +449,11 @@ export async function POST(request) {
     if (error instanceof AuthenticationError) {
       return errorResponse(error.message, 401);
     }
-    return errorResponse('Error interno al generar plan semanal.', 500);
+    console.error('[weekly-plan POST] Unhandled error:', error?.message, error?.stack);
+    const safeMessage = error?.message && typeof error.message === 'string'
+      ? `Error al generar plan semanal: ${error.message.slice(0, 200)}`
+      : 'Error interno al generar plan semanal.';
+    return errorResponse(safeMessage, 500);
   }
 }
 

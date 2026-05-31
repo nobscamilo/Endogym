@@ -1856,14 +1856,14 @@ button.nutrition-day-chip.active {
 
 .day-hero {
   border: 1px solid rgba(189, 210, 234, 0.88);
-  border-radius: 24px;
-  padding: 1rem;
+  border-radius: 22px;
+  padding: 0.85rem;
   display: grid;
-  gap: 0.92rem;
+  gap: 0.68rem;
   background:
     radial-gradient(120% 120% at 100% 0%, rgba(16, 123, 233, 0.12), transparent 54%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 255, 0.92));
-  box-shadow: 0 24px 40px rgba(113, 148, 187, 0.14);
+  box-shadow: 0 18px 36px rgba(113, 148, 187, 0.12);
 }
 
 .day-hero-main {
@@ -1930,11 +1930,11 @@ button.nutrition-day-chip.active {
 
 .day-badge {
   border: 1px solid rgba(191, 211, 234, 0.96);
-  border-radius: 18px;
-  padding: 0.72rem 0.8rem;
+  border-radius: 14px;
+  padding: 0.55rem 0.7rem;
   background: rgba(255, 255, 255, 0.78);
   display: grid;
-  gap: 0.18rem;
+  gap: 0.12rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
@@ -1959,16 +1959,16 @@ button.nutrition-day-chip.active {
 
 .day-coach-strip {
   border: 1px solid rgba(187, 208, 232, 0.92);
-  border-radius: 22px;
-  padding: 0.88rem 0.92rem;
+  border-radius: 18px;
+  padding: 0.72rem 0.82rem;
   display: grid;
-  gap: 0.8rem;
+  gap: 0.58rem;
   background:
     radial-gradient(120% 130% at 0% 0%, rgba(255, 255, 255, 0.78), transparent 44%),
     linear-gradient(180deg, rgba(246, 250, 255, 0.94), rgba(236, 244, 255, 0.9));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.74),
-    0 18px 32px rgba(101, 136, 172, 0.11);
+    0 14px 28px rgba(101, 136, 172, 0.09);
 }
 
 .day-coach-strip.is-live {
@@ -2055,13 +2055,202 @@ button.nutrition-day-chip.active {
   color: #83521c;
 }
 
+/* ── Coach IA Briefing ── */
+
+.coach-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.coach-header-row strong {
+  font-size: 1.05rem !important;
+}
+
+.coach-weekly-summary {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #2c4c6e;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 0.6rem 0.72rem;
+  border-left: 3px solid #1a9aaa;
+  margin: 0.2rem 0 0.1rem;
+}
+
+.coach-section-label {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #3a6a8d;
+  margin-bottom: 0.3rem;
+}
+
+.coach-adjustments-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.coach-adjustment-card {
+  border: 1px solid rgba(26, 154, 170, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  transition: border-color 200ms ease;
+}
+
+.coach-adjustment-card[open] {
+  border-color: rgba(26, 154, 170, 0.35);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.coach-adjustment-card summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.58rem 0.7rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #1c3e5e;
+  font-weight: 600;
+  transition: background 150ms ease;
+}
+
+.coach-adjustment-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.coach-adjustment-card summary:hover {
+  background: rgba(26, 154, 170, 0.05);
+}
+
+.adj-number {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a9aaa, #137a88);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.adj-title {
+  flex: 1;
+}
+
+.adj-body {
+  padding: 0 0.7rem 0.6rem 2.9rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.adj-block {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.adj-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5a7a97;
+}
+
+.adj-block p {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #3a5870;
+  margin: 0;
+}
+
+.adj-block.evidence {
+  background: rgba(26, 154, 170, 0.04);
+  border-radius: 10px;
+  padding: 0.42rem 0.58rem;
+  border: 1px solid rgba(26, 154, 170, 0.1);
+}
+
+.adj-block.evidence p {
+  font-style: italic;
+  font-size: 0.78rem;
+  color: #2a6070;
+}
+
+.coach-acsm-block {
+  border: 1px solid rgba(26, 154, 170, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.45);
+  margin-top: 0.15rem;
+  overflow: hidden;
+}
+
+.coach-acsm-block summary {
+  padding: 0.48rem 0.68rem;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.coach-acsm-block summary::-webkit-details-marker {
+  display: none;
+}
+
+.coach-acsm-block summary:hover {
+  background: rgba(26, 154, 170, 0.04);
+}
+
+.coach-acsm-block > p {
+  margin: 0;
+  padding: 0 0.68rem 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #3a5870;
+}
+
+.coach-risk-flags {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.coach-risk-flag {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #8c3a1e;
+  background: rgba(231, 76, 60, 0.06);
+  border: 1px solid rgba(231, 76, 60, 0.18);
+  border-radius: 10px;
+  padding: 0.4rem 0.6rem;
+}
+
+.is-live .day-coach-strip-copy {
+  gap: 0.35rem;
+}
+
 .day-snapshot-card {
   border: 1px solid rgba(191, 211, 234, 0.86);
-  border-radius: 18px;
-  padding: 0.82rem 0.86rem;
+  border-radius: 14px;
+  padding: 0.62rem 0.72rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(241, 247, 255, 0.78));
   display: grid;
-  gap: 0.2rem;
+  gap: 0.14rem;
 }
 
 .day-snapshot-eyebrow {
@@ -2220,12 +2409,12 @@ button.nutrition-day-chip.active {
 
 .day-workbench {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.7rem;
 }
 
 @media (min-width: 1040px) {
   .day-workbench {
-    grid-template-columns: minmax(272px, 324px) minmax(0, 1fr);
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
     align-items: start;
   }
 }
@@ -2233,11 +2422,11 @@ button.nutrition-day-chip.active {
 .exercise-selector,
 .exercise-spotlight {
   border: 1px solid rgba(191, 210, 232, 0.88);
-  border-radius: 20px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 250, 255, 0.9));
-  padding: 0.85rem;
-  box-shadow: 0 18px 30px rgba(108, 141, 178, 0.1);
+  padding: 0.72rem;
+  box-shadow: 0 12px 24px rgba(108, 141, 178, 0.08);
 }
 
 .exercise-selector {
@@ -2341,7 +2530,7 @@ button.exercise-selector-item.active {
 
 .exercise-spotlight {
   display: grid;
-  gap: 0.88rem;
+  gap: 0.6rem;
   background:
     radial-gradient(120% 120% at 100% 0%, rgba(15, 123, 233, 0.08), transparent 54%),
     radial-gradient(90% 110% at 0% 100%, rgba(92, 164, 255, 0.06), transparent 50%),
@@ -2397,12 +2586,12 @@ button.exercise-selector-item.active {
 
 .exercise-spotlight-grid {
   display: grid;
-  gap: 0.82rem;
+  gap: 0.6rem;
 }
 
 @media (min-width: 980px) {
   .exercise-spotlight-grid {
-    grid-template-columns: minmax(0, 1.14fr) minmax(276px, 352px);
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 330px);
     align-items: start;
   }
 }
@@ -2410,7 +2599,7 @@ button.exercise-selector-item.active {
 .exercise-muscle-panel,
 .exercise-detail-stack {
   display: grid;
-  gap: 0.72rem;
+  gap: 0.5rem;
 }
 
 .exercise-muscle-panel {
@@ -2421,11 +2610,11 @@ button.exercise-selector-item.active {
 .exercise-cue-panel,
 .exercise-action-panel {
   border: 1px solid rgba(197, 214, 236, 0.84);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.82);
-  padding: 0.76rem;
+  padding: 0.65rem;
   display: grid;
-  gap: 0.52rem;
+  gap: 0.4rem;
 }
 
 .exercise-muscle-list > div {
@@ -4584,12 +4773,28 @@ button:active:not(:disabled) {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  background: rgba(15, 123, 233, 0.04);
-  border: 1px solid rgba(15, 123, 233, 0.08);
-  border-radius: 18px;
-  padding: 0.95rem;
-  margin: 1rem 0;
+  background: linear-gradient(135deg, rgba(15, 123, 233, 0.06), rgba(10, 86, 164, 0.03));
+  border: 1px solid rgba(15, 123, 233, 0.12);
+  border-radius: 16px;
+  padding: 0.75rem;
+  margin: 0.6rem 0;
   backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-prescription-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transform: translateX(-100%);
+  animation: shimmer-card 4s ease-in-out infinite;
+}
+
+@keyframes shimmer-card {
+  0% { transform: translateX(-100%); }
+  50%, 100% { transform: translateX(100%); }
 }
 
 .prescription-metric {
@@ -4633,9 +4838,9 @@ button:active:not(:disabled) {
 .premium-set-tracker {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(197, 214, 236, 0.7);
-  border-radius: 20px;
-  padding: 1.1rem;
-  margin: 1.1rem 0;
+  border-radius: 16px;
+  padding: 0.85rem;
+  margin: 0.6rem 0;
   box-shadow: inset 0 2px 4px rgba(108, 141, 178, 0.03);
 }
 
@@ -4757,13 +4962,54 @@ button:active:not(:disabled) {
 }
 
 /* Premium Cues Cards Grid */
+.premium-cues {
+  border-left: 3px solid #0f7be9;
+  padding-left: 0.85rem !important;
+  position: relative;
+}
+
+.premium-cues.accent {
+  border-left-color: #2ecc71;
+}
+
+.premium-cues.soft {
+  border-left-color: #f1c40f;
+}
+
+.premium-cues.caution {
+  border-left-color: #e74c3c;
+}
+
 .premium-cues h5 {
-  margin-bottom: 0.8rem !important;
+  margin-bottom: 0.55rem !important;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.premium-cues h5::before {
+  content: '💡';
+  font-size: 0.85rem;
+}
+
+.premium-cues.accent h5::before {
+  content: '📈';
+}
+
+.premium-cues.soft h5::before {
+  content: '🔄';
+}
+
+.premium-cues.caution h5::before {
+  content: '⚠️';
 }
 
 .premium-cue-grid {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.45rem;
   grid-template-columns: 1fr;
 }
 
@@ -4775,11 +5021,11 @@ button:active:not(:disabled) {
 
 .premium-cue-card {
   display: flex;
-  gap: 0.72rem;
-  background: rgba(255, 255, 255, 0.7);
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(197, 214, 236, 0.55);
-  border-radius: 16px;
-  padding: 0.78rem;
+  border-radius: 14px;
+  padding: 0.62rem 0.7rem;
   align-items: flex-start;
   transition: all 200ms ease;
 }
@@ -4792,24 +5038,26 @@ button:active:not(:disabled) {
 }
 
 .premium-cue-number {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
   border-radius: 50%;
   background: linear-gradient(135deg, #0f7be9, #0a56a4);
   color: #ffffff;
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .premium-cue-card p {
   margin: 0;
   font-size: 0.82rem;
   color: #2c4c70;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* Card overrides for accent panels */

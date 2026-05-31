@@ -4,3 +4,7 @@ node_modules/
 .DS_Store
 npm-debug.log*
 .vercel
+
+# Environment variables
+.env.local
+.env*.local
