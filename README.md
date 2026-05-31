@@ -1,122 +1,115 @@
-# Endogym
+# Endogym — Guía de Desarrollo para Agentes y Desarrolladores
 
-Endogym es una plataforma integral para **nutrición, control glucémico y entrenamiento** (gimnasio/casa), con IA para analizar platos desde fotos y estimar macros, GL e impacto insulínico.
+Bienvenido a **Endogym**, la plataforma científica integral y premium para el control de **nutrición, control glucémico y entrenamiento adaptativo** asistido por Inteligencia Artificial (Gemini y Vertex AI) y validado clínicamente.
 
-## Estado actual
+Este archivo y la carpeta `docs/` contienen toda la información estructurada, decisiones de diseño y recomendaciones técnicas para que cualquier desarrollador o agente de IA pueda entender el funcionamiento del proyecto de inmediato, operarlo, mantenerlo y extenderlo.
 
-La base ahora incluye:
+---
 
-1. Persistencia en Firebase (Auth + Firestore + Storage) mediante `firebase-admin`.
-2. API HTTP para comidas, rutinas y análisis de platos.
-3. Dashboard multi-vista (inicio, plan diario, plan completo y plan nutricional).
-4. Observabilidad con trazas (`traceId`) y logs estructurados.
+## 📌 Estado del Proyecto y Funcionalidades Principales
 
-## Estructura
+Endogym es una SPA (Single Page Application) responsiva de Next.js (App Router, React 19) estructurada bajo el principio de **desacoplamiento de negocio y persistencia**.
 
-- `src/app/page.js`: dashboard web con auth, tabs por vista, calendario semanal, plan diario y plan nutricional.
-- `src/app/api/*`: endpoints HTTP (`/health`, `/meals`, `/workouts`, `/metrics`, `/profile`, `/weekly-plan`, `/analyze-plate`).
-- `src/lib/firebaseAdmin.js`: acceso centralizado a Auth/Firestore/Storage.
-- `src/lib/logger.js`: trazas + logging estructurado.
-- `src/core/*`: motor de cálculo nutricional, glucémico, planificación, cribado y adaptación automática.
+### 1. Panel de Control de Alto Impacto Visual (Dashboard Premium)
+- **Vista Principal (Inicio)**: Visualizaciones en tiempo real del progreso, glucemia reciente, comidas diarias e indicadores calóricos.
+- **Vista Plan de Hoy**:
+  - **Briefing de Sesión del Coach IA**: Tarjeta destacada expandible que presenta una explicación científica diaria de la rutina del día, justificaciones de la ACSM y ajustes por fatiga acumulada del usuario.
+  - **Panel Muscular Interactivo**: Renderiza dinámicamente un mapa de calor muscular mostrando qué áreas se trabajan en la sesión activa.
+  - **Lista de Ejercicios del Día**: Desglose con calentamiento/enfriamiento, cues detalladas de técnica biomecánica, enlaces directos a videos de YouTube con las instrucciones correctas y control interactivo de finalización.
+- **Vista Plan de la Semana**: Distribución de días activos, modalidades deportivas y volumen semanal FITT.
+- **Vista Nutricional Semanal**: Menú semanal desglosado día a día con filtrado de intolerancias, alergias y exclusión de alimentos indeseados.
 
-## Endpoints principales
+### 2. Motor Científico e IA
+- **Análisis de Fotos de Platos**: Entrada de foto multimodal enviada a Gemini Studio / Vertex AI que estima ingredientes, porciones en gramos, calorías, desglose de macronutrientes, carga glucémica (CG) e impacto insulínico.
+- **Planificación Adaptativa FITT (ACSM Guidelines, 12th ed.)**:
+  - **Cribado de Salud (ACSM Preparticipation Screening)**: Filtra síntomas y patologías para limitar intensidades y preservar la seguridad cardiovascular y endocrina.
+  - **Ajuste por Fatiga Subjetiva**: El sistema adapta automáticamente el volumen, series y RPE según el estado de cansancio acumulado reportado por el usuario.
+  - **Buckets de Fitness Científicos**: Biblioteca inteligente organizada por niveles (Principiante, Intermedio, Avanzado) y modalidades deportivas (`full_gym`, `home`, `yoga`, `trx`, `running`).
+  - **IA Coach Briefing**: Generador detallado del porqué biomecánico de cada ejercicio seleccionado, enlazado a evidencias científicas sólidas.
 
-- `GET /api/health`
-- `GET|POST /api/meals`
-- `GET|POST /api/workouts`
-- `GET|POST /api/metrics`
-- `GET|PUT /api/profile`
-- `GET|POST /api/weekly-plan`
-- `POST /api/analyze-plate`
+### 3. Persistencia Unificada (Firebase)
+- Autenticación con Firebase Auth (validación automática de ID Tokens).
+- Base de datos relacional y ágil con Cloud Firestore.
+- Almacenamiento multimedia seguro en Firebase Storage para las imágenes de platos de comida analizados.
 
-`POST /api/analyze-plate`:
+---
 
-- Intenta guardar imagen en Firebase Storage, pero no bloquea el análisis si falla el almacenamiento.
-- Intenta inferencia real con Google AI (`GEMINI_API_KEY`) o Vertex AI/GCP (`GOOGLE_AI_BACKEND=vertex`).
-- Aplica fallback controlado a modo mock si falla el modelo (según flags).
-- Calcula adherencia del plato contra el plan semanal activo.
+## 🛠️ Arquitectura y Estructura del Código
 
-`POST /api/weekly-plan`:
+Para comprender la arquitectura técnica, consulta [docs/ARCHITECTURE.md](file:///Users/camilosar/Documents/antigravity/fearless-davinci/docs/ARCHITECTURE.md).
 
-- Genera rutina semanal personalizada por objetivo y modalidad (`full_gym`, `home`, `yoga`, `trx`, `running`, etc.).
-- Incluye prescripción FITT basada en ACSM Guidelines (12th edition) y actualización de resistencia 2026.
-- Ejecuta cribado preparticipación (ACSM), memoria de progreso reciente y ajuste automático de carga/nutrición.
-- Añade bloque de coaching IA (Gemini) con fallback heurístico seguro y trazabilidad clínica de reglas.
-- Incluye biblioteca amplia de ejercicios por modalidad (técnica, carga/reps/tiempo, calentamiento/enfriamiento y video/link YouTube).
-- Genera plan nutricional semanal explícito y filtra alimentos por alergias, intolerancias y no preferidos.
+Estructura resumida:
+- `/src/app/page.js`: El componente de UI principal que aloja el Dashboard interactivo con sus 4 tabs y la UI del Coach IA.
+- `/src/app/api/`: Capa de Route Handlers de Next.js.
+  - `/api/weekly-plan`: Generador inteligente de planes nutricionales y deportivos.
+  - `/api/analyze-plate`: Endpoint de análisis multimodal de imágenes.
+- `/src/core/`: Motores de cálculo 100% aislados de llamadas externas y efectos secundarios.
+  - `weeklyPlan.js`: Algoritmo de planificación de entrenamiento (ACSM, Buckets, Fatiga, Biblioteca de Ejercicios).
+  - `nutrition.js` y `glucose.js`: Motores de estimación metabólica.
+  - `screening.js`: Cuestionario y cribado cardiovascular inicial.
+- `/src/services/geminiPlateAnalyzer.js`: Servicio integrador con Gemini que utiliza prompts optimizados y ofrece un **fallback heurístico** local robusto en caso de fallos.
+- `/src/lib/logger.js`: Mapea trazas globales mediante `traceId` en cada llamada HTTP para facilitar la observabilidad en producción.
 
-## Variables de entorno
+---
 
-Consulta `.env.example` y configura:
+## ⚙️ Configuración y Variables de Entorno
 
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_PRIVATE_KEY`
-- `FIREBASE_STORAGE_BUCKET`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL` (fallback global, por defecto `gemini-3-flash-preview`)
-- `GEMINI_MODEL_PLATE` (opcional, modelo específico para análisis multimodal de plato)
-- `GEMINI_MODEL_COACH` (opcional, modelo específico para coach de entrenamiento; recomendado `gemini-3.1-pro-preview` tanto en Gemini API como en Vertex AI según la documentación actual)
-- `GOOGLE_AI_BACKEND` (`gemini|vertex`)
-- `VERTEX_AI_PROJECT_ID` (opcional si usas Vertex AI)
-- `VERTEX_AI_LOCATION` (opcional, por defecto `global`)
-- `GOOGLE_CLIENT_EMAIL` (opcional si usas Vertex AI)
-- `GOOGLE_PRIVATE_KEY` (opcional si usas Vertex AI)
-- `GEMINI_FORCE_MOCK` (`true|false`)
-- `GEMINI_FALLBACK_TO_MOCK` (`true|false`)
-- `NEXT_PUBLIC_AUTH_DISABLED` (`true|false`)
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-
-Para desarrollo local sin token de Firebase Auth puedes usar `AUTH_DISABLED=true`.
-
-Si quieres login real en frontend, define variables `NEXT_PUBLIC_FIREBASE_*` y usa `NEXT_PUBLIC_AUTH_DISABLED=false`.
-
-## Seguridad clínica
-
-La app entrega recomendaciones educativas y **no reemplaza** valoración médica individual ni diagnóstico endocrinológico.
-
-## Ejecutar
-
+Copia el archivo de plantilla `.env.example` para crear tu `.env.local` en local:
 ```bash
-npm install
-npm run dev
+cp .env.example .env.local
 ```
 
-Smoke test de motor de cálculo:
+### Variables Requeridas para Inferencia Real de IA
+- `GOOGLE_AI_BACKEND`: Define el motor. Usa `gemini` para Google AI Studio y `vertex` para Vertex AI en GCP.
+- `GEMINI_API_KEY`: API Key obtenida de Google AI Studio.
+- `GEMINI_MODEL_COACH`: Modelo recomendado: `gemini-3.1-pro-preview`.
+- `GEMINI_FALLBACK_TO_MOCK`: `true` (recomendado para desarrollo, proporciona un fallback local robusto si se supera el límite de cuotas de la IA).
 
-```bash
-npm run smoke
-```
+> [!TIP]
+> Si estás en desarrollo local y no deseas configurar Firebase Authentication en la UI, puedes establecer `AUTH_DISABLED=true` y `NEXT_PUBLIC_AUTH_DISABLED=true` en tu archivo `.env.local` para simular un inicio de sesión instantáneo con un perfil mock.
 
-Tests de integración API:
+---
 
-```bash
-npm test
-```
+## 🚀 Comandos de Operación Local
 
+1. **Instalar Dependencias**:
+   ```bash
+   npm install
+   ```
 
-## Deploy en Vercel
+2. **Iniciar Servidor de Desarrollo**:
+   ```bash
+   npm run dev
+   ```
+   La aplicación estará disponible en `http://localhost:3000`.
 
-Se añadió `vercel.json` con configuración base para Next.js y API routes.
+3. **Ejecutar Pruebas de Integración y Regresión (Smoke Test)**:
+   Asegura que el motor de cálculos, cribados, fallbacks y rutinas funcione perfectamente sin errores lógicos:
+   ```bash
+   npm run smoke
+   ```
 
-## Ruta seleccionada
+4. **Ejecutar Pruebas Unitarias**:
+   ```bash
+   npm run test
+   ```
 
-Se eligió **Ruta A**: Vercel para app/API Next.js + Firebase para Auth/Firestore/Storage.
+---
 
-Pasos recomendados:
+## 📋 Recomendaciones para otros Agentes de IA
 
-```bash
-vercel login
-vercel link --project Endogym
-vercel --prod
-```
+Si eres otro Agente de IA continuando el desarrollo de Endogym, sigue estrictamente estas directrices para mantener la calidad y el diseño estético de la aplicación:
 
-Guía completa en `docs/DEPLOYMENT.md`.
+### 🎨 1. Estética UI/UX
+- **Vanilla CSS Premium**: No utilices frameworks CSS como Tailwind a menos que se te indique explícitamente. Todos los estilos están centralizados en `src/app/styles.css`.
+- **Glassmorphism y Efectos Modernos**: Usa gradientes sutiles (`linear-gradient`), efectos de desenfoque de fondo (`backdrop-filter`), sombras profundas y bordes muy finos semitransparentes en tarjetas.
+- **Micro-animaciones**: Toda acción (cargando, hover en botones, transiciones entre pestañas, expansión del briefing del Coach IA) debe contar con una transición suave (`transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1)`).
 
+### 🧪 2. Principios de IA y Robustez
+- **Tolerancia a Fallos (Fallbacks)**: Toda consulta externa a la IA de Gemini (en análisis de platos o generación de planes) **debe** estar envuelta en bloques `try/catch` robustos que llamen a generadores heurísticos locales en caso de error. Nunca dejes que un fallo en la API Key de Gemini bloquee la experiencia del usuario.
+- **Salida Estructurada JSON**: Al llamar a Gemini con prompts, exige siempre respuestas en formato JSON limpio y utilízalo para poblar directamente los campos.
+- **Validaciones Clínicas Explicables**: El motor glucémico e insulínico debe calcular resultados transparentes basados en gramos e índices oficiales.
 
-Detalle operativo de la Ruta A en `docs/ROUTE_A_VERCEL.md`.
+### 📦 3. Despliegue en Producción
+- Consulta la guía de despliegue en Vercel y Firebase en [docs/DEPLOYMENT.md](file:///Users/camilosar/Documents/antigravity/fearless-davinci/docs/DEPLOYMENT.md).
+- Detalle paso a paso del CLI y de las configuraciones en la nube en [docs/ROUTE_A_VERCEL.md](file:///Users/camilosar/Documents/antigravity/fearless-davinci/docs/ROUTE_A_VERCEL.md).
