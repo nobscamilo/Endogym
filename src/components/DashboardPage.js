@@ -1009,6 +1009,8 @@ export default function DashboardPage() {
         primaryMuscles: exercise.primaryMuscles || metadata.primaryMuscles,
         secondaryMuscles: exercise.secondaryMuscles || metadata.secondaryMuscles,
         anatomyRegions: exercise.anatomyRegions || metadata.anatomyRegions,
+        videoUrl: exercise.videoUrl || metadata.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((exercise.youtubeQuery || exercise.name || '') + ' tecnica ejecucion')}`,
+        youtubeQuery: exercise.youtubeQuery || metadata.youtubeQuery || '',
       };
     }
 
@@ -1018,7 +1020,8 @@ export default function DashboardPage() {
       equipment: 'Sin especificar',
       cues: [],
       prescription: null,
-      videoUrl: null,
+      videoUrl: metadata.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((typeof exercise === 'string' ? exercise : '') + ' tecnica ejecucion')}`,
+      youtubeQuery: metadata.youtubeQuery || '',
       difficulty: '',
       progressions: [],
       regressions: [],
@@ -2068,8 +2071,9 @@ export default function DashboardPage() {
         };
       }
 
+      const normalizedReplacement = normalizeExerciseForView(replacement, index);
       return {
-        ...replacement,
+        ...normalizedReplacement,
         _swapKey: exerciseKey,
         _replaced: true,
         _originalExercise: normalized,
@@ -3785,22 +3789,33 @@ export default function DashboardPage() {
                       </article>
                     </div>
 
-                    <article className="day-coach-strip is-live">
-                      <div className="day-coach-strip-copy">
-                        <span className="day-coach-eyebrow">🧠 Coach IA — Briefing de Sesión</span>
-                        <div className="coach-header-row">
-                          <strong>Análisis Científico del Día</strong>
-                          <span className={`coach-status-pill ${coachStatusMode}`}>{coachStatusLabel}</span>
+                    <article className="day-coach-strip is-live" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', padding: '2rem', borderLeft: '5px solid #005bb1', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.72)', border: '1px solid rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(14px) saturate(140%)', gridTemplateColumns: '1fr', boxShadow: '0 8px 32px rgba(101, 136, 172, 0.08)' }}>
+                      <div className="day-coach-strip-copy" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                            <div style={{ padding: '0.5rem', background: 'rgba(0, 91, 177, 0.08)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005bb1' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>auto_awesome</span>
+                            </div>
+                            <div>
+                              <span className="day-coach-eyebrow" style={{ display: 'block', margin: 0, fontSize: '0.72rem', color: '#6a86a4', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Briefing de Sesión</span>
+                              <h4 style={{ margin: '0.1rem 0 0 0', fontSize: '1.1rem', fontWeight: 800, color: '#172f4a', fontFamily: 'Outfit, sans-serif' }}>Análisis Científico del Día</h4>
+                            </div>
+                          </div>
+                          <span className={`coach-status-pill ${coachStatusMode}`} style={{ margin: 0 }}>{coachStatusLabel}</span>
                         </div>
 
                         {coachWeeklySummary ? (
-                          <p className="coach-weekly-summary">{simplifyDeveloperJargon(coachWeeklySummary)}</p>
+                          <p className="coach-weekly-summary" style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.6', color: '#2b4562', fontWeight: 500 }}>
+                            {simplifyDeveloperJargon(coachWeeklySummary)}
+                          </p>
                         ) : (
-                          <p>{simplifyDeveloperJargon(dailyCoachHeadline)}</p>
+                          <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.6', color: '#2b4562', fontWeight: 500 }}>
+                            {simplifyDeveloperJargon(dailyCoachHeadline)}
+                          </p>
                         )}
 
                         {selectedDayAllCoachAdjustments.length > 0 ? (
-                          <div className="coach-adjustments-list">
+                          <div className="coach-adjustments-list" style={{ marginTop: '0.5rem' }}>
                             <span className="coach-section-label">¿Por qué estos ejercicios?</span>
                             {selectedDayAllCoachAdjustments.map((adj, adjIdx) => (
                               <details
@@ -3848,7 +3863,7 @@ export default function DashboardPage() {
                           </div>
                         ) : null}
 
-                        <small>
+                        <small style={{ marginTop: '0.5rem', color: 'var(--muted)' }}>
                           {[
                             coachStatusMode === 'live' ? coachStatusDetail : 'Sistema de Prescripción y Adecuación Clínica Endogym',
                             coachGeneratedLabel ? `Actualizado ${coachGeneratedLabel}` : null
@@ -4202,7 +4217,23 @@ export default function DashboardPage() {
                                       </button>
                                     ) : null}
                                     {activeExercise.videoUrl ? (
-                                      <a className="video-link" href={activeExercise.videoUrl} target="_blank" rel="noreferrer">
+                                      <a
+                                        className="video-link"
+                                        href={activeExercise.videoUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.4rem',
+                                          background: '#ff0000',
+                                          color: '#ffffff',
+                                          borderColor: '#ff0000',
+                                          fontWeight: '800',
+                                          boxShadow: '0 4px 10px rgba(255, 0, 0, 0.15)'
+                                        }}
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>smart_display</span>
                                         Ver técnica
                                       </a>
                                     ) : null}
