@@ -1,5 +1,5 @@
 const ATLAS = {
-  src: '/anatomy/vector-muscles-base.png?v=3',
+  src: '/anatomy/vector-muscles-base.png?v=4',
   width: 1600,
   height: 1394,
   sourceUrl: 'https://commons.wikimedia.org/wiki/File:Muscles_front_and_back.svg',
