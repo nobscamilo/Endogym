@@ -5078,3 +5078,33 @@ button:active:not(:disabled) {
 .exercise-cue-panel.caution .premium-cue-card p {
   color: #8c261a;
 }
+
+/* ── Daily Workout Split Layout (Stitch Alignment) ── */
+.workspace-alt.daily-workout-split {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1080px) {
+  .workspace-alt.daily-workout-split {
+    grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.85fr);
+    align-items: start;
+  }
+}
+
+.daily-muscle-map-aside {
+  position: sticky;
+  top: 1.4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.daily-muscle-map-aside .muscle-map-shell {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(184, 200, 220, 0.72);
+  border-radius: 24px;
+  padding: 1.2rem;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px) saturate(140%);
+}

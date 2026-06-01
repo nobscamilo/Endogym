@@ -2045,6 +2045,37 @@ export default function DashboardPage() {
     () => summarizeWorkoutPreview(selectedDayExercises, 3),
     [selectedDayExercises]
   );
+  const selectedDayPrimaryMuscles = useMemo(() => {
+    const list = [];
+    selectedDayExercises.forEach((ex) => {
+      (ex.primaryMuscles || []).forEach((m) => {
+        if (!list.includes(m)) list.push(m);
+      });
+    });
+    return list;
+  }, [selectedDayExercises]);
+  const selectedDaySecondaryMuscles = useMemo(() => {
+    const list = [];
+    selectedDayExercises.forEach((ex) => {
+      (ex.secondaryMuscles || []).forEach((m) => {
+        if (!list.includes(m)) list.push(m);
+      });
+    });
+    return list;
+  }, [selectedDayExercises]);
+  const selectedDayAnatomyRegions = useMemo(() => {
+    const front = [];
+    const back = [];
+    selectedDayExercises.forEach((ex) => {
+      (ex.anatomyRegions?.front || []).forEach((m) => {
+        if (!front.includes(m)) front.push(m);
+      });
+      (ex.anatomyRegions?.back || []).forEach((m) => {
+        if (!back.includes(m)) back.push(m);
+      });
+    });
+    return { front, back };
+  }, [selectedDayExercises]);
   const selectedDaySessionOverride = selectedDay ? getDaySessionOverride(selectedDay.date) : null;
   const selectedDayFocusLabel = SESSION_FOCUS_LABELS[selectedDay?.sessionFocus] || selectedDay?.sessionFocus || 'Sesión';
   useEffect(() => {
@@ -3516,7 +3547,7 @@ export default function DashboardPage() {
         </aside>
           </section>
 
-          {activeTab === 'daily' && <section className="workspace-alt" style={{ display: 'grid' }}>
+          {activeTab === 'daily' && <section className="workspace-alt daily-workout-split">
         <section className="panel">
           <SectionLabel
             title="Plan diario"
@@ -4078,6 +4109,15 @@ export default function DashboardPage() {
             <p className="empty-text">Genera primero un plan semanal.</p>
           )}
         </section>
+        {selectedDay ? (
+          <aside className="daily-muscle-map-aside">
+            <MuscleMapFigure
+              anatomyRegions={selectedDayAnatomyRegions}
+              primaryMuscles={selectedDayPrimaryMuscles}
+              secondaryMuscles={selectedDaySecondaryMuscles}
+            />
+          </aside>
+        ) : null}
           </section>}
 
           {activeTab === 'weekly' && <section className="workspace-alt" style={{ display: 'grid' }}>
