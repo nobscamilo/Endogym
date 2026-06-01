@@ -38,9 +38,9 @@ Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos 
 - `npm run audit` devuelve `0` vulnerabilidades.
 - El frontend tiene Firebase Client Auth implementado; `x-dev-user-id` solo pertenece al modo local explicito.
 - Las estimaciones nutricionales, glucemicas e insulinicas no son diagnostico medico.
-- El menú lateral es tipo hamburguesa desplegable (estado implementado en codigo, pendiente verificación local y producción).
+- El menú lateral es tipo hamburguesa desplegable (verificado localmente y en producción).
 - El atlas anatómico usa `gymbro-front-crop.png` (vista frontal) y `gymbro-back-crop.png` (vista posterior); colores primarios azul-magenta intenso (#7c3aed / #a855f7) y secundarios azul-magenta tenue. Vistas corregidas y posicionamiento ajustado.
-- La biblioteca muestra tarjetas colapsables por categoría con modal de detalle por ejercicio (implementado en codigo, pendiente verificación).
+- La biblioteca muestra tarjetas colapsables por categoría con modal de detalle por ejercicio (verificado localmente y en producción).
 
 ## Arquitectura acordada
 

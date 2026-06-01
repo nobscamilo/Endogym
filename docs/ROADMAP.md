@@ -55,8 +55,8 @@ Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 - [x] Aplicar diseño "Entrenamiento del día" de Stitch al tab "Hoy" con mapa muscular en columna derecha.
 - [x] Traducir dashboard a lenguaje de usuario final: eliminar jargón técnico (RPE, readiness, gate, etc.).
 - [x] Rediseñar Biblioteca hacia tarjetas colapsables por categoría + modal de detalle por ejercicio.
-- [ ] Verificar localmente todo el rediseño UI (`npm run smoke`, `npm test`, `npm run build`).
-- [ ] Redesplegar a producción y verificar atlas, menú y biblioteca en Vercel.
+- [x] Verificar localmente todo el rediseño UI (`npm run smoke`, `npm test`, `npm run build`).
+- [x] Redesplegar a producción y verificar atlas, menú y biblioteca en Vercel.
 
 ## P3 - Producto
 

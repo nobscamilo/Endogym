@@ -4,7 +4,7 @@ Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 
 ## Resumen ejecutivo
 
-Endogym es un MVP tecnico funcional con despliegue Vercel activo. La aplicacion compila, tiene tests automatizados y sus integraciones principales fueron verificadas end-to-end. El hardening tecnico inmediato ya esta aplicado: audit limpio, validacion MIME por firma, rate limiting persistente y retencion corta de fotos. La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible para el usuario final, atlas anatómico 3D con modelos clínicos realistas corregidos y sistema de biblioteca de ejercicios en rediseño. Antes de usuarios reales todavia necesita revision legal humana y una decision de plan de observabilidad.
+Endogym es un MVP tecnico funcional con despliegue Vercel activo. La aplicacion compila, tiene tests automatizados y sus integraciones principales fueron verificadas end-to-end. El hardening tecnico inmediato ya esta aplicado: audit limpio, validacion MIME por firma, rate limiting persistente y retencion corta de fotos. La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible para el usuario final, atlas anatómico 3D con modelos clínicos realistas corregidos y sistema de biblioteca de ejercicios premium completamente rediseñado. Antes de usuarios reales todavia necesita revision legal humana y una decision de plan de observabilidad.
 
 ## Recuperacion realizada
 
@@ -17,16 +17,16 @@ El 1 de junio de 2026 (sesión tarde) se aplicaron los siguientes cambios de int
 - Dashboard con lenguaje accesible para el usuario final: eliminación de jargón técnico (RPE, readiness, gate, etc.) y traducción a texto motivacional claro.
 - Atlas anatómico: vistas frontal/posterior corregidas (la imagen frontal muestra la vista delantera y viceversa), posicionamiento de superposiciones musculares ajustado a la geometría real de las imágenes, colores primarios azul-magenta intenso y secundarios azul-magenta tenue sin desfasamientos.
 - Tab "Hoy": integración del diseño "Entrenamiento del día" de Stitch con mapa muscular exclusivo en columna derecha.
-- Biblioteca: rediseño hacia tarjetas colapsables agrupadas por categoría con modal de detalle por ejercicio (implementado en código, pendiente de verificación local).
+- Biblioteca: rediseño hacia tarjetas colapsables agrupadas por categoría con modal de detalle por ejercicio (verificado localmente y desplegado a producción).
 
 ## Matriz de estado
 
 | Area | Estado | Evidencia |
 |---|---|---|
-| Atlas anatómico 3D | Verificado localmente | Modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` con superposiciones CSS azul-magenta. Vistas frontal/posterior corregidas, colores primarios intensos y secundarios tenues, sin desfasamiento. Pendiente de verificar en producción tras el último redespliegue. |
+| Atlas anatómico 3D | Verificado localmente y en producción | Modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` con superposiciones CSS azul-magenta. Vistas frontal/posterior corregidas, colores primarios intensos y secundarios tenues, sin desfasamiento. Verificado tras el último redespliegue. |
 | App Next.js | Verificada en producción | Compilada y desplegada en Vercel exitosamente con Next `16.2.6` y Turbopack. |
-| UI dashboard | Implementada en código | Menú hamburguesa lateral, bento cards con lenguaje de usuario, tab "Hoy" con mapa muscular en columna derecha. Pendiente verificación local/producción. |
-| Biblioteca de ejercicios | Implementada en código | Rediseño hacia tarjetas por categoría + modal de detalle (músculo, técnica, progresiones, video). Pendiente verificación local. |
+| UI dashboard | Verificado localmente y en producción | Menú hamburguesa lateral, bento cards con lenguaje de usuario, tab "Hoy" con mapa muscular en columna derecha. Verificado tras el último redespliegue. |
+| Biblioteca de ejercicios | Verificado localmente y en producción | Rediseño hacia tarjetas por categoría + modal de detalle (músculo, técnica, progresiones, video) completamente funcional y verificado. |
 | Conflictos Git | Verificado | `npm run check:conflicts` con 0 marcadores de conflicto. |
 | Dependencias | Verificado | `npm run audit`: 0 vulnerabilidades. |
 | Tests core y APIs | Verificado localmente | `npm run smoke`; `npm test`: 61 tests exitosos. |
