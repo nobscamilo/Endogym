@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **31 de mayo de 2026**.
+Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -44,9 +44,26 @@ Ultima actualizacion: **31 de mayo de 2026**.
 - [x] Rechazar identificadores Gemini invalidos y acotar timeout del coach antes del limite Vercel.
 - [ ] Añadir E2E con emuladores para CI.
 
+## P2 - UI / Experiencia de usuario
+
+- [x] Resolver duplicado del mapa muscular; mostrarlo solo en la columna derecha del tab "Hoy".
+- [x] Implementar modelos anatómicos clínicos 3D `gymbro-front-crop.png` / `gymbro-back-crop.png`.
+- [x] Corregir asignación de vistas frontal y posterior (imagen frontal mostraba la espalda y viceversa).
+- [x] Ajustar posicionamiento de superposiciones musculares a la geometría real de las imágenes.
+- [x] Aplicar colores azul-magenta intenso para músculos primarios y azul-magenta tenue para secundarios.
+- [x] Convertir menú lateral a hamburguesa desplegable para maximizar el área de contenido.
+- [x] Aplicar diseño "Entrenamiento del día" de Stitch al tab "Hoy" con mapa muscular en columna derecha.
+- [x] Traducir dashboard a lenguaje de usuario final: eliminar jargón técnico (RPE, readiness, gate, etc.).
+- [x] Rediseñar Biblioteca hacia tarjetas colapsables por categoría + modal de detalle por ejercicio.
+- [ ] Verificar localmente todo el rediseño UI (`npm run smoke`, `npm test`, `npm run build`).
+- [ ] Redesplegar a producción y verificar atlas, menú y biblioteca en Vercel.
+
 ## P3 - Producto
 
 - [ ] Mejorar correccion manual de alimentos y porciones.
 - [ ] Calibrar confianza por tipo de plato.
 - [ ] Ampliar historial y progresion.
 - [ ] Mejorar recomendaciones pre/post entreno con limites clinicos claros.
+- [ ] Revisar y completar la sección de perfil del usuario.
+- [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
+- [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.

@@ -24,7 +24,7 @@ Distingue siempre entre:
 
 Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos sin motivo: genera ruido y aumenta el riesgo de conflictos.
 
-## Estado confirmado el 31 de mayo de 2026
+## Estado confirmado el 1 de junio de 2026
 
 - Vercel responde en `/` y `/api/health`; vuelve a comprobarlo antes de afirmarlo en conversaciones futuras.
 - Firebase Auth, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se verificaron con sondas reales.
@@ -38,6 +38,9 @@ Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos 
 - `npm run audit` devuelve `0` vulnerabilidades.
 - El frontend tiene Firebase Client Auth implementado; `x-dev-user-id` solo pertenece al modo local explicito.
 - Las estimaciones nutricionales, glucemicas e insulinicas no son diagnostico medico.
+- El menú lateral es tipo hamburguesa desplegable (estado implementado en codigo, pendiente verificación local y producción).
+- El atlas anatómico usa `gymbro-front-crop.png` (vista frontal) y `gymbro-back-crop.png` (vista posterior); colores primarios azul-magenta intenso (#7c3aed / #a855f7) y secundarios azul-magenta tenue. Vistas corregidas y posicionamiento ajustado.
+- La biblioteca muestra tarjetas colapsables por categoría con modal de detalle por ejercicio (implementado en codigo, pendiente verificación).
 
 ## Arquitectura acordada
 
@@ -68,7 +71,9 @@ No habilites Vertex AI.
 - Usa `withTrace()` para operaciones HTTP nuevas.
 - Valida inputs antes de persistir o llamar proveedores.
 - Conserva fallbacks explicitos y observables.
-- Para cambios visibles de UI, toma screenshot si el entorno lo permite.
+- Para cambios visibles de UI, toma screenshot si el entorno lo permita (usa el MCP de Chrome DevTools).
+- Al modificar `DashboardPage.js` o `styles.css`, ejecuta `npm run build` localmente antes de considerar el cambio listo.
+- Los componentes de atlas anatómico residen en `src/components/MuscleMapFigure.js`; las imágenes en `public/anatomy/`. No reemplaces los modelos 3D sin actualización explícita de coordenadas de superposición.
 
 ## Verificacion minima
 

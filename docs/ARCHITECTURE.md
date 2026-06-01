@@ -21,7 +21,8 @@ Construir una app full-stack para nutricion, seguimiento glucemico, entrenamient
 |---|---|
 | `src/app/page.js` | Login y registro Firebase Client Auth. |
 | `src/app/dashboard/page.js` | Entrada al dashboard. |
-| `src/components/DashboardPage.js` | UI principal, platos, planes y entrenamiento. |
+| `src/components/DashboardPage.js` | UI principal: tab Hoy, Biblioteca, Nutrición, Perfil y menú hamburguesa. |
+| `src/components/MuscleMapFigure.js` | Componente de atlas anatómico 3D con superposiciones CSS de grupos musculares. |
 | `src/app/api/**/route.js` | APIs Next.js. |
 | `src/lib/auth.js` | Validacion de ID token y bypass local explicito. |
 | `src/lib/firebaseAdmin.js` | Inicializacion Firebase Admin. |
@@ -31,6 +32,8 @@ Construir una app full-stack para nutricion, seguimiento glucemico, entrenamient
 | `src/services/geminiClient.js` | Analisis multimodal estructurado. |
 | `src/services/exerciseCoachClient.js` | Coach estructurado con reintentos. |
 | `src/core/**` | Calculos y reglas de negocio sin efectos externos. |
+| `src/app/styles.css` | Hoja de estilos global: diseño premium, variables CSS, componentes y atlas anatómico. |
+| `public/anatomy/` | Imágenes clínicas 3D del atlas: `gymbro-front-crop.png`, `gymbro-back-crop.png`. |
 
 ## Colecciones Firestore
 

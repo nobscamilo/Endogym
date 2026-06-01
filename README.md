@@ -24,7 +24,7 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación: **31 de mayo de 2026**.
+Última verificación: **1 de junio de 2026 (sesión tarde)**.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
 - `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente.
@@ -37,6 +37,8 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - `POST /api/analyze-plate` fue verificado end-to-end: guarda foto, obtiene inferencia Gemini real, persiste la comida y conserva fallback observable para fallos futuros.
 - `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
 - Las fotos caducan a los 30 días, el bucket no conserva copias recuperables tras borrado y las rutas IA tienen rate limiting persistente en Firestore.
+
+- La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible, atlas anatómico 3D con modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` y vistas frontal/posterior corregidas, y biblioteca de ejercicios con tarjetas colapsables por categoría y modal de detalle. El rediseño está implementado en código; pendiente verificación local y redespliegue.
 
 Consulta el detalle en [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
 

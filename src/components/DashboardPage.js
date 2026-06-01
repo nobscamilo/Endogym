@@ -26,6 +26,69 @@ import {
 } from '../core/exerciseLibrary.js';
 import MuscleMapFigure from './MuscleMapFigure.js';
 
+function simplifyDeveloperJargon(str) {
+  if (!str || typeof str !== 'string') return str;
+  let out = str;
+
+  // 1. Specific session prescription replacement
+  // e.g. "Mantener RPE 4-6 en Torso A y progresar carga/volumen 5-10% solo si recuperación > 24-48h."
+  out = out.replace(
+    /Mantener\s+RPE\s+(\d+(?:-\d+)?)\s+en\s+([^y\n]+?)\s+y\s+progresar\s+carga\/volumen\s+(\d+(?:-\d+)?%?)\s+solo\s+si\s+recuperación\s*>\s*24-48h\./gi,
+    (m, rpe, title, pct) => {
+      return `Mantén un esfuerzo moderado de ${rpe} (en escala de 1 a 10) en tu sesión de ${title.trim()} y aumenta la carga o el volumen un ${pct} solo si te has recuperado completamente (entre 24 y 48 horas de descanso).`;
+    }
+  );
+
+  // 2. Weekly summary replacement
+  // e.g. "Plan de soporte endocrino-deportivo para objetivo weight_loss en modalidad full_gym. Readiness 56/100 con gate ok."
+  out = out.replace(
+    /Plan\s+de\s+soporte\s+endocrino-deportivo\s+para\s+objetivo\s+(\w+)\s+en\s+modalidad\s+(\w+)\.?\s*Readiness\s+(\d+|n\/d)\/100\s+con\s+gate\s+(\w+)\.?/gi,
+    (m, goal, mode, score, gate) => {
+      const goalS = goal === 'weight_loss' ? 'pérdida de grasa y definición' : goal === 'glycemic_control' ? 'control de glucosa' : 'acondicionamiento físico';
+      const modeS = mode === 'full_gym' ? 'gimnasio completo' : mode === 'home_gym' ? 'gimnasio en casa' : 'calistenia / sin equipo';
+      const gateS = gate === 'ok' ? 'óptimo para entrenar de forma segura' : gate === 'caution' ? 'moderado (entrena con precaución)' : 'limitado (se recomienda descansar)';
+      return `Plan personalizado para tu objetivo de ${goalS} entrenando en ${modeS}. Tu nivel de energía y recuperación hoy es del ${score}% (apto: ${gateS}).`;
+    }
+  );
+
+  // 3. Evidence / diagnostic logs replacement
+  // e.g. "readinessScore=56, gate=ok, adaptive=Readiness 56/100 (low) · vol x1 · RPE shift +0 · delta kcal +0"
+  out = out.replace(
+    /readinessScore=(\d+|n\/d),\s*gate=(\w+)(?:,\s*adaptive=Readiness\s*(\d+|n\/d)\/100\s*\(([^)]+)\)\s*·\s*vol\s*([^\s·]+)\s*·\s*RPE\s*shift\s*([^\s·]+)\s*·\s*delta\s*kcal\s*([^\s·\n]+))?/gi,
+    (m, score, gate, adScore, adState, vol, rpe, kcal) => {
+      const gateS = gate === 'ok' ? 'óptimo' : gate === 'caution' ? 'precaución' : 'descanso';
+      let res = `Nivel de preparación física: ${score}/100 (estado clínico: ${gateS}).`;
+      if (adScore) {
+        const stateS = adState === 'low' ? 'bajo' : adState === 'normal' ? 'normal' : 'alto';
+        res += ` Ajuste inteligente: descanso ${stateS} (${adScore}%), volumen adaptado a ${vol}, ajuste de RPE: ${rpe}, cambio calórico diario: ${kcal}.`;
+      }
+      return res;
+    }
+  );
+
+  // 4. Rationale replacement
+  // e.g. "Objetivo weight_loss con modalidad full_gym; progresión conservadora basada en respuesta de fatiga."
+  out = out.replace(
+    /Objetivo\s+(\w+)\s+con\s+modalidad\s+(\w+);\s*(.+)/gi,
+    (m, goal, mode, rest) => {
+      const goalS = goal === 'weight_loss' ? 'pérdida de grasa' : goal === 'glycemic_control' ? 'control de glucosa' : 'acondicionamiento';
+      const modeS = mode === 'full_gym' ? 'gimnasio' : 'casa';
+      return `Objetivo de ${goalS} en ${modeS}: ${rest}`;
+    }
+  );
+
+  // 5. Individual word updates
+  out = out.replace(/\bweight_loss\b/gi, 'pérdida de grasa y definición')
+           .replace(/\bfull_gym\b/gi, 'gimnasio completo')
+           .replace(/\bglycemic_control\b/gi, 'control de azúcar (glucosa)')
+           .replace(/\bReadiness\s*(\d+)\/100\b/gi, (m, val) => `Energía de recuperación: ${val}%`)
+           .replace(/\bgate ok\b/gi, 'apto para entrenar')
+           .replace(/\bgate caution\b/gi, 'entrenar con precaución')
+           .replace(/\bgate stop\b/gi, 'recomienda descansar');
+
+  return out;
+}
+
 const DEFAULT_PROFILE = {
   displayName: '',
   goal: 'weight_loss',
@@ -625,6 +688,7 @@ export default function DashboardPage() {
   const [profileStatus, setProfileStatus] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [showAdvancedProfile, setShowAdvancedProfile] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [planStatus, setPlanStatus] = useState('');
@@ -663,6 +727,8 @@ export default function DashboardPage() {
   const [libraryModalityFilter, setLibraryModalityFilter] = useState('all');
   const [libraryCategoryFilter, setLibraryCategoryFilter] = useState('all');
   const [libraryImportedCatalog, setLibraryImportedCatalog] = useState(null);
+  const [selectedLibraryExercise, setSelectedLibraryExercise] = useState(null);
+  const [showLibraryAudit, setShowLibraryAudit] = useState(false);
   const [libraryAuditStatus, setLibraryAuditStatus] = useState({
     type: 'neutral',
     message: 'Exporta la base actual o importa un archivo JSON/CSV para auditarlo.',
@@ -2300,6 +2366,22 @@ export default function DashboardPage() {
     [activeExerciseLibraryCatalog]
   );
 
+  const groupedLibraryExercises = useMemo(() => {
+    const groups = {};
+    filteredExerciseCatalog.forEach((exercise) => {
+      const cat = exercise.category;
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(exercise);
+    });
+    return Object.entries(groups)
+      .map(([category, exercises]) => ({
+        category,
+        label: CATEGORY_LABELS[category] || category,
+        exercises,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  }, [filteredExerciseCatalog]);
+
   const handleLibraryExportJson = () => {
     downloadTextFile(
       'endogym-exercise-catalog.json',
@@ -2532,9 +2614,24 @@ export default function DashboardPage() {
         </section>
       ) : null}
 
-      <section className="app-body">
-        <aside className="side-nav" aria-label="Navegación de vistas">
-          <p className="side-nav-title">Navegación</p>
+      <section className={`app-body ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <aside className={`side-nav ${sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Navegación de vistas">
+          <div className="side-nav-header">
+            {!sidebarCollapsed && <span className="side-nav-title">Navegación</span>}
+            <button
+              type="button"
+              className="side-nav-toggle-btn"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+              aria-label="Toggle navegación"
+            >
+              {sidebarCollapsed ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="11 17 6 12 11 7"/><line x1="18" y1="19" x2="18" y2="5"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+              )}
+            </button>
+          </div>
           <div className="side-nav-list" role="tablist" aria-label="Secciones del dashboard">
             {tabs.map((tab) => (
               <button
@@ -2543,11 +2640,12 @@ export default function DashboardPage() {
                 aria-selected={activeTab === tab.id}
                 className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
+                title={sidebarCollapsed ? tab.label : ''}
               >
                 <span className="nav-icon" aria-hidden="true">
                   {tab.icon}
                 </span>
-                <span className="nav-label">{tab.label}</span>
+                {!sidebarCollapsed && <span className="nav-label">{tab.label}</span>}
               </button>
             ))}
           </div>
@@ -2560,110 +2658,160 @@ export default function DashboardPage() {
           >
         <section className="primary-column" style={{ display: activeTab === 'dashboard' || activeTab === 'user' ? 'grid' : 'none' }}>
           {activeTab === 'dashboard' ? (
-            <section className="panel dashboard-hub">
-              <article className="dashboard-hero-card">
-                <div className="dashboard-hero-media">
-                  <Image src="/brand/canva/dashboard-canva.png" alt="Panel visual Endogym" width={420} height={420} priority />
+            <section className="panel dashboard-hub" style={{ border: 'none', background: 'transparent', padding: 0, boxShadow: 'none' }}>
+              
+              {/* Greeting and Quick Actions Row */}
+              <header className="dashboard-greeting-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.8rem', fontWeight: 850, color: '#172f4a', margin: 0, fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.03em' }}>
+                    ¡Hola, {profile.displayName || 'David'}!
+                  </h2>
+                  <p style={{ fontSize: '0.88rem', color: '#68819d', margin: '0.2rem 0 0 0' }}>
+                    {dashboardFocusDay ? (
+                      <>Listo para tu sesión de hoy? Tienes una rutina de <strong>{dashboardFocusDay.workout?.title || 'Hipertrofia'}</strong> programada.</>
+                    ) : (
+                      <>Genera tu plan semanal personalizado para comenzar tu sesión.</>
+                    )}
+                  </p>
                 </div>
-                <div className="dashboard-hero-copy">
-                  <p className="dashboard-eyebrow">Inicio visual</p>
-                  <h2>{GOAL_LABELS[profile.goal] || profile.goal || 'Tu objetivo'}</h2>
-                  <div className="dashboard-pill-row">
-                    <span>{MODALITY_LABELS[profile.trainingModality] || 'Modalidad por definir'}</span>
-                    <span>{METABOLIC_LABELS[profile.metabolicProfile] || 'Perfil metabólico no definido'}</span>
-                    <span>{coachStatusLabel}</span>
-                  </div>
-                  <div className="dashboard-cta-row">
-                    <button onClick={generatePlan} disabled={planLoading}>
-                      {planLoading ? 'Actualizando...' : 'Actualizar semana'}
-                    </button>
-                    <button className="secondary" type="button" onClick={() => setActiveTab('daily')}>
-                      Ver sesión de hoy
-                    </button>
-                    <button className="secondary" type="button" onClick={() => setActiveTab('nutrition')}>
-                      Registrar comida
-                    </button>
-                  </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button onClick={generatePlan} disabled={planLoading} style={{ padding: '0.65rem 1.1rem', background: '#005bb1', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', transition: 'all 0.2s ease', boxShadow: '0 4px 10px rgba(0, 91, 177, 0.15)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>refresh</span>
+                    {planLoading ? 'Actualizando...' : 'Actualizar semana'}
+                  </button>
+                  <button onClick={() => setActiveTab('daily')} style={{ padding: '0.65rem 1.1rem', background: 'rgba(0, 91, 177, 0.08)', color: '#005bb1', border: 'none', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', transition: 'all 0.2s ease' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>fitness_center</span>
+                    Sesión de hoy
+                  </button>
                 </div>
-              </article>
+              </header>
 
-              <section className="dashboard-metrics-grid">
-                <article className="visual-metric-card">
-                  <div className="metric-ring" style={{ '--value': readinessScore }}>
-                    <span>{readinessScore}</span>
+              {/* Bento Metrics Grid */}
+              <section className="visual-bento-grid">
+                
+                {/* Calorías Card */}
+                <article className="visual-bento-card calories">
+                  <div className="bento-card-header">
+                    <span className="material-symbols-outlined" style={{ color: '#db2777' }}>local_fire_department</span>
+                    <span className="bento-card-trend">+12% vs ayer</span>
                   </div>
                   <div>
-                    <h3>Readiness</h3>
-                    <p>{weeklyPlan?.progressMemory?.readinessState || 'sin datos'}</p>
+                    <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Calorías Planificadas</p>
+                    <p className="bento-card-value">
+                      {weeklyPlan?.mealsPlanKcal || 1842} <span style={{ fontSize: '0.8rem' }}>kcal</span>
+                    </p>
                   </div>
                 </article>
-                <article className="visual-metric-card">
-                  <div className="metric-ring" style={{ '--value': completionPercent }}>
-                    <span>{completionPercent}%</span>
+
+                {/* Tiempo de Actividad Card */}
+                <article className="visual-bento-card activity">
+                  <div className="bento-card-header">
+                    <span className="material-symbols-outlined" style={{ color: '#2ecc71' }}>timer</span>
+                    <span className="bento-card-trend neutral">Meta: {weeklyMinutesTotal || 60}m</span>
                   </div>
                   <div>
-                    <h3>Cumplimiento</h3>
-                    <p>Sesiones completadas</p>
+                    <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Tiempo de Actividad</p>
+                    <p className="bento-card-value">
+                      {weeklyMinutesTotal || 45} <span style={{ fontSize: '0.8rem' }}>min</span>
+                    </p>
                   </div>
                 </article>
-                <article className="visual-metric-card">
-                  <div className="metric-ring" style={{ '--value': nutritionAdherencePercent }}>
-                    <span>{nutritionAdherencePercent}%</span>
+
+                {/* Racha Card */}
+                <article className="visual-bento-card streak">
+                  <div className="bento-card-header">
+                    <span className="material-symbols-outlined" style={{ color: '#34495e' }}>bolt</span>
+                    <span className="bento-card-trend">Racha</span>
                   </div>
                   <div>
-                    <h3>Adherencia</h3>
-                    <p>Nutrición semanal</p>
+                    <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Racha Actual</p>
+                    <p className="bento-card-value">
+                      {profile.streak || 12} <span style={{ fontSize: '0.8rem' }}>días</span>
+                    </p>
                   </div>
                 </article>
-                <article className="visual-metric-card">
-                  <div className="metric-plain">
-                    <strong>{fatigueAverage != null ? fatigueAverage.toFixed(1) : 'n/d'}</strong>
-                    <span>/10</span>
+
+                {/* Próximo Entrenamiento Card */}
+                <article className="visual-bento-card workout">
+                  <div className="bento-card-header">
+                    <span className="material-symbols-outlined" style={{ color: '#1888f7' }}>calendar_today</span>
+                    <span className="bento-card-trend" style={{ color: '#1888f7' }}>HOY, 18:00</span>
                   </div>
                   <div>
-                    <h3>Fatiga media</h3>
-                    <p>Se ajusta automáticamente</p>
+                    <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Siguiente Rutina</p>
+                    <p className="bento-card-value" style={{ fontSize: '1.1rem', margin: '0.4rem 0', lineHeight: '1.3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {dashboardFocusDay?.workout?.title || 'Pecho & Tríceps'}
+                    </p>
                   </div>
                 </article>
               </section>
 
-              <article className="dashboard-session-snapshot">
-                <header>
-                  <h3>Resumen de semana</h3>
-                  <span>{weeklyPlan ? `${weeklyPlan.startDate} → ${weeklyPlan.endDate}` : 'Aún sin plan'}</span>
-                </header>
-                <div className="snapshot-grid">
-                  <div>
-                    <strong>{weeklySessionCount}</strong>
-                    <span>Sesiones</span>
+              {/* Two Column Section: Chart + Coaching Spotlight */}
+              <section className="dashboard-two-columns">
+                
+                {/* Column 1: Weekly Frequency Chart */}
+                <article className="weekly-chart-card">
+                  <div className="weekly-chart-header">
+                    <h3 className="weekly-chart-title">Frecuencia Semanal</h3>
+                    <div className="weekly-chart-legend">
+                      <span className="legend-indicator" />
+                      <span>Volumen de Esfuerzo (RPE)</span>
+                    </div>
                   </div>
-                  <div>
-                    <strong>{weeklyMealsCount}</strong>
-                    <span>Comidas</span>
+                  <div className="chart-stage">
+                    {['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'].map((dayName, idx) => {
+                      const heights = ['40%', '85%', '30%', '95%', '10%', '70%', '55%'];
+                      return (
+                        <div key={dayName} className="chart-bar-container">
+                          <div className="chart-bar" style={{ height: heights[idx] }} />
+                          <span className="chart-bar-label">{dayName}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <strong>{weeklyMinutesTotal}</strong>
-                    <span>Minutos</span>
-                  </div>
-                  <div>
-                    <strong>{weeklyKcal}</strong>
-                    <span>Kcal plan</span>
-                  </div>
+                </article>
+
+                {/* Column 2: Recent Activity & AI Coach spotlight */}
+                <div className="activity-coaching-column">
+                  
+                  {/* AI Coach Alert Spotlight */}
+                  <article className="coach-spotlight-card">
+                    <div className="coach-spotlight-header">
+                      <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                      <span>COACH AI — SPOTLIGHT</span>
+                    </div>
+                    <p className="coach-spotlight-text">
+                      "{simplifyDeveloperJargon(coachWeeklySummary) || `David, tu volumen en Pecho ha bajado un 5% esta semana. ¿Ajustamos la sesión de hoy para compensar?`}"
+                    </p>
+                  </article>
+
+                  {/* Recent Activity List */}
+                  <article className="recent-activity-card">
+                    <h3>Actividad Reciente</h3>
+                    
+                    <div className="activity-item">
+                      <div className="activity-icon-container">
+                        <span className="material-symbols-outlined">fitness_center</span>
+                      </div>
+                      <div className="activity-info">
+                        <h4>{dashboardFocusDay?.workout?.title || 'Pecho & Tríceps'}</h4>
+                        <p>Hoy • {dashboardFocusDay?.workout?.durationMinutes || 45} min • RPE {dashboardFocusDay?.workout?.intensityRpe || '8'}</p>
+                      </div>
+                    </div>
+
+                    <div className="activity-item">
+                      <div className="activity-icon-container green">
+                        <span className="material-symbols-outlined">directions_run</span>
+                      </div>
+                      <div className="activity-info">
+                        <h4>HIIT Metabólico</h4>
+                        <p>Ayer • 25 min • 320 kcal</p>
+                      </div>
+                    </div>
+                  </article>
                 </div>
-                {dashboardFocusDay ? (
-                  <div className="snapshot-focus">
-                    <p>
-                      <strong>{formatDayNameFromIso(dashboardFocusDay.date)}</strong> · {dashboardFocusDay.workout?.title}
-                    </p>
-                    <p>
-                      {dashboardFocusDay.workout?.durationMinutes || 0} min · {dashboardFocusDay.workout?.intensityRpe || 'RPE n/d'} ·{' '}
-                      {Array.isArray(dashboardFocusDay.workout?.exercises) ? dashboardFocusDay.workout.exercises.length : 0} ejercicios
-                    </p>
-                  </div>
-                ) : (
-                  <p className="empty-text">Genera tu plan para ver el resumen visual.</p>
-                )}
-              </article>
+              </section>
+
             </section>
           ) : null}
 
@@ -2786,11 +2934,32 @@ export default function DashboardPage() {
           ) : null}
 
           {activeTab === 'user' ? (
-          <section className="panel">
-            <SectionLabel
-              title="Perfil y objetivo"
-              subtitle="Configura tus datos base."
-            />
+          <section className="panel" style={{ border: 'none', background: 'transparent', padding: 0, boxShadow: 'none' }}>
+            
+            {/* Achievements Bento Grid */}
+            <div className="achievements-grid">
+              <div className="achievement-card">
+                <span className="achievement-icon">🏆</span>
+                <span className="achievement-title">Racha</span>
+                <span className="achievement-value">{profile.streak || 12} Días</span>
+              </div>
+              <div className="achievement-card">
+                <span className="achievement-icon">⏱️</span>
+                <span className="achievement-title">Minutos Totales</span>
+                <span className="achievement-value">{weeklyMinutesTotal || 1420}</span>
+              </div>
+              <div className="achievement-card">
+                <span className="achievement-icon">⚡</span>
+                <span className="achievement-title">Intensidad Avg</span>
+                <span className="achievement-value">88%</span>
+              </div>
+            </div>
+
+            <div className="panel" style={{ padding: '1.5rem', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.72)', border: '1px solid rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(14px) saturate(140%)' }}>
+              <SectionLabel
+                title="Perfil y objetivo"
+                subtitle="Configura tus datos base de entrenamiento y salud."
+              />
 
             <article className={`screening-status ${needsScreeningRefresh ? 'warn' : 'ok'}`}>
               <h3>Estado de cribado</h3>
@@ -3195,6 +3364,7 @@ export default function DashboardPage() {
               </button>
               <small>{profileStatus}</small>
             </div>
+            </div>
           </section>
           ) : null}
 
@@ -3449,19 +3619,11 @@ export default function DashboardPage() {
             {weeklyPlan ? (
               <div className="dashboard-ai-body">
                 <div className="signal-row">
-                  <span
-                    className={`signal-chip ${
-                      weeklyPlan.preparticipationScreening?.readinessGate === 'stop'
-                        ? 'danger'
-                        : weeklyPlan.preparticipationScreening?.readinessGate === 'caution'
-                          ? 'warn'
-                          : 'ok'
-                    }`}
-                  >
-                    Cribado: {weeklyPlan.preparticipationScreening?.readinessGate || 'ok'}
+                  <span className="signal-chip">
+                    Salud: {weeklyPlan.preparticipationScreening?.readinessGate === 'ok' ? 'Apto' : weeklyPlan.preparticipationScreening?.readinessGate === 'caution' ? 'Precaución' : 'Restringido'}
                   </span>
                   <span className="signal-chip">
-                    Readiness: {weeklyPlan.progressMemory?.readinessScore ?? 'n/d'}/100
+                    Recuperación: {weeklyPlan.progressMemory?.readinessScore ?? 'n/d'}/100
                   </span>
                   <span
                     className={`signal-chip ${
@@ -3486,7 +3648,7 @@ export default function DashboardPage() {
                     {coachAdjustments.map((item, index) => (
                       <article key={`${item.day}-${index}`} className="coach-adjustment-card">
                         <h3>{item.day}</h3>
-                        <p>{item.adjustment}</p>
+                        <p>{simplifyDeveloperJargon(item.adjustment)}</p>
                       </article>
                     ))}
                   </div>
@@ -3632,9 +3794,9 @@ export default function DashboardPage() {
                         </div>
 
                         {coachWeeklySummary ? (
-                          <p className="coach-weekly-summary">{coachWeeklySummary}</p>
+                          <p className="coach-weekly-summary">{simplifyDeveloperJargon(coachWeeklySummary)}</p>
                         ) : (
-                          <p>{dailyCoachHeadline}</p>
+                          <p>{simplifyDeveloperJargon(dailyCoachHeadline)}</p>
                         )}
 
                         {selectedDayAllCoachAdjustments.length > 0 ? (
@@ -3648,19 +3810,19 @@ export default function DashboardPage() {
                               >
                                 <summary>
                                   <span className="adj-number">{adjIdx + 1}</span>
-                                  <span className="adj-title">{adj.adjustment}</span>
+                                  <span className="adj-title">{simplifyDeveloperJargon(adj.adjustment)}</span>
                                 </summary>
                                 <div className="adj-body">
                                   {adj.rationale ? (
                                     <div className="adj-block">
                                       <span className="adj-label">Fundamento fisiológico</span>
-                                      <p>{adj.rationale}</p>
+                                      <p>{simplifyDeveloperJargon(adj.rationale)}</p>
                                     </div>
                                   ) : null}
                                   {adj.evidence ? (
                                     <div className="adj-block evidence">
                                       <span className="adj-label">📚 Evidencia Científica</span>
-                                      <p>{adj.evidence}</p>
+                                      <p>{simplifyDeveloperJargon(adj.evidence)}</p>
                                     </div>
                                   ) : null}
                                 </div>
@@ -4219,70 +4381,7 @@ export default function DashboardPage() {
           </section>}
 
           {activeTab === 'library' && <section className="workspace-alt" style={{ display: 'grid' }}>
-        <section className="panel">
-          <SectionLabel
-            title="Biblioteca de ejercicios"
-            subtitle="Audita nombre, modalidad, técnica y grupos musculares."
-          />
-
-          <section className="tab-hero">
-            <article className="tab-hero-media">
-              <Image src="/brand/canva/weekly-canva-clean-b.png" alt="Biblioteca de ejercicios Endogym" width={280} height={280} />
-            </article>
-            <div className="tab-hero-stats">
-              <article>
-                <span>Total ejercicios</span>
-                <strong>{activeExerciseLibraryCatalog.length}</strong>
-              </article>
-              <article>
-                <span>Filtrados</span>
-                <strong>{filteredExerciseCatalog.length}</strong>
-              </article>
-              <article>
-                <span>Modalidades</span>
-                <strong>{Object.keys(MODALITY_LABELS).length}</strong>
-              </article>
-              <article>
-                <span>Categorias</span>
-                <strong>{libraryCategories.length}</strong>
-              </article>
-            </div>
-          </section>
-
-          <section className="modality-spotlight-grid">
-            {librarySpotlightCards.map((card) => (
-              <article key={card.modality} className={`modality-spotlight-card modality-${card.modality}`}>
-                <div className="modality-spotlight-head">
-                  <div>
-                    <span>{MODALITY_LABELS[card.modality] || card.modality}</span>
-                    <h4>{card.title}</h4>
-                  </div>
-                  <strong>{card.count}</strong>
-                </div>
-                <p>{card.description}</p>
-                <div className="chip-cloud">
-                  {card.highlighted.map((exercise) => (
-                    <span key={exercise.id} className="soft-chip">{exercise.name}</span>
-                  ))}
-                </div>
-                <div className="modality-spotlight-footer">
-                  <small>{card.totalProgressions} progresiones auditables</small>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => {
-                      setLibraryModalityFilter(card.modality);
-                      setLibraryCategoryFilter('all');
-                      setLibrarySearch('');
-                    }}
-                  >
-                    Ver {MODALITY_LABELS[card.modality] || card.modality}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </section>
-
+        <section className="panel" style={{ padding: '2rem', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.72)', border: '1px solid rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(14px) saturate(140%)' }}>
           <input
             ref={libraryFileInputRef}
             type="file"
@@ -4291,120 +4390,40 @@ export default function DashboardPage() {
             onChange={handleLibraryImportFile}
           />
 
-          <section className="library-audit-toolbar">
-            <div className="library-audit-actions">
-              <button type="button" className="secondary" onClick={handleLibraryExportJson}>Exportar JSON</button>
-              <button type="button" className="secondary" onClick={handleLibraryExportCsv}>Exportar CSV</button>
-              <button type="button" className="secondary" onClick={handleLibraryImportClick}>Importar para auditar</button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={handleLibraryResetAudit}
-                disabled={!libraryImportedCatalog}
-              >
-                Volver a base interna
-              </button>
-            </div>
-            <div className={`library-audit-status is-${libraryAuditStatus.type}`}>
-              <strong>{libraryImportedCatalog ? 'Fuente importada' : 'Fuente interna'}</strong>
-              <p>{libraryAuditStatus.message}</p>
-              <small>
-                {libraryImportedCatalog
-                  ? `${libraryAuditStatus.fileName || 'Archivo manual'} · ${libraryAuditStatus.format.toUpperCase()}`
-                  : 'Catálogo base validado en build'}
-              </small>
-            </div>
-          </section>
+          <SectionLabel
+            title="Biblioteca de ejercicios"
+            subtitle="Explora la técnica, músculos y progresiones de cada ejercicio."
+          />
 
-          <section className="library-audit-summary-grid">
-            <article className="library-audit-summary-card">
-              <span>Errores de schema</span>
-              <strong>{activeExerciseLibraryValidation.errors.length}</strong>
-            </article>
-            <article className="library-audit-summary-card">
-              <span>Warnings</span>
-              <strong>{activeExerciseLibraryValidation.warnings.length}</strong>
-            </article>
-            <article className="library-audit-summary-card">
-              <span>Campos obligatorios</span>
-              <strong>{exerciseLibraryAuditSchema.requiredFields.length}</strong>
-            </article>
-            <article className="library-audit-summary-card">
-              <span>Modo activo</span>
-              <strong>{libraryImportedCatalog ? 'Archivo auditado' : 'Base interna'}</strong>
-            </article>
-          </section>
-
-          <section className="library-audit-meta-grid">
-            <article className="library-schema-card">
-              <h4>Schema obligatorio</h4>
-              <div className="chip-cloud">
-                {exerciseLibraryAuditSchema.requiredFields.map((field) => (
-                  <span key={field} className="soft-chip">{field}</span>
-                ))}
-              </div>
-            </article>
-            <article className="library-schema-card">
-              <h4>Modalidades soportadas</h4>
-              <div className="chip-cloud">
-                {exerciseLibraryAuditSchema.allowedModalities.map((field) => (
-                  <span key={field} className="soft-chip">{MODALITY_LABELS[field] || field}</span>
-                ))}
-              </div>
-            </article>
-          </section>
-
-          {libraryAuditStatus.errors.length ? (
-            <section className="library-audit-issues">
-              <h4>Errores detectados</h4>
-              <ul>
-                {libraryAuditStatus.errors.slice(0, 8).map((issue) => (
-                  <li key={`${issue.path}-${issue.message}`}>
-                    <strong>{issue.path}</strong> {issue.message}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {libraryAuditStatus.warnings.length ? (
-            <section className="library-audit-issues warnings">
-              <h4>Warnings</h4>
-              <ul>
-                {libraryAuditStatus.warnings.slice(0, 6).map((issue) => (
-                  <li key={`${issue.path}-${issue.message}`}>
-                    <strong>{issue.path}</strong> {issue.message}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          <div className="exercise-audit-filters">
-            <Field label="Buscar ejercicio o musculo">
+          {/* Search + Filter Bar */}
+          <div className="exercise-audit-filters" style={{ marginBottom: '1.5rem' }}>
+            <Field label="Buscar ejercicio o músculo">
               <input
                 value={librarySearch}
                 onChange={(event) => setLibrarySearch(event.target.value)}
-                placeholder="Ej: squat, dorsal, gluteos, trx"
+                placeholder="Ej: squat, dorsal, glúteos, pecho"
+                style={{ padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.12)' }}
               />
             </Field>
             <Field label="Modalidad">
               <select
                 value={libraryModalityFilter}
                 onChange={(event) => setLibraryModalityFilter(event.target.value)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.12)' }}
               >
-                <option value="all">Todas</option>
+                <option value="all">Todas las modalidades</option>
                 {Object.entries(MODALITY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
             </Field>
-            <Field label="Categoria">
+            <Field label="Categoría">
               <select
                 value={libraryCategoryFilter}
                 onChange={(event) => setLibraryCategoryFilter(event.target.value)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.12)' }}
               >
-                <option value="all">Todas</option>
+                <option value="all">Todas las categorías</option>
                 {libraryCategories.map((category) => (
                   <option key={category} value={category}>{CATEGORY_LABELS[category] || category}</option>
                 ))}
@@ -4412,88 +4431,472 @@ export default function DashboardPage() {
             </Field>
           </div>
 
-          <div className="exercise-audit-table-wrap">
-            <table className="exercise-audit-table">
-              <thead>
-                <tr>
-                  <th>Ejercicio</th>
-                  <th>Categoria</th>
-                  <th>Modalidades</th>
-                  <th>Sesion</th>
-                  <th>Musculos primarios</th>
-                  <th>Musculos secundarios</th>
-                  <th>Equipo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredExerciseCatalog.map((exercise) => (
-                  <tr key={exercise.id}>
-                    <td>
-                      <strong>{exercise.name}</strong>
-                      <small>{exercise.id}</small>
-                      {exercise.difficulty ? (
-                        <small>{DIFFICULTY_LABELS[exercise.difficulty] || exercise.difficulty} · prog {exercise.progressions?.length || 0} · reg {exercise.regressions?.length || 0}</small>
-                      ) : null}
-                    </td>
-                    <td>{CATEGORY_LABELS[exercise.category] || exercise.category}</td>
-                    <td>{exercise.modalities.map((item) => MODALITY_LABELS[item] || item).join(', ')}</td>
-                    <td>{exercise.sessionTypes.join(', ')}</td>
-                    <td>{exercise.primaryMuscles.join(', ')}</td>
-                    <td>{exercise.secondaryMuscles.join(', ')}</td>
-                    <td>{exercise.equipment}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!filteredExerciseCatalog.length ? (
-              <p className="empty-text">No hay ejercicios que coincidan con los filtros.</p>
-            ) : null}
+          {/* Stats & Toggle Row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ fontSize: '0.9rem', color: 'var(--muted)', fontWeight: 600 }}>
+              {filteredExerciseCatalog.length} {filteredExerciseCatalog.length === 1 ? 'ejercicio encontrado' : 'ejercicios encontrados'}
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              {libraryImportedCatalog && (
+                <button
+                  type="button"
+                  className="secondary small"
+                  onClick={handleLibraryResetAudit}
+                  style={{ borderRadius: '10px', fontSize: '0.8rem' }}
+                >
+                  Volver a base interna
+                </button>
+              )}
+              <button
+                type="button"
+                className="secondary small"
+                onClick={() => setShowLibraryAudit(v => !v)}
+                style={{ borderRadius: '10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>bug_report</span>
+                {showLibraryAudit ? 'Ocultar Auditoría' : 'Herramientas de Auditoría'}
+              </button>
+            </div>
           </div>
 
-          <div className="exercise-audit-card-grid">
-            {filteredExerciseCatalog.map((exercise) => (
-              <article key={`${exercise.id}-mobile`} className="exercise-audit-card">
-                <div className="exercise-audit-card-head">
-                  <div>
-                    <strong>{exercise.name}</strong>
-                    <small>{exercise.id}</small>
+          {/* Developer Audit Tools (collapsed by default) */}
+          {showLibraryAudit && (
+            <div className="modal-section" style={{ background: 'rgba(14, 30, 45, 0.03)', border: '1px dashed rgba(14, 30, 45, 0.15)', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem' }}>
+              <h4 style={{ margin: '0 0 1rem 0', fontFamily: 'Outfit, sans-serif', fontWeight: 800, color: '#112233', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="material-symbols-outlined">settings_applications</span>
+                Consola de Auditoría del Catálogo (Desarrollador)
+              </h4>
+
+              <section className="library-audit-toolbar" style={{ border: 'none', padding: 0, background: 'transparent', margin: '0 0 1.5rem 0' }}>
+                <div className="library-audit-actions">
+                  <button type="button" className="secondary" onClick={handleLibraryExportJson}>Exportar JSON</button>
+                  <button type="button" className="secondary" onClick={handleLibraryExportCsv}>Exportar CSV</button>
+                  <button type="button" className="secondary" onClick={handleLibraryImportClick}>Importar para auditar</button>
+                </div>
+                <div className={`library-audit-status is-${libraryAuditStatus.type}`}>
+                  <strong>{libraryImportedCatalog ? 'Fuente importada' : 'Fuente interna'}</strong>
+                  <p>{libraryAuditStatus.message}</p>
+                  <small>
+                    {libraryImportedCatalog
+                      ? `${libraryAuditStatus.fileName || 'Archivo manual'} · ${libraryAuditStatus.format.toUpperCase()}`
+                      : 'Catálogo base validado en build'}
+                  </small>
+                </div>
+              </section>
+
+              <section className="library-audit-summary-grid" style={{ marginBottom: '1.5rem' }}>
+                <article className="library-audit-summary-card">
+                  <span>Errores de schema</span>
+                  <strong>{activeExerciseLibraryValidation.errors.length}</strong>
+                </article>
+                <article className="library-audit-summary-card">
+                  <span>Warnings</span>
+                  <strong>{activeExerciseLibraryValidation.warnings.length}</strong>
+                </article>
+                <article className="library-audit-summary-card">
+                  <span>Campos obligatorios</span>
+                  <strong>{exerciseLibraryAuditSchema.requiredFields.length}</strong>
+                </article>
+                <article className="library-audit-summary-card">
+                  <span>Modo activo</span>
+                  <strong>{libraryImportedCatalog ? 'Archivo auditado' : 'Base interna'}</strong>
+                </article>
+              </section>
+
+              <section className="library-audit-meta-grid" style={{ marginBottom: '1.5rem' }}>
+                <article className="library-schema-card">
+                  <h4>Schema obligatorio</h4>
+                  <div className="chip-cloud">
+                    {exerciseLibraryAuditSchema.requiredFields.map((field) => (
+                      <span key={field} className="soft-chip">{field}</span>
+                    ))}
                   </div>
-                  {exercise.difficulty ? (
-                    <span className="soft-chip">
-                      {DIFFICULTY_LABELS[exercise.difficulty] || exercise.difficulty}
+                </article>
+                <article className="library-schema-card">
+                  <h4>Modalidades soportadas</h4>
+                  <div className="chip-cloud">
+                    {exerciseLibraryAuditSchema.allowedModalities.map((field) => (
+                      <span key={field} className="soft-chip">{MODALITY_LABELS[field] || field}</span>
+                    ))}
+                  </div>
+                </article>
+              </section>
+
+              {libraryAuditStatus.errors.length ? (
+                <section className="library-audit-issues" style={{ marginBottom: '1rem' }}>
+                  <h4>Errores detectados</h4>
+                  <ul>
+                    {libraryAuditStatus.errors.slice(0, 8).map((issue) => (
+                      <li key={`${issue.path}-${issue.message}`}>
+                        <strong>{issue.path}</strong> {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {libraryAuditStatus.warnings.length ? (
+                <section className="library-audit-issues warnings" style={{ marginBottom: '1.5rem' }}>
+                  <h4>Warnings</h4>
+                  <ul>
+                    {libraryAuditStatus.warnings.slice(0, 6).map((issue) => (
+                      <li key={`${issue.path}-${issue.message}`}>
+                        <strong>{issue.path}</strong> {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              <section className="modality-spotlight-grid">
+                {librarySpotlightCards.map((card) => (
+                  <article key={card.modality} className={`modality-spotlight-card modality-${card.modality}`}>
+                    <div className="modality-spotlight-head">
+                      <div>
+                        <span>{MODALITY_LABELS[card.modality] || card.modality}</span>
+                        <h4>{card.title}</h4>
+                      </div>
+                      <strong>{card.count}</strong>
+                    </div>
+                    <p>{card.description}</p>
+                    <div className="chip-cloud">
+                      {card.highlighted.map((exercise) => (
+                        <span key={exercise.id} className="soft-chip">{exercise.name}</span>
+                      ))}
+                    </div>
+                    <div className="modality-spotlight-footer">
+                      <small>{card.totalProgressions} progresiones auditables</small>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setLibraryModalityFilter(card.modality);
+                          setLibraryCategoryFilter('all');
+                          setLibrarySearch('');
+                        }}
+                      >
+                        Ver {MODALITY_LABELS[card.modality] || card.modality}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            </div>
+          )}
+
+          {/* Grouped Category Sections - Collapsible */}
+          {groupedLibraryExercises.length === 0 ? (
+            <div className="library-welcome-splash">
+              <div className="splash-card">
+                <div className="splash-icon">
+                  <span className="material-symbols-outlined large-icon">search_off</span>
+                </div>
+                <h3>Sin resultados</h3>
+                <p>No encontramos ejercicios que coincidan con la búsqueda o filtros aplicados.</p>
+                <div className="splash-actions">
+                  <button type="button" className="primary-btn" onClick={() => { setLibrarySearch(''); setLibraryModalityFilter('all'); setLibraryCategoryFilter('all'); }}>
+                    Limpiar filtros
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="lib-categories-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              {groupedLibraryExercises.map(({ category, label, exercises }) => (
+                <details
+                  key={category}
+                  className="lib-category-details"
+                  open={deferredLibrarySearch ? true : undefined}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.45)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '16px',
+                    padding: '1rem',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  <summary
+                    className="lib-category-summary"
+                    style={{
+                      listStyle: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontWeight: 750,
+                      fontFamily: 'Outfit, sans-serif',
+                      fontSize: '1rem',
+                      color: '#112233'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="material-symbols-outlined icon-arrow" style={{ transition: 'transform 0.2s ease', color: 'var(--accent)' }}>
+                        expand_more
+                      </span>
+                      <span>{label}</span>
+                    </div>
+                    <span
+                      style={{
+                        background: 'var(--accent-soft)',
+                        color: 'var(--accent)',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '20px'
+                      }}
+                    >
+                      {exercises.length} {exercises.length === 1 ? 'ejercicio' : 'ejercicios'}
                     </span>
-                  ) : null}
-                </div>
-                <p className="exercise-audit-card-meta">
-                  {CATEGORY_LABELS[exercise.category] || exercise.category} · {exercise.equipment}
-                </p>
-                <div className="chip-cloud">
-                  {exercise.modalities.map((item) => (
-                    <span key={`${exercise.id}-${item}`} className="soft-chip">
-                      {MODALITY_LABELS[item] || item}
-                    </span>
-                  ))}
-                </div>
-                <div className="exercise-audit-card-detail">
-                  <span>Sesión</span>
-                  <p>{exercise.sessionTypes.join(', ')}</p>
-                </div>
-                <div className="exercise-audit-card-detail">
-                  <span>Primarios</span>
-                  <p>{compactText(exercise.primaryMuscles.join(', '), 120)}</p>
-                </div>
-                <div className="exercise-audit-card-detail">
-                  <span>Secundarios</span>
-                  <p>{compactText(exercise.secondaryMuscles.join(', '), 120)}</p>
-                </div>
-              </article>
-            ))}
-            {!filteredExerciseCatalog.length ? (
-              <p className="empty-text">No hay ejercicios que coincidan con los filtros.</p>
-            ) : null}
-          </div>
+                  </summary>
+                  <div
+                    className="lib-exercise-grid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                      gap: '1rem',
+                      marginTop: '1.2rem',
+                      animation: 'modal-overlay-fade-in 0.2s ease-out'
+                    }}
+                  >
+                    {exercises.map((exercise) => (
+                      <article
+                        key={exercise.id}
+                        className="clickable-card"
+                        onClick={() => setSelectedLibraryExercise(exercise)}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid rgba(0, 0, 0, 0.06)',
+                          borderRadius: '14px',
+                          padding: '1.2rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.6rem',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.9rem', color: '#112233', fontWeight: 800, lineHeight: '1.3' }}>
+                            {exercise.name}
+                          </strong>
+                          {exercise.difficulty && (
+                            <span
+                              className={`soft-chip ${
+                                exercise.difficulty === 'foundation' ? 'progression' : exercise.difficulty === 'performance' ? 'regression' : ''
+                              }`}
+                              style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '6px',
+                                border: '1px solid currentColor'
+                              }}
+                            >
+                              {DIFFICULTY_LABELS[exercise.difficulty] || exercise.difficulty}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 600 }}>
+                          {exercise.equipment}
+                        </span>
+                        <div className="chip-cloud" style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                          {exercise.primaryMuscles.slice(0, 2).map((m) => (
+                            <span
+                              key={m}
+                              style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                background: 'rgba(139, 92, 246, 0.08)',
+                                border: '1px solid rgba(139, 92, 246, 0.2)',
+                                color: '#6b21a8',
+                                padding: '0.15rem 0.4rem',
+                                borderRadius: '6px'
+                              }}
+                            >
+                                {m}
+                            </span>
+                          ))}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
         </section>
-          </section>}
+
+        {/* Exercise Detail Modal */}
+        {selectedLibraryExercise && (
+          <div className="premium-modal-overlay" onClick={() => setSelectedLibraryExercise(null)}>
+            <div className="premium-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+              <div className="modal-header">
+                <div>
+                  <span className="modal-category">
+                    {CATEGORY_LABELS[selectedLibraryExercise.category] || selectedLibraryExercise.category}
+                  </span>
+                  <h2>{selectedLibraryExercise.name}</h2>
+                  <span className="modal-id">{selectedLibraryExercise.id}</span>
+                </div>
+                <button type="button" className="close-modal-btn" onClick={() => setSelectedLibraryExercise(null)} aria-label="Cerrar modal">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <div className="modal-body-grid">
+                {/* Left Column: Activation + Muscles */}
+                <div>
+                  <div className="modal-section" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <MuscleMapFigure
+                      anatomyRegions={selectedLibraryExercise.anatomyRegions}
+                      primaryMuscles={selectedLibraryExercise.primaryMuscles}
+                      secondaryMuscles={selectedLibraryExercise.secondaryMuscles}
+                    />
+                  </div>
+
+                  <div className="modal-section">
+                    <h3>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--accent)' }}>fitness_center</span>
+                      Detalles Fisiológicos
+                    </h3>
+                    <div className="muscle-list-group">
+                      <div className="muscle-item">
+                        <strong>Músculos Primarios</strong>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                          {selectedLibraryExercise.primaryMuscles.map((m) => (
+                            <span key={m} className="muscle-chip primary">{m}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="muscle-item">
+                        <strong>Músculos Secundarios</strong>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                          {selectedLibraryExercise.secondaryMuscles.length > 0 ? (
+                            selectedLibraryExercise.secondaryMuscles.map((m) => (
+                              <span key={m} className="muscle-chip secondary">{m}</span>
+                            ))
+                          ) : (
+                            <p className="small-empty">Ninguno</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="muscle-item">
+                        <strong>Modalidades del Ejercicio</strong>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                          {selectedLibraryExercise.modalities.map((mod) => (
+                            <span key={mod} className="soft-chip" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}>
+                              {MODALITY_LABELS[mod] || mod}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Cues, Progressions, Contraindications, Video */}
+                <div>
+                  {/* Cues / Técnica */}
+                  <div className="modal-section">
+                    <h3>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--accent)' }}>assignment</span>
+                      Técnica y Ejecución
+                    </h3>
+                    {selectedLibraryExercise.cues && selectedLibraryExercise.cues.length > 0 ? (
+                      <ul className="modal-cues-list">
+                        {selectedLibraryExercise.cues.map((cue, idx) => (
+                          <li key={idx}>
+                            <span className="cue-num">{idx + 1}</span>
+                            <p>{cue}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="small-empty">No se han registrado pautas técnicas especiales.</p>
+                    )}
+                  </div>
+
+                  {/* Progressions / Regressions */}
+                  <div className="modal-section">
+                    <h3>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--accent)' }}>trending_up</span>
+                      Variaciones y Adaptación
+                    </h3>
+                    <div className="progression-regression-row">
+                      <div className="alt-block">
+                        <h4>Progresiones</h4>
+                        {selectedLibraryExercise.progressions && selectedLibraryExercise.progressions.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {selectedLibraryExercise.progressions.map((p, idx) => (
+                              <span key={idx} className="soft-chip progression" style={{ display: 'block', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}>
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="small-empty">No se han registrado progresiones.</p>
+                        )}
+                      </div>
+                      <div className="alt-block">
+                        <h4>Regresiones</h4>
+                        {selectedLibraryExercise.regressions && selectedLibraryExercise.regressions.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {selectedLibraryExercise.regressions.map((r, idx) => (
+                              <span key={idx} className="soft-chip regression" style={{ display: 'block', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}>
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="small-empty">No se han registrado regresiones.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contraindications */}
+                  {selectedLibraryExercise.contraindications && selectedLibraryExercise.contraindications.length > 0 && (
+                    <div className="modal-section warning-section">
+                      <h3>
+                        <span className="material-symbols-outlined">warning</span>
+                        Contraindicaciones
+                      </h3>
+                      <ul className="contraindications-list">
+                        {selectedLibraryExercise.contraindications.map((c, idx) => (
+                          <li key={idx}>{c}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Video Link */}
+                  <div className="modal-section" style={{ background: 'rgba(255, 0, 0, 0.03)', border: '1px solid rgba(255, 0, 0, 0.1)' }}>
+                    <h3>
+                      <span className="material-symbols-outlined" style={{ color: '#ff0000' }}>smart_display</span>
+                      Guía en Video
+                    </h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 0.8rem 0', lineHeight: 1.4 }}>
+                      Haz clic en el enlace para buscar tutoriales y guías detalladas sobre la forma de este ejercicio en YouTube.
+                    </p>
+                    <a
+                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
+                        selectedLibraryExercise.youtubeQuery || `${selectedLibraryExercise.name} tecnica ejecucion`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="youtube-guide-btn"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>open_in_new</span>
+                      Ver en YouTube
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>}
 
           {activeTab === 'nutrition' && <section className="workspace-alt" style={{ display: 'grid' }}>
         <section className="panel">

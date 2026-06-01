@@ -1,32 +1,72 @@
-const ATLAS = {
-  src: '/anatomy/vector-muscles-base.png?v=4',
-  width: 1600,
-  height: 1394,
-  sourceUrl: 'https://commons.wikimedia.org/wiki/File:Muscles_front_and_back.svg',
-};
-
-const REGION_LAYERS = {
+const REGION_COORDINATES = {
   front: {
-    front_shoulders: '/anatomy/vector-layers/front-front_shoulders.png',
-    chest: '/anatomy/vector-layers/front-chest.png',
-    biceps: '/anatomy/vector-layers/front-biceps.png',
-    forearms: '/anatomy/vector-layers/front-forearms.png',
-    abs: '/anatomy/vector-layers/front-abs.png',
-    obliques: '/anatomy/vector-layers/front-obliques.png',
-    quadriceps: '/anatomy/vector-layers/front-quadriceps.png',
-    adductors: '/anatomy/vector-layers/front-adductors.png',
-    calves: '/anatomy/vector-layers/front-calves.png',
+    front_shoulders: [
+      { top: '26%', left: '40%', width: '8%', height: '8%' },
+      { top: '26%', left: '60%', width: '8%', height: '8%' }
+    ],
+    chest: [
+      { top: '30.5%', left: '45%', width: '10%', height: '7%' },
+      { top: '30.5%', left: '55%', width: '10%', height: '7%' }
+    ],
+    biceps: [
+      { top: '35%', left: '38%', width: '7%', height: '9%' },
+      { top: '35%', left: '62%', width: '7%', height: '9%' }
+    ],
+    forearms: [
+      { top: '45%', left: '35%', width: '7%', height: '10%' },
+      { top: '45%', left: '65%', width: '7%', height: '10%' }
+    ],
+    abs: [
+      { top: '39%', left: '50%', width: '12%', height: '14%' }
+    ],
+    obliques: [
+      { top: '39%', left: '45%', width: '7%', height: '12%' },
+      { top: '39%', left: '55%', width: '7%', height: '12%' }
+    ],
+    quadriceps: [
+      { top: '57%', left: '45%', width: '11%', height: '17%' },
+      { top: '57%', left: '55%', width: '11%', height: '17%' }
+    ],
+    adductors: [
+      { top: '61%', left: '50%', width: '8%', height: '12%' }
+    ],
+    calves: [
+      { top: '77%', left: '46%', width: '8%', height: '12%' },
+      { top: '77%', left: '54%', width: '8%', height: '12%' }
+    ]
   },
   back: {
-    rear_shoulders: '/anatomy/vector-layers/back-rear_shoulders.png',
-    upper_back: '/anatomy/vector-layers/back-upper_back.png',
-    lats: '/anatomy/vector-layers/back-lats.png',
-    triceps: '/anatomy/vector-layers/back-triceps.png',
-    lower_back: '/anatomy/vector-layers/back-lower_back.png',
-    glutes: '/anatomy/vector-layers/back-glutes.png',
-    hamstrings: '/anatomy/vector-layers/back-hamstrings.png',
-    calves: '/anatomy/vector-layers/back-calves.png',
-  },
+    rear_shoulders: [
+      { top: '26%', left: '40%', width: '8%', height: '8%' },
+      { top: '26%', left: '60%', width: '8%', height: '8%' }
+    ],
+    upper_back: [
+      { top: '24%', left: '50%', width: '16%', height: '11%' }
+    ],
+    lats: [
+      { top: '35%', left: '44%', width: '8%', height: '14%' },
+      { top: '35%', left: '56%', width: '8%', height: '14%' }
+    ],
+    triceps: [
+      { top: '34%', left: '38%', width: '7%', height: '11%' },
+      { top: '34%', left: '62%', width: '7%', height: '11%' }
+    ],
+    lower_back: [
+      { top: '43%', left: '50%', width: '12%', height: '8%' }
+    ],
+    glutes: [
+      { top: '51%', left: '46%', width: '10%', height: '11%' },
+      { top: '51%', left: '54%', width: '10%', height: '11%' }
+    ],
+    hamstrings: [
+      { top: '64%', left: '45%', width: '10%', height: '17%' },
+      { top: '64%', left: '55%', width: '10%', height: '17%' }
+    ],
+    calves: [
+      { top: '78%', left: '45%', width: '8%', height: '12%' },
+      { top: '78%', left: '55%', width: '8%', height: '12%' }
+    ]
+  }
 };
 
 const REGION_LABELS = {
@@ -106,26 +146,6 @@ function uniqueRegions(regions = []) {
   return Array.from(new Set(regions.filter(Boolean)));
 }
 
-function getLayerUrl(view, regionName) {
-  return REGION_LAYERS[view]?.[regionName] || null;
-}
-
-function renderAtlasLayers(view, regions, tone) {
-  return uniqueRegions(regions).map((regionName) => {
-    const layerUrl = getLayerUrl(view, regionName);
-    if (!layerUrl) return null;
-
-    return (
-      <span
-        key={`${view}-${regionName}-${tone}`}
-        className={`muscle-atlas-layer ${tone}`}
-        style={{ '--muscle-mask': `url(${layerUrl})` }}
-        aria-hidden="true"
-      />
-    );
-  });
-}
-
 export default function MuscleMapFigure({
   anatomyRegions = { front: [], back: [] },
   primaryMuscles = [],
@@ -135,44 +155,88 @@ export default function MuscleMapFigure({
   const primaryFrontRegions = uniqueRegions(anatomyRegions.front || []);
   const primaryBackRegions = uniqueRegions(anatomyRegions.back || []);
   const primaryRegionSet = new Set([...primaryFrontRegions, ...primaryBackRegions]);
+
   const secondaryFrontRegions = uniqueRegions(inferredSecondaryRegions.front || [])
     .filter((regionName) => !primaryRegionSet.has(regionName));
   const secondaryBackRegions = uniqueRegions(inferredSecondaryRegions.back || [])
     .filter((regionName) => !primaryRegionSet.has(regionName));
+
   const primaryRegionLabels = toUniqueLabels([...primaryFrontRegions, ...primaryBackRegions]);
   const secondaryRegionLabels = toUniqueLabels([...secondaryFrontRegions, ...secondaryBackRegions]);
+
+  const renderActiveSpots = (view, activeRegions, tone) => {
+    return activeRegions.map((regionName) => {
+      const coordList = REGION_COORDINATES[view]?.[regionName];
+      if (!coordList) return null;
+
+      return coordList.map((coord, idx) => (
+        <span
+          key={`${view}-${regionName}-${tone}-${idx}`}
+          className={`fiber-activation ${tone}`}
+          style={{
+            top: coord.top,
+            left: coord.left,
+            width: coord.width,
+            height: coord.height
+          }}
+          title={`${REGION_LABELS[regionName]} (${tone === 'primary' ? 'Primario' : 'Secundario'})`}
+          aria-hidden="true"
+        />
+      ));
+    });
+  };
 
   return (
     <section className="muscle-map-shell">
       <div className="muscle-map-header">
         <div>
-          <h5>Activación muscular</h5>
+          <h5>Activación Muscular 3D</h5>
         </div>
         <div className="muscle-map-legend-inline">
-          <span><i className="legend-swatch primary" /> Primario</span>
-          <span><i className="legend-swatch secondary" /> Secundario</span>
+          <span><i className="legend-swatch primary" /> Primario (Azul Magenta)</span>
+          <span><i className="legend-swatch secondary" /> Secundario (Índigo)</span>
         </div>
       </div>
 
-      <div
-        className="muscle-atlas-stage vector"
-        style={{ '--atlas-ratio': `${ATLAS.width} / ${ATLAS.height}` }}
-        role="img"
-        aria-label="Mapa anatómico frontal y posterior con músculos activos de la sesión"
-      >
-        <img className="muscle-atlas-base" src={ATLAS.src} alt="" aria-hidden="true" style={{ opacity: 0.95, filter: 'contrast(1.02) brightness(1.01)' }} />
-        <div className="muscle-atlas-layer-stack" aria-hidden="true">
-          {renderAtlasLayers('front', secondaryFrontRegions, 'secondary')}
-          {renderAtlasLayers('back', secondaryBackRegions, 'secondary')}
-          {renderAtlasLayers('front', primaryFrontRegions, 'primary')}
-          {renderAtlasLayers('back', primaryBackRegions, 'primary')}
+      <div className="muscle-atlas-stage double-view" role="img" aria-label="Vista 3D anatómica frontal y posterior con activación dinámica">
+        {/* Panel Frontal */}
+        <div className="view-panel">
+          <span className="panel-kicker">VISTA FRONTAL</span>
+          <div className="anatomy-view-container">
+            <img
+              className="muscle-atlas-base-new"
+              src="/anatomy/gray-back.png?v=5"
+              alt="Modelo Clínico 3D Frontal"
+            />
+            <div className="muscle-atlas-layer-stack">
+              {renderActiveSpots('front', secondaryFrontRegions, 'secondary')}
+              {renderActiveSpots('front', primaryFrontRegions, 'primary')}
+            </div>
+          </div>
         </div>
+
+        {/* Panel Posterior */}
+        <div className="view-panel">
+          <span className="panel-kicker">VISTA POSTERIOR</span>
+          <div className="anatomy-view-container">
+            <img
+              className="muscle-atlas-base-new"
+              src="/anatomy/gray-front.png?v=5"
+              alt="Modelo Clínico 3D Posterior"
+            />
+            <div className="muscle-atlas-layer-stack">
+              {renderActiveSpots('back', secondaryBackRegions, 'secondary')}
+              {renderActiveSpots('back', primaryBackRegions, 'primary')}
+            </div>
+          </div>
+        </div>
+
         <div className="muscle-atlas-vignette" aria-hidden="true" />
       </div>
 
-      <div className="muscle-atlas-view-summary" aria-label="Regiones activas por vista anatómica">
-        <span>Frontal <strong>{primaryFrontRegions.length + secondaryFrontRegions.length}</strong></span>
-        <span>Posterior <strong>{primaryBackRegions.length + secondaryBackRegions.length}</strong></span>
+      <div className="muscle-atlas-view-summary">
+        <span>Frente: <strong>{primaryFrontRegions.length + secondaryFrontRegions.length}</strong> activos</span>
+        <span>Espalda: <strong>{primaryBackRegions.length + secondaryBackRegions.length}</strong> activos</span>
       </div>
 
       <div className="muscle-map-insights" aria-label="Resumen de grupos musculares">
@@ -202,10 +266,6 @@ export default function MuscleMapFigure({
           )}
         </article>
       </div>
-
-      <a className="muscle-atlas-credit" href={ATLAS.sourceUrl} target="_blank" rel="noreferrer">
-        Atlas anatómico CC BY-SA 4.0
-      </a>
     </section>
   );
 }
