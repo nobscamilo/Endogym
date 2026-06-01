@@ -3993,11 +3993,6 @@ export default function DashboardPage() {
                               </div>
 
                               <aside className="exercise-muscle-panel">
-                                <MuscleMapFigure
-                                  anatomyRegions={activeExercise.anatomyRegions}
-                                  primaryMuscles={activeExercise.primaryMuscles}
-                                  secondaryMuscles={activeExercise.secondaryMuscles}
-                                />
 
                                 <section className="exercise-muscle-list">
                                   <div>

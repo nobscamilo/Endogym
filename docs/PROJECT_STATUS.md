@@ -1,21 +1,20 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **31 de mayo de 2026**.
+Ultima actualizacion: **1 de junio de 2026**.
 
 ## Resumen ejecutivo
 
-Endogym es un MVP tecnico funcional con despliegue Vercel activo. La aplicacion compila, tiene tests automatizados y sus integraciones principales fueron verificadas end-to-end. El hardening tecnico inmediato ya esta aplicado: audit limpio, validacion MIME por firma, rate limiting persistente y retencion corta de fotos. Antes de usuarios reales todavia necesita revision legal humana y una decision de plan de observabilidad.
+Endogym es un MVP tecnico funcional con despliegue Vercel activo. La aplicacion compila, tiene tests automatizados y sus integraciones principales fueron verificadas end-to-end. El hardening tecnico inmediato ya esta aplicado: audit limpio, validacion MIME por firma, rate limiting persistente y retencion corta de fotos. El mapa anatómico interactivo ahora utiliza los modelos clínicos 3D realistas en escala de grises con resaltados azul-magenta eléctrico. Antes de usuarios reales todavia necesita revision legal humana y una decision de plan de observabilidad.
 
 ## Recuperacion realizada
 
-El 31 de mayo de 2026 se corrigio una edicion local que habia reinsertado marcadores Git en 22 archivos. Se agrego una barrera local y de CI para impedir que vuelva a entrar una resolucion incompleta.
-
-Las reparaciones de codigo, CI y documentacion descritas aqui estan en el working tree local hasta que se haga commit y push. La configuracion externa si fue aplicada en Firebase/GCP y Vercel, y la app fue redesplegada.
+El 31 de mayo de 2026 se corrigio una edicion local que habia reinsertado marcadores Git en 22 archivos. Se agrego una barrera local y de CI para impedir que vuelva a entrar una resolucion incompleta. El 1 de junio de 2026 se resolvió el duplicado del mapa muscular interactivo para mostrarse de forma exclusiva en la columna de activación del día, y se rediseñó visualmente con la nueva paleta premium.
 
 ## Matriz de estado
 
 | Area | Estado | Evidencia |
 |---|---|---|
+| Atlas anatómico 3D | Verificado localmente | Modelos clínicos gray 3D alineados matemáticamente con capas vectoriales, eliminando duplicados y aplicando paleta azul-magenta brillante. |
 | App Next.js | Verificada localmente | `npm run build` con Next `16.2.6`. |
 | Conflictos Git | Verificado | `npm run check:conflicts`. |
 | Dependencias | Verificado | `npm run audit`: 0 vulnerabilidades. |
