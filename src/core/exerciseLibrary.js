@@ -21,30 +21,52 @@ function roundToStep(value, step = 2.5) {
   return Math.round(value / step) * step;
 }
 
-// Verified through YouTube oEmbed on 2026-06-02. Exercises without a
-// confirmed embed intentionally use the local animated fallback.
+// Curated exercise video mappings pointing to @DeltaBolic YouTube videos/Shorts.
+// Exercises without a mapping will fall back to search within his channel.
 const EXERCISE_VIDEO_MAP = {
-  'gym-bench-press': 'rT7DgCr-3pg',
-  'gym-pushup': 'IODxDxX7oi4',
+  // Chest
+  'gym-bench-press': 'Nf_qO1s5n9g', // Perfect Bench Press Form (DO THIS!)
+  'gym-db-bench-press': 'Nf_qO1s5n9g',
+  'gym-pushup': 'PO9ggbu09sT', // Push-Up Mistake (SAVE YOUR SHOULDERS!)
+  'home-push-up': 'PO9ggbu09sT',
+  'home-incline-push-up': 'PO9ggbu09sT',
+
+  // Back / Pull
+  'gym-pullup': 'ZuV_NokRESN', // The Perfect Pull-Up (FIX THESE!)
+  'home-pull-up': 'ZuV_NokRESN',
+
+  // Arms
+  'gym-bicep-curl': 'kGgJuek3Kz8', // Fix Your Bicep Curl Mistakes!
+  'home-band-curl': 'kGgJuek3Kz8',
+
+  // Legs / Posterior Chain
+  'gym-barbell-back-squat': '9r-k1D_Wz3A', // FIX THESE Squat Mistakes!
+  'home-bodyweight-squat': '9r-k1D_Wz3A',
+  'gym-conventional-deadlift': '3i_JmO99S4w', // The PERFECT Deadlift (DO THIS!)
+  'gym-romanian-deadlift': '3i_JmO99S4w',
+  'home-single-leg-rdl': '3i_JmO99S4w',
+
+  // Other curated guidelines
   'gym-plank': 'pSHjTRCQxIw',
-  'gym-bicep-curl': 'in7PaeYlhrM',
   'gym-dumbbell-lunge': 'D7KaRcUTQeE',
-  'gym-db-bench-press': 'rT7DgCr-3pg',
-  'gym-pullup': 'eGo4IYlbE5g',
   'gym-dips': '2z8JmcrW-As',
   'gym-lunges': 'D7KaRcUTQeE',
   'gym-crunch': 'Xyd_fa5zoEU',
   'gym-facepull': 'eIq5CB9JfKE',
+  'gym-face-pull': 'eIq5CB9JfKE',
   'gym-hammer-curl': 'zC3nLlEvin4',
   'gym-dumbbell-flye': 'eGjt4lk6g34',
   'gym-burpee': 'dZgVxmf6jkA',
 };
 
 function youtubeLinks(query, exerciseId = '') {
-  const encoded = encodeURIComponent(query);
   const videoId = EXERCISE_VIDEO_MAP[exerciseId] || null;
+  // If we don't have a mapped video, search DeltaBolic's channel page directly using the exercise name query
+  const cleanQuery = query.replace(' proper form tutorial', '').replace(' gym', '').replace(' home', '');
+  const searchUrl = `https://www.youtube.com/@DeltaBolic/search?query=${encodeURIComponent(cleanQuery)}`;
+  
   return {
-    videoUrl: `https://www.youtube.com/results?search_query=${encoded}`,
+    videoUrl: searchUrl,
     videoEmbedUrl: videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=1&controls=1&modestbranding=1&rel=0&showinfo=0` : null,
     videoEmbedId: videoId,
   };

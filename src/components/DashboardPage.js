@@ -538,7 +538,7 @@ function ExerciseVisualPlayer({ exercise }) {
   if (!exercise) return null;
 
   const hasVideo = Boolean(exercise.videoEmbedUrl);
-  const videoUrl = exercise.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((exercise.youtubeQuery || exercise.name || '') + ' tecnica ejecucion')}`;
+  const videoUrl = exercise.videoUrl || `https://www.youtube.com/@DeltaBolic/search?query=${encodeURIComponent(exercise.name)}`;
 
   // Determine movement type for animation fallback
   const category = exercise.category || 'lower_body_strength';
@@ -559,7 +559,7 @@ function ExerciseVisualPlayer({ exercise }) {
         <span className="material-symbols-outlined header-icon">
           {hasVideo ? 'smart_display' : 'motion_photos_on'}
         </span>
-        <h6>Demostración Técnica</h6>
+        <h6>Guía de Técnica: @DeltaBolic</h6>
       </header>
 
       <div className="video-frame-container">
@@ -676,7 +676,7 @@ function ExerciseVisualPlayer({ exercise }) {
           className="premium-action-btn youtube-search-btn"
         >
           <span className="material-symbols-outlined">search</span>
-          {hasVideo ? 'Ver variantes en YouTube' : 'Buscar guía en YouTube'}
+          {hasVideo ? 'Ver más de @DeltaBolic' : 'Buscar guía en @DeltaBolic'}
         </a>
       </footer>
     </article>

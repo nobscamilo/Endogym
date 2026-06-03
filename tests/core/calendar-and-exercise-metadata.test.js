@@ -53,10 +53,10 @@ describe('exercise muscle metadata', () => {
 
   it('uses embeds only for verified videos and falls back for unverified ids', () => {
     const verified = resolveExerciseMetadata({ id: 'gym-bench-press' });
-    const fallback = resolveExerciseMetadata({ id: 'gym-barbell-back-squat' });
+    const fallback = resolveExerciseMetadata({ id: 'gym-front-squat' });
 
-    expect(verified.videoEmbedId).toBe('rT7DgCr-3pg');
-    expect(verified.videoEmbedUrl).toContain('youtube.com/embed/rT7DgCr-3pg');
+    expect(verified.videoEmbedId).toBe('Nf_qO1s5n9g');
+    expect(verified.videoEmbedUrl).toContain('youtube.com/embed/Nf_qO1s5n9g');
     expect(fallback.videoEmbedId).toBeNull();
     expect(fallback.videoEmbedUrl).toBeNull();
   });
