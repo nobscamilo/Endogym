@@ -1,10 +1,10 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **3 de junio de 2026 (integración de base de datos médica RAG y redespliegue)**.
+Ultima actualizacion: **3 de junio de 2026 (Integración de Strava y sincronización de GitHub)**.
 
 ## Resumen ejecutivo
 
-Endogym es un MVP tecnico funcional con despliegue Vercel activo. La aplicacion compila, tiene tests automatizados y sus integraciones principales fueron verificadas end-to-end. El 3 de junio de 2026 se completó la integración de una base de datos médica robusta compuesta por 213 capítulos/libros de medicina del deporte parseados de PDFs a JSON y subidos a Firestore. Se implementó un motor de recuperación semántica RAG (Retrieval-Augmented Generation) que extrae las directrices clínicas más relevantes para cada usuario basadas en su edad, perfil de salud y objetivos deportivos, inyectándolas en tiempo real al prompt del Coach IA. El despliegue de producción se actualizó a la revisión `dpl_9H6Y1zwHA977rPH7RshiSoC2iWm8` e ignora archivos PDF locales de gran tamaño mediante `.vercelignore`.
+Endogym es un MVP tecnico funcional con despliegue Vercel activo. La aplicacion compila, tiene tests automatizados y sus integraciones principales fueron verificadas end-to-end. El 3 de junio de 2026 se completaron dos hitos principales: la integración de una base de datos médica RAG (con 213 capítulos/libros parseados de PDFs a Firestore) y la integración completa de Strava (OAuth y sincronización bajo demanda) para incorporar automáticamente entrenamientos externos al cálculo de volumen y fatiga de la IA. El despliegue de producción se actualizó automáticamente mediante integración de GitHub a la última versión.
 
 ## Recuperacion realizada
 
@@ -36,6 +36,7 @@ El 3 de junio de 2026 se completaron las siguientes mejoras en la base de datos 
 |---|---|---|
 | Base de Datos de Directrices Médicas (RAG) | **Verificado localmente y en producción** | `guidelinesRetriever.js` realiza coincidencia semántica de palabras clave sobre metadatos y recupera dinámicamente los capítulos correspondientes de Firestore. Verificado mediante tests en `guidelines-retriever.test.js`. |
 | Parseo y Seeding de Libros | **Exitoso** | 213 capítulos de libros de referencia en PDF procesados a JSON y subidos a la colección `guidelines` de Firestore usando la clave de servicio de producción. |
+| Integración con Strava | **Verificado localmente y desplegado** | Flujo completo de OAuth, sincronización bajo demanda (últimos 14 días) con ID determinista de prevención de duplicados, y desconexión segura. Verificado mediante tests en `strava-integration.test.js`. |
 | Demostraciones interactivas de técnica | Verificado localmente | `ExerciseVisualPlayer` usa 14 embeds oEmbed verificados y 4 fallbacks SVG; los 37 IDs no resolubles fueron retirados. |
 | Atlas anatómico 3D | Verificado localmente y en producción | Modelos clínicos con superposiciones CSS azul-magenta. Vistas frontal/posterior corregidas, colores primarios intensos y secundarios tenues, sin desfasamiento. |
 | App Next.js | Verificada en producción | Compilada y desplegada en Vercel exitosamente con Next `16.2.6` y Turbopack. |
@@ -44,8 +45,8 @@ El 3 de junio de 2026 se completaron las siguientes mejoras en la base de datos 
 | Cabeceras HTTP | Verificadas localmente y en producción | Vercel sirve CSP sin `unsafe-eval`, HSTS, `nosniff`, referrer policy, permissions policy y framing denegado; no expone `X-Powered-By`. |
 | Conflictos Git | Verificado | `npm run check:conflicts` con 0 marcadores de conflicto. |
 | Dependencias | Verificado | `npm run audit`: 0 vulnerabilidades. |
-| Tests core y APIs | Verificado localmente | `npm run smoke`; `npm test`: 76 tests exitosos (incluyendo test RAG). |
-| Vercel | Verificado públicamente | Alias `https://endogym.vercel.app` operativo; deployment inspeccionado el 3 de junio: `dpl_9H6Y1zwHA977rPH7RshiSoC2iWm8`, estado `Ready`. |
+| Tests core y APIs | Verificado localmente | `npm run smoke`; `npm test`: 83 tests exitosos (incluyendo tests RAG y de integración con Strava). |
+| Vercel | Verificado públicamente | Alias `https://endogym.vercel.app` operativo y actualizado automáticamente mediante push a GitHub. |
 | Firebase Auth cliente | Verificado end-to-end | Usuario temporal, custom token e ID token; Google OAuth para `endogym.vercel.app` devuelve URI de autenticacion. |
 | Firebase Admin produccion | Verificado end-to-end | `FIREBASE_PRIVATE_KEY` corregida en Vercel; `/api/profile` y carga de guidelines a Firestore operativas. |
 | APIs autenticadas produccion | Verificado end-to-end | `/api/profile`, `/api/meals` y `/api/analyze-plate` probados con usuario temporal eliminado. |
@@ -91,6 +92,6 @@ El 3 de junio de 2026 se completaron las siguientes mejoras en la base de datos 
 - Vercel esta en plan `hobby`; Vercel Pro no es viable por ahora. Alertas automáticas y Log Drains quedan bloqueados salvo proveedor externo/gratuito alternativo.
 - Conviene añadir una variante E2E con emuladores para CI; la sonda controlada de produccion ya existe.
 - Mantener verificación periódica manual mientras no haya alertas automáticas.
-- Sincronizar GitHub con producción: `main` local está cinco commits por delante de `origin/main` y conserva cambios sin commit desplegados manualmente.
+- Sincronizar GitHub con producción: **Completado el 3 de junio de 2026** (repositorio local y remoto de GitHub completamente alineados y al día).
 - Diseñar un flujo explícito de reevaluación o clearance para levantar el gate diario de síntomas; hoy la señal conservadora desaparece al salir de la ventana reciente.
 - La biblioteca muestra iconos de Material Symbols solo si el font se carga en el HTML head; conservar una comprobación visual tras despliegues.
