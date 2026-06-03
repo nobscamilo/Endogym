@@ -1175,19 +1175,19 @@ export default function DashboardPage() {
 
       const handleOauthCallback = async () => {
         try {
-          addToast('Conectando tu cuenta de Strava...', 'info');
+          showToast('Conectando tu cuenta de Strava...', 'info');
           await apiFetch('/api/integrations/strava/connect', {
             method: 'POST',
             body: JSON.stringify({ code }),
           });
-          addToast('¡Cuenta de Strava conectada con éxito!', 'success');
+          showToast('¡Cuenta de Strava conectada con éxito!', 'success');
 
           const cleanUrl = window.location.pathname + window.location.hash;
           window.history.replaceState({}, document.title, cleanUrl);
 
           loadProfile();
         } catch (err) {
-          addToast(err.message || 'Error al conectar con Strava.', 'error');
+          showToast(err.message || 'Error al conectar con Strava.', 'error');
           const cleanUrl = window.location.pathname + window.location.hash;
           window.history.replaceState({}, document.title, cleanUrl);
         }
@@ -1195,7 +1195,7 @@ export default function DashboardPage() {
 
       handleOauthCallback();
     }
-  }, [authReady, addToast]);
+  }, [authReady, showToast]);
 
   const connectStrava = async () => {
     setStravaConnecting(true);
@@ -1207,7 +1207,7 @@ export default function DashboardPage() {
         throw new Error('La respuesta del servidor no contiene una URL válida.');
       }
     } catch (err) {
-      addToast(err.message || 'Error al conectar con Strava.', 'error');
+      showToast(err.message || 'Error al conectar con Strava.', 'error');
     } finally {
       setStravaConnecting(false);
     }
@@ -1217,11 +1217,11 @@ export default function DashboardPage() {
     setStravaSyncing(true);
     try {
       const data = await apiFetch('/api/integrations/strava/sync', { method: 'POST' });
-      addToast(`Sincronizados ${data.syncedCount || 0} entrenamientos de Strava con éxito.`, 'success');
+      showToast(`Sincronizados ${data.syncedCount || 0} entrenamientos de Strava con éxito.`, 'success');
       loadProfile();
       loadWeeklyPlan();
     } catch (err) {
-      addToast(err.message || 'Error al sincronizar.', 'error');
+      showToast(err.message || 'Error al sincronizar.', 'error');
     } finally {
       setStravaSyncing(false);
     }
@@ -1234,10 +1234,10 @@ export default function DashboardPage() {
     setStravaDisconnecting(true);
     try {
       await apiFetch('/api/integrations/strava/disconnect', { method: 'POST' });
-      addToast('Cuenta de Strava desconectada con éxito.', 'success');
+      showToast('Cuenta de Strava desconectada con éxito.', 'success');
       loadProfile();
     } catch (err) {
-      addToast(err.message || 'Error al desconectar.', 'error');
+      showToast(err.message || 'Error al desconectar.', 'error');
     } finally {
       setStravaDisconnecting(false);
     }
