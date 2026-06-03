@@ -1,16 +1,17 @@
 # Observabilidad operativa
 
-Ultima actualizacion: **31 de mayo de 2026**.
+Ultima actualizacion: **2 de junio de 2026**.
 
 ## Estado real
 
-Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel esta en plan `hobby`: permite consultar logs, pero no activar Alerts Beta ni Log Drains. Segun la documentacion oficial de Vercel, las alertas automaticas requieren Pro o Enterprise con Observability Plus.
+Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel esta en plan `hobby`; Vercel Pro no es viable por ahora. Se mantiene observabilidad manual con logs de runtime y sondas, sin Alerts Beta ni Drains.
 
 ## Eventos relevantes
 
 | Evento | Significado | Accion |
 |---|---|---|
 | `operation_failed` | Una operacion HTTP lanzo error. | Revisar `operationName`, `traceId` y stack. |
+| `operation_rejected` | Una operacion HTTP fue rechazada de forma esperada, por ejemplo auth ausente. | Vigilar abuso sin tratarlo como fallo operativo. |
 | `gemini_call_failed` | Gemini fallo y puede haberse aplicado fallback. | Revisar status del proveedor y frecuencia. |
 | `exercise_coach_failed` | El coach Gemini fallo y puede haberse aplicado heuristica. | Revisar `failureCode`, modelo sanitizado y timeout. |
 | `plate_analysis_result` | Resultado de plato persistido. | Vigilar `fallbackApplied` y `storageSaved`. |
@@ -20,10 +21,15 @@ Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel e
 
 No registres imagenes, tokens, API keys ni datos nutricionales completos en logs.
 
+## Clasificacion de rechazos
+
+`withTrace()` separa rechazos esperados marcados por dominio de fallos operativos. `AuthenticationError` genera `operation_rejected` con status `401`; los errores inesperados conservan `operation_failed`. El cambio pasó tests locales y fue desplegado el 2 de junio de 2026; no se reconsultaron Runtime Logs filtrados porque el CLI rechazó combinar follow con filtros en esta sesión.
+
 ## Consultas utiles
 
 ```bash
 npx vercel logs --environment production --since 1h --query 'operation_failed' --no-branch
+npx vercel logs --environment production --since 1h --query 'operation_rejected' --no-branch
 npx vercel logs --environment production --since 1h --query 'gemini_call_failed' --no-branch
 npx vercel logs --environment production --since 1h --query 'plate_analysis_result' --no-branch
 npx vercel logs --environment production --since 1h --query 'weekly_plan_coach_result' --no-branch
@@ -45,13 +51,13 @@ Cuando se habilite un canal de alertas:
 
 ## Pendiente externo
 
-Para entrega automatica por email, Slack o webhook hay dos rutas:
+Para entrega automatica por email, Slack o webhook hay dos rutas, no viables por ahora sin cambio de plan o proveedor:
 
 1. Subir Vercel a Pro o Enterprise con Observability Plus y activar Alerts.
-2. Configurar un proveedor externo y un Log Drain cuando el plan lo permita.
+2. Subir Vercel a Pro o Enterprise y configurar un Drain hacia un proveedor externo.
 
 Referencias oficiales:
 
 - [Vercel Alerts](https://vercel.com/docs/alerts/)
 - [Vercel Runtime Logs](https://vercel.com/docs/observability/runtime-logs/)
-- [Vercel Log Drains](https://vercel.com/docs/observability/log-drains)
+- [Vercel Drains](https://vercel.com/docs/drains/using-drains)

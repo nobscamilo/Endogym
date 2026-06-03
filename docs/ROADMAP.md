@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
+Ultima actualizacion: **2 de junio de 2026 (auditoría local y pública)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -18,7 +18,7 @@ Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 
 - [x] Ejecutar `npm install`.
 - [x] Ejecutar `npm run smoke`.
-- [x] Ejecutar `npm test`: 61 tests.
+- [x] Ejecutar `npm test`: 74 tests.
 - [x] Ejecutar `npm run build`.
 - [x] Actualizar Next a `16.2.6` y eliminar vulnerabilidades altas.
 - [x] Verificar Vercel `/` y `/api/health`.
@@ -43,6 +43,9 @@ Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 - [x] Bloquear vulnerabilidades moderadas en CI.
 - [x] Rechazar identificadores Gemini invalidos y acotar timeout del coach antes del limite Vercel.
 - [ ] Añadir E2E con emuladores para CI.
+- [x] Añadir cabeceras HTTP de hardening: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` y política de framing. Verificado localmente y en producción.
+- [x] Separar rechazos esperados de autenticación de `operation_failed` mediante `operation_rejected`. Desplegado; Runtime Logs filtrados no se reconsultaron por limitación del CLI.
+- [x] Añadir tests de `/api/workouts`, idempotencia diaria y adaptación derivada de check-ins.
 
 ## P2 - UI / Experiencia de usuario
 
@@ -57,6 +60,18 @@ Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 - [x] Rediseñar Biblioteca hacia tarjetas colapsables por categoría + modal de detalle por ejercicio.
 - [x] Verificar localmente todo el rediseño UI (`npm run smoke`, `npm test`, `npm run build`).
 - [x] Redesplegar a producción y verificar atlas, menú y biblioteca en Vercel.
+- [x] Sustituir claims no sustentados de la landing por mensajes verificables. Verificado con Playwright local y producción.
+- [x] Retirar los 37 IDs de YouTube no resolubles; conservar 14 embeds verificados y fallback SVG para el resto.
+- [x] Sustituir imágenes remotas `lh3.googleusercontent.com/aida-public` por assets versionados propios.
+- [x] Añadir recuperación de contraseña Firebase y favicon propio.
+
+## P2 - Check-in diario seguro
+
+- [x] Persistir síntomas como campos estructurados y conectarlos al gate clínico del siguiente plan.
+- [x] No registrar valores desconocidos de RPE, fatiga o sueño como cero al omitir la encuesta.
+- [x] Rehidratar check-ins persistidos por fecha y prevenir registros duplicados con upsert `daily-YYYY-MM-DD`.
+- [x] Normalizar `performedAt` al mediodía UTC de la fecha seleccionada, permitir pasado/hoy local y bloquear futuro desde UI.
+- [ ] Sincronizar `origin/main` con los cinco commits locales y los cambios manualmente desplegados.
 
 ## P3 - Producto
 
@@ -64,6 +79,7 @@ Ultima actualizacion: **1 de junio de 2026 (sesión tarde)**.
 - [ ] Calibrar confianza por tipo de plato.
 - [ ] Ampliar historial y progresion.
 - [ ] Mejorar recomendaciones pre/post entreno con limites clinicos claros.
+- [ ] Diseñar reevaluación o clearance explícito para levantar el gate diario de síntomas sin depender solo de la ventana reciente.
 - [ ] Revisar y completar la sección de perfil del usuario.
 - [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
 - [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.

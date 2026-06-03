@@ -22,6 +22,8 @@ No habilites `AUTH_DISABLED=true` en produccion. Usa exclusivamente Gemini Devel
 
 Las operaciones IA costosas tienen rate limiting persistente en Firestore. Consulta [`API.md`](API.md) y [`OBSERVABILITY.md`](OBSERVABILITY.md).
 
+El cierre del 2 de junio de 2026 añadió cabeceras HTTP defensivas globales y clasificación `operation_rejected` para rechazos auth esperados. Fue desplegado manualmente a Vercel en `dpl_FJ2jWbaV8Ktjy9G57aKMDaVB4t9r` y pasó sondas públicas.
+
 ## URL canonica
 
 Configura:

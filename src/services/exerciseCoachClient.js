@@ -178,7 +178,7 @@ export function resolveGeminiCoachModel() {
   return typeof model === 'string' ? model.trim() : model;
 }
 
-export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) {
+export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, clinicalGuidelinesContext = '' }) {
   if (!isGeminiConfigured()) {
     throw new GeminiCoachError('No existe configuración de Gemini Developer API.', {
       code: 'GEMINI_COACH_NOT_CONFIGURED',
@@ -192,7 +192,7 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId }) 
     });
   }
 
-  const prompt = buildExerciseCoachPrompt({ profile, weeklyPlan });
+  const prompt = buildExerciseCoachPrompt({ profile, weeklyPlan, clinicalGuidelinesContext });
   const maxRetries = toPositiveInteger(process.env.GEMINI_COACH_MAX_RETRIES, 1, 0, 2);
   const retryBaseMs = toPositiveInteger(process.env.GEMINI_COACH_RETRY_BASE_MS, 350, 100, 5_000);
   const timeoutMs = toPositiveInteger(process.env.GEMINI_COACH_TIMEOUT_MS, 10_000, 1_000, 12_000);

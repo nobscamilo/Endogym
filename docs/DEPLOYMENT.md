@@ -2,6 +2,15 @@
 
 ## Estado verificado
 
+Sonda pública repetida el **2 de junio de 2026**:
+
+- deployment Production inspeccionado tras redespliegue manual: `dpl_FJ2jWbaV8Ktjy9G57aKMDaVB4t9r`, estado `Ready`;
+- `https://endogym.vercel.app/` responde HTTP `200`;
+- `https://endogym.vercel.app/api/health` responde HTTP `200`;
+- `/api/meals` sin token responde `401`;
+- `npm run e2e:production` pasó con Gemini live, Storage, rate limits y limpieza del usuario temporal.
+- Vercel Pro no es viable por ahora; alertas y drains quedan fuera del despliegue actual.
+
 Verificacion realizada el **31 de mayo de 2026**:
 
 - proyecto Vercel `endogym` con Production `Ready`;
@@ -65,7 +74,8 @@ NEXT_PUBLIC_FIREBASE_APP_ID
 ## Pendientes antes de usuarios reales
 
 1. Completar revision legal humana de privacidad, consentimiento y disclaimer medico por mercado.
-2. Decidir si se sube Vercel desde `hobby` para activar Alerts y Log Drains.
+2. Mantener alternativa gratuita/manual de observabilidad mientras Vercel Pro no sea viable.
+3. Sincronizar GitHub con el runtime manualmente desplegado: `main` local esta cinco commits por delante de `origin/main` y conserva cambios sin commit.
 
 ## Deploy
 
@@ -86,6 +96,8 @@ curl -i https://endogym.vercel.app/api/meals
 ```
 
 Esperado: `200`, `200`, `401`.
+
+Confirma además en `/` y `/api/health`: CSP sin `unsafe-eval`, HSTS, `nosniff`, referrer policy, permissions policy, framing denegado y ausencia de `X-Powered-By`. Verificado en producción el 2 de junio de 2026.
 
 Despues valida con ID token real:
 

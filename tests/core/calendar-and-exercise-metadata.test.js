@@ -51,6 +51,16 @@ describe('exercise muscle metadata', () => {
     expect(metadata.anatomyRegions.front).toContain('chest');
   });
 
+  it('uses embeds only for verified videos and falls back for unverified ids', () => {
+    const verified = resolveExerciseMetadata({ id: 'gym-bench-press' });
+    const fallback = resolveExerciseMetadata({ id: 'gym-barbell-back-squat' });
+
+    expect(verified.videoEmbedId).toBe('rT7DgCr-3pg');
+    expect(verified.videoEmbedUrl).toContain('youtube.com/embed/rT7DgCr-3pg');
+    expect(fallback.videoEmbedId).toBeNull();
+    expect(fallback.videoEmbedUrl).toBeNull();
+  });
+
   it('exposes the audit catalog with modalities and muscle metadata', () => {
     const catalog = getExerciseLibraryCatalog();
     const trxRow = catalog.find((exercise) => exercise.id === 'trx-row');
@@ -274,5 +284,81 @@ describe('exercise muscle metadata', () => {
         })
       )
     ).toBe(true);
+  });
+
+  it('calculates session exercise count dynamically based on intensity, goals, and clinical screening safety', () => {
+    const sessionFocus = resolveSessionFocus({
+      modality: TrainingModality.FULL_GYM,
+      sessionType: 'resistance',
+      sessionTitle: 'Torso B',
+    });
+
+    // 1. Vigorous intensity + weight_loss (high-volume goal) -> 7 exercises
+    const ex1 = buildSessionExercises({
+      modality: TrainingModality.FULL_GYM,
+      sessionType: 'resistance',
+      sessionFocus,
+      goal: GoalType.WEIGHT_LOSS,
+      profile: {
+        goal: GoalType.WEIGHT_LOSS,
+        preparticipation: { desiredIntensity: 'vigorous' }
+      },
+    });
+    expect(ex1.length).toBe(7);
+
+    // 2. Vigorous intensity + glycemic_control (not high-volume goal) -> 6 exercises
+    const ex2 = buildSessionExercises({
+      modality: TrainingModality.FULL_GYM,
+      sessionType: 'resistance',
+      sessionFocus,
+      goal: GoalType.GLYCEMIC_CONTROL,
+      profile: {
+        goal: GoalType.GLYCEMIC_CONTROL,
+        preparticipation: { desiredIntensity: 'vigorous' }
+      },
+    });
+    expect(ex2.length).toBe(6);
+
+    // 3. Moderate intensity + weight_loss (high-volume goal) -> 6 exercises
+    const ex3 = buildSessionExercises({
+      modality: TrainingModality.FULL_GYM,
+      sessionType: 'resistance',
+      sessionFocus,
+      goal: GoalType.WEIGHT_LOSS,
+      profile: {
+        goal: GoalType.WEIGHT_LOSS,
+        preparticipation: { desiredIntensity: 'moderate' }
+      },
+    });
+    expect(ex3.length).toBe(6);
+
+    // 4. Moderate intensity + maintain_weight (not high-volume goal) -> 5 exercises
+    const ex4 = buildSessionExercises({
+      modality: TrainingModality.FULL_GYM,
+      sessionType: 'resistance',
+      sessionFocus,
+      goal: GoalType.MAINTAIN_WEIGHT,
+      profile: {
+        goal: GoalType.MAINTAIN_WEIGHT,
+        preparticipation: { desiredIntensity: 'moderate' }
+      },
+    });
+    expect(ex4.length).toBe(5);
+
+    // 5. Clinical STOP gate (e.g. exerciseSymptoms) -> caps at 4 exercises
+    const ex5 = buildSessionExercises({
+      modality: TrainingModality.FULL_GYM,
+      sessionType: 'resistance',
+      sessionFocus,
+      goal: GoalType.WEIGHT_LOSS,
+      profile: {
+        goal: GoalType.WEIGHT_LOSS,
+        preparticipation: {
+          desiredIntensity: 'vigorous',
+          exerciseSymptoms: true
+        }
+      },
+    });
+    expect(ex5.length).toBe(4);
   });
 });

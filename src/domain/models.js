@@ -10,6 +10,7 @@ export const GoalType = Object.freeze({
   STRENGTH: 'strength',
   RECOMPOSITION: 'recomposition',
   GLYCEMIC_CONTROL: 'glycemic_control',
+  SAFE_CONDITIONING: 'safe_conditioning',
   // Legacy values kept for backward compatibility
   CUT: 'cut',
   MAINTENANCE: 'maintenance',

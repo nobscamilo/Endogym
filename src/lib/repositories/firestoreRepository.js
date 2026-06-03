@@ -93,15 +93,32 @@ function sanitizeExercise(exercise) {
   };
 }
 
-export async function createWorkout(userId, payload) {
-  const { db } = await getAdminServices();
-  const ref = db.collection('users').doc(userId).collection('workouts').doc();
+const DAILY_CHECKIN_SYMPTOM_KEYS = ['dyspnea', 'jointPain', 'dizziness', 'tachycardia'];
 
-  const safeNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+function safeNumber(value) {
+  if (value == null || value === '') return null;
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
 
-  const record = {
+function sanitizeDailyCheckinSymptoms(symptoms) {
+  if (!symptoms || typeof symptoms !== 'object') return null;
+  return Object.fromEntries(
+    DAILY_CHECKIN_SYMPTOM_KEYS.map((key) => [key, symptoms[key] === true])
+  );
+}
+
+function buildWorkoutRecord({ ref, userId, payload, createdAt, updatedAt }) {
+  const source = ['daily_checkin', 'strava'].includes(payload.source) ? payload.source : 'manual';
+  const symptoms = source === 'daily_checkin' ? sanitizeDailyCheckinSymptoms(payload.symptoms) : null;
+
+  return {
     id: ref.id,
     userId,
+    source,
+    dailyCheckinDate: source === 'daily_checkin' ? payload.dailyCheckinDate : null,
+    checkinSkipped: source === 'daily_checkin' ? payload.checkinSkipped === true : false,
+    symptoms,
+    hasAlarmSymptoms: symptoms ? Object.values(symptoms).some(Boolean) : false,
     mode: String(payload.mode || '').slice(0, 50),
     title: String(payload.title || '').slice(0, 200),
     durationMinutes: safeNumber(payload.durationMinutes),
@@ -114,8 +131,49 @@ export async function createWorkout(userId, payload) {
     completed: payload.completed ?? true,
     notes: typeof payload.notes === 'string' ? payload.notes.slice(0, 2000) : null,
     planId: typeof payload.planId === 'string' ? payload.planId.slice(0, 100) : null,
-    createdAt: new Date().toISOString(),
+    createdAt,
+    updatedAt,
   };
+}
+
+export async function createWorkout(userId, payload) {
+  const { db } = await getAdminServices();
+  const workouts = db.collection('users').doc(userId).collection('workouts');
+  const isDailyCheckin = payload.source === 'daily_checkin';
+  let ref;
+  if (isDailyCheckin) {
+    ref = workouts.doc(`daily-${payload.dailyCheckinDate}`);
+  } else if (payload.id) {
+    ref = workouts.doc(payload.id);
+  } else {
+    ref = workouts.doc();
+  }
+  const now = new Date().toISOString();
+
+  if (isDailyCheckin) {
+    return await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.exists ? snapshot.data() : null;
+      const record = buildWorkoutRecord({
+        ref,
+        userId,
+        payload,
+        createdAt: current?.createdAt || now,
+        updatedAt: now,
+      });
+
+      transaction.set(ref, record, { merge: true });
+      return record;
+    });
+  }
+
+  const record = buildWorkoutRecord({
+    ref,
+    userId,
+    payload,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   await ref.set(record);
   return record;
@@ -405,4 +463,47 @@ export async function deleteUserAccountData(userId) {
     deletedStorageFiles,
     storageCleanupError,
   };
+}
+
+export async function saveStravaCredentials(userId, credentials) {
+  if (!userId) throw new Error('userId es obligatorio para guardar credenciales de Strava.');
+  const { db } = await getAdminServices();
+  const ref = db
+    .collection('users')
+    .doc(userId)
+    .collection('integrations')
+    .doc('strava');
+
+  await ref.set({
+    accessToken: String(credentials.accessToken || ''),
+    refreshToken: String(credentials.refreshToken || ''),
+    expiresAt: Number(credentials.expiresAt) || 0,
+    athleteId: String(credentials.athleteId || ''),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function getStravaCredentials(userId) {
+  if (!userId) return null;
+  const { db } = await getAdminServices();
+  const ref = db
+    .collection('users')
+    .doc(userId)
+    .collection('integrations')
+    .doc('strava');
+
+  const snapshot = await ref.get();
+  return snapshot.exists ? snapshot.data() : null;
+}
+
+export async function deleteStravaCredentials(userId) {
+  if (!userId) return;
+  const { db } = await getAdminServices();
+  const ref = db
+    .collection('users')
+    .doc(userId)
+    .collection('integrations')
+    .doc('strava');
+
+  await ref.delete();
 }

@@ -24,12 +24,12 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación: **1 de junio de 2026 (sesión tarde)**.
+Última verificación: **2 de junio de 2026 (auditoría local, despliegue y sonda pública)**.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
-- `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente.
+- `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente. La suite tiene `74` tests.
 - `npm audit` devuelve `0` vulnerabilidades tras fijar overrides transitivos seguros para `postcss` y `uuid`.
-- La producción Vercel responde en `/` y `/api/health`.
+- La producción Vercel responde en `/` y `/api/health`; `/api/meals` sin token responde `401`. Producción actual: `dpl_FJ2jWbaV8Ktjy9G57aKMDaVB4t9r`.
 - Firebase Authentication, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se validaron con sondas reales.
 - Firebase Admin y Firestore funcionan localmente y en producción con Firebase ID tokens reales.
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu` del proyecto Firebase/GCP; escritura y borrado fueron verificados.
@@ -38,7 +38,11 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
 - Las fotos caducan a los 30 días, el bucket no conserva copias recuperables tras borrado y las rutas IA tienen rate limiting persistente en Firestore.
 
-- La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible, atlas anatómico 3D con modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` y vistas frontal/posterior corregidas, y biblioteca de ejercicios con tarjetas colapsables por categoría y modal de detalle. El rediseño está implementado en código; pendiente verificación local y redespliegue.
+- La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible, atlas anatómico 3D con modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` y vistas frontal/posterior corregidas, y biblioteca de ejercicios con tarjetas colapsables por categoría y modal de detalle.
+- El cierre local del 2 de junio retiró claims no sustentados de la landing, sustituyó recursos remotos por assets propios, añadió recuperación de contraseña y conservó solo 14 embeds de YouTube verificados con fallback SVG para el resto.
+- El check-in diario quedó estructurado e idempotente por fecha: rehidrata estado, no inventa ceros al omitir encuesta y bloquea alta intensidad en el siguiente plan si hay síntomas de alarma.
+- Se añadieron CSP, HSTS, `nosniff`, política de referrer, permisos y framing; `withTrace()` separa rechazos auth esperados de fallos operativos. Las cabeceras están verificadas en producción.
+- `npm run e2e:production` pasó tras el despliegue con Gemini live, Storage, rate limits y limpieza del usuario temporal.
 
 Consulta el detalle en [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
 

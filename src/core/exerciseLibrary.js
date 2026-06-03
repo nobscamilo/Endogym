@@ -1,4 +1,5 @@
 import { GoalType, TrainingModality } from '../domain/models.js';
+import { evaluatePreparticipationScreening } from './screening.js';
 import {
   EXERCISE_AUDIT_SCHEMA,
   buildExerciseCatalog,
@@ -20,11 +21,32 @@ function roundToStep(value, step = 2.5) {
   return Math.round(value / step) * step;
 }
 
-function youtubeLinks(query) {
+// Verified through YouTube oEmbed on 2026-06-02. Exercises without a
+// confirmed embed intentionally use the local animated fallback.
+const EXERCISE_VIDEO_MAP = {
+  'gym-bench-press': 'rT7DgCr-3pg',
+  'gym-pushup': 'IODxDxX7oi4',
+  'gym-plank': 'pSHjTRCQxIw',
+  'gym-bicep-curl': 'in7PaeYlhrM',
+  'gym-dumbbell-lunge': 'D7KaRcUTQeE',
+  'gym-db-bench-press': 'rT7DgCr-3pg',
+  'gym-pullup': 'eGo4IYlbE5g',
+  'gym-dips': '2z8JmcrW-As',
+  'gym-lunges': 'D7KaRcUTQeE',
+  'gym-crunch': 'Xyd_fa5zoEU',
+  'gym-facepull': 'eIq5CB9JfKE',
+  'gym-hammer-curl': 'zC3nLlEvin4',
+  'gym-dumbbell-flye': 'eGjt4lk6g34',
+  'gym-burpee': 'dZgVxmf6jkA',
+};
+
+function youtubeLinks(query, exerciseId = '') {
   const encoded = encodeURIComponent(query);
+  const videoId = EXERCISE_VIDEO_MAP[exerciseId] || null;
   return {
     videoUrl: `https://www.youtube.com/results?search_query=${encoded}`,
-    videoEmbedUrl: null,
+    videoEmbedUrl: videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=1&controls=1&modestbranding=1&rel=0&showinfo=0` : null,
+    videoEmbedId: videoId,
   };
 }
 
@@ -942,6 +964,9 @@ export function resolveExerciseMetadata(exerciseLike = null) {
   const baseExercise = libraryExercise || exerciseLike;
   const muscleProfile = buildExerciseMuscleProfile(baseExercise);
 
+  const query = resolveYoutubeQuery(baseExercise, baseExercise.modalities?.[0] || 'strength');
+  const links = youtubeLinks(query, baseExercise.id);
+
   return {
     ...muscleProfile,
     primaryMuscles: Array.isArray(exerciseLike.primaryMuscles) && exerciseLike.primaryMuscles.length
@@ -951,6 +976,7 @@ export function resolveExerciseMetadata(exerciseLike = null) {
       ? exerciseLike.secondaryMuscles
       : muscleProfile.secondaryMuscles,
     anatomyRegions: exerciseLike.anatomyRegions || muscleProfile.anatomyRegions,
+    ...links,
   };
 }
 
@@ -1116,6 +1142,9 @@ export function getExerciseLibraryCatalog() {
         regressions: exercise.regressions || [],
         contraindications: exercise.contraindications || [],
         cues: exercise.cues,
+        videoUrl: metadata.videoUrl,
+        videoEmbedUrl: metadata.videoEmbedUrl,
+        videoEmbedId: metadata.videoEmbedId,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'es'));
@@ -1169,7 +1198,7 @@ export function suggestExerciseAlternatives({
   }
 
   return rankedPool.slice(0, Math.max(1, limit)).map((exercise) => {
-    const links = youtubeLinks(resolveYoutubeQuery(exercise, modality));
+    const links = youtubeLinks(resolveYoutubeQuery(exercise, modality), exercise.id);
     const metadata = resolveExerciseMetadata(exercise);
     return {
       id: exercise.id,
@@ -1247,7 +1276,40 @@ export function buildSessionExercises({
 }) {
   const resolvedSessionFocus = sessionFocus || resolveSessionFocus({ modality, sessionType, sessionTitle });
   const pool = listBaseSessionExercises(modality, sessionType, resolvedSessionFocus);
-  const desiredCount = sessionType === 'recovery' ? 3 : sessionType === 'aerobic' ? 2 : 5;
+
+  const intensity = profile?.preparticipation?.desiredIntensity || 'moderate';
+  const resolvedGoal = goal || profile?.goal || 'recomposition';
+
+  let desiredCount = 5;
+  if (sessionType === 'recovery') {
+    desiredCount = 3;
+  } else if (sessionType === 'aerobic') {
+    desiredCount = 2;
+  } else {
+    // Determine base exercise count for resistance, mixed, mindbody based on intensity and goal
+    const highVolumeGoals = new Set([
+      'weight_loss',
+      'recomposition',
+      'hypertrophy',
+      'strength',
+      'cut',
+      'bulk'
+    ]);
+
+    const screening = profile?.preparticipation ? evaluatePreparticipationScreening(profile.preparticipation) : null;
+    const isStopGate = screening?.readinessGate === 'stop';
+
+    if (isStopGate) {
+      desiredCount = 4; // Clinical cap for high-risk safety
+    } else if (intensity === 'vigorous') {
+      desiredCount = highVolumeGoals.has(resolvedGoal) ? 7 : 6;
+    } else if (intensity === 'moderate') {
+      desiredCount = highVolumeGoals.has(resolvedGoal) ? 6 : 5;
+    } else { // light
+      desiredCount = 4;
+    }
+  }
+
   const selectedPool = selectExercisesFromPool(pool, {
     desiredCount: Math.min(desiredCount, pool.length),
     sessionType,
@@ -1256,7 +1318,7 @@ export function buildSessionExercises({
   });
 
   const selected = selectedPool.map((exercise) => {
-    const links = youtubeLinks(resolveYoutubeQuery(exercise, modality));
+    const links = youtubeLinks(resolveYoutubeQuery(exercise, modality), exercise.id);
     const metadata = resolveExerciseMetadata(exercise);
     return {
       id: exercise.id,

@@ -1,0 +1,2 @@
+# Ignore local sport medicine PDF books (only parsed JSON / Firestore is needed)
+docs/guidelines/

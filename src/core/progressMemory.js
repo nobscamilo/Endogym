@@ -1,6 +1,7 @@
 import { GoalType } from '../domain/models.js';
 
 function toNumber(value, fallback = null) {
+  if (value == null || value === '') return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 }
@@ -18,6 +19,20 @@ function normalizeDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date;
+}
+
+const ALARM_SYMPTOM_LABELS = {
+  dyspnea: 'Disnea o ahogo inusual',
+  jointPain: 'Dolor articular o muscular agudo',
+  dizziness: 'Mareo o inestabilidad',
+  tachycardia: 'Taquicardia inusual o palpitaciones',
+};
+
+function listWorkoutAlarmSymptoms(workout) {
+  if (!workout?.symptoms || typeof workout.symptoms !== 'object') return [];
+  return Object.entries(ALARM_SYMPTOM_LABELS)
+    .filter(([key]) => workout.symptoms[key] === true)
+    .map(([key, label]) => ({ key, label }));
 }
 
 function trendPerWeek(points) {
@@ -64,16 +79,27 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     return date && date >= since && date <= nowDate;
   });
 
-  const sessionRpes = recentWorkouts
+  const subjectiveWorkouts = recentWorkouts.filter((workout) => workout.checkinSkipped !== true);
+  const sessionRpes = subjectiveWorkouts
     .map((workout) => toNumber(workout.sessionRpe))
     .filter((value) => value != null);
-  const fatigueScores = recentWorkouts
+  const fatigueScores = subjectiveWorkouts
     .map((workout) => toNumber(workout.fatigue))
     .filter((value) => value != null);
-  const sleepHours = recentWorkouts
+  const sleepHours = subjectiveWorkouts
     .map((workout) => toNumber(workout.sleepHours))
     .filter((value) => value != null);
   const completedFlags = recentWorkouts.map((workout) => (workout.completed === false ? 0 : 1));
+  const alarmSymptomEntries = recentWorkouts
+    .flatMap((workout) => {
+      const occurredAt = workout.performedAt || workout.createdAt || null;
+      return listWorkoutAlarmSymptoms(workout).map((symptom) => ({ ...symptom, occurredAt }));
+    });
+  const latestAlarmSymptomAt = alarmSymptomEntries
+    .map((entry) => entry.occurredAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
 
   const adherenceScores = recentMeals
     .map((meal) => toNumber(meal?.adherence?.scorePercent))
@@ -112,6 +138,7 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     until: nowDate.toISOString(),
     samples: {
       workouts: recentWorkouts.length,
+      subjectiveWorkouts: subjectiveWorkouts.length,
       meals: recentMeals.length,
       adherenceMeals: adherenceScores.length,
       metrics: recentMetrics.length,
@@ -135,6 +162,12 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     readinessState,
     fatigueState,
     adherenceState,
+    clinicalSignals: {
+      alarmSymptomsDetected: alarmSymptomEntries.length > 0,
+      alarmSymptoms: [...new Set(alarmSymptomEntries.map((entry) => entry.label))],
+      latestAlarmSymptomAt,
+      readinessGate: alarmSymptomEntries.length > 0 ? 'stop' : 'ok',
+    },
   };
 }
 
@@ -157,6 +190,7 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
   const workoutSamples = progressMemory?.samples?.workouts ?? 0;
   const adherenceSamples = progressMemory?.samples?.adherenceMeals ?? 0;
   const metricSamples = progressMemory?.samples?.metrics ?? 0;
+  const hasAlarmSymptoms = progressMemory?.clinicalSignals?.alarmSymptomsDetected === true;
 
   let volumeFactor = 1;
   let rpeShift = 0;
@@ -165,6 +199,20 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
   let fatFactor = 1;
   let proteinFactor = 1;
   const appliedRules = [];
+
+  if (hasAlarmSymptoms) {
+    volumeFactor *= 0.75;
+    rpeShift -= 3;
+    calorieDelta += 120;
+    appliedRules.push(
+      createRule(
+        'DAILY_CHECKIN_ALARM_SYMPTOMS',
+        'El check-in diario reciente contiene síntomas de alarma.',
+        `symptoms=${(progressMemory.clinicalSignals.alarmSymptoms || []).join('; ') || 'n/d'}, latest=${progressMemory.clinicalSignals.latestAlarmSymptomAt || 'n/d'}`,
+        'Bloqueo de alta intensidad, volumen conservador y recomendación de valoración clínica antes de progresar.'
+      )
+    );
+  }
 
   if (screening?.readinessGate === 'stop') {
     volumeFactor *= 0.75;
@@ -293,6 +341,8 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
   }
 
   if (
+    !hasAlarmSymptoms
+    &&
     progressMemory?.readinessScore >= thresholds.highReadiness
     && completionRate >= 0.8
     && avgFatigue <= 5
@@ -321,7 +371,11 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
 
   volumeFactor = Number(clamp(volumeFactor, 0.7, 1.15).toFixed(2));
   rpeShift = clamp(rpeShift, -3, 1);
-  const maxRpeCap = clamp(toNumber(screening?.maxAllowedSessionRpe, 9), 4, 9);
+  const maxRpeCap = clamp(
+    Math.min(toNumber(screening?.maxAllowedSessionRpe, 9), hasAlarmSymptoms ? 4 : 9),
+    4,
+    9
+  );
 
   const summary = [
     `Readiness ${progressMemory?.readinessScore ?? 'n/d'}/100 (${progressMemory?.readinessState || 'n/d'})`,
@@ -330,6 +384,7 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
     `delta kcal ${calorieDelta >= 0 ? '+' : ''}${calorieDelta}`,
     weightTrend != null ? `peso ${weightTrend >= 0 ? '+' : ''}${weightTrend}kg/sem` : null,
     avgGlucose != null ? `glu ${Math.round(avgGlucose)}mg/dL` : null,
+    hasAlarmSymptoms ? 'gate clínico stop' : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -340,7 +395,7 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
       volumeFactor,
       rpeShift,
       maxRpeCap,
-      highIntensityBlocked: screening?.highIntensityAllowed === false,
+      highIntensityBlocked: screening?.highIntensityAllowed === false || hasAlarmSymptoms,
     },
     nutrition: {
       calorieDelta,

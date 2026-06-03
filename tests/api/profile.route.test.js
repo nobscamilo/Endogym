@@ -89,6 +89,8 @@ describe('/api/profile route', () => {
             contraindications: false,
             desiredIntensity: 'vigorous',
           },
+          medicalConditions: 'diabetes tipo 2, asma',
+          physicalInjuries: 'molestia en hombro izquierdo',
           nutritionPreferences: {
             dietaryPattern: 'omnivore',
             allergies: ['marisco'],
@@ -106,21 +108,23 @@ describe('/api/profile route', () => {
       })
     );
 
-    const json = await readJson(response);
-    expect(response.status).toBe(200);
-    expect(json.profile.displayName).toBe('Juan');
-    expect(json.profile.goal).toBe('weight_loss');
-    expect(json.profile.trainingModality).toBe('trx');
-    expect(json.profile.metabolicProfile).toBe('prediabetes');
-    expect(json.profile.preparticipation.knownCardiometabolicDisease).toBe(true);
-    expect(json.profile.preparticipation.desiredIntensity).toBe('vigorous');
-    expect(typeof json.profile.preparticipationUpdatedAt).toBe('string');
-    expect(json.profile.screeningRefreshDays).toBe(15);
-    expect(json.profile.nutritionPreferences.allergies).toContain('marisco');
-    expect(json.profile.adaptiveThresholds.highFatigue).toBe(7.5);
-    expect(json.profile.targetMacros).toBeTruthy();
-    expect(json.profile.targetMacros.targetCalories).toBeGreaterThan(0);
-  });
+      const json = await readJson(response);
+      expect(response.status).toBe(200);
+      expect(json.profile.displayName).toBe('Juan');
+      expect(json.profile.goal).toBe('weight_loss');
+      expect(json.profile.trainingModality).toBe('trx');
+      expect(json.profile.metabolicProfile).toBe('prediabetes');
+      expect(json.profile.medicalConditions).toBe('diabetes tipo 2, asma');
+      expect(json.profile.physicalInjuries).toBe('molestia en hombro izquierdo');
+      expect(json.profile.preparticipation.knownCardiometabolicDisease).toBe(true);
+      expect(json.profile.preparticipation.desiredIntensity).toBe('vigorous');
+      expect(typeof json.profile.preparticipationUpdatedAt).toBe('string');
+      expect(json.profile.screeningRefreshDays).toBe(15);
+      expect(json.profile.nutritionPreferences.allergies).toContain('marisco');
+      expect(json.profile.adaptiveThresholds.highFatigue).toBe(7.5);
+      expect(json.profile.targetMacros).toBeTruthy();
+      expect(json.profile.targetMacros.targetCalories).toBeGreaterThan(0);
+    });
 
   it('PUT conserva fecha de cribado si no cambian respuestas y respeta ventana mínima', async () => {
     mocks.getUserProfile.mockResolvedValue({

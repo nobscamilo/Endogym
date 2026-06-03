@@ -40,12 +40,25 @@ export async function withTrace(operationName, handler, context = {}) {
     });
     return result;
   } catch (error) {
-    logError('operation_failed', error, {
+    const failureContext = {
       traceId,
       operationName,
       durationMs: Date.now() - startedAt,
       ...context,
-    });
+    };
+
+    if (error?.expected === true) {
+      logInfo('operation_rejected', {
+        ...failureContext,
+        rejection: {
+          name: error?.name,
+          message: error?.message,
+          statusCode: error?.statusCode,
+        },
+      });
+    } else {
+      logError('operation_failed', error, failureContext);
+    }
     throw error;
   }
 }

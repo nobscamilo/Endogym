@@ -36,6 +36,7 @@ const GOAL_CALORIE_DELTA = {
   [GoalType.STRENGTH]: 100,
   [GoalType.RECOMPOSITION]: -100,
   [GoalType.GLYCEMIC_CONTROL]: -150,
+  [GoalType.SAFE_CONDITIONING]: 0,
 };
 
 const MODALITY_TEMPLATES = {
@@ -181,6 +182,7 @@ function resolveGoal(goal) {
     GoalType.STRENGTH,
     GoalType.RECOMPOSITION,
     GoalType.GLYCEMIC_CONTROL,
+    GoalType.SAFE_CONDITIONING,
   ]);
   return goals.has(resolved) ? resolved : GoalType.RECOMPOSITION;
 }
@@ -371,6 +373,7 @@ function resolveMacroStrategy(goal) {
     [GoalType.STRENGTH]: 'strength',
     [GoalType.RECOMPOSITION]: 'recomposition',
     [GoalType.GLYCEMIC_CONTROL]: 'glycemic_control',
+    [GoalType.SAFE_CONDITIONING]: 'safe_conditioning',
   };
   return mapping[goal] || 'recomposition';
 }
@@ -421,7 +424,7 @@ function getSessionRpeRange(goal, sessionType) {
   if (goal === GoalType.ENDURANCE) {
     return sessionType === 'aerobic' ? 'RPE 5-8' : 'RPE 5-6';
   }
-  if (goal === GoalType.WEIGHT_LOSS || goal === GoalType.GLYCEMIC_CONTROL) {
+  if (goal === GoalType.WEIGHT_LOSS || goal === GoalType.GLYCEMIC_CONTROL || goal === GoalType.SAFE_CONDITIONING) {
     return sessionType === 'mixed' ? 'RPE 6-7' : 'RPE 4-6';
   }
   return sessionType === 'resistance' ? 'RPE 6-8' : 'RPE 4-6';
@@ -547,6 +550,15 @@ function buildClinicalAuditTrail({ preparticipationScreening, progressMemory, ad
     });
   }
 
+  if (progressMemory?.clinicalSignals?.alarmSymptomsDetected) {
+    items.push({
+      id: 'DAILY_CHECKIN_CLINICAL_GATE',
+      reason: 'Síntomas de alarma reportados en un check-in diario reciente.',
+      evidence: `gate=${progressMemory.clinicalSignals.readinessGate}, symptoms=${(progressMemory.clinicalSignals.alarmSymptoms || []).join('; ') || 'n/d'}, latest=${progressMemory.clinicalSignals.latestAlarmSymptomAt || 'n/d'}`,
+      effect: 'Bloquear alta intensidad y solicitar valoración clínica antes de progresar.',
+    });
+  }
+
   if (Array.isArray(adaptiveTuning?.appliedRules)) {
     adaptiveTuning.appliedRules.forEach((rule) => items.push(rule));
   }
@@ -563,6 +575,7 @@ function buildAcsmPrescription(goal, modality) {
     [GoalType.STRENGTH]: '90-180 min/semana de cardio complementario',
     [GoalType.RECOMPOSITION]: '150-250 min/semana moderado',
     [GoalType.GLYCEMIC_CONTROL]: '150-300 min/semana + caminatas postprandiales',
+    [GoalType.SAFE_CONDITIONING]: '150-200 min/semana de intensidad ligera a moderada',
   };
 
   const resistanceByGoal = {
@@ -573,6 +586,7 @@ function buildAcsmPrescription(goal, modality) {
     [GoalType.STRENGTH]: '3-5 días/semana, 2-6 series, 2-6 repeticiones',
     [GoalType.RECOMPOSITION]: '3-4 días/semana, 3-5 series, 6-12 repeticiones',
     [GoalType.GLYCEMIC_CONTROL]: '2-4 días/semana, 2-4 series, 8-15 repeticiones',
+    [GoalType.SAFE_CONDITIONING]: '2 días/semana, 1-3 series, 10-15 repeticiones de intensidad controlada',
   };
 
   const modalityNotes = {
@@ -623,7 +637,10 @@ export function buildHeuristicCoachPlan({ profile, weeklyPlan }) {
   const goal = resolveGoal(profile.goal);
   const modality = resolveTrainingModality(profile.trainingModality, profile.trainingMode);
   const metabolicProfile = resolveMetabolicProfile(profile.metabolicProfile);
-  const readinessGate = weeklyPlan?.preparticipationScreening?.readinessGate || 'ok';
+  const hasAlarmSymptoms = weeklyPlan?.progressMemory?.clinicalSignals?.alarmSymptomsDetected === true;
+  const readinessGate = hasAlarmSymptoms
+    ? 'stop'
+    : weeklyPlan?.preparticipationScreening?.readinessGate || 'ok';
   const readinessScore = weeklyPlan?.progressMemory?.readinessScore ?? null;
   const trainingDays = Array.isArray(weeklyPlan?.days)
     ? weeklyPlan.days.filter((day) => day?.sessionType !== 'recovery').slice(0, 4)
@@ -646,7 +663,9 @@ export function buildHeuristicCoachPlan({ profile, weeklyPlan }) {
     ];
 
   const riskFlags = [];
-  if (readinessGate === 'stop') {
+  if (hasAlarmSymptoms) {
+    riskFlags.push('Síntomas de alarma en check-in reciente: bloquear alta intensidad y solicitar valoración clínica antes de progresar.');
+  } else if (readinessGate === 'stop') {
     riskFlags.push('Riesgo alto en cribado: limitar intensidad y solicitar valoración médica antes de progresar.');
   } else if (readinessGate === 'caution') {
     riskFlags.push('Cribado en cautela: evitar picos de intensidad y controlar síntomas durante la sesión.');

@@ -73,6 +73,15 @@ users/{userId}/rateLimits/{scope}
 4. El coach usa `thinkingBudget=0`, timeout de 10 segundos por intento y un reintento.
 5. Si Gemini falla o agota presupuesto, la API persiste fallback heuristico ACSM observable sin exceder el timeout Vercel.
 
+## Flujo de check-in diario
+
+1. La UI envia la sesión completada o no realizada a `POST /api/workouts`.
+2. La UI normaliza `performedAt` al mediodía UTC de la fecha seleccionada y bloquea fechas futuras locales.
+3. Firestore usa upsert determinista `daily-YYYY-MM-DD`, persiste completitud, subjetivos opcionales, síntomas booleanos y `checkinSkipped`.
+4. La UI rehidrata los check-ins persistidos con `GET /api/workouts`.
+5. El siguiente `POST /api/weekly-plan` agrega entrenamientos recientes mediante `buildProgressMemory()`.
+6. Si hay síntomas de alarma recientes, `buildAdaptiveTuning()` bloquea alta intensidad, limita RPE y deja trazabilidad clínica para el coach heurístico.
+
 ## Retencion de fotos
 
 - `infra/storage-lifecycle.json` elimina objetos `plates/` cuando superan 30 dias.
@@ -82,7 +91,7 @@ users/{userId}/rateLimits/{scope}
 ## Observabilidad
 
 - `withTrace()` genera `traceId`.
-- Los logs JSON registran inicio, fin, duracion y errores.
+- Los logs JSON registran inicio, fin, duracion y errores. Rechazos auth esperados usan `operation_rejected`, no `operation_failed`.
 - `plate_analysis_result`, `weekly_plan_coach_result`, `plate_image_rejected` y `rate_limit_exceeded` permiten vigilar degradacion y abuso.
 - Evita incluir imagenes, tokens o datos sensibles en logs.
 - Consulta [`OBSERVABILITY.md`](OBSERVABILITY.md).

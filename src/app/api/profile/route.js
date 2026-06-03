@@ -115,14 +115,20 @@ function normalizePayload(payload = {}, existingProfile = null) {
     ? existingProfile.preparticipationUpdatedAt
     : null;
   const preparticipationChanged = !isSamePreparticipation(preparticipation, existingPreparticipation);
+  const forceScreeningRefresh = payload.forceScreeningRefresh === true;
   const preparticipationUpdatedAt = payloadIncludesPreparticipation
-    ? preparticipationChanged || !existingPreparticipationUpdatedAt
+    ? preparticipationChanged || forceScreeningRefresh || !existingPreparticipationUpdatedAt
       ? nowIso
       : existingPreparticipationUpdatedAt
     : existingPreparticipationUpdatedAt;
   const screeningRefreshDays = normalizeScreeningRefreshDays(
     payload.screeningRefreshDays,
     existingProfile?.screeningRefreshDays
+  );
+  const preferredDurationMinutes = clamp(
+    Math.round(toNumber(payload.preferredDurationMinutes ?? existingProfile?.preferredDurationMinutes, 60)),
+    20,
+    180
   );
   const nutritionPreferences = normalizeNutritionPreferencesInput(payload.nutritionPreferences);
   const adaptiveThresholds = normalizeAdaptiveThresholds(payload.adaptiveThresholds);
@@ -148,6 +154,9 @@ function normalizePayload(payload = {}, existingProfile = null) {
     heightCm: toNumber(payload.heightCm, 175),
     mealsPerDay: toNumber(payload.mealsPerDay, 4),
     targetCalories: toNumber(payload.targetCalories, null),
+    medicalConditions: typeof payload.medicalConditions === 'string' ? payload.medicalConditions.trim().slice(0, 500) : (existingProfile?.medicalConditions || ''),
+    physicalInjuries: typeof payload.physicalInjuries === 'string' ? payload.physicalInjuries.trim().slice(0, 500) : (existingProfile?.physicalInjuries || ''),
+    preferredDurationMinutes,
     preparticipation,
     preparticipationUpdatedAt,
     screeningRefreshDays,
@@ -174,6 +183,9 @@ function buildDefaultProfile(user) {
     heightCm: 175,
     mealsPerDay: 4,
     targetCalories: null,
+    medicalConditions: '',
+    physicalInjuries: '',
+    preferredDurationMinutes: 60,
     preparticipation: normalizePreparticipationInput(),
     preparticipationUpdatedAt: null,
     screeningRefreshDays: DEFAULT_SCREENING_REFRESH_DAYS,

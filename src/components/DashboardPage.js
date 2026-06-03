@@ -102,6 +102,9 @@ const DEFAULT_PROFILE = {
   heightCm: 175,
   mealsPerDay: 4,
   targetCalories: '',
+  medicalConditions: '',
+  physicalInjuries: '',
+  preferredDurationMinutes: 60,
   preparticipation: {
     knownCardiometabolicDisease: false,
     exerciseSymptoms: false,
@@ -354,6 +357,13 @@ function buildLocalNoonIso(date = new Date()) {
   ).toISOString();
 }
 
+function buildNoonIsoForDateKey(dateKey) {
+  const date = parseIsoDate(dateKey);
+  if (!date) return null;
+  date.setUTCHours(12, 0, 0, 0);
+  return date.toISOString();
+}
+
 function resolveFocusFamily(sessionFocus = '') {
   switch (sessionFocus) {
     case 'upper':
@@ -524,6 +534,185 @@ function Field({ label, children }) {
   );
 }
 
+function ExerciseVisualPlayer({ exercise }) {
+  if (!exercise) return null;
+
+  const hasVideo = Boolean(exercise.videoEmbedUrl);
+  const videoUrl = exercise.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((exercise.youtubeQuery || exercise.name || '') + ' tecnica ejecucion')}`;
+
+  // Determine movement type for animation fallback
+  const category = exercise.category || 'lower_body_strength';
+  const sessionTypes = exercise.sessionTypes || [];
+
+  let movementType = 'strength'; // strength, yoga, pilates, cardio
+  if (category.includes('flexibility') || category.includes('stretch') || sessionTypes.includes('yoga') || category.includes('yoga')) {
+    movementType = 'yoga';
+  } else if (category.includes('recovery') || sessionTypes.includes('recovery') || category.includes('pilates') || sessionTypes.includes('pilates')) {
+    movementType = 'pilates';
+  } else if (category.includes('aerobic') || sessionTypes.includes('aerobic') || category.includes('cardio') || sessionTypes.includes('cardio') || category.includes('conditioning')) {
+    movementType = 'cardio';
+  }
+
+  return (
+    <article className="premium-video-card glass-panel bg-white/5">
+      <header className="video-card-header">
+        <span className="material-symbols-outlined header-icon">
+          {hasVideo ? 'smart_display' : 'motion_photos_on'}
+        </span>
+        <h6>Demostración Técnica</h6>
+      </header>
+
+      <div className="video-frame-container">
+        {hasVideo ? (
+          <iframe
+            src={exercise.videoEmbedUrl}
+            title={`Guía de técnica para ${exercise.name}`}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+            className="youtube-embed-frame"
+          />
+        ) : (
+          <div className={`fallback-animation-container ${movementType}`}>
+            {/* Geometric SVG Animation Fallback */}
+            {movementType === 'strength' && (
+              <svg className="fallback-svg" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="strengthGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#db2777" />
+                    <stop offset="100%" stopColor="#4f46e5" />
+                  </linearGradient>
+                </defs>
+                <circle className="bg-ring" cx="50" cy="50" r="40" />
+                <g className="strength-bar-group">
+                  <line className="barbell-bar" x1="20" y1="50" x2="80" y2="50" />
+                  <rect className="plate-left" x="25" y="35" width="6" height="30" rx="2" />
+                  <rect className="plate-left-2" x="18" y="40" width="5" height="20" rx="1" />
+                  <rect className="plate-right" x="69" y="35" width="6" height="30" rx="2" />
+                  <rect className="plate-right-2" x="77" y="40" width="5" height="20" rx="1" />
+                </g>
+                <path className="muscle-pulse-line" d="M 15 50 Q 50 10 85 50" />
+                <path className="muscle-pulse-line-bottom" d="M 15 50 Q 50 90 85 50" />
+              </svg>
+            )}
+
+            {movementType === 'yoga' && (
+              <svg className="fallback-svg" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="yogaGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#a855f7" />
+                    <stop offset="100%" stopColor="#6366f1" />
+                  </linearGradient>
+                </defs>
+                <circle className="bg-ring" cx="50" cy="50" r="40" />
+                <g className="lotus-group">
+                  <path className="petal center-petal" d="M 50 20 C 40 40 40 70 50 80 C 60 70 60 40 50 20" />
+                  <path className="petal left-petal" d="M 50 45 C 25 45 25 70 50 80 C 40 70 40 55 50 45" />
+                  <path className="petal right-petal" d="M 50 45 C 75 45 75 70 50 80 C 60 70 60 55 50 45" />
+                </g>
+                <circle className="glow-core" cx="50" cy="80" r="4" />
+                <circle className="spirit-node" cx="50" cy="30" r="2" />
+              </svg>
+            )}
+
+            {movementType === 'pilates' && (
+              <svg className="fallback-svg" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="pilatesGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#10b981" />
+                    <stop offset="100%" stopColor="#3b82f6" />
+                  </linearGradient>
+                </defs>
+                <circle className="bg-ring" cx="50" cy="50" r="40" />
+                <g className="grid-alignment-group">
+                  <circle className="alignment-concentric concentric-1" cx="50" cy="50" r="25" />
+                  <circle className="alignment-concentric concentric-2" cx="50" cy="50" r="15" />
+                  <line className="alignment-axis axis-h" x1="15" y1="50" x2="85" y2="50" />
+                  <line className="alignment-axis axis-v" x1="50" y1="15" x2="50" y2="85" />
+                </g>
+                <circle className="alignment-core" cx="50" cy="50" r="6" />
+                <g className="spine-align-dots">
+                  <circle className="spine-dot" cx="50" cy="28" r="2" />
+                  <circle className="spine-dot" cx="50" cy="39" r="2" />
+                  <circle className="spine-dot" cx="50" cy="61" r="2" />
+                  <circle className="spine-dot" cx="50" cy="72" r="2" />
+                </g>
+              </svg>
+            )}
+
+            {movementType === 'cardio' && (
+              <svg className="fallback-svg" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="cardioGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ef4444" />
+                    <stop offset="100%" stopColor="#f43f5e" />
+                  </linearGradient>
+                </defs>
+                <circle className="bg-ring" cx="50" cy="50" r="40" />
+                <path className="heart-wave-path" d="M 15 50 L 35 50 L 41 25 L 47 75 L 53 40 L 59 55 L 65 50 L 85 50" />
+                <circle className="pulsing-heart" cx="50" cy="50" r="2" />
+              </svg>
+            )}
+
+            <div className="fallback-visual-label">
+              <span className="fallback-badge">{
+                movementType === 'strength' ? 'Patrón de Fuerza' :
+                movementType === 'yoga' ? 'Fluidez y Flexibilidad' :
+                movementType === 'pilates' ? 'Alineación y Control Core' :
+                'Acondicionamiento Aeróbico'
+              }</span>
+              <p className="fallback-text">Demostración técnica interactiva activa</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <footer className="video-card-footer">
+        <a
+          href={videoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="premium-action-btn youtube-search-btn"
+        >
+          <span className="material-symbols-outlined">search</span>
+          {hasVideo ? 'Ver variantes en YouTube' : 'Buscar guía en YouTube'}
+        </a>
+      </footer>
+    </article>
+  );
+}
+
+function scaleSessionExercises(exercises, originalDuration, targetDuration) {
+  if (!exercises || !exercises.length) return [];
+  const od = originalDuration || 60;
+  const td = targetDuration || od;
+  if (td === od) return exercises;
+
+  const ratio = td / od;
+  let scaled = exercises.map((exercise) => {
+    if (!exercise) return exercise;
+    const scaledExercise = { ...exercise };
+    if (scaledExercise.prescription) {
+      const pres = { ...scaledExercise.prescription };
+      if (typeof pres.sets === 'number') {
+        pres.sets = Math.max(1, Math.min(8, Math.round(pres.sets * ratio)));
+      }
+      if (typeof pres.durationMinutes === 'number') {
+        pres.durationMinutes = Math.max(1, Math.round(pres.durationMinutes * ratio));
+      }
+      scaledExercise.prescription = pres;
+    }
+    return scaledExercise;
+  });
+
+  if (ratio <= 0.65) {
+    const targetCount = Math.max(1, Math.round(scaled.length * 0.65));
+    scaled = scaled.slice(0, targetCount);
+  }
+  return scaled;
+}
+
 function buildProfilePayload(profile) {
   return {
     displayName: profile.displayName || '',
@@ -538,6 +727,9 @@ function buildProfilePayload(profile) {
     heightCm: toNumber(profile.heightCm, 175),
     mealsPerDay: toNumber(profile.mealsPerDay, 4),
     targetCalories: toNumber(profile.targetCalories, null),
+    medicalConditions: profile.medicalConditions || '',
+    physicalInjuries: profile.physicalInjuries || '',
+    preferredDurationMinutes: toNumber(profile.preferredDurationMinutes, 60),
     preparticipation: {
       knownCardiometabolicDisease: toBoolean(profile.preparticipation?.knownCardiometabolicDisease, false),
       exerciseSymptoms: toBoolean(profile.preparticipation?.exerciseSymptoms, false),
@@ -590,6 +782,7 @@ const GOAL_LABELS = {
   strength: 'Fuerza',
   recomposition: 'Recomposición',
   glycemic_control: 'Control glucémico',
+  safe_conditioning: 'Acondicionamiento seguro',
 };
 
 const DIETARY_PATTERN_LABELS = {
@@ -690,6 +883,10 @@ export default function DashboardPage() {
   const [showAdvancedProfile, setShowAdvancedProfile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const [stravaConnecting, setStravaConnecting] = useState(false);
+  const [stravaSyncing, setStravaSyncing] = useState(false);
+  const [stravaDisconnecting, setStravaDisconnecting] = useState(false);
+
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [planStatus, setPlanStatus] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
@@ -743,10 +940,25 @@ export default function DashboardPage() {
   const [sessionSwapState, setSessionSwapState] = useState({});
   const [sessionSwapOpen, setSessionSwapOpen] = useState(false);
   const [exerciseSwapState, setExerciseSwapState] = useState({});
+  const [durationOverridesState, setDurationOverridesState] = useState({});
   const [openSwapTarget, setOpenSwapTarget] = useState(null);
   const [selectedExerciseKey, setSelectedExerciseKey] = useState(null);
   const [completedSets, setCompletedSets] = useState({});
   const [workoutStatus, setWorkoutStatus] = useState('');
+  const [completedDaysCheckins, setCompletedDaysCheckins] = useState({});
+  const [dailyCheckinRpe, setDailyCheckinRpe] = useState(6);
+  const [dailyCheckinFatigue, setDailyCheckinFatigue] = useState(4);
+  const [dailyCheckinSleep, setDailyCheckinSleep] = useState(7);
+  const [dailyCheckinSymptoms, setDailyCheckinSymptoms] = useState({
+    dyspnea: false,
+    jointPain: false,
+    dizziness: false,
+    tachycardia: false
+  });
+  const [dailyCheckinNotes, setDailyCheckinNotes] = useState('');
+  const [showGoalGuide, setShowGoalGuide] = useState(false);
+  const [dailyCheckinLoading, setDailyCheckinLoading] = useState(false);
+  const [dailyCheckinStatus, setDailyCheckinStatus] = useState('');
   const [workoutLoading, setWorkoutLoading] = useState(false);
   const [workoutCheckin, setWorkoutCheckin] = useState({
     title: 'Sesión planificada',
@@ -837,8 +1049,10 @@ export default function DashboardPage() {
 
   const loadProfileRef = useRef(null);
   const loadWeeklyPlanRef = useRef(null);
+  const loadDailyCheckinsRef = useRef(null);
   loadProfileRef.current = loadProfile;
   loadWeeklyPlanRef.current = loadWeeklyPlan;
+  loadDailyCheckinsRef.current = loadDailyCheckins;
 
   useEffect(() => {
     if (!authReady) return;
@@ -846,6 +1060,7 @@ export default function DashboardPage() {
     if (!devAuthMode && !authUser) return;
     loadProfileRef.current();
     loadWeeklyPlanRef.current();
+    loadDailyCheckinsRef.current();
   }, [authReady, authConfigMissing, devAuthMode, authUser]);
 
   useEffect(() => {
@@ -938,13 +1153,95 @@ export default function DashboardPage() {
       },
     });
     const data = await safeJson(response);
-
     if (!response.ok) {
       throw new Error(data.error || 'Error en la petición.');
     }
 
     return data;
   }
+
+  const hasCheckedStravaRef = useRef(false);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (typeof window === 'undefined') return;
+    if (hasCheckedStravaRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+
+    if (code) {
+      hasCheckedStravaRef.current = true;
+
+      const handleOauthCallback = async () => {
+        try {
+          addToast('Conectando tu cuenta de Strava...', 'info');
+          await apiFetch('/api/integrations/strava/connect', {
+            method: 'POST',
+            body: JSON.stringify({ code }),
+          });
+          addToast('¡Cuenta de Strava conectada con éxito!', 'success');
+
+          const cleanUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+
+          loadProfile();
+        } catch (err) {
+          addToast(err.message || 'Error al conectar con Strava.', 'error');
+          const cleanUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      };
+
+      handleOauthCallback();
+    }
+  }, [authReady, addToast]);
+
+  const connectStrava = async () => {
+    setStravaConnecting(true);
+    try {
+      const data = await apiFetch('/api/integrations/strava/authorize');
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('La respuesta del servidor no contiene una URL válida.');
+      }
+    } catch (err) {
+      addToast(err.message || 'Error al conectar con Strava.', 'error');
+    } finally {
+      setStravaConnecting(false);
+    }
+  };
+
+  const syncStrava = async () => {
+    setStravaSyncing(true);
+    try {
+      const data = await apiFetch('/api/integrations/strava/sync', { method: 'POST' });
+      addToast(`Sincronizados ${data.syncedCount || 0} entrenamientos de Strava con éxito.`, 'success');
+      loadProfile();
+      loadWeeklyPlan();
+    } catch (err) {
+      addToast(err.message || 'Error al sincronizar.', 'error');
+    } finally {
+      setStravaSyncing(false);
+    }
+  };
+
+  const disconnectStrava = async () => {
+    if (!window.confirm('¿Seguro que quieres desconectar tu cuenta de Strava? No se sincronizarán más entrenamientos.')) {
+      return;
+    }
+    setStravaDisconnecting(true);
+    try {
+      await apiFetch('/api/integrations/strava/disconnect', { method: 'POST' });
+      addToast('Cuenta de Strava desconectada con éxito.', 'success');
+      loadProfile();
+    } catch (err) {
+      addToast(err.message || 'Error al desconectar.', 'error');
+    } finally {
+      setStravaDisconnecting(false);
+    }
+  };
 
   function applyPlanCustomizationState(plan, options = {}) {
     const resetSelection = options.resetSelection !== false;
@@ -959,6 +1256,11 @@ export default function DashboardPage() {
         ? customizations.exerciseSwapsByDate
         : {}
     );
+    setDurationOverridesState(
+      customizations?.durationOverridesByDate && typeof customizations.durationOverridesByDate === 'object'
+        ? customizations.durationOverridesByDate
+        : {}
+    );
     setSessionSwapOpen(false);
     setOpenSwapTarget(null);
     if (resetSelection) {
@@ -966,7 +1268,12 @@ export default function DashboardPage() {
     }
   }
 
-  async function persistPlanCustomizations(nextSessionSwapState, nextExerciseSwapState, successMessage = 'Personalización guardada.') {
+  async function persistPlanCustomizations(
+    nextSessionSwapState,
+    nextExerciseSwapState,
+    nextDurationOverridesState = durationOverridesState,
+    successMessage = 'Personalización guardada.'
+  ) {
     if (!weeklyPlan?.id) {
       setPlanStatus('El plan actual no se pudo identificar; cambios solo locales.');
       return;
@@ -980,6 +1287,7 @@ export default function DashboardPage() {
           customizations: {
             sessionSwapsByDate: nextSessionSwapState,
             exerciseSwapsByDate: nextExerciseSwapState,
+            durationOverridesByDate: nextDurationOverridesState,
           },
         }),
       });
@@ -993,6 +1301,16 @@ export default function DashboardPage() {
     } catch (error) {
       setPlanStatus(`No se pudo guardar la personalización: ${error.message}`);
     }
+  }
+
+  function applyDurationOverride(dayDate, duration) {
+    if (!dayDate) return;
+    const nextDurationOverridesState = {
+      ...durationOverridesState,
+      [dayDate]: duration,
+    };
+    setDurationOverridesState(nextDurationOverridesState);
+    persistPlanCustomizations(sessionSwapState, exerciseSwapState, nextDurationOverridesState, 'Duración ajustada para hoy.');
   }
 
   function normalizeExerciseForView(exercise, index) {
@@ -1010,6 +1328,8 @@ export default function DashboardPage() {
         secondaryMuscles: exercise.secondaryMuscles || metadata.secondaryMuscles,
         anatomyRegions: exercise.anatomyRegions || metadata.anatomyRegions,
         videoUrl: exercise.videoUrl || metadata.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((exercise.youtubeQuery || exercise.name || '') + ' tecnica ejecucion')}`,
+        videoEmbedUrl: exercise.videoEmbedUrl || metadata.videoEmbedUrl || null,
+        videoEmbedId: exercise.videoEmbedId || metadata.videoEmbedId || null,
         youtubeQuery: exercise.youtubeQuery || metadata.youtubeQuery || '',
       };
     }
@@ -1021,6 +1341,8 @@ export default function DashboardPage() {
       cues: [],
       prescription: null,
       videoUrl: metadata.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((typeof exercise === 'string' ? exercise : '') + ' tecnica ejecucion')}`,
+      videoEmbedUrl: metadata.videoEmbedUrl || null,
+      videoEmbedId: metadata.videoEmbedId || null,
       youtubeQuery: metadata.youtubeQuery || '',
       difficulty: '',
       progressions: [],
@@ -1178,6 +1500,11 @@ export default function DashboardPage() {
         heightCm: serverProfile.heightCm ?? 175,
         mealsPerDay: serverProfile.mealsPerDay ?? 4,
         targetCalories: serverProfile.targetCalories ?? '',
+        medicalConditions: serverProfile.medicalConditions || '',
+        physicalInjuries: serverProfile.physicalInjuries || '',
+        preferredDurationMinutes: Number.isFinite(Number(serverProfile.preferredDurationMinutes))
+          ? Number(serverProfile.preferredDurationMinutes)
+          : 60,
         preparticipation: {
           knownCardiometabolicDisease: serverProfile.preparticipation?.knownCardiometabolicDisease ?? false,
           exerciseSymptoms: serverProfile.preparticipation?.exerciseSymptoms ?? false,
@@ -1230,13 +1557,16 @@ export default function DashboardPage() {
     }
   }
 
-  async function saveProfile() {
+  async function saveProfile(forceRefresh = false) {
     if (profileLoading) return;
     setProfileLoading(true);
     setProfileStatus('Guardando perfil...');
 
     try {
-      const payload = buildProfilePayload(profile);
+      const payload = {
+        ...buildProfilePayload(profile),
+        forceScreeningRefresh: forceRefresh === true || profile.forceScreeningRefresh === true,
+      };
       const data = await apiFetch('/api/profile', {
         method: 'PUT',
         body: JSON.stringify(payload),
@@ -1244,6 +1574,7 @@ export default function DashboardPage() {
       if (data.profile) {
         setProfile((prev) => ({
           ...prev,
+          forceScreeningRefresh: false,
           preparticipationUpdatedAt: data.profile.preparticipationUpdatedAt || prev.preparticipationUpdatedAt || null,
           screeningRefreshDays: Number.isFinite(Number(data.profile.screeningRefreshDays))
             ? Math.max(15, Math.round(Number(data.profile.screeningRefreshDays)))
@@ -1306,6 +1637,20 @@ export default function DashboardPage() {
       setPlanStatus(`Error cargando plan: ${error.message}`);
     } finally {
       setPlanLoading(false);
+    }
+  }
+
+  async function loadDailyCheckins() {
+    try {
+      const data = await apiFetch('/api/workouts?limit=100', { method: 'GET' });
+      const persistedCheckins = Object.fromEntries(
+        (data.workouts || [])
+          .filter((workout) => workout?.source === 'daily_checkin' && typeof workout.dailyCheckinDate === 'string')
+          .map((workout) => [workout.dailyCheckinDate, workout.completed === false ? 'uncompleted' : true])
+      );
+      setCompletedDaysCheckins(persistedCheckins);
+    } catch (error) {
+      setDailyCheckinStatus(`No se pudo cargar el historial de check-ins: ${error.message}`);
     }
   }
 
@@ -1853,6 +2198,111 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleDailyWorkoutCheckinWithoutSurvey() {
+    if (!selectedDay) return;
+    if (selectedDay.date > buildLocalDateKey()) {
+      setDailyCheckinStatus('No puedes registrar un check-in para una fecha futura.');
+      return;
+    }
+    setDailyCheckinLoading(true);
+    setDailyCheckinStatus('Registrando sesión como no realizada...');
+
+    try {
+      const data = await apiFetch('/api/workouts', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: selectedDay.workout?.title || 'Entrenamiento del día',
+          mode: selectedDay.workout?.trainingModality || profile.trainingModality || 'full_gym',
+          source: 'daily_checkin',
+          dailyCheckinDate: selectedDay.date,
+          checkinSkipped: true,
+          symptoms: {
+            dyspnea: false,
+            jointPain: false,
+            dizziness: false,
+            tachycardia: false,
+          },
+          performedAt: buildNoonIsoForDateKey(selectedDay.date),
+          durationMinutes: toNumber(selectedDay.workout?.durationMinutes || 45),
+          completed: false,
+          notes: '[SESIÓN INCOMPLETA: El usuario omitió la encuesta subjetiva de check-in clínico]',
+          planId: weeklyPlan?.id ?? null,
+        }),
+      });
+
+      setCompletedDaysCheckins(prev => ({
+        ...prev,
+        [data.workout.dailyCheckinDate]: 'uncompleted'
+      }));
+      setDailyCheckinStatus('Sesión registrada como NO REALIZADA (encuesta omitida).');
+    } catch (error) {
+      setDailyCheckinStatus(`Error: ${error.message}`);
+    } finally {
+      setDailyCheckinLoading(false);
+    }
+  }
+
+  async function handleDailyWorkoutCheckin() {
+    if (!selectedDay) return;
+    if (selectedDay.date > buildLocalDateKey()) {
+      setDailyCheckinStatus('No puedes registrar un check-in para una fecha futura.');
+      return;
+    }
+    setDailyCheckinLoading(true);
+    setDailyCheckinStatus('Registrando sesión y síntomas...');
+
+    // Collect clinical symptoms
+    const activeSymptoms = [];
+    if (dailyCheckinSymptoms.dyspnea) activeSymptoms.push('Disnea / Ahogo inusual');
+    if (dailyCheckinSymptoms.jointPain) activeSymptoms.push('Dolor articular / Muscular agudo');
+    if (dailyCheckinSymptoms.dizziness) activeSymptoms.push('Mareo / Inestabilidad');
+    if (dailyCheckinSymptoms.tachycardia) activeSymptoms.push('Taquicardia inusual / Palpitaciones');
+    const hasAlarmSymptoms = activeSymptoms.length > 0;
+
+    // Build the formatted notes containing clinical symptoms
+    let formattedNotes = dailyCheckinNotes.trim();
+    if (activeSymptoms.length > 0) {
+      const symptomAlerts = activeSymptoms.map(s => `[SÍNTOMA DETECTADO: ${s}]`).join(' ');
+      formattedNotes = symptomAlerts + (formattedNotes ? `\nNotas adicionales: ${formattedNotes}` : '');
+    }
+
+    try {
+      const data = await apiFetch('/api/workouts', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: selectedDay.workout?.title || 'Entrenamiento del día',
+          mode: selectedDay.workout?.trainingModality || profile.trainingModality || 'full_gym',
+          source: 'daily_checkin',
+          dailyCheckinDate: selectedDay.date,
+          checkinSkipped: false,
+          symptoms: dailyCheckinSymptoms,
+          performedAt: buildNoonIsoForDateKey(selectedDay.date),
+          durationMinutes: toNumber(selectedDay.workout?.durationMinutes || 45),
+          sessionRpe: toNumber(dailyCheckinRpe, 6),
+          fatigue: toNumber(dailyCheckinFatigue, 4),
+          sleepHours: toNumber(dailyCheckinSleep, 7),
+          completed: true,
+          notes: formattedNotes,
+          planId: weeklyPlan?.id ?? null,
+        }),
+      });
+
+      setCompletedDaysCheckins(prev => ({
+        ...prev,
+        [data.workout.dailyCheckinDate]: true
+      }));
+      setDailyCheckinStatus(
+        hasAlarmSymptoms
+          ? 'Síntomas de alarma registrados. Evita alta intensidad y solicita valoración clínica antes de progresar.'
+          : 'Sesión y síntomas registrados con éxito.'
+      );
+    } catch (error) {
+      setDailyCheckinStatus(`Error: ${error.message}`);
+    } finally {
+      setDailyCheckinLoading(false);
+    }
+  }
+
   async function registerMetricsCheckin() {
     if (metricLoading) return;
     setMetricLoading(true);
@@ -2036,29 +2486,54 @@ export default function DashboardPage() {
 
     return basePlannedDays.map((day) => {
       const sessionOverride = getDaySessionOverride(day.date);
-      if (!sessionOverride?.workout) return day;
-
-      return {
-        ...day,
-        sessionFocus: sessionOverride.sessionFocus || day.sessionFocus,
-        workout: {
-          ...day.workout,
-          ...sessionOverride.workout,
+      let dayData = { ...day };
+      if (sessionOverride?.workout) {
+        dayData = {
+          ...day,
           sessionFocus: sessionOverride.sessionFocus || day.sessionFocus,
-          sessionOverrideApplied: true,
-          originalTitle: day.workout?.title || null,
-          overrideDescriptor: sessionOverride.descriptor || null,
-          overrideCompatibilityNote: sessionOverride.compatibilityNote || null,
-        },
-      };
+          workout: {
+            ...day.workout,
+            ...sessionOverride.workout,
+            sessionFocus: sessionOverride.sessionFocus || day.sessionFocus,
+            sessionOverrideApplied: true,
+            originalTitle: day.workout?.title || null,
+            overrideDescriptor: sessionOverride.descriptor || null,
+            overrideCompatibilityNote: sessionOverride.compatibilityNote || null,
+          },
+        };
+      }
+
+      const durationOverride = durationOverridesState?.[dayData.date];
+      if (durationOverride) {
+        const originalDuration = dayData.workout?.durationMinutes || 60;
+        dayData.workout = {
+          ...dayData.workout,
+          originalDurationMinutes: originalDuration,
+          durationMinutes: durationOverride,
+          durationOverrideApplied: true,
+        };
+      } else if (profile.preferredDurationMinutes) {
+        const targetDuration = profile.preferredDurationMinutes || 60;
+        const originalDuration = dayData.workout?.durationMinutes || 60;
+        if (targetDuration !== originalDuration && dayData.workout && dayData.sessionType !== 'recovery') {
+          dayData.workout = {
+            ...dayData.workout,
+            originalDurationMinutes: originalDuration,
+            durationMinutes: targetDuration,
+            durationDefaultPreferredApplied: true,
+          };
+        }
+      }
+
+      return dayData;
     });
-  }, [basePlannedDays, sessionSwapState]);
+  }, [basePlannedDays, sessionSwapState, durationOverridesState, profile.preferredDurationMinutes]);
   const selectedDay = plannedDays.find((day) => day.date === selectedDate) || plannedDays[0] || null;
   const selectedDayExercises = useMemo(() => {
     if (!selectedDay || !Array.isArray(selectedDay?.workout?.exercises)) return [];
 
     const dayOverrides = getDayOverrideMap(selectedDay.date);
-    return selectedDay.workout.exercises.map((exercise, index) => {
+    const rawExercises = selectedDay.workout.exercises.map((exercise, index) => {
       const normalized = normalizeExerciseForView(exercise, index);
       const exerciseKey = buildSwapKey(normalized, index);
       const replacement = dayOverrides[exerciseKey];
@@ -2079,6 +2554,14 @@ export default function DashboardPage() {
         _originalExercise: normalized,
       };
     });
+
+    const originalDuration = selectedDay.workout?.originalDurationMinutes || selectedDay.workout?.durationMinutes || 60;
+    const targetDuration = selectedDay.workout?.durationMinutes || 60;
+
+    if (selectedDay.sessionType !== 'recovery' && originalDuration !== targetDuration) {
+      return scaleSessionExercises(rawExercises, originalDuration, targetDuration);
+    }
+    return rawExercises;
   }, [selectedDay, exerciseSwapState]);
   const activeExercise = selectedDayExercises.find((exercise) => exercise._swapKey === selectedExerciseKey)
     || selectedDayExercises[0]
@@ -2653,6 +3136,30 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
+          <div className="side-nav-separator" style={{ height: '1px', background: 'rgba(0, 0, 0, 0.08)', margin: '0.5rem 0' }}></div>
+          <div className="side-nav-footer-actions" style={{ display: 'grid', gap: '0.45rem' }}>
+            <button
+              type="button"
+              className="nav-tab nav-action-start"
+              onClick={() => setActiveTab('daily')}
+              title={sidebarCollapsed ? 'Iniciar Entreno' : ''}
+              style={{ background: 'linear-gradient(135deg, rgba(43, 212, 160, 0.1), rgba(43, 212, 160, 0.2))', border: '1px solid rgba(43, 212, 160, 0.3)', cursor: 'pointer' }}
+            >
+              <span className="nav-icon" aria-hidden="true" style={{ filter: 'grayscale(0)' }}>🏋️‍♂️</span>
+              {!sidebarCollapsed && <span className="nav-label" style={{ color: '#0f523c', fontWeight: '800' }}>Iniciar Entreno</span>}
+            </button>
+            
+            <button
+              type="button"
+              className="nav-tab nav-action-logout"
+              onClick={logout}
+              title={sidebarCollapsed ? 'Cerrar Sesión' : ''}
+              style={{ background: 'linear-gradient(135deg, rgba(235, 68, 90, 0.08), rgba(235, 68, 90, 0.15))', border: '1px solid rgba(235, 68, 90, 0.25)', cursor: 'pointer' }}
+            >
+              <span className="nav-icon" aria-hidden="true" style={{ filter: 'grayscale(0)' }}>🚪</span>
+              {!sidebarCollapsed && <span className="nav-label" style={{ color: '#a31d2e', fontWeight: '800' }}>Cerrar Sesión</span>}
+            </button>
+          </div>
         </aside>
 
         <section className="main-content">
@@ -2792,7 +3299,7 @@ export default function DashboardPage() {
                   {/* Recent Activity List */}
                   <article className="recent-activity-card">
                     <h3>Actividad Reciente</h3>
-                    
+
                     <div className="activity-item">
                       <div className="activity-icon-container">
                         <span className="material-symbols-outlined">fitness_center</span>
@@ -2833,6 +3340,20 @@ export default function DashboardPage() {
                     placeholder="Tu nombre"
                   />
                 </Field>
+                <Field label="Condiciones de salud / metabólicas (ej: diabetes, osteoporosis)">
+                  <input
+                    value={profile.medicalConditions || ''}
+                    onChange={(event) => setProfile((prev) => ({ ...prev, medicalConditions: event.target.value }))}
+                    placeholder="ej: diabetes tipo 2, osteoporosis, asma"
+                  />
+                </Field>
+                <Field label="Lesiones físicas / molestias articulares (ej: dolor lumbar, rodilla)">
+                  <input
+                    value={profile.physicalInjuries || ''}
+                    onChange={(event) => setProfile((prev) => ({ ...prev, physicalInjuries: event.target.value }))}
+                    placeholder="ej: lumbalgia, condromalacia rotuliana, hombro"
+                  />
+                </Field>
                 <Field label="Objetivo principal">
                   <select
                     value={profile.goal}
@@ -2845,7 +3366,107 @@ export default function DashboardPage() {
                     <option value="strength">Ganar fuerza</option>
                     <option value="recomposition">Recomposición</option>
                     <option value="glycemic_control">Control glucémico</option>
+                    <option value="safe_conditioning">Acondicionamiento seguro</option>
                   </select>
+
+                  {profile.goal && (() => {
+                    const goalExplanations = {
+                      weight_loss: {
+                        title: 'Bajar peso (Pérdida de Peso)',
+                        desc: 'Reducción de masa grasa protegiendo el tejido muscular activo. Se prioriza el entrenamiento de fuerza con volumen moderado y un RPE medio (6-8), complementado con pautas de déficit calórico controlado.'
+                      },
+                      maintain_weight: {
+                        title: 'Mantener peso (Mantenimiento)',
+                        desc: 'Preservación de la composición corporal actual, densidad mineral y salud metabólica general. Sigue las guías FITT recomendadas para mantenimiento, balanceando ingesta energética y gasto diario.'
+                      },
+                      endurance: {
+                        title: 'Aumentar resistencia',
+                        desc: 'Maximizar la capacidad aeróbica oxidativa, la densidad mitocondrial de las fibras tipo I y el aclaramiento de lactato. Se enfoca en volumen aeróbico constante o intervalos específicos de alta intensidad.'
+                      },
+                      hypertrophy: {
+                        title: 'Hipertrofia muscular',
+                        desc: 'Estimulación de la síntesis de proteínas musculares (MPS) para incrementar la masa magra. Se enfoca en volumen de entrenamiento adaptado por grupo muscular, tensión mecánica controlada y RPE medio-alto.'
+                      },
+                      strength: {
+                        title: 'Ganar fuerza',
+                        desc: 'Optimización del reclutamiento neuromuscular, sincronización de unidades motoras y rigidez tendinosa. Prioriza series cortas con cargas pesadas, tiempos de descanso largos y RPE elevado (8-9.5).'
+                      },
+                      recomposition: {
+                        title: 'Recomposición corporal',
+                        desc: 'Pérdida de grasa y ganancia de masa muscular de forma simultánea. Se logra mediante entrenamiento de fuerza regular, aporte proteico elevado y un NEAT (gasto por actividad física no deportiva) optimizado.'
+                      },
+                      glycemic_control: {
+                        title: 'Control glucémico',
+                        desc: 'Maximización de la traslocación de transportadores celulares GLUT4 independientes de insulina en el sarcolema mediante contracción de grandes grupos musculares. Estimula la sensibilidad a la insulina y amortigua picos glucémicos postprandiales.'
+                      },
+                      safe_conditioning: {
+                        title: 'Acondicionamiento seguro',
+                        desc: 'Diseñado para personas que regresan de una lesión o manejan condiciones de salud crónicas. Se enfoca en volumen bajo-moderado, RPE controlado (5-7) y priorización absoluta de patrones de movimiento seguros guiados por la literatura de medicina física.'
+                      }
+                    };
+                    const currentGoal = goalExplanations[profile.goal];
+                    if (!currentGoal) return null;
+                    return (
+                      <div className="onboarding-goal-highlight-card">
+                        <h6 style={{ margin: '0 0 0.4rem 0', fontSize: '0.86rem', fontWeight: 800, color: '#005bb1', display: 'flex', alignItems: 'center', gap: '0.4rem', fontFamily: 'Outfit, sans-serif' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          {currentGoal.title}
+                        </h6>
+                        <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: '1.45', color: '#173e67', fontWeight: 500 }}>{currentGoal.desc}</p>
+                      </div>
+                    );
+                  })()}
+
+                  <button
+                    type="button"
+                    className="onboarding-goal-guide-toggle-btn"
+                    onClick={() => setShowGoalGuide(prev => !prev)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      {showGoalGuide ? 'expand_less' : 'menu_book'}
+                    </span>
+                    <span>{showGoalGuide ? 'Ocultar guía de objetivos' : 'Ver guía completa de objetivos'}</span>
+                  </button>
+
+                  {showGoalGuide && (
+                    <div className="onboarding-goal-guide-box">
+                      <h6>Guía Científica de Objetivos Deportivos</h6>
+                      <div className="onboarding-goal-guide-grid">
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'weight_loss' ? 'highlighted' : ''}`}>
+                          <strong>Pérdida de peso / Bajar peso</strong>
+                          <span>Reducción de grasa protegiendo músculo. Volumen e RPE medio.</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'maintain_weight' ? 'highlighted' : ''}`}>
+                          <strong>Mantenimiento / Mantener peso</strong>
+                          <span>Preservar composición y salud metabólica según guías FITT.</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'endurance' ? 'highlighted' : ''}`}>
+                          <strong>Resistencia / Aumentar resistencia</strong>
+                          <span>Maximizar capacidad aeróbica oxidativa y densidad mitocondrial.</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'hypertrophy' ? 'highlighted' : ''}`}>
+                          <strong>Hipertrofia muscular</strong>
+                          <span>Estimular síntesis proteica muscular con volumen adaptado.</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'strength' ? 'highlighted' : ''}`}>
+                          <strong>Fuerza / Ganar fuerza</strong>
+                          <span>Reclutamiento neuromuscular y tensión mecánica (RPE 8-9.5).</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'recomposition' ? 'highlighted' : ''}`}>
+                          <strong>Recomposición corporal</strong>
+                          <span>Reducción de grasa y ganancia magra simultánea (NEAT alto).</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'glycemic_control' ? 'highlighted' : ''}`}>
+                          <strong>Control glucémico</strong>
+                          <span>Traslocación de GLUT4 por contracción muscular (mejora insulina).</span>
+                        </div>
+                        <div className={`onboarding-goal-guide-item ${profile.goal === 'safe_conditioning' ? 'highlighted' : ''}`}>
+                          <strong>Acondicionamiento seguro</strong>
+                          <span>Rehabilitación y readaptación física con RPE controlado y guías clínicas.</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </Field>
                 <Field label="Entrenamiento preferido">
                   <select
@@ -2939,8 +3560,22 @@ export default function DashboardPage() {
 
           {activeTab === 'user' ? (
           <section className="panel" style={{ border: 'none', background: 'transparent', padding: 0, boxShadow: 'none' }}>
-            
-            {/* Achievements Bento Grid */}
+
+            {/* ——— Glass Profile Header ——— */}
+            <div className="profile-glass-header">
+              <div className="profile-avatar-ring">
+                {(profile.displayName || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div className="profile-header-info">
+                <h2 className="profile-header-name">{profile.displayName || 'Usuario'}</h2>
+                <p className="profile-header-sub">
+                  {profile.sex === 'female' ? '♀' : '♂'} {profile.age} años · {profile.weightKg} kg · {profile.heightCm} cm
+                  <span className="profile-goal-badge">🎯 {GOAL_LABELS[profile.goal] || profile.goal}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* ——— Achievement Bento Grid ——— */}
             <div className="achievements-grid">
               <div className="achievement-card">
                 <span className="achievement-icon">🏆</span>
@@ -2959,415 +3594,519 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="panel" style={{ padding: '1.5rem', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.72)', border: '1px solid rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(14px) saturate(140%)' }}>
-              <SectionLabel
-                title="Perfil y objetivo"
-                subtitle="Configura tus datos base de entrenamiento y salud."
-              />
+            {/* ——— Bento Profile Grid ——— */}
+            <div className="bento-profile-grid">
 
-            <article className={`screening-status ${needsScreeningRefresh ? 'warn' : 'ok'}`}>
-              <h3>Estado de cribado</h3>
-              <p>
-                {needsScreeningRefresh
-                  ? `Actualiza tu cribado ahora. Vigencia configurada: ${screeningRefreshDays} días.`
-                  : `Cribado vigente. Restan ${screeningDaysRemaining} de ${screeningRefreshDays} días.`}
-              </p>
-              <small>
-                {hasValidScreeningDate
-                  ? `Última actualización: ${screeningLastUpdateDate.toLocaleDateString()}`
-                  : 'Aún no hay fecha registrada de cribado.'}
-              </small>
-            </article>
+              {/* Card: Datos personales */}
+              <div className="bento-card">
+                <div className="bento-card-head">
+                  <div className="bento-card-icon icon-body">📏</div>
+                  <div>
+                    <div className="bento-card-title">Datos Personales</div>
+                    <div className="bento-card-subtitle">Métricas base del cuerpo</div>
+                  </div>
+                </div>
+                <div className="bento-field-group two-col">
+                  <div className="bento-field">
+                    <label>Nombre</label>
+                    <input
+                      value={profile.displayName}
+                      onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="bento-field">
+                    <label>Sexo</label>
+                    <select
+                      value={profile.sex}
+                      onChange={(e) => setProfile((p) => ({ ...p, sex: e.target.value }))}
+                    >
+                      <option value="male">Masculino</option>
+                      <option value="female">Femenino</option>
+                    </select>
+                  </div>
+                  <div className="bento-field">
+                    <label>Edad</label>
+                    <input type="number" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} />
+                  </div>
+                  <div className="bento-field">
+                    <label>Peso (kg)</label>
+                    <input type="number" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} />
+                  </div>
+                  <div className="bento-field">
+                    <label>Altura (cm)</label>
+                    <input type="number" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} />
+                  </div>
+                  <div className="bento-field">
+                    <label>Comidas/día</label>
+                    <input type="number" value={profile.mealsPerDay} onChange={(e) => setProfile((p) => ({ ...p, mealsPerDay: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
 
-            <div className="form-grid">
-              <Field label="Nombre">
-                <input
-                  value={profile.displayName}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, displayName: event.target.value }))}
-                />
-              </Field>
-              <Field label="Objetivo">
-                <select
-                  value={profile.goal}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, goal: event.target.value }))}
-                >
-                  <option value="weight_loss">Bajar peso</option>
-                  <option value="maintain_weight">Mantener peso</option>
-                  <option value="endurance">Aumentar resistencia</option>
-                  <option value="hypertrophy">Hipertrofia</option>
-                  <option value="strength">Ganar fuerza</option>
-                  <option value="recomposition">Recomposition</option>
-                  <option value="glycemic_control">Control glucémico</option>
-                </select>
-              </Field>
-              <Field label="Modalidad principal">
-                <select
-                  value={profile.trainingModality}
-                  onChange={(event) => {
-                    const nextModality = event.target.value;
-                    setProfile((prev) => ({
-                      ...prev,
-                      trainingModality: nextModality,
-                      trainingMode: nextModality === 'full_gym' ? 'gym' : 'home',
-                    }));
-                    setWorkoutCheckin((prev) => ({ ...prev, mode: nextModality }));
-                  }}
-                >
-                  <option value="full_gym">Gimnasio completo</option>
-                  <option value="home">Entrenamiento en casa</option>
-                  <option value="yoga">Yoga</option>
-                  <option value="trx">TRX</option>
-                  <option value="calisthenics">Calistenia</option>
-                  <option value="running">Running</option>
-                  <option value="cycling">Ciclismo</option>
-                  <option value="pilates">Pilates</option>
-                  <option value="mixed">Mixto</option>
-                </select>
-              </Field>
-              <Field label="Perfil metabólico">
-                <select
-                  value={profile.metabolicProfile}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, metabolicProfile: event.target.value }))}
-                >
-                  <option value="none">Sin condición declarada</option>
-                  <option value="insulin_resistance">Resistencia a la insulina</option>
-                  <option value="prediabetes">Prediabetes</option>
-                  <option value="type2_diabetes">Diabetes tipo 2</option>
-                  <option value="hypothyroidism">Hipotiroidismo</option>
-                  <option value="pcos">SOP/PCOS</option>
-                </select>
-              </Field>
-              <Field label="Nivel actividad">
-                <select
-                  value={profile.activityLevel}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, activityLevel: event.target.value }))}
-                >
-                  <option value="sedentary">Sedentario</option>
-                  <option value="light">Ligero</option>
-                  <option value="moderate">Moderado</option>
-                  <option value="high">Alto</option>
-                </select>
-              </Field>
-              <Field label="Sexo">
-                <select
-                  value={profile.sex}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, sex: event.target.value }))}
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </Field>
-              <Field label="Edad">
-                <input
-                  type="number"
-                  value={profile.age}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, age: event.target.value }))}
-                />
-              </Field>
-              <Field label="Peso (kg)">
-                <input
-                  type="number"
-                  value={profile.weightKg}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, weightKg: event.target.value }))}
-                />
-              </Field>
-              <Field label="Altura (cm)">
-                <input
-                  type="number"
-                  value={profile.heightCm}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, heightCm: event.target.value }))}
-                />
-              </Field>
-              <Field label="Comidas por día">
-                <input
-                  type="number"
-                  value={profile.mealsPerDay}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, mealsPerDay: event.target.value }))}
-                />
-              </Field>
-              <Field label="Calorías objetivo (opcional)">
-                <input
-                  type="number"
-                  value={profile.targetCalories}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, targetCalories: event.target.value }))}
-                />
-              </Field>
-              {showAdvancedProfile ? (
-                <>
-                  <Field label="Cribado: síntomas de alarma en ejercicio">
+              {/* Card: Objetivo y entrenamiento */}
+              <div className="bento-card">
+                <div className="bento-card-head">
+                  <div className="bento-card-icon icon-goal">🎯</div>
+                  <div>
+                    <div className="bento-card-title">Objetivo y Entreno</div>
+                    <div className="bento-card-subtitle">Meta principal y modalidad</div>
+                  </div>
+                </div>
+                <div className="bento-field-group">
+                  <div className="bento-field">
+                    <label>Objetivo</label>
                     <select
-                      value={String(profile.preparticipation?.exerciseSymptoms ?? false)}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          preparticipation: {
-                            ...prev.preparticipation,
-                            exerciseSymptoms: event.target.value === 'true',
-                          },
-                        }))}
+                      value={profile.goal}
+                      onChange={(e) => setProfile((p) => ({ ...p, goal: e.target.value }))}
                     >
-                      <option value="false">No</option>
-                      <option value="true">Sí</option>
+                      <option value="weight_loss">Bajar peso</option>
+                      <option value="maintain_weight">Mantener peso</option>
+                      <option value="endurance">Aumentar resistencia</option>
+                      <option value="hypertrophy">Hipertrofia</option>
+                      <option value="strength">Ganar fuerza</option>
+                      <option value="recomposition">Recomposición</option>
+                      <option value="glycemic_control">Control glucémico</option>
+                      <option value="safe_conditioning">Acondicionamiento seguro</option>
                     </select>
-                  </Field>
-                  <Field label="Cribado: enfermedad cardiometabólica/renal conocida">
+                  </div>
+                  <div className="bento-field">
+                    <label>Modalidad</label>
                     <select
-                      value={String(profile.preparticipation?.knownCardiometabolicDisease ?? false)}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          preparticipation: {
-                            ...prev.preparticipation,
-                            knownCardiometabolicDisease: event.target.value === 'true',
-                          },
-                        }))}
+                      value={profile.trainingModality}
+                      onChange={(e) => {
+                        const nextModality = e.target.value;
+                        setProfile((p) => ({
+                          ...p,
+                          trainingModality: nextModality,
+                          trainingMode: nextModality === 'full_gym' ? 'gym' : 'home',
+                        }));
+                        setWorkoutCheckin((p) => ({ ...p, mode: nextModality }));
+                      }}
                     >
-                      <option value="false">No</option>
-                      <option value="true">Sí</option>
+                      <option value="full_gym">Gimnasio completo</option>
+                      <option value="home">Entrenamiento en casa</option>
+                      <option value="yoga">Yoga</option>
+                      <option value="trx">TRX</option>
+                      <option value="calisthenics">Calistenia</option>
+                      <option value="running">Running</option>
+                      <option value="cycling">Ciclismo</option>
+                      <option value="pilates">Pilates</option>
+                      <option value="mixed">Mixto</option>
                     </select>
-                  </Field>
-                  <Field label="Cribado: actualmente activo (>=3 días/sem)">
-                    <select
-                      value={String(profile.preparticipation?.currentlyActive ?? false)}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          preparticipation: {
-                            ...prev.preparticipation,
-                            currentlyActive: event.target.value === 'true',
-                          },
-                        }))}
+                  </div>
+                  <div className="bento-field-group two-col">
+                    <div className="bento-field">
+                      <label>Nivel actividad</label>
+                      <select
+                        value={profile.activityLevel}
+                        onChange={(e) => setProfile((p) => ({ ...p, activityLevel: e.target.value }))}
+                      >
+                        <option value="sedentary">Sedentario</option>
+                        <option value="light">Ligero</option>
+                        <option value="moderate">Moderado</option>
+                        <option value="high">Alto</option>
+                      </select>
+                    </div>
+                    <div className="bento-field">
+                      <label>Perfil metabólico</label>
+                      <select
+                        value={profile.metabolicProfile}
+                        onChange={(e) => setProfile((p) => ({ ...p, metabolicProfile: e.target.value }))}
+                      >
+                        <option value="none">Sin condición</option>
+                        <option value="insulin_resistance">Resist. insulina</option>
+                        <option value="prediabetes">Prediabetes</option>
+                        <option value="type2_diabetes">Diabetes T2</option>
+                        <option value="hypothyroidism">Hipotiroidismo</option>
+                        <option value="pcos">SOP/PCOS</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="bento-field">
+                    <label>Calorías objetivo (opcional)</label>
+                    <input
+                      type="number"
+                      value={profile.targetCalories}
+                      onChange={(e) => setProfile((p) => ({ ...p, targetCalories: e.target.value }))}
+                      placeholder="Auto si vacío"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card: Duración preferida */}
+              <div className="bento-card">
+                <div className="bento-card-head">
+                  <div className="bento-card-icon icon-time">⏱️</div>
+                  <div>
+                    <div className="bento-card-title">Duración de Sesión</div>
+                    <div className="bento-card-subtitle">Tiempo disponible para entrenar</div>
+                  </div>
+                </div>
+                <div className="duration-chip-row">
+                  {[20, 30, 45, 60, 75, 90, 120].map((min) => (
+                    <button
+                      key={min}
+                      type="button"
+                      className={`duration-chip ${Number(profile.preferredDurationMinutes) === min ? 'active' : ''}`}
+                      onClick={() => setProfile((p) => ({ ...p, preferredDurationMinutes: min }))}
                     >
-                      <option value="false">No</option>
-                      <option value="true">Sí</option>
-                    </select>
-                  </Field>
-                  <Field label="Cribado: alta médica disponible">
-                    <select
-                      value={String(profile.preparticipation?.medicalClearance ?? false)}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          preparticipation: {
-                            ...prev.preparticipation,
-                            medicalClearance: event.target.value === 'true',
-                          },
-                        }))}
-                    >
-                      <option value="false">No</option>
-                      <option value="true">Sí</option>
-                    </select>
-                  </Field>
-                  <Field label="Cribado: contraindicaciones activas">
-                    <select
-                      value={String(profile.preparticipation?.contraindications ?? false)}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          preparticipation: {
-                            ...prev.preparticipation,
-                            contraindications: event.target.value === 'true',
-                          },
-                        }))}
-                    >
-                      <option value="false">No</option>
-                      <option value="true">Sí</option>
-                    </select>
-                  </Field>
-                  <Field label="Cribado: intensidad deseada">
+                      {min} min
+                    </button>
+                  ))}
+                </div>
+                <div className="bento-field" style={{ marginTop: '0.6rem' }}>
+                  <label>Personalizar (min)</label>
+                  <input
+                    type="number"
+                    min="20"
+                    max="180"
+                    value={profile.preferredDurationMinutes ?? 60}
+                    onChange={(e) => setProfile((p) => ({ ...p, preferredDurationMinutes: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+
+              {/* Card: Condiciones de salud */}
+              <div className="bento-card">
+                <div className="bento-card-head">
+                  <div className="bento-card-icon icon-health">🩺</div>
+                  <div>
+                    <div className="bento-card-title">Salud y Lesiones</div>
+                    <div className="bento-card-subtitle">Condiciones relevantes para tu entreno</div>
+                  </div>
+                </div>
+                <div className="bento-field-group">
+                  <div className="bento-field">
+                    <label>Condiciones de salud / metabólicas</label>
+                    <input
+                      value={profile.medicalConditions || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, medicalConditions: e.target.value }))}
+                      placeholder="ej: diabetes, osteoporosis"
+                    />
+                  </div>
+                  <div className="bento-field">
+                    <label>Lesiones / molestias recurrentes</label>
+                    <input
+                      value={profile.physicalInjuries || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, physicalInjuries: e.target.value }))}
+                      placeholder="ej: lumbalgia, dolor de rodilla"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card: Cribado Clínico — full width */}
+              <div className="bento-card bento-card--full">
+                <div className="bento-card-head">
+                  <div className="bento-card-icon icon-screening">🔬</div>
+                  <div>
+                    <div className="bento-card-title">Cribado Pre-participación</div>
+                    <div className="bento-card-subtitle">Evaluación de seguridad para la actividad física</div>
+                  </div>
+                </div>
+
+                <div className={`screening-bento-status ${needsScreeningRefresh ? 'status-warn' : 'status-ok'}`}>
+                  <span className="screening-bento-dot"></span>
+                  <span>
+                    {needsScreeningRefresh
+                      ? `Actualiza tu cribado. Vigencia: ${screeningRefreshDays} días.`
+                      : `Cribado vigente. ${screeningDaysRemaining} de ${screeningRefreshDays} días restantes.`}
+                    {hasValidScreeningDate
+                      ? ` (Última: ${screeningLastUpdateDate.toLocaleDateString()})`
+                      : ' (Sin fecha registrada)'}
+                  </span>
+                </div>
+
+                <div className="bento-field-group two-col">
+                  <div className="toggle-switch-wrapper">
+                    <div>
+                      <div className="toggle-switch-label">Síntomas de alarma en ejercicio</div>
+                      <div className="toggle-switch-help">Dolor torácico, disnea, mareo</div>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!profile.preparticipation?.exerciseSymptoms}
+                        onChange={(e) => setProfile((p) => ({ ...p, preparticipation: { ...p.preparticipation, exerciseSymptoms: e.target.checked } }))}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="toggle-switch-wrapper">
+                    <div>
+                      <div className="toggle-switch-label">Enfermedad cardiometabólica</div>
+                      <div className="toggle-switch-help">Cardiopatía, renal, metabólica</div>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!profile.preparticipation?.knownCardiometabolicDisease}
+                        onChange={(e) => setProfile((p) => ({ ...p, preparticipation: { ...p.preparticipation, knownCardiometabolicDisease: e.target.checked } }))}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="toggle-switch-wrapper">
+                    <div>
+                      <div className="toggle-switch-label">Actualmente activo (≥3 días/sem)</div>
+                      <div className="toggle-switch-help">Ejercicio regular reciente</div>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!profile.preparticipation?.currentlyActive}
+                        onChange={(e) => setProfile((p) => ({ ...p, preparticipation: { ...p.preparticipation, currentlyActive: e.target.checked } }))}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="toggle-switch-wrapper">
+                    <div>
+                      <div className="toggle-switch-label">Alta médica disponible</div>
+                      <div className="toggle-switch-help">Certificado médico vigente</div>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!profile.preparticipation?.medicalClearance}
+                        onChange={(e) => setProfile((p) => ({ ...p, preparticipation: { ...p.preparticipation, medicalClearance: e.target.checked } }))}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="toggle-switch-wrapper">
+                    <div>
+                      <div className="toggle-switch-label">Contraindicaciones activas</div>
+                      <div className="toggle-switch-help">Restricción médica actual</div>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!profile.preparticipation?.contraindications}
+                        onChange={(e) => setProfile((p) => ({ ...p, preparticipation: { ...p.preparticipation, contraindications: e.target.checked } }))}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="bento-field">
+                    <label>Intensidad deseada</label>
                     <select
                       value={profile.preparticipation?.desiredIntensity || 'moderate'}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          preparticipation: {
-                            ...prev.preparticipation,
-                            desiredIntensity: event.target.value,
-                          },
-                        }))}
+                      onChange={(e) => setProfile((p) => ({ ...p, preparticipation: { ...p.preparticipation, desiredIntensity: e.target.value } }))}
                     >
                       <option value="light">Ligera</option>
                       <option value="moderate">Moderada</option>
                       <option value="vigorous">Vigorosa</option>
                     </select>
-                  </Field>
-                  <Field label="Actualizar cribado cada (días)">
+                  </div>
+                </div>
+
+                <div className="bento-field-group two-col" style={{ marginTop: '0.6rem' }}>
+                  <div className="bento-field">
+                    <label>Actualizar cribado cada (días)</label>
                     <input
                       type="number"
                       min="15"
                       max="90"
                       step="1"
                       value={profile.screeningRefreshDays ?? 15}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          screeningRefreshDays: event.target.value,
-                        }))}
+                      onChange={(e) => setProfile((p) => ({ ...p, screeningRefreshDays: e.target.value }))}
                     />
-                  </Field>
-                  <Field label="Patrón alimentario">
-                    <select
-                      value={profile.nutritionPreferences?.dietaryPattern || 'omnivore'}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          nutritionPreferences: {
-                            ...prev.nutritionPreferences,
-                            dietaryPattern: event.target.value,
-                          },
-                        }))}
+                  </div>
+                  <div className="bento-field" style={{ justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn-force-screening"
+                      onClick={() => {
+                        setProfile((p) => ({ ...p, forceScreeningRefresh: true }));
+                        setProfileStatus('Se forzará actualización al guardar.');
+                      }}
                     >
-                      <option value="omnivore">Omnívoro</option>
-                      <option value="vegetarian">Vegetariano</option>
-                      <option value="vegan">Vegano</option>
-                    </select>
-                  </Field>
-                  <Field label="Alergias alimentarias (coma separadas)">
-                    <input
-                      value={profile.nutritionPreferences?.allergies || ''}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          nutritionPreferences: {
-                            ...prev.nutritionPreferences,
-                            allergies: event.target.value,
-                          },
-                        }))}
-                      placeholder="ej: marisco, cacahuete"
-                    />
-                  </Field>
-                  <Field label="Intolerancias (coma separadas)">
-                    <input
-                      value={profile.nutritionPreferences?.intolerances || ''}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          nutritionPreferences: {
-                            ...prev.nutritionPreferences,
-                            intolerances: event.target.value,
-                          },
-                        }))}
-                      placeholder="ej: lactosa, gluten"
-                    />
-                  </Field>
-                  <Field label="Alimentos no deseados (coma separadas)">
-                    <input
-                      value={profile.nutritionPreferences?.dislikedFoods || ''}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          nutritionPreferences: {
-                            ...prev.nutritionPreferences,
-                            dislikedFoods: event.target.value,
-                          },
-                        }))}
-                      placeholder="ej: brócoli, hígado"
-                    />
-                  </Field>
-                  <Field label="Umbral fatiga alta (0-10)">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="10"
-                      value={profile.adaptiveThresholds?.highFatigue ?? 7}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          adaptiveThresholds: {
-                            ...prev.adaptiveThresholds,
-                            highFatigue: event.target.value,
-                          },
-                        }))}
-                    />
-                  </Field>
-                  <Field label="Umbral RPE alto (0-10)">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="10"
-                      value={profile.adaptiveThresholds?.highSessionRpe ?? 8.2}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          adaptiveThresholds: {
-                            ...prev.adaptiveThresholds,
-                            highSessionRpe: event.target.value,
-                          },
-                        }))}
-                    />
-                  </Field>
-                  <Field label="Umbral adherencia baja (%)">
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="100"
-                      value={profile.adaptiveThresholds?.lowAdherencePercent ?? 60}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          adaptiveThresholds: {
-                            ...prev.adaptiveThresholds,
-                            lowAdherencePercent: event.target.value,
-                          },
-                        }))}
-                    />
-                  </Field>
-                  <Field label="Umbral cumplimiento bajo (0-1)">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="1"
-                      value={profile.adaptiveThresholds?.lowCompletionRate ?? 0.6}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          adaptiveThresholds: {
-                            ...prev.adaptiveThresholds,
-                            lowCompletionRate: event.target.value,
-                          },
-                        }))}
-                    />
-                  </Field>
-                  <Field label="Umbral readiness alto (0-100)">
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="100"
-                      value={profile.adaptiveThresholds?.highReadiness ?? 78}
-                      onChange={(event) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          adaptiveThresholds: {
-                            ...prev.adaptiveThresholds,
-                            highReadiness: event.target.value,
-                          },
-                        }))}
-                    />
-                  </Field>
+                      Forzar actualización de cribado
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card: Sincronización con Strava */}
+              <div className="bento-card">
+                <div className="bento-card-head">
+                  <div className="bento-card-icon icon-strava" style={{ background: '#fc6100', color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🧡</div>
+                  <div>
+                    <div className="bento-card-title">Sincronización con Strava</div>
+                    <div className="bento-card-subtitle">Importa tus entrenamientos automáticamente</div>
+                  </div>
+                </div>
+
+                <div className="bento-field-group" style={{ marginTop: '0.6rem' }}>
+                  {profile.stravaConnected ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%' }}>
+                      <div className="strava-status-connected" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', color: '#27ae60', fontWeight: 'bold' }}>
+                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#27ae60' }}></span>
+                        Conectado (Atleta ID: {profile.stravaAthleteId})
+                      </div>
+                      
+                      {profile.stravaLastSyncAt && (
+                        <div style={{ fontSize: '0.78rem', color: '#667788' }}>
+                          Última sincronización: {new Date(profile.stravaLastSyncAt).toLocaleString('es-ES')}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '0.6rem', width: '100%', marginTop: '0.4rem' }}>
+                        <button
+                          type="button"
+                          className="btn-profile-secondary"
+                          style={{ flex: 1, padding: '0.5rem 0.8rem', fontSize: '0.83rem', border: '1px solid rgba(0,0,0,0.08)' }}
+                          onClick={syncStrava}
+                          disabled={stravaSyncing}
+                        >
+                          {stravaSyncing ? 'Sincronizando...' : '🔄 Sincronizar ahora'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-force-screening"
+                          style={{ background: 'rgba(231, 76, 60, 0.08)', color: '#e74c3c', border: '1px solid rgba(231, 76, 60, 0.15)', padding: '0.5rem 0.8rem', fontSize: '0.83rem' }}
+                          onClick={disconnectStrava}
+                          disabled={stravaDisconnecting}
+                        >
+                          {stravaDisconnecting ? 'Desconectando...' : 'Desconectar'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%' }}>
+                      <p style={{ margin: 0, fontSize: '0.83rem', color: '#667788', lineHeight: '1.4' }}>
+                        Importa automáticamente tus carreras, ciclismo y entrenamientos de fuerza para que la IA los analice.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn-profile-save"
+                        style={{ background: 'linear-gradient(135deg, #fc6100 0%, #e04a00 100%)', width: '100%', padding: '0.6rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                        onClick={connectStrava}
+                        disabled={stravaConnecting}
+                      >
+                        {stravaConnecting ? 'Conectando...' : '🧡 Conectar Strava'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card: Nutrición (expandable) */}
+              {showAdvancedProfile && (
+                <>
+                  <div className="bento-card">
+                    <div className="bento-card-head">
+                      <div className="bento-card-icon icon-nutrition">🥗</div>
+                      <div>
+                        <div className="bento-card-title">Preferencias Nutricionales</div>
+                        <div className="bento-card-subtitle">Dieta, alergias e intolerancias</div>
+                      </div>
+                    </div>
+                    <div className="bento-field-group">
+                      <div className="bento-field">
+                        <label>Patrón alimentario</label>
+                        <select
+                          value={profile.nutritionPreferences?.dietaryPattern || 'omnivore'}
+                          onChange={(e) => setProfile((p) => ({ ...p, nutritionPreferences: { ...p.nutritionPreferences, dietaryPattern: e.target.value } }))}
+                        >
+                          <option value="omnivore">Omnívoro</option>
+                          <option value="vegetarian">Vegetariano</option>
+                          <option value="vegan">Vegano</option>
+                        </select>
+                      </div>
+                      <div className="bento-field">
+                        <label>Alergias alimentarias</label>
+                        <input
+                          value={profile.nutritionPreferences?.allergies || ''}
+                          onChange={(e) => setProfile((p) => ({ ...p, nutritionPreferences: { ...p.nutritionPreferences, allergies: e.target.value } }))}
+                          placeholder="ej: marisco, cacahuete"
+                        />
+                      </div>
+                      <div className="bento-field">
+                        <label>Intolerancias</label>
+                        <input
+                          value={profile.nutritionPreferences?.intolerances || ''}
+                          onChange={(e) => setProfile((p) => ({ ...p, nutritionPreferences: { ...p.nutritionPreferences, intolerances: e.target.value } }))}
+                          placeholder="ej: lactosa, gluten"
+                        />
+                      </div>
+                      <div className="bento-field">
+                        <label>Alimentos no deseados</label>
+                        <input
+                          value={profile.nutritionPreferences?.dislikedFoods || ''}
+                          onChange={(e) => setProfile((p) => ({ ...p, nutritionPreferences: { ...p.nutritionPreferences, dislikedFoods: e.target.value } }))}
+                          placeholder="ej: brócoli, hígado"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card: Umbrales adaptativos */}
+                  <div className="bento-card">
+                    <div className="bento-card-head">
+                      <div className="bento-card-icon icon-thresholds">⚙️</div>
+                      <div>
+                        <div className="bento-card-title">Umbrales Adaptativos</div>
+                        <div className="bento-card-subtitle">Personaliza la sensibilidad de la IA</div>
+                      </div>
+                    </div>
+                    <div className="bento-field-group two-col">
+                      <div className="bento-field">
+                        <label>Fatiga alta (0-10)</label>
+                        <input type="number" step="0.1" min="0" max="10"
+                          value={profile.adaptiveThresholds?.highFatigue ?? 7}
+                          onChange={(e) => setProfile((p) => ({ ...p, adaptiveThresholds: { ...p.adaptiveThresholds, highFatigue: e.target.value } }))}
+                        />
+                      </div>
+                      <div className="bento-field">
+                        <label>RPE alto (0-10)</label>
+                        <input type="number" step="0.1" min="0" max="10"
+                          value={profile.adaptiveThresholds?.highSessionRpe ?? 8.2}
+                          onChange={(e) => setProfile((p) => ({ ...p, adaptiveThresholds: { ...p.adaptiveThresholds, highSessionRpe: e.target.value } }))}
+                        />
+                      </div>
+                      <div className="bento-field">
+                        <label>Adherencia baja (%)</label>
+                        <input type="number" step="1" min="0" max="100"
+                          value={profile.adaptiveThresholds?.lowAdherencePercent ?? 60}
+                          onChange={(e) => setProfile((p) => ({ ...p, adaptiveThresholds: { ...p.adaptiveThresholds, lowAdherencePercent: e.target.value } }))}
+                        />
+                      </div>
+                      <div className="bento-field">
+                        <label>Cumplimiento bajo (0-1)</label>
+                        <input type="number" step="0.01" min="0" max="1"
+                          value={profile.adaptiveThresholds?.lowCompletionRate ?? 0.6}
+                          onChange={(e) => setProfile((p) => ({ ...p, adaptiveThresholds: { ...p.adaptiveThresholds, lowCompletionRate: e.target.value } }))}
+                        />
+                      </div>
+                      <div className="bento-field">
+                        <label>Readiness alto (0-100)</label>
+                        <input type="number" step="1" min="0" max="100"
+                          value={profile.adaptiveThresholds?.highReadiness ?? 78}
+                          onChange={(e) => setProfile((p) => ({ ...p, adaptiveThresholds: { ...p.adaptiveThresholds, highReadiness: e.target.value } }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </>
-              ) : (
-                <p className="empty-text">Campos clínicos avanzados ocultos para simplificar la vista.</p>
               )}
             </div>
 
-            <div className="inline-actions">
-              <button onClick={saveProfile} disabled={profileLoading}>
-                {profileLoading ? 'Guardando...' : 'Guardar perfil'}
+            {/* ——— Action Bar ——— */}
+            <div className="profile-action-bar">
+              <button className="btn-profile-save" onClick={saveProfile} disabled={profileLoading}>
+                {profileLoading ? 'Guardando...' : '💾 Guardar perfil'}
               </button>
               <button
-                className="secondary"
+                className="btn-profile-secondary"
                 type="button"
                 onClick={() => setShowAdvancedProfile((prev) => !prev)}
               >
-                {showAdvancedProfile ? 'Ocultar ajustes avanzados' : 'Mostrar ajustes avanzados'}
+                {showAdvancedProfile ? 'Ocultar avanzados' : '⚙️ Ajustes avanzados'}
               </button>
-              <small>{profileStatus}</small>
-            </div>
+              <span className="profile-status-text">{profileStatus}</span>
             </div>
           </section>
           ) : null}
@@ -3743,8 +4482,44 @@ export default function DashboardPage() {
                           <h3>{selectedDay.workout?.title}</h3>
                           <span className="day-focus-pill">{selectedDayFocusLabel}</span>
                         </div>
-                        <p className="day-hero-meta">
-                          {selectedDay.workout?.durationMinutes || 0} min · {selectedDay.workout?.intensityRpe || 'RPE n/d'}
+                        <p className="day-hero-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: '#005bb1' }}>schedule</span>
+                            {selectedDay.sessionType === 'recovery' ? (
+                              <span>{selectedDay.workout?.durationMinutes || 0} min (Recuperación)</span>
+                            ) : (
+                              <select
+                                value={selectedDay.workout?.durationMinutes || 60}
+                                onChange={(e) => applyDurationOverride(selectedDay.date, Number(e.target.value))}
+                                className="day-duration-select-glass"
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.4)',
+                                  border: '1px solid rgba(0, 91, 177, 0.25)',
+                                  borderRadius: '8px',
+                                  padding: '0.1rem 0.4rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  color: '#143861',
+                                  width: 'auto',
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                }}
+                              >
+                                <option value={20}>20 min (Express)</option>
+                                <option value={30}>30 min (Corto)</option>
+                                <option value={45}>45 min (Estándar)</option>
+                                <option value={60}>60 min (Completo)</option>
+                                <option value={90}>90 min (Intenso)</option>
+                                <option value={120}>120 min (Extendido)</option>
+                                <option value={180}>180 min (Atleta)</option>
+                              </select>
+                            )}
+                          </span>
+                          <span className="meta-divider" style={{ opacity: 0.3 }}>·</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: '#7c3aed' }}>bolt</span>
+                            {selectedDay.workout?.intensityRpe || 'RPE n/d'}
+                          </span>
                         </p>
                       </div>
 
@@ -3789,90 +4564,7 @@ export default function DashboardPage() {
                       </article>
                     </div>
 
-                    <article className="day-coach-strip is-live" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', padding: '2rem', borderLeft: '5px solid #005bb1', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.72)', border: '1px solid rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(14px) saturate(140%)', gridTemplateColumns: '1fr', boxShadow: '0 8px 32px rgba(101, 136, 172, 0.08)' }}>
-                      <div className="day-coach-strip-copy" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-                            <div style={{ padding: '0.5rem', background: 'rgba(0, 91, 177, 0.08)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005bb1' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>auto_awesome</span>
-                            </div>
-                            <div>
-                              <span className="day-coach-eyebrow" style={{ display: 'block', margin: 0, fontSize: '0.72rem', color: '#6a86a4', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Briefing de Sesión</span>
-                              <h4 style={{ margin: '0.1rem 0 0 0', fontSize: '1.1rem', fontWeight: 800, color: '#172f4a', fontFamily: 'Outfit, sans-serif' }}>Análisis Científico del Día</h4>
-                            </div>
-                          </div>
-                          <span className={`coach-status-pill ${coachStatusMode}`} style={{ margin: 0 }}>{coachStatusLabel}</span>
-                        </div>
 
-                        {coachWeeklySummary ? (
-                          <p className="coach-weekly-summary" style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.6', color: '#2b4562', fontWeight: 500 }}>
-                            {simplifyDeveloperJargon(coachWeeklySummary)}
-                          </p>
-                        ) : (
-                          <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.6', color: '#2b4562', fontWeight: 500 }}>
-                            {simplifyDeveloperJargon(dailyCoachHeadline)}
-                          </p>
-                        )}
-
-                        {selectedDayAllCoachAdjustments.length > 0 ? (
-                          <div className="coach-adjustments-list" style={{ marginTop: '0.5rem' }}>
-                            <span className="coach-section-label">¿Por qué estos ejercicios?</span>
-                            {selectedDayAllCoachAdjustments.map((adj, adjIdx) => (
-                              <details
-                                key={`coach-adj-${adjIdx}`}
-                                className="coach-adjustment-card"
-                                open={adjIdx === 0}
-                              >
-                                <summary>
-                                  <span className="adj-number">{adjIdx + 1}</span>
-                                  <span className="adj-title">{simplifyDeveloperJargon(adj.adjustment)}</span>
-                                </summary>
-                                <div className="adj-body">
-                                  {adj.rationale ? (
-                                    <div className="adj-block">
-                                      <span className="adj-label">Fundamento fisiológico</span>
-                                      <p>{simplifyDeveloperJargon(adj.rationale)}</p>
-                                    </div>
-                                  ) : null}
-                                  {adj.evidence ? (
-                                    <div className="adj-block evidence">
-                                      <span className="adj-label">📚 Evidencia Científica</span>
-                                      <p>{simplifyDeveloperJargon(adj.evidence)}</p>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </details>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {coachAcsmJustification ? (
-                          <details className="coach-acsm-block">
-                            <summary>
-                              <span className="adj-label">📋 Justificación ACSM (American College of Sports Medicine)</span>
-                            </summary>
-                            <p>{coachAcsmJustification}</p>
-                          </details>
-                        ) : null}
-
-                        {coachRiskFlags.length > 0 ? (
-                          <div className="coach-risk-flags">
-                            {coachRiskFlags.map((flag, flagIdx) => (
-                              <p key={`risk-${flagIdx}`} className="coach-risk-flag">⚠️ {flag}</p>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        <small style={{ marginTop: '0.5rem', color: 'var(--muted)' }}>
-                          {[
-                            coachStatusMode === 'live' ? coachStatusDetail : 'Sistema de Prescripción y Adecuación Clínica Endogym',
-                            coachGeneratedLabel ? `Actualizado ${coachGeneratedLabel}` : null
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </small>
-                      </div>
-                    </article>
 
                     <div className="day-hero-actions">
                       <button
@@ -4170,6 +4862,7 @@ export default function DashboardPage() {
                               </div>
 
                               <aside className="exercise-muscle-panel">
+                                <ExerciseVisualPlayer exercise={activeExercise} />
 
                                 <section className="exercise-muscle-list">
                                   <div>
@@ -4215,27 +4908,6 @@ export default function DashboardPage() {
                                       >
                                         Volver al original
                                       </button>
-                                    ) : null}
-                                    {activeExercise.videoUrl ? (
-                                      <a
-                                        className="video-link"
-                                        href={activeExercise.videoUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.4rem',
-                                          background: '#ff0000',
-                                          color: '#ffffff',
-                                          borderColor: '#ff0000',
-                                          fontWeight: '800',
-                                          boxShadow: '0 4px 10px rgba(255, 0, 0, 0.15)'
-                                        }}
-                                      >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>smart_display</span>
-                                        Ver técnica
-                                      </a>
                                     ) : null}
                                   </div>
 
@@ -4290,6 +4962,299 @@ export default function DashboardPage() {
                       </div>
                     </details>
                   ) : null}
+
+                  {/* REGISTRO DIARIO DE SESIÓN Y SÍNTOMAS */}
+                  {selectedDay ? (() => {
+                    const isCheckedIn = completedDaysCheckins[selectedDay.date];
+                    const isFutureCheckinDay = selectedDay.date > buildLocalDateKey();
+
+                    if (isCheckedIn === true) {
+                      return (
+                        <div className="checkin-success-banner" style={{ margin: '1.2rem 0', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(46, 204, 113, 0.12), rgba(39, 174, 96, 0.06))', border: '1px solid rgba(46, 204, 113, 0.35)', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '1.2rem', boxShadow: '0 8px 32px rgba(46, 204, 113, 0.08)' }}>
+                          <span className="success-icon-pulse" style={{ width: '48px', height: '48px', minWidth: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #2ecc71, #27ae60)', color: '#ffffff', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(46, 204, 113, 0.3)' }}>✓</span>
+                          <div>
+                            <h5 style={{ margin: '0 0 0.25rem 0', fontSize: '1.05rem', fontWeight: 800, color: '#27ae60', fontFamily: 'Outfit, sans-serif' }}>¡Sesión y Síntomas Registrados!</h5>
+                            <p style={{ margin: 0, fontSize: '0.86rem', lineHeight: '1.5', color: '#2b4f3a', fontWeight: 500 }}>Excelente consistencia. Tu IA procesará estos datos para adaptar y optimizar tu volumen e intensidad en las próximas planificaciones.</p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isCheckedIn === 'uncompleted') {
+                      return (
+                        <div className="checkin-warning-banner" style={{ margin: '1.2rem 0', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(231, 76, 60, 0.12), rgba(192, 57, 43, 0.06))', border: '1px solid rgba(231, 76, 60, 0.35)', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '1.2rem', boxShadow: '0 8px 32px rgba(231, 76, 60, 0.08)' }}>
+                          <span style={{ width: '48px', height: '48px', minWidth: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #e74c3c, #c0392b)', color: '#ffffff', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(231, 76, 60, 0.3)' }}>!</span>
+                          <div>
+                            <h5 style={{ margin: '0 0 0.25rem 0', fontSize: '1.05rem', fontWeight: 800, color: '#c0392b', fontFamily: 'Outfit, sans-serif' }}>Sesión Finalizada (No Realizada)</h5>
+                            <p style={{ margin: 0, fontSize: '0.86rem', lineHeight: '1.5', color: '#5a2f2b', fontWeight: 500 }}>Has finalizado la sesión sin completar la encuesta clínica/física obligatoria. La sesión ha sido catalogada como NO REALIZADA y esto impactará el cálculo de adherencia de tu IA.</p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <section className="daily-checkin-card" style={{ margin: '1.2rem 0', padding: '1.8rem', background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.9))', border: '1px solid rgba(137, 183, 241, 0.32)', borderRadius: '24px', boxShadow: '0 12px 36px rgba(108, 141, 178, 0.06)', backdropFilter: 'blur(16px)' }}>
+                        <div className="checkin-header" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                          <div style={{ padding: '0.6rem', background: 'rgba(15, 123, 233, 0.08)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f7be9' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.6rem' }}>fact_check</span>
+                          </div>
+                          <div>
+                            <h5 style={{ margin: '0 0 0.2rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#173e67', fontFamily: 'Outfit, sans-serif' }}>¿Has terminado el entrenamiento de este día?</h5>
+                            <p style={{ margin: 0, fontSize: '0.84rem', color: '#607997', lineHeight: '1.45' }}>
+                              {isFutureCheckinDay
+                                ? 'Podrás registrar sensaciones cuando llegue la fecha seleccionada.'
+                                : 'Registra tus sensaciones clínicas y físicas para adaptar la próxima planificación.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="checkin-sliders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                          <div className="slider-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                            <label className="slider-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.83rem', fontWeight: 700, color: '#173e67' }}>
+                              <span>Esfuerzo Percibido (RPE: 1-10)</span>
+                              <strong className={`rpe-badge val-${dailyCheckinRpe}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '50%', background: dailyCheckinRpe <= 4 ? '#2ecc71' : dailyCheckinRpe <= 7 ? '#f1c40f' : '#e74c3c', color: dailyCheckinRpe <= 4 || dailyCheckinRpe >= 8 ? '#ffffff' : '#173e67', fontSize: '0.8rem', fontWeight: 800 }}>{dailyCheckinRpe}</strong>
+                            </label>
+                            <input
+                              type="range"
+                              min="1"
+                              max="10"
+                              value={dailyCheckinRpe}
+                              onChange={(e) => setDailyCheckinRpe(Number(e.target.value))}
+                              className="premium-range-slider"
+                              style={{ width: '100%', height: '6px', background: 'rgba(15, 123, 233, 0.12)', borderRadius: '999px', outline: 'none' }}
+                            />
+                            <span className="slider-caption" style={{ fontSize: '0.74rem', fontWeight: 600, color: '#607997' }}>
+                              {dailyCheckinRpe <= 2 ? '🟢 Muy ligero / Recuperación' :
+                               dailyCheckinRpe <= 5 ? '🟡 Moderado / Buen estímulo' :
+                               dailyCheckinRpe <= 8 ? '🟠 Elevado / Esfuerzo notable' :
+                               '🔴 Extremo / Cerca del fallo total'}
+                            </span>
+                          </div>
+
+                          <div className="slider-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                            <label className="slider-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.83rem', fontWeight: 700, color: '#173e67' }}>
+                              <span>Fatiga General (0-10)</span>
+                              <strong className={`fatigue-badge val-${dailyCheckinFatigue}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '50%', background: dailyCheckinFatigue <= 3 ? '#2ecc71' : dailyCheckinFatigue <= 6 ? '#f1c40f' : '#e74c3c', color: dailyCheckinFatigue <= 3 || dailyCheckinFatigue >= 7 ? '#ffffff' : '#173e67', fontSize: '0.8rem', fontWeight: 800 }}>{dailyCheckinFatigue}</strong>
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="10"
+                              value={dailyCheckinFatigue}
+                              onChange={(e) => setDailyCheckinFatigue(Number(e.target.value))}
+                              className="premium-range-slider"
+                              style={{ width: '100%', height: '6px', background: 'rgba(15, 123, 233, 0.12)', borderRadius: '999px', outline: 'none' }}
+                            />
+                            <span className="slider-caption" style={{ fontSize: '0.74rem', fontWeight: 600, color: '#607997' }}>
+                              {dailyCheckinFatigue <= 2 ? '🟢 Fresco / Plena energía' :
+                               dailyCheckinFatigue <= 5 ? '🟡 Cansancio normal' :
+                               dailyCheckinFatigue <= 8 ? '🟠 Fatiga acumulada notable' :
+                               '🔴 Agotamiento neuromuscular severo'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="checkin-row-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                          <div className="slider-group compact" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                            <label className="slider-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.83rem', fontWeight: 700, color: '#173e67' }}>
+                              <span>Sueño de anoche (horas)</span>
+                              <strong style={{ color: '#0f7be9' }}>{dailyCheckinSleep} horas</strong>
+                            </label>
+                            <input
+                              type="range"
+                              min="4"
+                              max="12"
+                              step="0.5"
+                              value={dailyCheckinSleep}
+                              onChange={(e) => setDailyCheckinSleep(Number(e.target.value))}
+                              className="premium-range-slider"
+                              style={{ width: '100%', height: '6px', background: 'rgba(15, 123, 233, 0.12)', borderRadius: '999px', outline: 'none' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="symptoms-section" style={{ marginBottom: '1.5rem' }}>
+                          <span className="section-title" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800, color: '#173e67', marginBottom: '0.8rem', fontFamily: 'Outfit, sans-serif' }}>¿Has sentido algún síntoma o molestia? (Selecciona los que apliquen)</span>
+                          <div className="symptom-chips-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                            <button
+                              type="button"
+                              className={`symptom-tag-chip ${dailyCheckinSymptoms.dyspnea ? 'active' : ''}`}
+                              onClick={() => setDailyCheckinSymptoms(prev => ({ ...prev, dyspnea: !prev.dyspnea }))}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(197, 214, 236, 0.8)', borderRadius: '14px', padding: '0.45rem 0.8rem', fontSize: '0.78rem', fontWeight: 700, color: dailyCheckinSymptoms.dyspnea ? '#e74c3c' : '#466684', background: dailyCheckinSymptoms.dyspnea ? 'rgba(231, 76, 60, 0.08)' : 'rgba(255, 255, 255, 0.8)', borderColor: dailyCheckinSymptoms.dyspnea ? '#e74c3c' : 'rgba(197, 214, 236, 0.8)', cursor: 'pointer', transition: 'all 200ms ease' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>airwave</span>
+                              <span>Ahogo / Disnea inusual</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`symptom-tag-chip ${dailyCheckinSymptoms.jointPain ? 'active' : ''}`}
+                              onClick={() => setDailyCheckinSymptoms(prev => ({ ...prev, jointPain: !prev.jointPain }))}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(197, 214, 236, 0.8)', borderRadius: '14px', padding: '0.45rem 0.8rem', fontSize: '0.78rem', fontWeight: 700, color: dailyCheckinSymptoms.jointPain ? '#e74c3c' : '#466684', background: dailyCheckinSymptoms.jointPain ? 'rgba(231, 76, 60, 0.08)' : 'rgba(255, 255, 255, 0.8)', borderColor: dailyCheckinSymptoms.jointPain ? '#e74c3c' : 'rgba(197, 214, 236, 0.8)', cursor: 'pointer', transition: 'all 200ms ease' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>personal_injury</span>
+                              <span>Dolor articular / Lesión</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`symptom-tag-chip ${dailyCheckinSymptoms.dizziness ? 'active' : ''}`}
+                              onClick={() => setDailyCheckinSymptoms(prev => ({ ...prev, dizziness: !prev.dizziness }))}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(197, 214, 236, 0.8)', borderRadius: '14px', padding: '0.45rem 0.8rem', fontSize: '0.78rem', fontWeight: 700, color: dailyCheckinSymptoms.dizziness ? '#e74c3c' : '#466684', background: dailyCheckinSymptoms.dizziness ? 'rgba(231, 76, 60, 0.08)' : 'rgba(255, 255, 255, 0.8)', borderColor: dailyCheckinSymptoms.dizziness ? '#e74c3c' : 'rgba(197, 214, 236, 0.8)', cursor: 'pointer', transition: 'all 200ms ease' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>sensors_off</span>
+                              <span>Mareo / Visión borrosa</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`symptom-tag-chip ${dailyCheckinSymptoms.tachycardia ? 'active' : ''}`}
+                              onClick={() => setDailyCheckinSymptoms(prev => ({ ...prev, tachycardia: !prev.tachycardia }))}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(197, 214, 236, 0.8)', borderRadius: '14px', padding: '0.45rem 0.8rem', fontSize: '0.78rem', fontWeight: 700, color: dailyCheckinSymptoms.tachycardia ? '#e74c3c' : '#466684', background: dailyCheckinSymptoms.tachycardia ? 'rgba(231, 76, 60, 0.08)' : 'rgba(255, 255, 255, 0.8)', borderColor: dailyCheckinSymptoms.tachycardia ? '#e74c3c' : 'rgba(197, 214, 236, 0.8)', cursor: 'pointer', transition: 'all 200ms ease' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>favorite</span>
+                              <span>Taquicardia inusual</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="checkin-notes-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.8rem' }}>
+                          <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#173e67' }}>Notas adicionales de sensaciones (opcional)</label>
+                          <textarea
+                            rows={2}
+                            value={dailyCheckinNotes}
+                            onChange={(e) => setDailyCheckinNotes(e.target.value)}
+                            placeholder="Describe molestias musculares, molestias de digestión, o tu rendimiento general..."
+                            style={{ padding: '0.7rem', border: '1px solid rgba(197, 214, 236, 0.8)', borderRadius: '14px', background: 'rgba(255, 255, 255, 0.72)', color: '#172f4a', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}
+                          />
+                        </div>
+
+                        <div className="checkin-warning-notice" style={{ padding: '1rem', background: 'rgba(231, 76, 60, 0.06)', border: '1px dashed rgba(231, 76, 60, 0.35)', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                          <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: '1.5', color: '#c0392b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>warning</span>
+                            <span><strong>Importante:</strong> Para que esta sesión cuente como COMPLETADA, debes rellenar esta encuesta subjetiva obligatoria. Si eliges finalizarla sin rellenar la encuesta, se registrará como NO REALIZADA en tu historial de progreso.</span>
+                          </p>
+                        </div>
+
+                        <div className="checkin-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="premium-checkin-btn"
+                            onClick={handleDailyWorkoutCheckin}
+                            disabled={dailyCheckinLoading || isFutureCheckinDay}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', border: 'none', borderRadius: '16px', padding: '0.8rem 1.6rem', fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #0f7be9, #0a56a4)', boxShadow: '0 8px 25px rgba(15, 123, 233, 0.25)', cursor: 'pointer', transition: 'all 200ms ease' }}
+                          >
+                            {dailyCheckinLoading ? (
+                              <>
+                                <span className="spinner-icon" style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#ffffff', borderRadius: '50%', animation: 'spin-loading 0.8s linear infinite' }}></span>
+                                <span>Registrando...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>done_all</span>
+                                <span>Registrar Sesión con Encuesta</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="secondary-checkin-btn"
+                            onClick={handleDailyWorkoutCheckinWithoutSurvey}
+                            disabled={dailyCheckinLoading || isFutureCheckinDay}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', border: '1px solid rgba(193, 198, 213, 0.8)', borderRadius: '16px', padding: '0.8rem 1.6rem', fontSize: '0.9rem', fontWeight: 700, color: '#e74c3c', background: 'rgba(255, 255, 255, 0.8)', cursor: 'pointer', transition: 'all 200ms ease' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>block</span>
+                            <span>Finalizar sin responder encuesta (No realizada)</span>
+                          </button>
+
+                          {dailyCheckinStatus && <p className="checkin-status-message" style={{ margin: 0, fontSize: '0.83rem', fontWeight: 700, color: dailyCheckinStatus.includes('Error') || dailyCheckinStatus.includes('Falta') || dailyCheckinStatus.includes('NO REALIZADA') || dailyCheckinStatus.includes('valoración') ? '#e74c3c' : '#27ae60' }}>{dailyCheckinStatus}</p>}
+                        </div>
+                      </section>
+                    );
+                  })() : null}
+
+                  <article className="day-coach-strip is-live" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', padding: '2rem', borderLeft: '5px solid #005bb1', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.72)', border: '1px solid rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(14px) saturate(140%)', gridTemplateColumns: '1fr', boxShadow: '0 8px 32px rgba(101, 136, 172, 0.08)', marginTop: '1.2rem' }}>
+                    <div className="day-coach-strip-copy" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                          <div style={{ padding: '0.5rem', background: 'rgba(0, 91, 177, 0.08)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005bb1' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>auto_awesome</span>
+                          </div>
+                          <div>
+                            <span className="day-coach-eyebrow" style={{ display: 'block', margin: 0, fontSize: '0.72rem', color: '#6a86a4', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Briefing de Sesión</span>
+                            <h4 style={{ margin: '0.1rem 0 0 0', fontSize: '1.1rem', fontWeight: 800, color: '#172f4a', fontFamily: 'Outfit, sans-serif' }}>Análisis Científico del Día</h4>
+                          </div>
+                        </div>
+                        <span className={`coach-status-pill ${coachStatusMode}`} style={{ margin: 0 }}>{coachStatusLabel}</span>
+                      </div>
+
+                      {coachWeeklySummary ? (
+                        <p className="coach-weekly-summary" style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.6', color: '#2b4562', fontWeight: 500 }}>
+                          {simplifyDeveloperJargon(coachWeeklySummary)}
+                        </p>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.6', color: '#2b4562', fontWeight: 500 }}>
+                          {simplifyDeveloperJargon(dailyCoachHeadline)}
+                        </p>
+                      )}
+
+                      {selectedDayAllCoachAdjustments.length > 0 ? (
+                        <div className="coach-adjustments-list" style={{ marginTop: '0.5rem' }}>
+                          <span className="coach-section-label">¿Por qué estos ejercicios?</span>
+                          {selectedDayAllCoachAdjustments.map((adj, adjIdx) => (
+                            <details
+                              key={`coach-adj-${adjIdx}`}
+                              className="coach-adjustment-card"
+                              open={adjIdx === 0}
+                            >
+                              <summary>
+                                <span className="adj-number">{adjIdx + 1}</span>
+                                <span className="adj-title">{simplifyDeveloperJargon(adj.adjustment)}</span>
+                              </summary>
+                              <div className="adj-body">
+                                {adj.rationale ? (
+                                  <div className="adj-block">
+                                    <span className="adj-label">Fundamento fisiológico</span>
+                                    <p>{simplifyDeveloperJargon(adj.rationale)}</p>
+                                  </div>
+                                ) : null}
+                                {adj.evidence ? (
+                                  <div className="adj-block evidence">
+                                    <span className="adj-label">📚 Evidencia Científica</span>
+                                    <p>{simplifyDeveloperJargon(adj.evidence)}</p>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {coachAcsmJustification ? (
+                        <details className="coach-acsm-block">
+                          <summary>
+                            <span className="adj-label">📋 Justificación ACSM (American College of Sports Medicine)</span>
+                          </summary>
+                          <p>{coachAcsmJustification}</p>
+                        </details>
+                      ) : null}
+
+                      {coachRiskFlags.length > 0 ? (
+                        <div className="coach-risk-flags">
+                          {coachRiskFlags.map((flag, flagIdx) => (
+                            <p key={`risk-${flagIdx}`} className="coach-risk-flag">⚠️ {flag}</p>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <small style={{ marginTop: '0.5rem', color: 'var(--muted)' }}>
+                        {[
+                          coachStatusMode === 'live' ? coachStatusDetail : 'Sistema de Prescripción y Adecuación Clínica Endogym',
+                          coachGeneratedLabel ? `Actualizado ${coachGeneratedLabel}` : null
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </small>
+                    </div>
+                  </article>
                 </article>
               ) : null}
             </>
@@ -4901,26 +5866,8 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Video Link */}
-                  <div className="modal-section" style={{ background: 'rgba(255, 0, 0, 0.03)', border: '1px solid rgba(255, 0, 0, 0.1)' }}>
-                    <h3>
-                      <span className="material-symbols-outlined" style={{ color: '#ff0000' }}>smart_display</span>
-                      Guía en Video
-                    </h3>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 0.8rem 0', lineHeight: 1.4 }}>
-                      Haz clic en el enlace para buscar tutoriales y guías detalladas sobre la forma de este ejercicio en YouTube.
-                    </p>
-                    <a
-                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
-                        selectedLibraryExercise.youtubeQuery || `${selectedLibraryExercise.name} tecnica ejecucion`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="youtube-guide-btn"
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>open_in_new</span>
-                      Ver en YouTube
-                    </a>
+                  <div className="modal-section" style={{ padding: 0, background: 'transparent', border: 'none' }}>
+                    <ExerciseVisualPlayer exercise={selectedLibraryExercise} />
                   </div>
                 </div>
               </div>

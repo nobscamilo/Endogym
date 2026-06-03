@@ -54,6 +54,37 @@ Al superar el limite responden HTTP `429`, cabecera `Retry-After` y `details.ret
 
 `POST /api/weekly-plan` genera la base del plan y solicita recomendaciones estructuradas a Gemini Developer API. Produccion usa `gemini-2.5-flash` estable, con latencia acotada y fallback ACSM observable. La sonda de produccion exige `coachSource=gemini` y `fallbackApplied=false`.
 
+## Check-in diario de entrenamiento
+
+La UI registra el check-in mediante `POST /api/workouts` con `source=daily_checkin`:
+
+```json
+{
+  "title": "Torso A",
+  "mode": "full_gym",
+  "source": "daily_checkin",
+  "dailyCheckinDate": "2026-06-02",
+  "checkinSkipped": false,
+  "symptoms": {
+    "dyspnea": false,
+    "jointPain": false,
+    "dizziness": false,
+    "tachycardia": false
+  },
+  "performedAt": "2026-06-02T12:00:00.000Z",
+  "sessionRpe": 6,
+  "fatigue": 4,
+  "sleepHours": 7,
+  "completed": true
+}
+```
+
+- Firestore usa el documento determinista `daily-YYYY-MM-DD`; repetir un check-in del mismo día actualiza el registro en lugar de duplicarlo.
+- La UI rehidrata los check-ins persistidos y no permite seleccionar fechas futuras para registrar.
+- La API valida fecha y payload. Tolera como máximo el día UTC siguiente para no rechazar el `hoy` legítimo de zonas horarias adelantadas.
+- Al omitir encuesta, `completed=false`, `checkinSkipped=true` y los subjetivos deben omitirse o enviarse como `null`; no se aceptan ceros inventados.
+- Los síntomas se guardan como booleanos y alimentan `buildProgressMemory()`. Una señal de alarma muestra advertencia inmediata y bloquea alta intensidad en el siguiente plan.
+
 ## Codigos esperados
 
 - `400`: payload o query invalida.
@@ -70,3 +101,4 @@ Al superar el limite responden HTTP `429`, cabecera `Retry-After` y `details.ret
 
 - Versionar API antes de exponer clientes externos.
 - Versionar limites antes de exponer clientes externos.
+- Versionar el contrato de check-in antes de exponer clientes externos.

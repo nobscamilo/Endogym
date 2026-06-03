@@ -20,6 +20,46 @@ function parseLimit(searchParams) {
 const MAX_EXERCISES_PER_WORKOUT = 60;
 const MAX_TITLE_LENGTH = 200;
 const MAX_NOTES_LENGTH = 2000;
+const ISO_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DAILY_CHECKIN_SYMPTOM_KEYS = ['dyspnea', 'jointPain', 'dizziness', 'tachycardia'];
+
+function isValidDateKey(value) {
+  if (typeof value !== 'string' || !ISO_DATE_KEY_PATTERN.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isValidSymptoms(symptoms) {
+  if (!symptoms || typeof symptoms !== 'object' || Array.isArray(symptoms)) return false;
+  return DAILY_CHECKIN_SYMPTOM_KEYS.every((key) => typeof symptoms[key] === 'boolean');
+}
+
+function getLatestAllowedDailyCheckinDate() {
+  const tomorrowUtc = new Date();
+  tomorrowUtc.setUTCDate(tomorrowUtc.getUTCDate() + 1);
+  return tomorrowUtc.toISOString().slice(0, 10);
+}
+
+function isValidDailyCheckin(payload) {
+  if (payload.source !== 'daily_checkin') return true;
+  if (!isValidDateKey(payload.dailyCheckinDate)) return false;
+  if (payload.dailyCheckinDate > getLatestAllowedDailyCheckinDate()) return false;
+  if (payload.performedAt.slice(0, 10) !== payload.dailyCheckinDate) return false;
+  if (typeof payload.checkinSkipped !== 'boolean') return false;
+  if (!isValidSymptoms(payload.symptoms)) return false;
+
+  if (payload.checkinSkipped) {
+    return payload.completed === false
+      && payload.sessionRpe == null
+      && payload.fatigue == null
+      && payload.sleepHours == null;
+  }
+
+  return payload.completed === true
+    && payload.sessionRpe != null
+    && payload.fatigue != null
+    && payload.sleepHours != null;
+}
 
 function isValidWorkoutPayload(payload) {
   if (!payload || typeof payload !== 'object') return false;
@@ -49,6 +89,8 @@ function isValidWorkoutPayload(payload) {
   }
   if (payload.completed != null && typeof payload.completed !== 'boolean') return false;
   if (payload.notes != null && typeof payload.notes !== 'string') return false;
+  if (payload.source != null && !['manual', 'daily_checkin'].includes(payload.source)) return false;
+  if (!isValidDailyCheckin(payload)) return false;
   return true;
 }
 

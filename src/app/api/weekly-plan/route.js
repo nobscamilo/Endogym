@@ -7,6 +7,7 @@ import {
   isGeminiConfigured,
   resolveGeminiCoachModel,
 } from '../../../services/exerciseCoachClient.js';
+import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { sanitizeGoogleAiModelNameForLog } from '../../../services/googleGenAiTransport.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import {
@@ -156,6 +157,9 @@ function sanitizePlanCustomizations(payload = {}) {
   const rawExerciseSwaps = payload?.exerciseSwapsByDate && typeof payload.exerciseSwapsByDate === 'object'
     ? payload.exerciseSwapsByDate
     : {};
+  const rawDurationOverrides = payload?.durationOverridesByDate && typeof payload.durationOverridesByDate === 'object'
+    ? payload.durationOverridesByDate
+    : {};
 
   const sessionSwapsByDate = Object.fromEntries(
     Object.entries(rawSessionSwaps)
@@ -187,10 +191,22 @@ function sanitizePlanCustomizations(payload = {}) {
       .filter(([, exerciseMap]) => Object.keys(exerciseMap).length > 0)
   );
 
+  const durationOverridesByDate = Object.fromEntries(
+    Object.entries(rawDurationOverrides)
+      .filter(([dayKey]) => ISO_DATE_KEY_PATTERN.test(dayKey))
+      .slice(0, MAX_CUSTOM_DAYS)
+      .map(([dayKey, duration]) => {
+        const num = Number(duration);
+        const validDuration = Number.isFinite(num) ? Math.min(180, Math.max(20, Math.round(num))) : 60;
+        return [dayKey, validDuration];
+      })
+  );
+
   return {
     version: 1,
     sessionSwapsByDate,
     exerciseSwapsByDate,
+    durationOverridesByDate,
   };
 }
 
@@ -355,10 +371,17 @@ export async function POST(request) {
 
       if (!forceMock && geminiConfigured) {
         try {
+          const clinicalGuidelinesContext = await retrieveGuidelinesContext({
+            profile,
+            weeklyPlan: generated,
+            traceId,
+          });
+
           const aiCoach = await callGeminiExerciseCoach({
             profile,
             weeklyPlan: generated,
             traceId,
+            clinicalGuidelinesContext,
           });
           coachSource = 'gemini';
           coachPlan = {

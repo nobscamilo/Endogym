@@ -32,6 +32,7 @@ export function buildMacroPlan(targetCalories, strategy = 'recomposition') {
     bulk: { protein: 0.25, carbs: 0.5, fat: 0.25 },
     recomposition: { protein: 0.33, carbs: 0.37, fat: 0.3 },
     glycemic_control: { protein: 0.35, carbs: 0.25, fat: 0.4 },
+    safe_conditioning: { protein: 0.3, carbs: 0.4, fat: 0.3 },
   };
 
   const resolvedStrategy = strategies[strategy] ? strategy : 'recomposition';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildAdaptiveTuning, buildProgressMemory } from '../../src/core/progressMemory.js';
-import { generateWeeklyPlan } from '../../src/core/planner.js';
+import { buildHeuristicCoachPlan, generateWeeklyPlan } from '../../src/core/planner.js';
 import { evaluatePreparticipationScreening } from '../../src/core/screening.js';
 
 describe('adaptive planning pipeline', () => {
@@ -103,5 +103,79 @@ describe('adaptive planning pipeline', () => {
     expect(plan.adaptiveTuning.workout.volumeFactor).toBeLessThan(1);
     expect(plan.clinicalAuditTrail.length).toBeGreaterThan(1);
     expect(plan.days[0].workout.intensityRpe).toMatch(/^RPE\s/);
+  });
+
+  it('ignores unknown subjective values when a daily survey was skipped', () => {
+    const progressMemory = buildProgressMemory({
+      workouts: [
+        {
+          performedAt: '2026-03-30T09:00:00.000Z',
+          sessionRpe: null,
+          fatigue: null,
+          sleepHours: null,
+          completed: false,
+          checkinSkipped: true,
+        },
+        {
+          performedAt: '2026-03-29T09:00:00.000Z',
+          sessionRpe: 8,
+          fatigue: 7,
+          sleepHours: 6,
+          completed: true,
+        },
+      ],
+      now: new Date('2026-03-31T12:00:00.000Z'),
+    });
+
+    expect(progressMemory.samples.workouts).toBe(2);
+    expect(progressMemory.samples.subjectiveWorkouts).toBe(1);
+    expect(progressMemory.metrics.avgSessionRpe).toBe(8);
+    expect(progressMemory.metrics.avgFatigue).toBe(7);
+    expect(progressMemory.metrics.avgSleepHours).toBe(6);
+  });
+
+  it('blocks high intensity when a recent daily check-in contains alarm symptoms', () => {
+    const progressMemory = buildProgressMemory({
+      workouts: [
+        {
+          performedAt: '2026-03-30T09:00:00.000Z',
+          sessionRpe: 5,
+          fatigue: 3,
+          sleepHours: 8,
+          completed: true,
+          symptoms: {
+            dyspnea: false,
+            jointPain: false,
+            dizziness: true,
+            tachycardia: false,
+          },
+        },
+      ],
+      now: new Date('2026-03-31T12:00:00.000Z'),
+    });
+    const screening = evaluatePreparticipationScreening({
+      currentlyActive: true,
+      desiredIntensity: 'vigorous',
+    });
+    const adaptive = buildAdaptiveTuning({
+      profile: { goal: 'recomposition' },
+      progressMemory,
+      screening,
+    });
+    const coachPlan = buildHeuristicCoachPlan({
+      profile: { goal: 'recomposition', trainingModality: 'full_gym' },
+      weeklyPlan: {
+        days: [],
+        progressMemory,
+        preparticipationScreening: screening,
+        adaptiveTuning: adaptive,
+      },
+    });
+
+    expect(progressMemory.clinicalSignals.readinessGate).toBe('stop');
+    expect(adaptive.workout.highIntensityBlocked).toBe(true);
+    expect(adaptive.workout.maxRpeCap).toBe(4);
+    expect(adaptive.appliedRules.map((rule) => rule.id)).toContain('DAILY_CHECKIN_ALARM_SYMPTOMS');
+    expect(coachPlan.riskFlags[0]).toContain('Síntomas de alarma');
   });
 });

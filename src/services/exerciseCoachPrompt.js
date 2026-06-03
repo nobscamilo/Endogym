@@ -35,21 +35,23 @@ function compactDay(day) {
     warmup: Array.isArray(day.workout?.warmup) ? day.workout.warmup.slice(0, 3) : [],
     cooldown: Array.isArray(day.workout?.cooldown) ? day.workout.cooldown.slice(0, 3) : [],
     exercises: Array.isArray(day.workout?.exercises)
-      ? day.workout.exercises.slice(0, 6).map(compactExercise)
+      ? day.workout.exercises.slice(0, 10).map(compactExercise)
       : [],
   };
 }
 
-export function buildExerciseCoachPrompt({ profile, weeklyPlan }) {
+export function buildExerciseCoachPrompt({ profile, weeklyPlan, clinicalGuidelinesContext = '' }) {
   const weekSummary = weeklyPlan.days.map(compactDay);
   const dayLabels = weeklyPlan.days.map((day) => `${day.dayName} ${day.date}`).join(', ');
+
+  const contextSec = clinicalGuidelinesContext ? `\n\n${clinicalGuidelinesContext}\n` : '';
 
   return `
 Rol:
 Eres un coach deportivo experto en metabolismo y prescripción del ejercicio, con formación en endocrinología y medicina deportiva.
 Tu tarea: auditar y personalizar un plan semanal de entrenamiento con enfoque seguro, motivador y accionable.
 Comunica de forma directa, profesional pero cercana — como un entrenador de confianza que domina la ciencia.
-
+${contextSec}
 Base científica:
 - ACSM Guidelines for Exercise Testing and Prescription (12th edition) & ACSM Resistance Training Position Stand 2026: Frecuencia de fuerza (2-3 días/semana para mantenimiento/salud, 3-5 días/semana para hipertrofia/fuerza). Volumen de series efectivas y periodización de la intensidad.
 - ACSM & Academy of Nutrition and Dietetics Position Stand on Nutrition and Athletic Performance: Periodización nutricional en base al tipo de sesión. Requerimientos de carbohidratos escalados (3-10 g/kg/día) para rendimiento y proteínas (1.6-2.2 g/kg/día) para balance nitrogenado positivo y maximizar la síntesis de proteínas musculares (MPS) durante déficit calórico.

@@ -51,7 +51,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'Endogym | Nutrición y entrenamiento con IA',
     description:
-      'Entrenamiento, nutrición y seguimiento clínico-deportivo en una sola plataforma con IA adaptativa.',
+      'Entrenamiento, nutrición y seguimiento deportivo educativo en una sola plataforma con IA adaptativa.',
   },
   robots: {
     index: true,
@@ -79,4 +79,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-

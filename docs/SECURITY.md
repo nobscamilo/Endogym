@@ -50,6 +50,15 @@ Antes de usuarios reales define:
 - disclaimer medico visible;
 - revision legal por mercado.
 
+El cierre local del 2 de junio de 2026 añadió:
+
+- cabeceras HTTP globales: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options` y `frame-ancestors 'none'`;
+- `poweredByHeader=false` para no publicar la firma de framework;
+- síntomas de check-in estructurados y conectados a una respuesta conservadora: gate `stop`, RPE máximo `4` y bloqueo de alta intensidad ante señales de alarma;
+- rechazo de encuestas omitidas rellenadas con ceros inventados.
+
+Estas medidas pasaron tests, `next start` local y verificación de cabeceras en Vercel el 2 de junio de 2026.
+
 ## Configuracion Gemini
 
 - Usa identificadores estables `gemini-*`; produccion fija `gemini-2.5-flash`.
@@ -59,4 +68,4 @@ Antes de usuarios reales define:
 
 ## Dependencias
 
-`npm run audit` bloquea vulnerabilidades moderadas, altas o criticas en CI. El 31 de mayo de 2026 devuelve `0` vulnerabilidades. Los overrides de `postcss` y `uuid` corrigen dependencias transitivas sin aplicar los downgrades rompientes propuestos por npm.
+`npm run audit` bloquea vulnerabilidades moderadas, altas o criticas en CI. El 2 de junio de 2026 devuelve `0` vulnerabilidades. Los overrides de `postcss` y `uuid` corrigen dependencias transitivas sin aplicar los downgrades rompientes propuestos por npm.
