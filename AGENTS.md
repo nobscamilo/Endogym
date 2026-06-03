@@ -2,6 +2,8 @@
 
 ## Proposito
 
+> **Marca (3 de junio de 2026):** nuevo nombre interno **"Ignios"** (sustituye a "Endogym" en comunicación interna). Cambio NO global: falta logo; código, dominio `endogym.vercel.app`, buckets y proyectos Firebase/GCP siguen como "endogym". No renombres infraestructura ni hagas find-replace masivo sin orden explícita del usuario. Marca verificada solo a nivel web (sin conflicto activo; pendiente clearance formal USPTO/EUIPO). Fallback: "Emberfit".
+
 Endogym es un MVP en construccion para nutricion, seguimiento glucemico y entrenamiento. Antes de modificar codigo, lee:
 
 1. `README.md`

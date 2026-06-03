@@ -2,6 +2,9 @@
 
 Endogym es un MVP full-stack para nutrición, seguimiento glucémico y entrenamiento adaptativo. Incluye una app Next.js, APIs HTTP, Firebase y adaptadores para Google AI. Sus estimaciones son educativas: no sustituyen diagnóstico, tratamiento ni seguimiento médico.
 
+> **Nota de marca (3 de junio de 2026): nuevo nombre interno = "Ignios".**
+> Se decidió renombrar el producto de "Endogym" a **Ignios** (raíz *ignite/ignis*, metáfora de combustión metabólica; legible en inglés y español). El cambio es **solo interno por ahora**: NO es un rebrand global, falta el logo, y el código, el dominio de producción (`endogym.vercel.app`), buckets, proyectos Firebase/GCP y configuración siguen usando "endogym". No hagas find-replace masivo de "Endogym" ni renombres recursos de infraestructura sin decisión explícita del usuario. Dominios candidatos disponibles a la fecha: `ignios.app` ($9.99/año), `ignios.io`, `ignios.ai`. Verificación de marca: búsqueda web sin conflicto activo en salud/fitness/software; único homónimo "Ignios Ltd" (semiconductores, Oxford, cerrado). Pendiente clearance formal en USPTO/EUIPO antes de registrar o lanzar globalmente (vigilar cercanía con IGNIO/Tata e IGNIS). Fallback descartado si Ignios fallara: "Emberfit".
+
 ## Leer primero
 
 1. [`AGENTS.md`](AGENTS.md)
