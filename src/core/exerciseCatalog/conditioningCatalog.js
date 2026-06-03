@@ -4,7 +4,7 @@ export const conditioningCatalog = [
   // Running / cycling conditioning
   {
     id: 'run-zone2',
-    name: 'Zone 2 Easy Run',
+    name: 'Carrera suave en Zona 2',
     modalities: [TrainingModality.RUNNING, TrainingModality.MIXED],
     sessionTypes: ['aerobic'],
     category: 'cardio_base',
@@ -15,7 +15,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'run-tempo',
-    name: 'Tempo Run',
+    name: 'Carrera a ritmo (Tempo Run)',
     modalities: [TrainingModality.RUNNING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_threshold',
@@ -26,7 +26,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'run-intervals',
-    name: 'Running Intervals',
+    name: 'Intervalos de carrera',
     modalities: [TrainingModality.RUNNING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_interval',
@@ -37,7 +37,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'run-strides',
-    name: 'Strides',
+    name: 'Aceleraciones progresivas (Strides)',
     modalities: [TrainingModality.RUNNING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_skill',
@@ -48,7 +48,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'run-hill-repeats',
-    name: 'Hill Repeats',
+    name: 'Cuestas (Hill Repeats)',
     modalities: [TrainingModality.RUNNING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_interval',
@@ -59,7 +59,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'run-a-skip-drill',
-    name: 'A-Skip Drill',
+    name: 'Técnica de carrera (A-Skip)',
     modalities: [TrainingModality.RUNNING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_skill',
@@ -70,7 +70,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'run-fartlek',
-    name: 'Fartlek Run',
+    name: 'Fartlek',
     modalities: [TrainingModality.RUNNING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_threshold',
@@ -81,7 +81,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-zone2',
-    name: 'Cycling Zone 2',
+    name: 'Ciclismo en Zona 2',
     modalities: [TrainingModality.CYCLING, TrainingModality.MIXED],
     sessionTypes: ['aerobic'],
     category: 'cardio_base',
@@ -92,7 +92,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-cadence-drill',
-    name: 'Cadence Drill',
+    name: 'Técnica de cadencia (Ciclismo)',
     modalities: [TrainingModality.CYCLING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_skill',
@@ -103,7 +103,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-intervals',
-    name: 'Cycling Intervals',
+    name: 'Intervalos de ciclismo',
     modalities: [TrainingModality.CYCLING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_interval',
@@ -114,7 +114,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-low-cadence-climb',
-    name: 'Low Cadence Climb',
+    name: 'Subida a baja cadencia',
     modalities: [TrainingModality.CYCLING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_threshold',
@@ -125,7 +125,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-spin-ups',
-    name: 'Spin-ups',
+    name: 'Aceleraciones de cadencia (Spin-ups)',
     modalities: [TrainingModality.CYCLING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_skill',
@@ -136,7 +136,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-standing-climb',
-    name: 'Standing Climb',
+    name: 'Subida de pie (Ciclismo)',
     modalities: [TrainingModality.CYCLING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_interval',
@@ -147,7 +147,7 @@ export const conditioningCatalog = [
   },
   {
     id: 'cycle-sweet-spot',
-    name: 'Sweet Spot Intervals',
+    name: 'Intervalos sweet spot',
     modalities: [TrainingModality.CYCLING],
     sessionTypes: ['aerobic', 'mixed'],
     category: 'cardio_threshold',

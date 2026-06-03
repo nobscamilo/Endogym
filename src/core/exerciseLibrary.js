@@ -25,14 +25,14 @@ function roundToStep(value, step = 2.5) {
 // Exercises without a mapping will fall back to search within his channel.
 const EXERCISE_VIDEO_MAP = {
   // Chest
-  'gym-bench-press': 'Nf_qO1s5n9g', // Perfect Bench Press Form (DO THIS!)
-  'gym-db-bench-press': 'Nf_qO1s5n9g',
-  'gym-pushup': 'PO9ggbu09sT', // Push-Up Mistake (SAVE YOUR SHOULDERS!)
-  'home-push-up': 'PO9ggbu09sT',
-  'home-incline-push-up': 'PO9ggbu09sT',
-  'home-floor-press': 'Nf_qO1s5n9g',
-  'home-band-chest-press': 'Nf_qO1s5n9g',
-  'trx-chest-press': 'PO9ggbu09sT',
+  'gym-bench-press': 'XjrsqShr-Ic', // Bench Press LIKE THIS! (Shorts)
+  'gym-db-bench-press': 'XjrsqShr-Ic',
+  'gym-pushup': 'J-vItVuxDl0', // Push-Up Variations (Shorts)
+  'home-push-up': 'J-vItVuxDl0',
+  'home-incline-push-up': 'J-vItVuxDl0',
+  'home-floor-press': 'XjrsqShr-Ic',
+  'home-band-chest-press': 'XjrsqShr-Ic',
+  'trx-chest-press': 'J-vItVuxDl0',
   'trx-chest-fly': 'eGjt4lk6g34',
 
   // Back / Pull
@@ -50,18 +50,18 @@ const EXERCISE_VIDEO_MAP = {
   'trx-single-arm-row': 'ZuV_NokRESN',
 
   // Arms
-  'gym-bicep-curl': 'kGgJuek3Kz8', // Fix Your Bicep Curl Mistakes!
-  'gym-db-curl': 'kGgJuek3Kz8',
-  'home-band-curl': 'kGgJuek3Kz8',
-  'trx-biceps-curl': 'kGgJuek3Kz8',
+  'gym-bicep-curl': '8xqUwVT_OYg', // Fix Your Bicep Curl Mistakes! (Shorts)
+  'gym-db-curl': '8xqUwVT_OYg',
+  'home-band-curl': '8xqUwVT_OYg',
+  'trx-biceps-curl': '8xqUwVT_OYg',
   'gym-hammer-curl': 'zC3nLlEvin4',
 
   // Legs / Posterior Chain
   'gym-barbell-back-squat': '9r-k1D_Wz3A', // FIX THESE Squat Mistakes!
   'home-bodyweight-squat': '9r-k1D_Wz3A',
-  'gym-conventional-deadlift': '3i_JmO99S4w', // The PERFECT Deadlift (DO THIS!)
-  'gym-romanian-deadlift': '3i_JmO99S4w',
-  'home-single-leg-rdl': '3i_JmO99S4w',
+  'gym-conventional-deadlift': 'K8a_Ab9R-aI', // The PERFECT Deadlift Guide (Shorts)
+  'gym-romanian-deadlift': 'K8a_Ab9R-aI',
+  'home-single-leg-rdl': 'K8a_Ab9R-aI',
   'gym-split-squat': 'or1frhkjBDc',
   'home-chair-split-squat': 'or1frhkjBDc',
   'trx-bulgarian-split-squat': 'or1frhkjBDc',
@@ -71,9 +71,9 @@ const EXERCISE_VIDEO_MAP = {
   // Shoulders
   'gym-overhead-press': '4LBVP2Oe7fg',
   'home-band-overhead-press': '4LBVP2Oe7fg',
-  'gym-face-pull': 'eIq5CB9JfKE',
-  'gym-facepull': 'eIq5CB9JfKE',
-  'trx-face-pull': 'eIq5CB9JfKE',
+  'gym-face-pull': 'ywQsaOTRjzM', // Do Face Pulls LIKE THIS! (Shorts)
+  'gym-facepull': 'ywQsaOTRjzM',
+  'trx-face-pull': 'ywQsaOTRjzM',
 
   // Other curated guidelines
   'gym-plank': 'pSHjTRCQxIw',
@@ -87,9 +87,9 @@ const EXERCISE_VIDEO_MAP = {
 
 function youtubeLinks(query, exerciseId = '') {
   const videoId = EXERCISE_VIDEO_MAP[exerciseId] || null;
-  // If we don't have a mapped video, search DeltaBolic's channel page directly using the exercise name query
+  // Fall back to general YouTube search query for technique execution
   const cleanQuery = query.replace(' proper form tutorial', '').replace(' gym', '').replace(' home', '');
-  const searchUrl = `https://www.youtube.com/@DeltaBolic/search?query=${encodeURIComponent(cleanQuery)}`;
+  const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery + ' tecnica de ejecucion')}`;
   
   return {
     videoUrl: searchUrl,

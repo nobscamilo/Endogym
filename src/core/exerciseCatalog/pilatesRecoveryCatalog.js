@@ -4,7 +4,7 @@ export const pilatesRecoveryCatalog = [
   // Pilates & recovery
   {
     id: 'pilates-hundred',
-    name: 'Pilates Hundred',
+    name: 'El cien de pilates (Hundred)',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -15,7 +15,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-roll-up',
-    name: 'Pilates Roll-up',
+    name: 'Roll-up de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core_mobility',
@@ -26,7 +26,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-single-leg-stretch',
-    name: 'Single Leg Stretch',
+    name: 'Estiramiento de una pierna',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -37,7 +37,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-swimming',
-    name: 'Pilates Swimming',
+    name: 'Swimming de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'posterior_chain',
@@ -48,7 +48,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-double-leg-stretch',
-    name: 'Double Leg Stretch',
+    name: 'Estiramiento de doble pierna',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -59,7 +59,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-teaser',
-    name: 'Pilates Teaser',
+    name: 'Teaser de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -70,7 +70,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-leg-circles',
-    name: 'Leg Circles',
+    name: 'Círculos con una pierna',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'core_mobility',
@@ -81,7 +81,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-side-kick-series',
-    name: 'Side Kick Series',
+    name: 'Serie de patadas laterales',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'lower_body_unilateral',
@@ -92,7 +92,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-spine-stretch',
-    name: 'Spine Stretch Forward',
+    name: 'Estiramiento de columna hacia adelante',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -103,7 +103,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-shoulder-bridge',
-    name: 'Shoulder Bridge',
+    name: 'Puente sobre hombros',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'posterior_chain',
@@ -114,7 +114,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-criss-cross',
-    name: 'Criss-Cross',
+    name: 'Criss-cross de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -129,7 +129,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-open-leg-rocker',
-    name: 'Open Leg Rocker',
+    name: 'Mecedora con piernas abiertas',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core_mobility',
@@ -144,7 +144,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-rolling-like-a-ball',
-    name: 'Rolling Like a Ball',
+    name: 'Rodar como una pelota',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core_mobility',
@@ -159,7 +159,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-saw',
-    name: 'Pilates Saw',
+    name: 'Sierra de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -174,7 +174,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-single-leg-kick',
-    name: 'Single Leg Kick',
+    name: 'Patada con una pierna',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'posterior_chain',
@@ -189,7 +189,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-double-leg-kick',
-    name: 'Double Leg Kick',
+    name: 'Patada doble de piernas',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'posterior_chain',
@@ -204,7 +204,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-bridge-march',
-    name: 'Bridge March',
+    name: 'Puente con marcha',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'posterior_chain',
@@ -219,7 +219,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-side-bend',
-    name: 'Side Bend',
+    name: 'Inclinación lateral de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -234,7 +234,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-mermaid-stretch',
-    name: 'Mermaid Stretch',
+    name: 'Estiramiento de la sirena',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -249,7 +249,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-neck-pull',
-    name: 'Neck Pull',
+    name: 'Neck pull de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core_mobility',
@@ -264,7 +264,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-shoulder-bridge-kick',
-    name: 'Shoulder Bridge Kick',
+    name: 'Patada en puente sobre hombros',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'lower_body_unilateral',
@@ -279,7 +279,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-scissors',
-    name: 'Scissors',
+    name: 'Tijeras de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -295,7 +295,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-double-leg-lower-lift',
-    name: 'Double Leg Lower Lift',
+    name: 'Descenso y elevación de doble pierna',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -311,7 +311,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-front-support',
-    name: 'Front Support',
+    name: 'Front support (Plancha controlada)',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -327,7 +327,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-leg-pull-front',
-    name: 'Leg Pull Front',
+    name: 'Leg pull front de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -343,7 +343,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-leg-pull-back',
-    name: 'Leg Pull Back',
+    name: 'Leg pull back de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'posterior_chain',
@@ -359,7 +359,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-seal',
-    name: 'Seal',
+    name: 'El sello de pilates (Seal)',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core_mobility',
@@ -375,7 +375,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-twist',
-    name: 'Pilates Twist',
+    name: 'Giro de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core_mobility',
@@ -391,7 +391,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-jackknife',
-    name: 'Jackknife',
+    name: 'Navaja de pilates (Jackknife)',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -407,7 +407,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-wall-roll-down',
-    name: 'Wall Roll Down',
+    name: 'Desenrollado de columna en pared',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -423,7 +423,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-side-lying-clam',
-    name: 'Side-Lying Clam',
+    name: 'Almeja acostada de lado (Clam)',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'lower_body_unilateral',
@@ -439,7 +439,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-swan-prep',
-    name: 'Swan Prep',
+    name: 'Swan prep de pilates',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'posterior_chain',
@@ -455,7 +455,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'pilates-standing-roll-down',
-    name: 'Standing Roll Down',
+    name: 'Desenrollado de columna de pie',
     modalities: [TrainingModality.PILATES],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -471,7 +471,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-hack-squat',
-    name: 'Hack Squat',
+    name: 'Sentadilla hack',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'lower_body_strength',
@@ -482,7 +482,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-chest-supported-row',
-    name: 'Chest-Supported Row',
+    name: 'Remo apoyado en pecho',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -493,7 +493,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-leg-curl',
-    name: 'Leg Curl',
+    name: 'Curl de piernas',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -504,7 +504,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-cable-fly',
-    name: 'Cable Fly',
+    name: 'Cruce de poleas',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -515,7 +515,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-lateral-raise',
-    name: 'Lateral Raise',
+    name: 'Elevación lateral',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -526,7 +526,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-triceps-pushdown',
-    name: 'Triceps Pushdown',
+    name: 'Extensión de tríceps en polea',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -537,7 +537,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'gym-db-curl',
-    name: 'Dumbbell Curl',
+    name: 'Curl con mancuernas',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -548,7 +548,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'mobility-ankle',
-    name: 'Ankle Mobility Drill',
+    name: 'Movilidad de tobillo',
     modalities: [
       TrainingModality.FULL_GYM,
       TrainingModality.HOME,
@@ -566,7 +566,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'mobility-thoracic',
-    name: 'Thoracic Rotation Drill',
+    name: 'Rotación torácica',
     modalities: [
       TrainingModality.FULL_GYM,
       TrainingModality.HOME,
@@ -586,7 +586,7 @@ export const pilatesRecoveryCatalog = [
   },
   {
     id: 'recovery-walk',
-    name: 'Recovery Walk',
+    name: 'Caminata de recuperación',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['recovery'],
     category: 'recovery',

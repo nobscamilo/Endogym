@@ -4,7 +4,7 @@ export const trxYogaCatalog = [
   // TRX
   {
     id: 'trx-row',
-    name: 'TRX Row',
+    name: 'Remo en TRX',
     modalities: [TrainingModality.TRX, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_pull',
@@ -15,7 +15,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-chest-press',
-    name: 'TRX Chest Press',
+    name: 'Press de pecho en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_push',
@@ -26,7 +26,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-squat',
-    name: 'TRX Squat',
+    name: 'Sentadilla en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_strength',
@@ -37,7 +37,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-lunge',
-    name: 'TRX Lunge',
+    name: 'Zancada en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -48,7 +48,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-hamstring-curl',
-    name: 'TRX Hamstring Curl',
+    name: 'Curl femoral en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -59,7 +59,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-atomic-pushup',
-    name: 'TRX Atomic Push-up',
+    name: 'Flexión atómica en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['mixed'],
     category: 'conditioning',
@@ -70,7 +70,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-biceps-curl',
-    name: 'TRX Biceps Curl',
+    name: 'Curl de bíceps en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -81,7 +81,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-triceps-extension',
-    name: 'TRX Triceps Extension',
+    name: 'Extensión de tríceps en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -92,7 +92,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-y-fly',
-    name: 'TRX Y Fly',
+    name: 'Apertura en Y en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -103,7 +103,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-power-pull',
-    name: 'TRX Power Pull',
+    name: 'Tirón de potencia en TRX (Power Pull)',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_pull',
@@ -114,7 +114,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-plank-saw',
-    name: 'TRX Plank Saw',
+    name: 'Plancha con sierra en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -125,7 +125,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-chest-fly',
-    name: 'TRX Chest Fly',
+    name: 'Aperturas de pecho en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_push',
@@ -140,7 +140,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-reverse-fly',
-    name: 'TRX Reverse Fly',
+    name: 'Aperturas invertidas en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -155,7 +155,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-fallout',
-    name: 'TRX Fallout',
+    name: 'Fallout en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -170,7 +170,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-rollout',
-    name: 'TRX Rollout',
+    name: 'Rollout en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -185,7 +185,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-single-leg-squat',
-    name: 'TRX Single-Leg Squat',
+    name: 'Sentadilla a una pierna en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -200,7 +200,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-hip-press',
-    name: 'TRX Hip Press',
+    name: 'Prensa de cadera en TRX (Hip Press)',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -215,7 +215,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-side-plank',
-    name: 'TRX Side Plank',
+    name: 'Plancha lateral en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'core',
@@ -230,7 +230,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-pike',
-    name: 'TRX Pike',
+    name: 'Flexión en pica en TRX (Pike)',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['mixed', 'resistance'],
     category: 'core',
@@ -245,7 +245,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-sprinter-start',
-    name: 'TRX Sprinter Start',
+    name: 'Salida de velocista en TRX (Sprinter Start)',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['mixed'],
     category: 'conditioning',
@@ -260,7 +260,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-t-fly',
-    name: 'TRX T Fly',
+    name: 'Apertura en T en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -275,7 +275,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-single-arm-row',
-    name: 'TRX Single-Arm Row',
+    name: 'Remo a un brazo en TRX',
     modalities: [TrainingModality.TRX, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_pull',
@@ -291,7 +291,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-high-row',
-    name: 'TRX High Row',
+    name: 'Remo alto en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -307,7 +307,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-knee-tuck',
-    name: 'TRX Knee Tuck',
+    name: 'Encogimiento de rodillas en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -323,7 +323,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-bulgarian-split-squat',
-    name: 'TRX Bulgarian Split Squat',
+    name: 'Sentadilla búlgara en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -339,7 +339,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-curtsy-lunge',
-    name: 'TRX Curtsy Lunge',
+    name: 'Zancada cruzada en TRX (Curtsy Lunge)',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -355,7 +355,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-assisted-pistol-squat',
-    name: 'TRX Assisted Pistol Squat',
+    name: 'Sentadilla pistola asistida en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -371,7 +371,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-glute-bridge',
-    name: 'TRX Glute Bridge',
+    name: 'Puente de glúteos en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'posterior_chain',
@@ -387,7 +387,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-hamstring-runner',
-    name: 'TRX Hamstring Runner',
+    name: 'Zancadas de corredor para femoral en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'posterior_chain',
@@ -403,7 +403,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-hip-hinge',
-    name: 'TRX Hip Hinge',
+    name: 'Bisagra de cadera en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'posterior_chain',
@@ -419,7 +419,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-oblique-crunch',
-    name: 'TRX Oblique Crunch',
+    name: 'Encogimiento oblicuo en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -435,7 +435,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-crossover-row',
-    name: 'TRX Crossover Row',
+    name: 'Remo cruzado en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_pull',
@@ -451,7 +451,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'trx-face-pull',
-    name: 'TRX Face Pull',
+    name: 'Face pull en TRX',
     modalities: [TrainingModality.TRX],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -469,7 +469,7 @@ export const trxYogaCatalog = [
   // Yoga
   {
     id: 'yoga-sun-salutation',
-    name: 'Sun Salutation Flow',
+    name: 'Flujo de saludo al sol',
     modalities: [TrainingModality.YOGA, TrainingModality.MIXED],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -480,7 +480,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-warrior-sequence',
-    name: 'Warrior I/II Sequence',
+    name: 'Secuencia de guerrero I/II',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'mobility_strength',
@@ -491,7 +491,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-chair-pose',
-    name: 'Chair Pose',
+    name: 'Postura de la silla',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'lower_body_strength',
@@ -502,7 +502,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-tree-pose',
-    name: 'Tree Pose',
+    name: 'Postura del árbol',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'neuromotor',
@@ -513,7 +513,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-child-pose',
-    name: 'Child Pose',
+    name: 'Postura del niño',
     modalities: [TrainingModality.YOGA, TrainingModality.PILATES],
     sessionTypes: ['recovery', 'mindbody'],
     category: 'recovery',
@@ -524,7 +524,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-cat-cow',
-    name: 'Cat-Cow',
+    name: 'Gato-vaca',
     modalities: [TrainingModality.YOGA, TrainingModality.PILATES, TrainingModality.HOME],
     sessionTypes: ['recovery', 'mindbody'],
     category: 'mobility',
@@ -535,7 +535,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-downward-dog',
-    name: 'Downward Dog',
+    name: 'Perro boca abajo',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -546,7 +546,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-cobra-pose',
-    name: 'Cobra Pose',
+    name: 'Postura de la cobra',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'posterior_chain',
@@ -557,7 +557,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-bridge-pose',
-    name: 'Bridge Pose',
+    name: 'Postura del puente',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'posterior_chain',
@@ -568,7 +568,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-boat-pose',
-    name: 'Boat Pose',
+    name: 'Postura del bote',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'core',
@@ -579,7 +579,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-pigeon-stretch',
-    name: 'Pigeon Stretch',
+    name: 'Estiramiento de la paloma',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['recovery', 'mindbody'],
     category: 'mobility',
@@ -590,7 +590,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-half-moon',
-    name: 'Half Moon Pose',
+    name: 'Postura de la media luna',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'neuromotor',
@@ -601,7 +601,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-triangle-pose',
-    name: 'Triangle Pose',
+    name: 'Postura del triángulo',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'mobility_strength',
@@ -616,7 +616,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-extended-side-angle',
-    name: 'Extended Side Angle',
+    name: 'Ángulo lateral extendido',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'mobility_strength',
@@ -631,7 +631,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-low-lunge-twist',
-    name: 'Low Lunge Twist',
+    name: 'Torsión en zancada baja',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -646,7 +646,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-locust-pose',
-    name: 'Locust Pose',
+    name: 'Postura de la langosta',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'posterior_chain',
@@ -661,7 +661,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-camel-pose',
-    name: 'Camel Pose',
+    name: 'Postura del camello',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -676,7 +676,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-garland-pose',
-    name: 'Garland Pose',
+    name: 'Postura de la guirnalda (Malasana)',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -691,7 +691,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-dancer-pose',
-    name: 'Dancer Pose',
+    name: 'Postura del bailarín',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'neuromotor',
@@ -706,7 +706,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-revolved-chair',
-    name: 'Revolved Chair',
+    name: 'Postura de la silla girada',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'mobility_strength',
@@ -721,7 +721,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-plank-pose',
-    name: 'Plank Pose',
+    name: 'Postura de la plancha',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'resistance'],
     category: 'core',
@@ -736,7 +736,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-seated-forward-fold',
-    name: 'Seated Forward Fold',
+    name: 'Plegamiento sentado hacia adelante',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['recovery', 'mindbody'],
     category: 'mobility',
@@ -751,7 +751,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-happy-baby',
-    name: 'Happy Baby Pose',
+    name: 'Postura del bebé feliz',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['recovery', 'mindbody'],
     category: 'mobility',
@@ -766,7 +766,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-eagle-pose',
-    name: 'Eagle Pose',
+    name: 'Postura del águila',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'neuromotor',
@@ -781,7 +781,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-warrior-iii',
-    name: 'Warrior III',
+    name: 'Guerrero III',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'neuromotor',
@@ -797,7 +797,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-revolved-triangle',
-    name: 'Revolved Triangle',
+    name: 'Triángulo girado',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'mobility_strength',
@@ -813,7 +813,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-side-plank-pose',
-    name: 'Side Plank Pose',
+    name: 'Postura de plancha lateral',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'resistance'],
     category: 'core',
@@ -829,7 +829,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-chaturanga-hold',
-    name: 'Chaturanga Hold',
+    name: 'Sostén en chaturanga',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'resistance'],
     category: 'upper_push',
@@ -845,7 +845,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-upward-facing-dog',
-    name: 'Upward-Facing Dog',
+    name: 'Perro boca arriba',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'posterior_chain',
@@ -861,7 +861,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-lizard-pose',
-    name: 'Lizard Pose',
+    name: 'Postura del lagarto',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -877,7 +877,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-thread-the-needle',
-    name: 'Thread the Needle',
+    name: 'Enhebrar la aguja',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -893,7 +893,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-bound-angle-pose',
-    name: 'Bound Angle Pose',
+    name: 'Postura del ángulo atado',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -909,7 +909,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-supine-twist',
-    name: 'Supine Twist',
+    name: 'Torsión supina',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -925,7 +925,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-standing-forward-fold',
-    name: 'Standing Forward Fold',
+    name: 'Plegamiento de pie hacia adelante',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -941,7 +941,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-fish-pose',
-    name: 'Fish Pose',
+    name: 'Postura del pez',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'mobility',
@@ -957,7 +957,7 @@ export const trxYogaCatalog = [
   },
   {
     id: 'yoga-pyramid-pose',
-    name: 'Pyramid Pose',
+    name: 'Postura de la pirámide',
     modalities: [TrainingModality.YOGA],
     sessionTypes: ['mindbody'],
     category: 'mobility_strength',

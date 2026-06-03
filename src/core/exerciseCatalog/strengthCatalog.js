@@ -4,7 +4,7 @@ export const strengthCatalog = [
   // Full gym strength / hypertrophy
   {
     id: 'gym-barbell-back-squat',
-    name: 'Barbell Back Squat',
+    name: 'Sentadilla trasera con barra',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_strength',
@@ -15,7 +15,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-front-squat',
-    name: 'Front Squat',
+    name: 'Sentadilla frontal',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_strength',
@@ -26,7 +26,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-romanian-deadlift',
-    name: 'Romanian Deadlift',
+    name: 'Peso muerto rumano',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -37,7 +37,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-conventional-deadlift',
-    name: 'Conventional Deadlift',
+    name: 'Peso muerto convencional',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -48,7 +48,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-bench-press',
-    name: 'Barbell Bench Press',
+    name: 'Press de banca con barra',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -59,7 +59,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-incline-db-press',
-    name: 'Incline Dumbbell Press',
+    name: 'Press inclinado con mancuernas',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -70,7 +70,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-overhead-press',
-    name: 'Overhead Press',
+    name: 'Press militar',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -81,7 +81,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-lat-pulldown',
-    name: 'Lat Pulldown',
+    name: 'Jalón al pecho',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -92,7 +92,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-seated-row',
-    name: 'Seated Cable Row',
+    name: 'Remo sentado en polea',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -103,7 +103,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-barbell-row',
-    name: 'Barbell Row',
+    name: 'Remo con barra',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -114,7 +114,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-leg-press',
-    name: 'Leg Press',
+    name: 'Prensa de piernas',
     modalities: [TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'lower_body_strength',
@@ -125,7 +125,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-hip-thrust',
-    name: 'Hip Thrust',
+    name: 'Hip thrust',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'posterior_chain',
@@ -136,7 +136,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-split-squat',
-    name: 'Bulgarian Split Squat',
+    name: 'Sentadilla búlgara',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -147,7 +147,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-face-pull',
-    name: 'Face Pull',
+    name: 'Face pull',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.HOME],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -158,7 +158,7 @@ export const strengthCatalog = [
   },
   {
     id: 'gym-calf-raise',
-    name: 'Standing Calf Raise',
+    name: 'Elevación de talones de pie',
     modalities: [TrainingModality.FULL_GYM, TrainingModality.HOME],
     sessionTypes: ['resistance'],
     category: 'lower_body_accessory',
@@ -171,7 +171,7 @@ export const strengthCatalog = [
   // Home / bodyweight / calisthenics
   {
     id: 'home-push-up',
-    name: 'Push-up',
+    name: 'Flexiones',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_push',
@@ -182,7 +182,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-incline-push-up',
-    name: 'Incline Push-up',
+    name: 'Flexiones inclinadas',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -193,7 +193,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-pike-push-up',
-    name: 'Pike Push-up',
+    name: 'Flexiones en pica',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -204,7 +204,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-row',
-    name: 'Band Row',
+    name: 'Remo con banda',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -215,7 +215,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-chest-press',
-    name: 'Band Chest Press',
+    name: 'Press de pecho con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -226,7 +226,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-bodyweight-squat',
-    name: 'Bodyweight Squat',
+    name: 'Sentadilla libre',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_strength',
@@ -237,7 +237,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-reverse-lunge',
-    name: 'Reverse Lunge',
+    name: 'Zancada inversa',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_unilateral',
@@ -259,7 +259,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-single-leg-rdl',
-    name: 'Single-Leg Romanian Deadlift',
+    name: 'Peso muerto rumano a una pierna',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -270,7 +270,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-hip-bridge',
-    name: 'Hip Bridge',
+    name: 'Puente de glúteos',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS, TrainingModality.PILATES],
     sessionTypes: ['resistance', 'recovery'],
     category: 'posterior_chain',
@@ -281,7 +281,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-plank',
-    name: 'Front Plank',
+    name: 'Plancha frontal',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS, TrainingModality.YOGA, TrainingModality.PILATES],
     sessionTypes: ['resistance', 'mixed', 'mindbody', 'recovery'],
     category: 'core',
@@ -292,7 +292,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-dead-bug',
-    name: 'Dead Bug',
+    name: 'Dead bug',
     modalities: [TrainingModality.HOME, TrainingModality.PILATES, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mindbody', 'recovery'],
     category: 'core',
@@ -303,7 +303,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-side-plank',
-    name: 'Side Plank',
+    name: 'Plancha lateral',
     modalities: [TrainingModality.HOME, TrainingModality.CALISTHENICS, TrainingModality.YOGA, TrainingModality.PILATES],
     sessionTypes: ['resistance', 'mindbody', 'recovery'],
     category: 'core',
@@ -314,7 +314,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-bird-dog',
-    name: 'Bird Dog',
+    name: 'Bird dog',
     modalities: [TrainingModality.HOME, TrainingModality.PILATES, TrainingModality.MIXED],
     sessionTypes: ['recovery', 'mindbody', 'resistance'],
     category: 'core',
@@ -325,7 +325,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-overhead-press',
-    name: 'Band Overhead Press',
+    name: 'Press de hombros con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -340,7 +340,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-pullover',
-    name: 'Band Pullover',
+    name: 'Pullover con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -355,7 +355,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-pull-apart',
-    name: 'Band Pull-Apart',
+    name: 'Band pull-apart',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'recovery'],
     category: 'upper_pull',
@@ -370,7 +370,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-banded-good-morning',
-    name: 'Banded Good Morning',
+    name: 'Buenos días con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'posterior_chain',
@@ -385,7 +385,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-single-leg-glute-bridge',
-    name: 'Single-Leg Glute Bridge',
+    name: 'Puente de glúteos a una pierna',
     modalities: [TrainingModality.HOME, TrainingModality.PILATES, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mindbody'],
     category: 'posterior_chain',
@@ -400,7 +400,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-wall-sit',
-    name: 'Wall Sit',
+    name: 'Sentadilla isométrica en pared',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'lower_body_strength',
@@ -415,7 +415,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-cossack-squat',
-    name: 'Cossack Squat',
+    name: 'Sentadilla cosaca',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mindbody'],
     category: 'lower_body_unilateral',
@@ -430,7 +430,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-bear-crawl',
-    name: 'Bear Crawl',
+    name: 'Paso del oso (Bear Crawl)',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['mixed'],
     category: 'conditioning',
@@ -445,7 +445,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-mountain-climber',
-    name: 'Mountain Climber',
+    name: 'Escaladores (Mountain Climber)',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['mixed'],
     category: 'conditioning',
@@ -460,7 +460,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-suitcase-carry',
-    name: 'Suitcase Carry',
+    name: 'Suitcase carry',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -475,7 +475,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-floor-press',
-    name: 'Floor Press',
+    name: 'Floor press',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -491,7 +491,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-towel-row',
-    name: 'Towel Row',
+    name: 'Remo con toalla',
     modalities: [TrainingModality.HOME],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -507,7 +507,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-lat-pulldown',
-    name: 'Band Lat Pulldown',
+    name: 'Jalón al pecho con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -523,7 +523,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-curl',
-    name: 'Band Curl',
+    name: 'Curl de bíceps con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -539,7 +539,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-triceps-pressdown',
-    name: 'Band Triceps Pressdown',
+    name: 'Extensión de tríceps con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -555,7 +555,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-lateral-raise',
-    name: 'Band Lateral Raise',
+    name: 'Elevación lateral con banda',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -571,7 +571,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-chair-split-squat',
-    name: 'Chair Split Squat',
+    name: 'Sentadilla split con silla',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'lower_body_unilateral',
@@ -587,7 +587,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-skater-squat-box',
-    name: 'Skater Squat to Box',
+    name: 'Sentadilla skater a cajón',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'lower_body_unilateral',
@@ -603,7 +603,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-single-leg-calf-raise',
-    name: 'Single-Leg Calf Raise',
+    name: 'Elevación de talón a una pierna',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance'],
     category: 'lower_body_accessory',
@@ -619,7 +619,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-hip-airplane',
-    name: 'Hip Airplane',
+    name: 'Hip airplane',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['mindbody', 'recovery'],
     category: 'neuromotor',
@@ -635,7 +635,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-band-woodchop',
-    name: 'Band Woodchop',
+    name: 'Leñador con banda (Woodchop)',
     modalities: [TrainingModality.HOME, TrainingModality.MIXED],
     sessionTypes: ['resistance', 'mixed'],
     category: 'core',
@@ -651,7 +651,7 @@ export const strengthCatalog = [
   },
   {
     id: 'home-reverse-plank',
-    name: 'Reverse Plank',
+    name: 'Plancha invertida',
     modalities: [TrainingModality.HOME, TrainingModality.PILATES, TrainingModality.MIXED],
     sessionTypes: ['mindbody', 'recovery', 'resistance'],
     category: 'posterior_chain',
@@ -667,7 +667,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-pull-up-assisted',
-    name: 'Assisted Pull-up',
+    name: 'Dominadas asistidas',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.HOME, TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -678,7 +678,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-dip-assisted',
-    name: 'Assisted Dip',
+    name: 'Fondos asistidos',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.FULL_GYM],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -689,7 +689,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-inverted-row',
-    name: 'Inverted Row',
+    name: 'Remo invertido',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.HOME],
     sessionTypes: ['resistance'],
     category: 'upper_pull',
@@ -700,7 +700,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-bench-dip',
-    name: 'Bench Dip',
+    name: 'Fondos en banco',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.HOME],
     sessionTypes: ['resistance'],
     category: 'upper_push',
@@ -711,7 +711,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-hindu-push-up',
-    name: 'Hindu Push-up',
+    name: 'Flexiones hindúes',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.HOME],
     sessionTypes: ['resistance', 'mixed'],
     category: 'upper_push',
@@ -722,7 +722,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-hollow-hold',
-    name: 'Hollow Body Hold',
+    name: 'Hollow hold',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.HOME, TrainingModality.PILATES],
     sessionTypes: ['resistance', 'mixed', 'mindbody'],
     category: 'core',
@@ -733,7 +733,7 @@ export const strengthCatalog = [
   },
   {
     id: 'calis-arch-hold',
-    name: 'Arch Hold',
+    name: 'Arch hold',
     modalities: [TrainingModality.CALISTHENICS, TrainingModality.HOME],
     sessionTypes: ['resistance', 'mindbody'],
     category: 'posterior_chain',

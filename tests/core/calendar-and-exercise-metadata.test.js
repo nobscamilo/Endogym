@@ -55,8 +55,8 @@ describe('exercise muscle metadata', () => {
     const verified = resolveExerciseMetadata({ id: 'gym-bench-press' });
     const fallback = resolveExerciseMetadata({ id: 'gym-front-squat' });
 
-    expect(verified.videoEmbedId).toBe('Nf_qO1s5n9g');
-    expect(verified.videoEmbedUrl).toContain('youtube.com/embed/Nf_qO1s5n9g');
+    expect(verified.videoEmbedId).toBe('XjrsqShr-Ic');
+    expect(verified.videoEmbedUrl).toContain('youtube.com/embed/XjrsqShr-Ic');
     expect(fallback.videoEmbedId).toBeNull();
     expect(fallback.videoEmbedUrl).toBeNull();
   });
