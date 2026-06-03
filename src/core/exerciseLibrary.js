@@ -30,14 +30,31 @@ const EXERCISE_VIDEO_MAP = {
   'gym-pushup': 'PO9ggbu09sT', // Push-Up Mistake (SAVE YOUR SHOULDERS!)
   'home-push-up': 'PO9ggbu09sT',
   'home-incline-push-up': 'PO9ggbu09sT',
+  'home-floor-press': 'Nf_qO1s5n9g',
+  'home-band-chest-press': 'Nf_qO1s5n9g',
+  'trx-chest-press': 'PO9ggbu09sT',
+  'trx-chest-fly': 'eGjt4lk6g34',
 
   // Back / Pull
   'gym-pullup': 'ZuV_NokRESN', // The Perfect Pull-Up (FIX THESE!)
   'home-pull-up': 'ZuV_NokRESN',
+  'calis-pull-up-assisted': 'ZuV_NokRESN',
+  'gym-lat-pulldown': 'S481pmnNTYY',
+  'gym-barbell-row': 'phVtqawIgbk',
+  'gym-seated-row': 'G35gTqGcXXA',
+  'gym-chest-supported-row': 'G35gTqGcXXA',
+  'home-band-row': 'phVtqawIgbk',
+  'home-band-lat-pulldown': 'S481pmnNTYY',
+  'home-towel-row': 'phVtqawIgbk',
+  'trx-row': 'ZuV_NokRESN',
+  'trx-single-arm-row': 'ZuV_NokRESN',
 
   // Arms
   'gym-bicep-curl': 'kGgJuek3Kz8', // Fix Your Bicep Curl Mistakes!
+  'gym-db-curl': 'kGgJuek3Kz8',
   'home-band-curl': 'kGgJuek3Kz8',
+  'trx-biceps-curl': 'kGgJuek3Kz8',
+  'gym-hammer-curl': 'zC3nLlEvin4',
 
   // Legs / Posterior Chain
   'gym-barbell-back-squat': '9r-k1D_Wz3A', // FIX THESE Squat Mistakes!
@@ -45,6 +62,18 @@ const EXERCISE_VIDEO_MAP = {
   'gym-conventional-deadlift': '3i_JmO99S4w', // The PERFECT Deadlift (DO THIS!)
   'gym-romanian-deadlift': '3i_JmO99S4w',
   'home-single-leg-rdl': '3i_JmO99S4w',
+  'gym-split-squat': 'or1frhkjBDc',
+  'home-chair-split-squat': 'or1frhkjBDc',
+  'trx-bulgarian-split-squat': 'or1frhkjBDc',
+  'gym-hip-thrust': '96uDbymTaHM',
+  'gym-leg-press': 'Hpag6J2_4LY',
+
+  // Shoulders
+  'gym-overhead-press': '4LBVP2Oe7fg',
+  'home-band-overhead-press': '4LBVP2Oe7fg',
+  'gym-face-pull': 'eIq5CB9JfKE',
+  'gym-facepull': 'eIq5CB9JfKE',
+  'trx-face-pull': 'eIq5CB9JfKE',
 
   // Other curated guidelines
   'gym-plank': 'pSHjTRCQxIw',
@@ -52,9 +81,6 @@ const EXERCISE_VIDEO_MAP = {
   'gym-dips': '2z8JmcrW-As',
   'gym-lunges': 'D7KaRcUTQeE',
   'gym-crunch': 'Xyd_fa5zoEU',
-  'gym-facepull': 'eIq5CB9JfKE',
-  'gym-face-pull': 'eIq5CB9JfKE',
-  'gym-hammer-curl': 'zC3nLlEvin4',
   'gym-dumbbell-flye': 'eGjt4lk6g34',
   'gym-burpee': 'dZgVxmf6jkA',
 };
