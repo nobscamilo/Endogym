@@ -1,0 +1,9 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "bucket": "endogym-vtety8-plates-eu",
+    "rules": "storage.rules"
+  }
+}

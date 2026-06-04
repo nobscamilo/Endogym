@@ -936,6 +936,41 @@ export default function DashboardPage() {
   });
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('endogym-theme') || 'light';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('endogym-theme', theme);
+    }
+  }, [theme]);
+
+  // Citations Drawer RAG states and handlers
+  const [selectedCitation, setSelectedCitation] = useState(null);
+  const [citationContent, setCitationContent] = useState(null);
+  const [loadingCitation, setLoadingCitation] = useState(false);
+  const [citationDrawerOpen, setCitationDrawerOpen] = useState(false);
+
+  const openCitationsDrawer = async (citation) => {
+    setSelectedCitation(citation);
+    setCitationDrawerOpen(true);
+    setLoadingCitation(true);
+    setCitationContent(null);
+    try {
+      const data = await apiFetch(`/api/guidelines?id=${citation.id}`);
+      setCitationContent(data.guideline);
+    } catch (error) {
+      setCitationContent({ error: error.message });
+    } finally {
+      setLoadingCitation(false);
+    }
+  };
+
   const [selectedDate, setSelectedDate] = useState(null);
   const [sessionSwapState, setSessionSwapState] = useState({});
   const [sessionSwapOpen, setSessionSwapOpen] = useState(false);
@@ -3047,6 +3082,14 @@ export default function DashboardPage() {
           {activeTabMeta.description ? <p className="topbar-context">{activeTabMeta.description}</p> : null}
         </div>
         <div className="status-row">
+          <button
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="chip subtle"
+            style={{ cursor: 'pointer', border: '1px solid var(--line)', background: 'var(--surface-muted)', color: 'var(--text)', gap: '0.3rem' }}
+            title="Cambiar tema"
+          >
+            {theme === 'light' ? '🌙 Modo oscuro' : '☀️ Modo claro'}
+          </button>
           <span className="chip">
             {devAuthMode
               ? 'Modo demo'
@@ -5237,6 +5280,45 @@ export default function DashboardPage() {
                         </details>
                       ) : null}
 
+                      {weeklyPlan?.clinicalCitations && weeklyPlan.clinicalCitations.length > 0 ? (
+                        <div className="clinical-citations-section" style={{ marginTop: '0.8rem' }}>
+                          <span className="adj-label" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600 }}>
+                            📚 Directrices médicas de referencia (RAG)
+                          </span>
+                          <div className="citations-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {weeklyPlan.clinicalCitations.map((cit) => (
+                              <button
+                                key={cit.id}
+                                onClick={() => openCitationsDrawer(cit)}
+                                className="citation-btn"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.5rem 0.75rem',
+                                  background: 'var(--surface-muted)',
+                                  border: '1px solid var(--line)',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  color: 'var(--text)',
+                                  fontSize: '0.82rem',
+                                  textAlign: 'left',
+                                  width: '100%'
+                                }}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 500 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1.0rem', color: 'var(--accent)' }}>menu_book</span>
+                                  {cit.fileName.replace('.pdf', '')}
+                                </span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--muted)', background: 'var(--accent-soft)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
+                                  Ver guía
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
                       {coachRiskFlags.length > 0 ? (
                         <div className="coach-risk-flags">
                           {coachRiskFlags.map((flag, flagIdx) => (
@@ -5301,6 +5383,47 @@ export default function DashboardPage() {
                   </article>
                 </div>
               </section>
+
+              {weeklyPlan.clinicalCitations && weeklyPlan.clinicalCitations.length > 0 ? (
+                <div className="clinical-citations-weekly-section" style={{ margin: '0.8rem 0 1.2rem' }}>
+                  <span className="coach-section-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', fontWeight: 600 }}>
+                    📚 Directrices Médicas de Referencia (RAG)
+                  </span>
+                  <div className="citations-list" style={{ display: 'grid', gap: '0.6rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                    {weeklyPlan.clinicalCitations.map((cit) => (
+                      <button
+                        key={cit.id}
+                        onClick={() => openCitationsDrawer(cit)}
+                        className="citation-btn"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.65rem 0.85rem',
+                          background: 'var(--surface-muted)',
+                          border: '1px solid var(--line)',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          color: 'var(--text)',
+                          fontSize: '0.82rem',
+                          textAlign: 'left',
+                          width: '100%',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 500 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--accent)' }}>menu_book</span>
+                          {cit.fileName.replace('.pdf', '')}
+                        </span>
+                        <span className="chip subtle" style={{ margin: 0, padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}>
+                          Leer
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="calendar-grid">
                 {plannedDays.map((day) => (
                   <button
@@ -6429,6 +6552,62 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : null}
+
+      {/* Citations RAG Drawer */}
+      <div className={`citations-drawer-overlay ${citationDrawerOpen ? 'open' : ''}`} onClick={() => setCitationDrawerOpen(false)}>
+        <div className="citations-drawer" onClick={(e) => e.stopPropagation()}>
+          <header className="drawer-header">
+            <h3>Directriz Médica RAG</h3>
+            <button className="drawer-close-btn" onClick={() => setCitationDrawerOpen(false)}>
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </header>
+          <div className="drawer-content">
+            {selectedCitation ? (
+              <>
+                <div className="drawer-meta-section">
+                  <span>Documento de origen</span>
+                  <p>{selectedCitation.fileName.replace('.pdf', '')}</p>
+                  {selectedCitation.matchedTerms && selectedCitation.matchedTerms.length > 0 && (
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <span>Términos clínicos coincidentes</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.2rem' }}>
+                        {selectedCitation.matchedTerms.map((term) => (
+                          <span key={term} className="chip subtle" style={{ fontSize: '0.68rem', margin: 0, padding: '0.05rem 0.3rem' }}>
+                            {term}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="drawer-pages-section">
+                  {loadingCitation ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '2rem 0', alignItems: 'center' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', color: 'var(--accent)', animation: 'spin 1s linear infinite' }}>sync</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Cargando literatura médica...</span>
+                    </div>
+                  ) : citationContent ? (
+                    citationContent.error ? (
+                      <p style={{ color: 'var(--danger)', fontSize: '0.88rem', margin: '1rem 0' }}>{citationContent.error}</p>
+                    ) : Array.isArray(citationContent.pages) && citationContent.pages.length > 0 ? (
+                      citationContent.pages.map((page) => (
+                        <article key={page.pageNumber} className="drawer-page-block">
+                          <header className="drawer-page-header">Página {page.pageNumber}</header>
+                          <div className="drawer-page-text">{page.text}</div>
+                        </article>
+                      ))
+                    ) : (
+                      <p style={{ fontSize: '0.88rem', color: 'var(--muted)', margin: '1rem 0' }}>No hay páginas disponibles para este capítulo.</p>
+                    )
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

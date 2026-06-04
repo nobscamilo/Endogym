@@ -102,8 +102,9 @@ function deriveKeywords(profile, weeklyPlan) {
 
 /**
  * Realiza un RAG (búsqueda y recuperación) en Firestore sobre la colección 'guidelines'.
+ * Retorna tanto el texto del contexto como las citaciones estructuradas.
  */
-export async function retrieveGuidelinesContext({ profile, weeklyPlan, traceId }) {
+export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, traceId }) {
   try {
     const { db } = await getAdminServices();
     
@@ -117,7 +118,7 @@ export async function retrieveGuidelinesContext({ profile, weeklyPlan, traceId }
     
     if (snapshot.empty) {
       logInfo('guidelines_retrieval_empty_db', { traceId });
-      return '';
+      return { contextText: '', citations: [] };
     }
 
     // 3. Evaluar coincidencia (scoring) de cada documento basado en las palabras clave
@@ -174,6 +175,8 @@ export async function retrieveGuidelinesContext({ profile, weeklyPlan, traceId }
 
     // 5. Cargar el contenido completo de los documentos seleccionados
     const contextBlocks = [];
+    const citations = [];
+
     for (const match of topMatches) {
       const docSnapshot = await db.collection('guidelines').doc(match.id).get();
       if (!docSnapshot.exists) continue;
@@ -181,8 +184,13 @@ export async function retrieveGuidelinesContext({ profile, weeklyPlan, traceId }
       const fullDoc = docSnapshot.data();
       const filename = fullDoc.source?.fileName || 'Documento sin nombre';
       
+      citations.push({
+        id: match.id,
+        fileName: filename,
+        matchedTerms: match.matchedTerms
+      });
+
       // Unir el texto de las páginas. Para optimizar el tamaño, limitamos el número de páginas o limpiamos exceso de saltos.
-      // Dado que los capítulos individuales suelen tener pocas páginas, las incluimos todas de forma limpia.
       const fullText = (fullDoc.pages || [])
         .map((page) => `[Página ${page.pageNumber}]\n${page.text}`)
         .join('\n\n');
@@ -199,10 +207,10 @@ ${truncatedText}`);
     }
 
     if (contextBlocks.length === 0) {
-      return '';
+      return { contextText: '', citations: [] };
     }
 
-    return `
+    const contextText = `
 === CONTEXTO CIENTÍFICO Y DIRECTRICES DE MEDICINA DEL DEPORTE ===
 Las siguientes secciones han sido recuperadas de la biblioteca médica de Endogym (Braddom's Physical Medicine and Rehabilitation & DeLee, Drez, & Miller's Orthopaedic Sports Medicine) para este usuario específico basado en sus condiciones clínicas y objetivos. Úsalas como la base de mayor prioridad para realizar tus ajustes de prescripción y justificación ACSM:
 
@@ -210,8 +218,19 @@ ${contextBlocks.join('\n\n')}
 ================================================================
 `.trim();
 
+    return { contextText, citations };
+
   } catch (error) {
     logError('guidelines_retrieval_failed', error, { traceId });
-    return ''; // Retornar vacío en caso de fallo para no romper la generación del plan semanal
+    return { contextText: '', citations: [] };
   }
 }
+
+/**
+ * Realiza un RAG (búsqueda y recuperación) en Firestore sobre la colección 'guidelines' y retorna sólo el texto.
+ */
+export async function retrieveGuidelinesContext({ profile, weeklyPlan, traceId }) {
+  const result = await retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, traceId });
+  return result.contextText;
+}
+

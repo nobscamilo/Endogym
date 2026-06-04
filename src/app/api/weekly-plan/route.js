@@ -7,7 +7,7 @@ import {
   isGeminiConfigured,
   resolveGeminiCoachModel,
 } from '../../../services/exerciseCoachClient.js';
-import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
+import { retrieveGuidelinesContext, retrieveGuidelinesContextWithCitations } from '../../../services/guidelinesRetriever.js';
 import { sanitizeGoogleAiModelNameForLog } from '../../../services/googleGenAiTransport.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import {
@@ -364,6 +364,21 @@ export async function POST(request) {
         generatedAt: new Date().toISOString(),
       };
 
+      let clinicalCitations = [];
+      let clinicalGuidelinesContext = '';
+
+      try {
+        const guidelinesResult = await retrieveGuidelinesContextWithCitations({
+          profile,
+          weeklyPlan: generated,
+          traceId,
+        });
+        clinicalGuidelinesContext = guidelinesResult.contextText;
+        clinicalCitations = guidelinesResult.citations;
+      } catch (err) {
+        logError('weekly_plan_guidelines_failed', err, { traceId, userId: user.uid });
+      }
+
       let coachPlan = buildHeuristicCoachPlan({
         profile,
         weeklyPlan: generated,
@@ -371,12 +386,6 @@ export async function POST(request) {
 
       if (!forceMock && geminiConfigured) {
         try {
-          const clinicalGuidelinesContext = await retrieveGuidelinesContext({
-            profile,
-            weeklyPlan: generated,
-            traceId,
-          });
-
           const aiCoach = await callGeminiExerciseCoach({
             profile,
             weeklyPlan: generated,
@@ -466,6 +475,7 @@ export async function POST(request) {
         coachMeta,
         coachWarning,
         systemAlerts,
+        clinicalCitations,
         previousPlanId: currentPlan?.id ?? null,
       });
 
