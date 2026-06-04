@@ -180,22 +180,23 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     workspace_dir = os.path.dirname(script_dir)
     
+    guidelines_dir = os.path.join(workspace_dir, "docs", "guidelines")
     guidelines_json_dir = os.path.join(workspace_dir, "docs", "guidelines-json")
     os.makedirs(guidelines_json_dir, exist_ok=True)
 
-    # Chunk ACSM Guidelines
-    chunk_json(
-        os.path.join(workspace_dir, "docs", "guidelines", "ACSM_ocr_text.json"),
-        "ACSM'S Guidelines for Exercise Testing and Prescription 11th Edition PDF.pdf",
-        guidelines_json_dir
-    )
+    # Buscar automáticamente todos los archivos JSON de texto OCR generados
+    has_processed = False
+    for file in os.listdir(guidelines_dir):
+        if file.endswith("_ocr_text.json"):
+            ocr_path = os.path.join(guidelines_dir, file)
+            base_name = file[:-14] # Remover "_ocr_text.json"
+            original_pdf_name = f"{base_name}.pdf"
+            
+            chunk_json(ocr_path, original_pdf_name, guidelines_json_dir)
+            has_processed = True
 
-    # Chunk Fundamentos
-    chunk_json(
-        os.path.join(workspace_dir, "docs", "guidelines", "Fundamentos_ocr_text.json"),
-        "FUNDAMENTOS-DE-FISIOLOGIA-DO-EXERCÍCIO.pdf",
-        guidelines_json_dir
-    )
+    if not has_processed:
+        print("No se encontraron archivos de texto OCR (*_ocr_text.json) en " + guidelines_dir)
 
 if __name__ == "__main__":
     main()
