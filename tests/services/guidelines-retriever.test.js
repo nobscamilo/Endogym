@@ -85,7 +85,7 @@ describe('guidelines RAG retriever', () => {
 
     // 4. Aserciones
     expect(mockDb.collection).toHaveBeenCalledWith('guidelines');
-    expect(mockDb.select).toHaveBeenCalledWith('source.fileName');
+    expect(mockDb.select).toHaveBeenCalledWith('source.fileName', 'keywords');
     
     // Debería identificar coincidencia con el documento 1 (diabetes, glycemic, glucose) y el documento 2 (osteoporosis, bone, geriatrics)
     expect(mockDb.doc).toHaveBeenCalledWith('1');
@@ -117,5 +117,51 @@ describe('guidelines RAG retriever', () => {
     });
 
     expect(context).toBe('');
+  });
+
+  it('matches documents by chunk-level keywords and ranks them higher', async () => {
+    const mockFilesMetadata = [
+      { id: '1', data: () => ({ source: { fileName: "General_Nutrition.pdf" }, keywords: ['obesity', 'diabetes'] }) },
+      { id: '2', data: () => ({ source: { fileName: "ACSM_Guidelines.pdf" }, keywords: ['aerobic', 'endurance'] }) },
+    ];
+
+    const mockGetDoc = vi.fn().mockImplementation((docId) => {
+      return {
+        exists: true,
+        data: () => ({
+          source: { fileName: docId === '1' ? 'General_Nutrition.pdf' : 'ACSM_Guidelines.pdf' },
+          pages: [
+            { pageNumber: 1, text: 'Clinical details about the matching criteria.' }
+          ]
+        })
+      };
+    });
+
+    const mockDb = {
+      collection: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({
+        empty: false,
+        docs: mockFilesMetadata,
+      }),
+      doc: vi.fn().mockImplementation((docId) => ({
+        get: async () => mockGetDoc(docId)
+      })),
+    };
+
+    getAdminServices.mockResolvedValue({ db: mockDb });
+
+    const profile = { age: 30 };
+    const weeklyPlan = { goal: 'GLYCEMIC_CONTROL' }; // Derives 'diabetes', 'glycemic', etc.
+
+    const context = await retrieveGuidelinesContext({
+      profile,
+      weeklyPlan,
+      traceId: 'test-trace-id',
+    });
+
+    // Should match General_Nutrition.pdf since its keywords array contains 'diabetes'
+    expect(mockDb.doc).toHaveBeenCalledWith('1');
+    expect(context).toContain('General_Nutrition.pdf');
   });
 });

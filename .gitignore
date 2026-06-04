@@ -8,3 +8,8 @@ npm-debug.log*
 # Environment variables
 .env.local
 .env*.local
+
+# Compiled binaries and temporary OCR artifacts
+scripts/ocr_pdf
+docs/guidelines/*_ocr_text.json
+docs/guidelines/*.pdf

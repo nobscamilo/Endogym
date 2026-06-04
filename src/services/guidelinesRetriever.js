@@ -113,8 +113,8 @@ export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPl
     logInfo('guidelines_retrieval_start', { traceId, keywords });
 
     // 2. Obtener metadatos de todos los documentos en 'guidelines'
-    // Usamos select('source.fileName') para mantener la consulta lo más ligera y rápida posible
-    const snapshot = await db.collection('guidelines').select('source.fileName').get();
+    // Recuperamos también el campo 'keywords' para realizar búsqueda semántica a nivel de bloque
+    const snapshot = await db.collection('guidelines').select('source.fileName', 'keywords').get();
     
     if (snapshot.empty) {
       logInfo('guidelines_retrieval_empty_db', { traceId });
@@ -126,18 +126,33 @@ export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPl
     snapshot.docs.forEach((doc) => {
       const docData = doc.data();
       const fileName = String(docData.source?.fileName || '').toLowerCase();
+      const docKeywords = Array.isArray(docData.keywords) ? docData.keywords : [];
       
       let score = 0;
       const matchedTerms = [];
 
       keywords.forEach((keyword) => {
-        if (fileName.includes(keyword.toLowerCase())) {
+        const kwLower = keyword.toLowerCase();
+        let matched = false;
+
+        // Si la palabra clave coincide con el nombre del archivo (match temático general)
+        if (fileName.includes(kwLower)) {
           score += 1.0;
+          matched = true;
+        }
+
+        // Si coincide con las palabras clave específicas del bloque (match contextual preciso)
+        if (docKeywords.some(dk => dk.toLowerCase() === kwLower)) {
+          score += 1.5;
+          matched = true;
+        }
+
+        if (matched) {
           matchedTerms.push(keyword);
         }
       });
 
-      // Dar peso extra a capítulos del libro correspondientes si el match es directo
+      // Registrar el documento si posee al menos una coincidencia válida
       if (score > 0) {
         scoredDocs.push({
           id: doc.id,
