@@ -1,5 +1,5 @@
 /* ENDOGYM STUDIO — Pantalla NUTRICIÓN (qué comer · compra · glucemia) + variaciones */
-const { useState: useStateN } = React;
+const { useState: useStateN, useEffect: useEffectN } = React;
 
 /* ---- Añadir producto consumido (manual o por código de barras) → /api/meals ---- */
 function AddFood({ onAdded }) {
@@ -163,6 +163,13 @@ function NutritionScreen({ layout }) {
       setGenStatus('ok');
     } catch (e) { setGenStatus('err'); }
   }
+
+  // Auto-generar el plan de comidas la primera vez que se abre Nutrición (una vez por sesión).
+  useEffectN(() => {
+    if (window.__studioNutriAuto) return;
+    window.__studioNutriAuto = true;
+    generate();
+  }, []);
 
   return (
     <div className="page stagger screen-enter">

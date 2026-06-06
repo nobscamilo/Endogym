@@ -149,6 +149,13 @@ function mapTodaySession(plan, today) {
   };
   if (prim.length) out.primaryMuscles = prim;
   if (sec.length) out.secondaryMuscles = sec;
+  const mapSteps = (arr) => (Array.isArray(arr) ? arr : []).map((w) => (
+    typeof w === 'string' ? { step: w } : { step: w.step || '', min: w.durationMinutes ?? null, details: w.details || '' }
+  )).filter((w) => w.step);
+  const warmup = mapSteps(day.workout?.warmup);
+  const cooldown = mapSteps(day.workout?.cooldown);
+  if (warmup.length) out.warmup = warmup;
+  if (cooldown.length) out.cooldown = cooldown;
   return out;
 }
 

@@ -44,7 +44,7 @@ function App() {
   const u = (window.STUDIO && window.STUDIO.user) || {};
   const userName = `${u.name || ''} ${u.last || ''}`.trim() || 'Tu perfil';
   const userInitials = u.initials || (u.name ? u.name[0].toUpperCase() : 'U');
-  const userPlan = u.plan || (u.goalShort ? u.goalShort : 'Plan personalizado');
+  const userPlan = [u.goalShort, u.modality].filter(Boolean).join(' · ') || 'Plan personalizado';
 
   useEffectA(() => {
     const r = document.documentElement;

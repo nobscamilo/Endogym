@@ -354,6 +354,37 @@ function TrainSession() {
         </div>
       </SectionCard>
 
+      {/* Calentamiento y enfriamiento */}
+      {(Array.isArray(s.warmup) && s.warmup.length) || (Array.isArray(s.cooldown) && s.cooldown.length) ? (
+        <div className="grid g-2" style={{ alignItems: 'start' }}>
+          {Array.isArray(s.warmup) && s.warmup.length ? (
+            <SectionCard title="Calentamiento y movilidad" icon="bolt" sub="Antes de empezar — prepara articulaciones y activa">
+              <div className="stack" style={{ gap: 10 }}>
+                {s.warmup.map((w, i) => (
+                  <div key={i} className="row ac" style={{ gap: 10, alignItems: 'flex-start' }}>
+                    <span className="cue-n">{w.min ? `${w.min}'` : '·'}</span>
+                    <div><strong style={{ fontSize: '0.9rem' }}>{w.step}</strong>{w.details ? <div className="tiny muted" style={{ lineHeight: 1.4 }}>{w.details}</div> : null}</div>
+                  </div>
+                ))}
+                <p className="tiny muted" style={{ margin: '2px 0 0', lineHeight: 1.5 }}>El calentamiento ya incluye una activación cardiovascular ligera; para un objetivo de fuerza no necesitas cardio adicional salvo que el coach lo indique.</p>
+              </div>
+            </SectionCard>
+          ) : null}
+          {Array.isArray(s.cooldown) && s.cooldown.length ? (
+            <SectionCard title="Enfriamiento" icon="heart" sub="Al terminar — baja pulsaciones y estira">
+              <div className="stack" style={{ gap: 10 }}>
+                {s.cooldown.map((w, i) => (
+                  <div key={i} className="row ac" style={{ gap: 10, alignItems: 'flex-start' }}>
+                    <span className="cue-n">{w.min ? `${w.min}'` : '·'}</span>
+                    <div><strong style={{ fontSize: '0.9rem' }}>{w.step}</strong>{w.details ? <div className="tiny muted" style={{ lineHeight: 1.4 }}>{w.details}</div> : null}</div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Activación muscular */}
       <SectionCard title="Activación muscular" icon="target" sub="Qué trabaja la sesión de hoy">
         <div className="stack" style={{ gap: 14 }}>

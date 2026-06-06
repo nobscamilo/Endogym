@@ -57,7 +57,7 @@ const PREAMBLE = `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 
 // --- Integración con el backend (sustituye al shim inline del index.html) ---
 let __auth = null;
@@ -79,6 +79,10 @@ async function __getIdToken() {
   try { return __auth && __auth.currentUser ? await __auth.currentUser.getIdToken() : null; } catch (e) { return null; }
 }
 window.__getIdToken = __getIdToken;
+window.__signOut = async function () {
+  try { if (__auth) await signOut(__auth); } catch (e) { /* noop */ }
+  window.location.href = '/';
+};
 
 window.claude = {
   complete: async function (prompt) {

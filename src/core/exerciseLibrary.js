@@ -1328,34 +1328,28 @@ export function buildSessionExercises({
   const intensity = profile?.preparticipation?.desiredIntensity || 'moderate';
   const resolvedGoal = goal || profile?.goal || 'recomposition';
 
+  const highVolumeGoals = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'cut', 'bulk']);
+  const screening = profile?.preparticipation ? evaluatePreparticipationScreening(profile.preparticipation) : null;
+  const isStopGate = screening?.readinessGate === 'stop';
+  // Minutos por sesión que indicó el usuario (encuesta del Studio).
+  const availMinutes = profile?.studioAvailability === true ? Number(profile.preferredDurationMinutes) : NaN;
+
   let desiredCount = 5;
   if (sessionType === 'recovery') {
     desiredCount = 3;
   } else if (sessionType === 'aerobic') {
     desiredCount = 2;
-  } else {
-    // Determine base exercise count for resistance, mixed, mindbody based on intensity and goal
-    const highVolumeGoals = new Set([
-      'weight_loss',
-      'recomposition',
-      'hypertrophy',
-      'strength',
-      'cut',
-      'bulk'
-    ]);
-
-    const screening = profile?.preparticipation ? evaluatePreparticipationScreening(profile.preparticipation) : null;
-    const isStopGate = screening?.readinessGate === 'stop';
-
-    if (isStopGate) {
-      desiredCount = 4; // Clinical cap for high-risk safety
-    } else if (intensity === 'vigorous') {
-      desiredCount = highVolumeGoals.has(resolvedGoal) ? 7 : 6;
-    } else if (intensity === 'moderate') {
-      desiredCount = highVolumeGoals.has(resolvedGoal) ? 6 : 5;
-    } else { // light
-      desiredCount = 4;
-    }
+  } else if (isStopGate) {
+    desiredCount = 4; // Cap clínico por seguridad
+  } else if (Number.isFinite(availMinutes) && availMinutes >= 20) {
+    // Escala con la duración: ~9 min/ejercicio + ~14 min de calentamiento/enfriamiento.
+    desiredCount = Math.max(4, Math.min(8, Math.round((availMinutes - 14) / 9)));
+  } else if (intensity === 'vigorous') {
+    desiredCount = highVolumeGoals.has(resolvedGoal) ? 7 : 6;
+  } else if (intensity === 'moderate') {
+    desiredCount = highVolumeGoals.has(resolvedGoal) ? 6 : 5;
+  } else { // light
+    desiredCount = 4;
   }
 
   const selectedPool = selectExercisesFromPool(pool, {

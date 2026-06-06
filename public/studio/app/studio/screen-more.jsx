@@ -244,6 +244,10 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
             <div><strong style={{ fontSize: '0.92rem' }}>Sincronizar wearable</strong><div className="tiny muted">Apple Health · Garmin</div></div>
             <button className="btn ghost sm">Conectar</button>
           </div>
+          <div className="set-row">
+            <div><strong style={{ fontSize: '0.92rem' }}>Sesión</strong><div className="tiny muted">Cierra tu sesión en este dispositivo</div></div>
+            <button className="btn ghost sm" onClick={() => { if (window.__signOut) window.__signOut(); }}><Icon name="arrowRight" size={15} /> Cerrar sesión</button>
+          </div>
         </SectionCard>
       </div>
 
