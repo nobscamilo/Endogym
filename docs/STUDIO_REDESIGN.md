@@ -20,11 +20,12 @@ Pendiente (fase C, cuando Studio sea la UI por defecto): aplicar el logo/favicon
 El diseño es un SPA React. Para máxima fidelidad y aislamiento total del resto de la app, se monta como **bundle servido en un iframe**. **Está PRE-COMPILADO** (producción):
 
 - `public/studio/app/studio/*` — código fuente del diseño (CSS, JSX, data.js). El JSX es la **fuente de verdad**; aquí se editan/añaden features.
-- `scripts/build-studio.mjs` — compila ese JSX + **React de producción + Firebase (modular)** a un único `public/studio/app/studio.bundle.js` con **esbuild**. Sin Babel-in-browser, sin `unsafe-eval`, sin CDNs. Incluye la integración con el backend (coach `window.claude.complete`, token Firebase, fusión de datos reales). Se ejecuta en `npm run prebuild` (antes de cada `npm run build`) y manualmente con `npm run build:studio`.
+- `public/studio/app/studio.bundle.js` — **artefacto compilado y COMMITEADO** (React de producción + Firebase modular + el JSX + la integración backend: coach `window.claude.complete`, token Firebase, fusión de datos reales). Sin Babel-in-browser, sin `unsafe-eval`, sin CDNs. La app **NO** necesita esbuild para `npm install` ni `npm run build`; el bundle ya viene compilado en el repo y se despliega tal cual.
+- `scripts/build-studio.mjs` + `npm run build:studio` — **herramienta solo de mantenedor** para regenerar el bundle con esbuild. `esbuild` **NO** es dependencia del proyecto (su binario es nativo por plataforma y `node_modules` se comparte entre macOS y el sandbox Linux, lo que rompería). Para regenerar en tu máquina: `npm i -D esbuild` temporal (no lo dejes en el lockfile compartido), `npm run build:studio`, luego desinstálalo.
 - `public/studio/app/index.html` — carga solo `studio.bundle.js` (+ Google Fonts + favicon llama).
 - `src/app/studio/page.js` — ruta Next `/studio`: iframe a pantalla completa de `/studio/app/index.html`. Aislamiento CSS/JS total respecto a la app.
 
-> Tras editar cualquier archivo en `public/studio/app/studio/`, regenera el bundle con `npm run build:studio` (o `npm run build`, que lo hace en `prebuild`).
+> Tras editar cualquier archivo fuente en `public/studio/app/studio/`, hay que **regenerar y commitear** `studio.bundle.js` (lo hace el mantenedor con esbuild). Mientras no se regenere, el iframe sigue sirviendo el bundle anterior.
 
 ### Integraciones con el backend real
 

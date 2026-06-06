@@ -12,10 +12,27 @@
  *
  * Uso: node scripts/build-studio.mjs
  */
-import * as esbuild from 'esbuild';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// esbuild es una herramienta SOLO de mantenedor para regenerar el bundle. NO es una
+// dependencia del proyecto (el bundle compilado, public/studio/app/studio.bundle.js, se
+// commitea como artefacto). Se carga de forma dinámica para dar un mensaje claro si falta
+// o si es de otra plataforma (node_modules es compartido entre macOS y el sandbox Linux).
+let esbuild;
+try {
+  esbuild = await import('esbuild');
+} catch (err) {
+  console.error('\n[build-studio] esbuild no está disponible para esta plataforma.');
+  console.error('Este script es solo para regenerar el bundle (mantenedor). El bundle ya está');
+  console.error('compilado y commiteado en public/studio/app/studio.bundle.js, así que la app');
+  console.error('NO necesita esbuild para `npm install` ni `npm run build`.');
+  console.error('Si necesitas regenerarlo en tu plataforma: `npm i -D esbuild` (no lo dejes en');
+  console.error('el lockfile compartido) y vuelve a ejecutar este script.\n');
+  console.error('Detalle:', err && err.message ? err.message : err);
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(__dirname);
