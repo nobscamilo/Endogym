@@ -74,7 +74,9 @@ function AddFood({ onAdded }) {
         carbsGrams: Number(f.carbsGrams) || 0,
         fatGrams: Number(f.fatGrams) || 0,
       };
-      const totals = { calories: food.calories, proteinGrams: food.proteinGrams, carbsGrams: food.carbsGrams, fatGrams: food.fatGrams };
+      // Estima la carga glucémica (GL ≈ carbohidratos × IG/100, IG medio ~55) para que sume al día.
+      const glycemicLoad = Math.round(food.carbsGrams * 0.55);
+      const totals = { calories: food.calories, proteinGrams: food.proteinGrams, carbsGrams: food.carbsGrams, fatGrams: food.fatGrams, glycemicLoad };
       const r = await fetch('/api/meals', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },

@@ -109,8 +109,8 @@ Objetivo nutricional del día: ~${t.kcal} kcal, proteína ${t.protein} g, carboh
 Requisitos:
 - Exactamente 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena". La suma de kcal debe acercarse al objetivo.
 - Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (3-4 pasos), serving (consejo breve).
-- shopping: 3-4 categorías (cat, icon emoji, items con name y qty) cubriendo los ingredientes de la semana.
-- batch: 3-4 tareas de batch cooking (title, desc, time, day, emoji).
+- shopping: lista de la compra para TODA LA SEMANA (7 días), NO para un solo día. 4-6 categorías (cat, icon emoji, items con name y qty), con cantidades agregadas para 7 días (p. ej. "Pollo 1,4 kg", "Huevos 18 ud", "Arroz 1 kg"). El usuario compra una vez para la semana.
+- batch: 3-4 tareas de batch cooking del fin de semana para dejar la semana lista (title, desc, time, day, emoji).
 - Respeta condiciones/restricciones. Comida real, variada y práctica. Devuelve SOLO el JSON del esquema.`;
 
     try {

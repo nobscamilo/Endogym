@@ -30,19 +30,31 @@ function initialsFrom(name, last) {
   return (a + b).toUpperCase() || a.toUpperCase() || 'U';
 }
 
+const GOAL_LABELS = { weight_loss: 'Pérdida de peso', recomposition: 'Recomposición', hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia', glycemic_control: 'Control glucémico' };
+const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Mixto' };
+
 function mapUser(profile) {
   if (!profile) return null;
   const name = profile.firstName || profile.name || profile.displayName || '';
   const last = profile.lastName || profile.surname || '';
-  const goal = profile.goal || profile.objetivo || '';
+  const goal = profile.goal || '';
   const modality = profile.trainingModality || profile.trainingMode || '';
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : undefined);
   const out = {};
   if (name) out.name = name;
-  if (last) out.last = last;
-  if (name || last) out.initials = initialsFrom(name, last);
-  if (goal) { out.goal = goal; out.goalShort = String(goal).split(/[+,·]/)[0].trim(); }
-  if (modality) out.modality = modality;
-  return Object.keys(out).length ? out : null;
+  out.last = last;                       // siempre (evita heredar el apellido de muestra)
+  out.initials = initialsFrom(name, last);
+  if (goal) { out.goalRaw = goal; out.goal = goal; out.goalShort = GOAL_LABELS[goal] || goal; }
+  if (modality) { out.modalityRaw = modality; out.modality = MODALITY_LABELS[modality] || modality; }
+  // Para prefijar el formulario de Perfil:
+  if (num(profile.age) !== undefined) out.age = num(profile.age);
+  if (num(profile.weightKg) !== undefined) out.weightKg = num(profile.weightKg);
+  if (num(profile.heightCm) !== undefined) out.heightCm = num(profile.heightCm);
+  if (profile.sex) out.sex = profile.sex;
+  if (num(profile.mealsPerDay) !== undefined) out.mealsPerDay = num(profile.mealsPerDay);
+  if (num(profile.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(profile.preferredDurationMinutes);
+  if (num(profile.daysPerWeek) !== undefined) out.daysPerWeek = num(profile.daysPerWeek);
+  return out;
 }
 
 function rpeAvg(rpe) {

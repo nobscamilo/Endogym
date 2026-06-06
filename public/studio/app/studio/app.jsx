@@ -31,7 +31,7 @@ const ACCENT_BY_HEX = Object.fromEntries(ACCENTS.map((a) => [a.hex, a.id]));
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [view, setView] = useStateA('today');
-  const [device, setDevice] = useStateA('desktop');
+  const [isMobile, setIsMobile] = useStateA(typeof window !== 'undefined' && window.innerWidth < 760);
   const [mini, setMini] = useStateA(false);
   const [sheet, setSheet] = useStateA(false);
   const mainRef = useRefA(null);
@@ -55,7 +55,14 @@ function App() {
     r.style.setProperty('--rs', t.radius);
   }, [t.theme, t.accent, t.density, t.coach, t.radius]);
 
-  const isMobile = device === 'mobile';
+  useEffectA(() => {
+    const mq = window.matchMedia('(max-width: 760px)');
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    if (mq.addEventListener) mq.addEventListener('change', onChange); else mq.addListener(onChange);
+    return () => { if (mq.removeEventListener) mq.removeEventListener('change', onChange); else mq.removeListener(onChange); };
+  }, []);
+
   const go = (id) => { setView(id); setSheet(false); if (mainRef.current) mainRef.current.scrollTo({ top: 0, behavior: 'auto' }); };
 
   const screen = (() => {
@@ -74,25 +81,8 @@ function App() {
   return (
     <VideoProvider>
       <div className="stage">
-        {/* Barra demo */}
-        <div className="topbar">
-          <span className="brand"><Logo size={26} /> Ignios <small>Studio</small></span>
-          <span className="spacer" />
-          <span className="lbl">Vista</span>
-          <div className="seg">
-            <div className="seg-thumb" style={{ left: isMobile ? 'calc(50%)' : '3px', width: 'calc(50% - 3px)' }} />
-            <button className={!isMobile ? 'on' : ''} onClick={() => setDevice('desktop')}>Ordenador</button>
-            <button className={isMobile ? 'on' : ''} onClick={() => setDevice('mobile')}>Móvil</button>
-          </div>
-          <div className="seg">
-            <div className="seg-thumb accent" style={{ left: theme === 'light' ? '3px' : 'calc(50%)', width: 'calc(50% - 3px)' }} />
-            <button className={theme === 'light' ? 'on solid' : ''} onClick={() => setTheme('light')}><Icon name="sun" size={15} /></button>
-            <button className={theme === 'dark' ? 'on solid' : ''} onClick={() => setTheme('dark')}><Icon name="moon" size={15} /></button>
-          </div>
-        </div>
-
-        {/* Viewport */}
-        <div className={`viewport ${isMobile ? 'phone' : ''}`}>
+        {/* Viewport (responsive automático) */}
+        <div className="viewport">
           <div className="device">
             <div className={`app ${isMobile ? 'mobile' : ''}`}>
               {!isMobile ? (

@@ -38,6 +38,14 @@ export async function POST(request) {
     if (Number.isFinite(days)) patch.daysPerWeek = Math.min(7, Math.max(1, Math.round(days)));
     const weeks = Number(body?.resurveyWeeks);
     if (Number.isFinite(weeks)) patch.resurveyWeeks = Math.min(26, Math.max(1, Math.round(weeks)));
+    // Datos personales (también merge parcial, no resetean el resto del perfil).
+    const age = Number(body?.age);
+    if (Number.isFinite(age)) patch.age = Math.min(100, Math.max(12, Math.round(age)));
+    const weightKg = Number(body?.weightKg);
+    if (Number.isFinite(weightKg)) patch.weightKg = Math.min(300, Math.max(30, Math.round(weightKg * 10) / 10));
+    const heightCm = Number(body?.heightCm);
+    if (Number.isFinite(heightCm)) patch.heightCm = Math.min(230, Math.max(120, Math.round(heightCm)));
+    if (['male', 'female'].includes(body?.sex)) patch.sex = body.sex;
 
     try {
       await upsertUserProfile(user.uid, patch);

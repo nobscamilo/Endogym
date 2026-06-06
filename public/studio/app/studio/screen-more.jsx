@@ -120,11 +120,16 @@ const AV_GOALS = [['recomposition', 'Recomposición'], ['weight_loss', 'Bajar pe
 const AV_EQUIP = [['full_gym', 'Gimnasio'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
 function AvailabilitySurvey() {
   const D = window.STUDIO;
-  const [goal, setGoal] = useStateP('recomposition');
-  const [equip, setEquip] = useStateP('full_gym');
-  const [mins, setMins] = useStateP(60);
-  const [days, setDays] = useStateP(5);
-  const [meals, setMeals] = useStateP(4);
+  const u = D.user || {};
+  const [goal, setGoal] = useStateP(u.goalRaw || 'recomposition');
+  const [equip, setEquip] = useStateP(u.modalityRaw || 'full_gym');
+  const [sex, setSex] = useStateP(u.sex || 'male');
+  const [age, setAge] = useStateP(u.age != null ? u.age : 30);
+  const [weight, setWeight] = useStateP(u.weightKg != null ? u.weightKg : 75);
+  const [height, setHeight] = useStateP(u.heightCm != null ? u.heightCm : 170);
+  const [mins, setMins] = useStateP(u.sessionMinutes != null ? u.sessionMinutes : 60);
+  const [days, setDays] = useStateP(u.daysPerWeek != null ? u.daysPerWeek : 5);
+  const [meals, setMeals] = useStateP(u.mealsPerDay != null ? u.mealsPerDay : 4);
   const [weeks, setWeeks] = useStateP(4);
   const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth
 
@@ -136,7 +141,11 @@ function AvailabilitySurvey() {
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
       const r = await fetch('/api/studio-availability', {
         method: 'POST', headers,
-        body: JSON.stringify({ goal, trainingModality: equip, sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks) }),
+        body: JSON.stringify({
+          goal, trainingModality: equip, sex,
+          age: Number(age), weightKg: Number(weight), heightCm: Number(height),
+          sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks),
+        }),
       });
       if (!r.ok) { setStatus('err'); return; }
       await fetch('/api/weekly-plan', { method: 'POST', headers, body: '{}' }).catch(() => {});
@@ -153,7 +162,7 @@ function AvailabilitySurvey() {
   }
 
   return (
-    <SectionCard title="Disponibilidad y ajuste" icon="settings" sub="Adapta tu plan y comidas a tu tiempo y equipo. Repítela cada cierto tiempo.">
+    <SectionCard title="Tu perfil y disponibilidad" icon="settings" sub="Tus datos y tu tiempo/equipo. Al guardar, reajustamos tu plan y comidas.">
       <div className="stack" style={{ gap: 14 }}>
         <div>
           <div className="mb-label">Objetivo</div>
@@ -163,19 +172,28 @@ function AvailabilitySurvey() {
           <div className="mb-label">Equipo disponible</div>
           <div className="chips">{AV_EQUIP.map(([v, l]) => <button key={v} type="button" className={`pill ${equip === v ? 'accent' : ''}`} onClick={() => setEquip(v)}>{l}</button>)}</div>
         </div>
+        <div>
+          <div className="mb-label">Sexo</div>
+          <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
+        </div>
+        <div className="grid g-4" style={{ gap: 10 }}>
+          <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" value={age} onChange={(e) => setAge(e.target.value)} /></div>
+          <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>
+          <div className="field"><label>Altura (cm)</label><input className="text-input" type="number" min="120" max="230" value={height} onChange={(e) => setHeight(e.target.value)} /></div>
+          <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
+        </div>
         <div className="grid g-4" style={{ gap: 10 }}>
           <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
           <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
-          <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
           <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
         </div>
         <div className="row ac" style={{ gap: 12 }}>
-          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="sparkles" size={16} /> {status === 'saving' ? 'Ajustando plan…' : 'Guardar y reajustar plan'}</button>
-          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan y comidas reajustados ✨</span> : null}
+          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando…' : 'Guardar cambios'}</button>
+          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado ✨</span> : null}
           {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
           {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
         </div>
-        <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>Al guardar, regeneramos tu plan de entreno y tus macros según tu objetivo, equipo y tiempo. Los días/semana se guardan para tu seguimiento.</p>
+        <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>Al guardar, tus datos se conservan y regeneramos tu plan de entreno y tus macros según tu objetivo, equipo y tiempo.</p>
       </div>
     </SectionCard>
   );
@@ -197,36 +215,18 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
           <div className="avatar">{u.initials}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.02em' }}>{u.name} {u.last}</div>
-            <div className="muted">{u.plan}</div>
+            <div className="muted">{[u.goalShort, u.modality].filter(Boolean).join(' · ') || 'Tu plan'}</div>
             <div className="chips" style={{ marginTop: 10 }}>
-              <span className="pill accent tiny"><Icon name="target" size={12} /> {u.goalShort}</span>
-              <span className="pill tiny"><Icon name="train" size={12} /> {u.modality}</span>
-              <span className="pill tiny"><Icon name="flame" size={12} /> Racha {u.streak}</span>
+              {u.goalShort ? <span className="pill accent tiny"><Icon name="target" size={12} /> {u.goalShort}</span> : null}
+              {u.modality ? <span className="pill tiny"><Icon name="train" size={12} /> {u.modality}</span> : null}
             </div>
           </div>
-          <button className="btn ghost"><Icon name="edit" size={16} /> Editar</button>
         </div>
       </div>
 
       <AvailabilitySurvey />
 
-      <div className="grid g-2" style={{ alignItems: 'start' }}>
-        <SectionCard title="Datos y objetivo" icon="profile">
-          <div className="grid g-2" style={{ gap: 14 }}>
-            <div className="field"><label>Edad</label><input defaultValue="31" /></div>
-            <div className="field"><label>Peso (kg)</label><input defaultValue="74.8" /></div>
-            <div className="field"><label>Altura (cm)</label><input defaultValue="168" /></div>
-            <div className="field"><label>Comidas/día</label><input defaultValue="4" /></div>
-          </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <label>Objetivo principal</label>
-            <div className="segc" style={{ width: '100%' }}>
-              <div className="segc-thumb" style={{ left: `calc(4px + ${gi} * (100% - 8px) / 4)`, width: `calc((100% - 8px) / 4)` }} />
-              {goals.map((g) => <button key={g} className={goal === g ? 'on' : ''} style={{ flex: 1 }} onClick={() => setGoal(g)}>{g}</button>)}
-            </div>
-          </div>
-        </SectionCard>
-
+      <div>
         <SectionCard title="Apariencia y avisos" icon="settings">
           <div className="set-row">
             <div><strong style={{ fontSize: '0.92rem' }}>Tema</strong><div className="tiny muted">Claro u oscuro</div></div>
