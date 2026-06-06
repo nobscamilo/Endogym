@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark" data-accent="ambar" data-density="comoda" data-coach="gradiente">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ignios Studio</title>
+  <!-- Fuentes del diseño: Bricolage Grotesque (display) · Manrope (body) · Space Mono (mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Manrope:wght@400..800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="studio/theme.css" />
+  <link rel="stylesheet" href="studio/app.css" />
+  <link rel="stylesheet" href="studio/screens.css" />
+</head>
+<body>
+  <div id="root"></div>
+
+  <template id="__bundler_thumbnail">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="16" fill="#1a1714" />
+      <path d="M46 32a14 14 0 1 0-5.6 11.2" fill="none" stroke="#e8843f" stroke-width="6" stroke-linecap="round" />
+      <circle cx="32" cy="32" r="5" fill="#e8843f" />
+    </svg>
+  </template>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- Firebase (compat) para leer la sesión existente del mismo origen y autenticar llamadas -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <!-- Integración con el backend: token de Firebase + Coach IA real (window.claude.complete) -->
+  <script>
+    (function () {
+      var idTokenGetter = function () { return Promise.resolve(null); };
+      window.__getIdToken = function () {
+        try { return idTokenGetter(); } catch (e) { return Promise.resolve(null); }
+      };
+      // Promesa que resuelve cuando Firebase está listo (o falla) — la usa el cargador de datos.
+      window.__firebaseReady = fetch('/api/public-config')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (cfg) {
+          if (!cfg || !cfg.apiKey || !window.firebase) return;
+          try {
+            firebase.initializeApp(cfg);
+            idTokenGetter = function () {
+              var u = firebase.auth().currentUser;
+              return u ? u.getIdToken() : Promise.resolve(null);
+            };
+            // Espera breve a que Auth restablezca la sesión persistida.
+            return new Promise(function (resolve) {
+              var done = false;
+              var unsub = firebase.auth().onAuthStateChanged(function () { if (!done) { done = true; resolve(); if (unsub) unsub(); } });
+              setTimeout(function () { if (!done) { done = true; resolve(); } }, 1500);
+            });
+          } catch (e) { /* noop */ }
+        })
+        .catch(function () { /* sin sesión: coach con respaldo y datos de muestra */ });
+
+      window.claude = {
+        complete: async function (prompt) {
+          var token = null;
+          try { token = await window.__getIdToken(); } catch (e) { token = null; }
+          var headers = { 'content-type': 'application/json' };
+          if (token) headers['authorization'] = 'Bearer ' + token;
+          var res = await fetch('/api/coach-chat', {
+            method: 'POST', headers: headers, body: JSON.stringify({ prompt: prompt }),
+          });
+          if (!res.ok) throw new Error('coach-chat HTTP ' + res.status);
+          var data = await res.json();
+          return data && typeof data.text === 'string' ? data.text : '';
+        },
+      };
+    })();
+  </script>
+
+  <!-- Datos de muestra del diseño (defaults) -->
+  <script src="studio/data.js"></script>
+
+  <!-- Cargador: fusiona datos reales (si hay sesión) y luego compila/ejecuta el JSX.
+       Respaldo automático a <script type="text/babel"> si la compilación dinámica falla. -->
+  <script>
+    (function () {
+      var FILES = ['icons', 'ui', 'coach', 'tweaks-panel', 'screen-today', 'screen-train', 'screen-nutrition', 'screen-more', 'app'];
+
+      function applyOverrides(base, ov) {
+        if (!base || !ov) return;
+        Object.keys(ov).forEach(function (k) {
+          var v = ov[k];
+          if (v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object') {
+            Object.assign(base[k], v);
+          } else if (k !== 'todaySessionTitle') {
+            base[k] = v;
+          }
+        });
+        if (ov.todaySessionTitle && base.todaySession) base.todaySession.title = ov.todaySessionTitle;
+      }
+
+      async function mergeRealData() {
+        try {
+          if (window.__firebaseReady) { await window.__firebaseReady; }
+          var token = null;
+          try { token = await window.__getIdToken(); } catch (e) { token = null; }
+          var headers = {};
+          if (token) headers['authorization'] = 'Bearer ' + token;
+          var ctrl = new AbortController();
+          var to = setTimeout(function () { ctrl.abort(); }, 2500);
+          var r = await fetch('/api/studio-data', { headers: headers, signal: ctrl.signal });
+          clearTimeout(to);
+          if (r.ok) {
+            var j = await r.json();
+            if (j && j.ok && j.overrides && window.STUDIO) applyOverrides(window.STUDIO, j.overrides);
+          }
+        } catch (e) { /* datos de muestra */ }
+      }
+
+      function loadStaticFallback() {
+        FILES.forEach(function (f) {
+          var s = document.createElement('script');
+          s.type = 'text/babel'; s.src = 'studio/' + f + '.jsx'; s.async = false;
+          document.body.appendChild(s);
+        });
+        try { if (window.Babel && window.Babel.transformScriptTags) window.Babel.transformScriptTags(); } catch (e) {}
+      }
+
+      async function loadCompiled() {
+        for (var i = 0; i < FILES.length; i++) {
+          var f = FILES[i];
+          var code = await (await fetch('studio/' + f + '.jsx')).text();
+          var out = window.Babel.transform(code, { presets: ['react'], filename: f + '.jsx' }).code;
+          var s = document.createElement('script');
+          s.textContent = out;
+          document.body.appendChild(s); // ejecución síncrona en ámbito global compartido
+        }
+      }
+
+      (async function boot() {
+        await mergeRealData();
+        try {
+          if (!window.Babel || !window.Babel.transform) throw new Error('Babel.transform no disponible');
+          await loadCompiled();
+        } catch (e) {
+          console.warn('[studio] carga dinámica falló, usando respaldo estático:', e);
+          loadStaticFallback();
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>

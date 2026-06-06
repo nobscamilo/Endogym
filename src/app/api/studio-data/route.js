@@ -1,0 +1,292 @@
+import { jsonResponse, errorResponse } from '../../../lib/http.js';
+import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
+import { withTrace, logError } from '../../../lib/logger.js';
+import {
+  getUserProfile,
+  getLatestWeeklyPlan,
+  listMealsSince,
+  listMetricsSince,
+  listWorkoutsSince,
+} from '../../../lib/repositories/firestoreRepository.js';
+
+// Datos reales para el rediseño Studio (fase 2). Devuelve overrides que el bundle
+// estático fusiona sobre window.STUDIO (datos de muestra) ANTES de renderizar.
+// Cada sección es defensiva: si faltan datos válidos, se omite y se conserva la muestra.
+//
+// REAL: perfil, sesión de hoy (con vídeos reales de YouTube), semana, biblioteca,
+//       macros objetivo/consumidas, progreso (peso + sesiones).
+// MUESTRA (no hay equivalente en backend aún): recetas de comidas, lista de compra,
+//       batch cooking, curva glucémica, strain/recovery/volumen muscular/PRs.
+
+const HUES = [55, 232, 18, 300, 162, 78, 200, 120];
+
+function todayStrUTC() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function initialsFrom(name, last) {
+  const a = (name || '').trim()[0] || '';
+  const b = (last || '').trim()[0] || '';
+  return (a + b).toUpperCase() || a.toUpperCase() || 'U';
+}
+
+function mapUser(profile) {
+  if (!profile) return null;
+  const name = profile.firstName || profile.name || profile.displayName || '';
+  const last = profile.lastName || profile.surname || '';
+  const goal = profile.goal || profile.objetivo || '';
+  const modality = profile.trainingModality || profile.trainingMode || '';
+  const out = {};
+  if (name) out.name = name;
+  if (last) out.last = last;
+  if (name || last) out.initials = initialsFrom(name, last);
+  if (goal) { out.goal = goal; out.goalShort = String(goal).split(/[+,·]/)[0].trim(); }
+  if (modality) out.modality = modality;
+  return Object.keys(out).length ? out : null;
+}
+
+function rpeAvg(rpe) {
+  if (rpe == null) return null;
+  if (typeof rpe === 'number') return rpe;
+  if (typeof rpe === 'object') {
+    const a = Number(rpe.min); const b = Number(rpe.max);
+    if (Number.isFinite(a) && Number.isFinite(b)) return (a + b) / 2;
+    if (Number.isFinite(a)) return a;
+    if (Number.isFinite(b)) return b;
+  }
+  return null;
+}
+
+function rpeLabel(rpe) {
+  const v = rpeAvg(rpe);
+  if (v == null) return 'Moderada';
+  if (v < 5) return 'Suave';
+  if (v < 7) return 'Moderada';
+  if (v < 8.5) return 'Moderada-alta';
+  return 'Alta';
+}
+
+function schemeOf(p) {
+  if (!p) return '';
+  if (p.format === 'reps') {
+    const sets = p.sets ?? null;
+    const reps = p.reps ?? null;
+    if (sets && reps) return `${sets} × ${reps}`;
+    if (reps) return `${reps} reps`;
+    if (sets) return `${sets} series`;
+    return '';
+  }
+  if (p.durationMinutes) return `${p.sets ? p.sets + ' × ' : ''}${p.durationMinutes} min`;
+  return p.sets ? `${p.sets} series` : '';
+}
+
+function loadOf(p) {
+  if (!p) return 'Selecciona';
+  if (Number.isFinite(Number(p.loadKg)) && Number(p.loadKg) > 0) return `${p.loadKg} kg`;
+  if (p.format !== 'reps') return 'Tiempo';
+  return 'Selecciona';
+}
+
+function shortWeekday(dayName, dateStr) {
+  if (typeof dayName === 'string' && dayName.trim()) {
+    const s = dayName.trim();
+    return s.charAt(0).toUpperCase() + s.slice(1, 3);
+  }
+  try {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    return ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][d.getUTCDay()];
+  } catch { return ''; }
+}
+
+function dayNumber(dateStr) {
+  const n = parseInt(String(dateStr).slice(8, 10), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapTodaySession(plan, today) {
+  const days = plan?.days;
+  if (!Array.isArray(days) || !days.length) return null;
+  const day = days.find((d) => d.date === today && d.isTrainingDay)
+    || days.find((d) => d.isTrainingDay) || days[0];
+  if (!day) return null;
+  const ex = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
+  const list = ex.map((e, i) => {
+    const item = {
+      name: e.name || 'Ejercicio',
+      scheme: schemeOf(e.prescription),
+      load: loadOf(e.prescription),
+      tag: e.category || 'Ejercicio',
+      muscle: (Array.isArray(e.primaryMuscles) && e.primaryMuscles[0]) || e.category || '',
+      hue: HUES[i % HUES.length],
+      done: false,
+    };
+    if (e.videoEmbedId) item.yt = e.videoEmbedId;
+    if (Array.isArray(e.cues) && e.cues.length) item.cues = e.cues.slice(0, 3);
+    return item;
+  });
+  if (!list.length) return null;
+  const prim = [...new Set(ex.flatMap((e) => e.primaryMuscles || []))].slice(0, 3);
+  const sec = [...new Set(ex.flatMap((e) => e.secondaryMuscles || []))].slice(0, 3);
+  const out = {
+    title: day.workout?.title || 'Sesión de hoy',
+    focus: day.sessionFocus || day.workout?.sessionFocus || '',
+    durationMin: day.workout?.durationMinutes || null,
+    intensity: rpeLabel(day.workout?.intensityRpe),
+    list,
+  };
+  if (prim.length) out.primaryMuscles = prim;
+  if (sec.length) out.secondaryMuscles = sec;
+  return out;
+}
+
+function mapWeek(plan, today) {
+  const days = plan?.days;
+  if (!Array.isArray(days) || !days.length) return null;
+  const week = days.map((d) => {
+    const training = d.isTrainingDay;
+    const v = rpeAvg(d.workout?.intensityRpe);
+    const load = training ? Math.min(1, Math.max(0.4, (v || 7) / 10)) : 0.15;
+    const row = {
+      day: shortWeekday(d.dayName, d.date),
+      date: dayNumber(d.date),
+      focus: d.workout?.title || d.sessionFocus || '',
+      tag: d.sessionFocus || '',
+      load: Number(load.toFixed(2)),
+    };
+    if (d.date === today) row.today = true;
+    if (!training) row.rest = true;
+    return row;
+  });
+  return week.length ? week : null;
+}
+
+function mapLibrary(plan) {
+  const days = plan?.days;
+  if (!Array.isArray(days)) return null;
+  const seen = new Set();
+  const lib = [];
+  for (const d of days) {
+    for (const e of (d.workout?.exercises || [])) {
+      if (!e?.name || seen.has(e.name)) continue;
+      seen.add(e.name);
+      const item = {
+        name: e.name,
+        muscle: (Array.isArray(e.primaryMuscles) && e.primaryMuscles[0]) || e.category || '',
+        level: e.difficulty || 'Base',
+        equip: e.equipment || '—',
+        len: '',
+        hue: HUES[lib.length % HUES.length],
+      };
+      if (e.videoEmbedId) item.yt = e.videoEmbedId;
+      lib.push(item);
+      if (lib.length >= 12) break;
+    }
+    if (lib.length >= 12) break;
+  }
+  return lib.length ? lib : null;
+}
+
+function mapMacroTargets(plan, today) {
+  const days = plan?.days;
+  const dayTarget = Array.isArray(days)
+    ? (days.find((d) => d.date === today) || days[0])?.nutritionTarget
+    : null;
+  const t = dayTarget || plan?.baseTarget;
+  if (!t) return null;
+  const kcal = Number(t.targetCalories ?? t.calories);
+  if (!Number.isFinite(kcal)) return null;
+  return {
+    kcal: Math.round(kcal),
+    protein: Math.round(Number(t.proteinGrams) || 0),
+    carbs: Math.round(Number(t.carbsGrams) || 0),
+    fat: Math.round(Number(t.fatGrams) || 0),
+  };
+}
+
+function mapMacroEaten(meals) {
+  if (!Array.isArray(meals) || !meals.length) return null;
+  const sum = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  for (const m of meals) {
+    const t = m.totals || {};
+    sum.kcal += Number(t.calories) || 0;
+    sum.protein += Number(t.proteinGrams) || 0;
+    sum.carbs += Number(t.carbsGrams) || 0;
+    sum.fat += Number(t.fatGrams) || 0;
+  }
+  return {
+    kcal: Math.round(sum.kcal),
+    protein: Math.round(sum.protein),
+    carbs: Math.round(sum.carbs),
+    fat: Math.round(sum.fat),
+  };
+}
+
+function mapProgress(metrics, workouts, plan) {
+  const out = {};
+  const weights = (Array.isArray(metrics) ? metrics : [])
+    .filter((m) => Number.isFinite(Number(m.weightKg)) && m.performedAt)
+    .sort((a, b) => String(a.performedAt).localeCompare(String(b.performedAt)))
+    .map((m) => Number(m.weightKg));
+  if (weights.length >= 2) {
+    const series = weights.slice(-7);
+    out.weightSeries = series;
+    out.weightNow = series[series.length - 1];
+    out.weightDelta6w = Number((series[series.length - 1] - series[0]).toFixed(1));
+    out.weightDeltaWk = Number((series[series.length - 1] - series[Math.max(0, series.length - 2)]).toFixed(1));
+  }
+  const planDays = Array.isArray(plan?.days) ? plan.days : [];
+  const sessionsPlan = planDays.filter((d) => d.isTrainingDay).length;
+  if (sessionsPlan) out.sessionsPlan = sessionsPlan;
+  if (Array.isArray(workouts)) {
+    out.sessionsDone = workouts.filter((w) => w.completed !== false).length;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+export async function GET(request) {
+  return withTrace('studio_data', async ({ traceId }) => {
+    let user;
+    try {
+      user = await getAuthenticatedUser(request);
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        return errorResponse('Autenticación requerida.', 401);
+      }
+      throw error;
+    }
+
+    try {
+      const today = todayStrUTC();
+      const startOfTodayIso = `${today}T00:00:00.000Z`;
+      const since6wIso = new Date(Date.now() - 42 * 24 * 3600 * 1000).toISOString();
+      const startOfWeek = new Date();
+      startOfWeek.setUTCHours(0, 0, 0, 0);
+      startOfWeek.setUTCDate(startOfWeek.getUTCDate() - 6);
+      const startOfWeekIso = startOfWeek.toISOString();
+
+      const [profile, latestPlan, todayMeals, metrics, workouts] = await Promise.all([
+        getUserProfile(user.uid),
+        getLatestWeeklyPlan(user.uid).catch(() => null),
+        listMealsSince(user.uid, startOfTodayIso, 50).catch(() => []),
+        listMetricsSince(user.uid, since6wIso, 200).catch(() => []),
+        listWorkoutsSince(user.uid, startOfWeekIso, 50).catch(() => []),
+      ]);
+
+      const overrides = {};
+      const setIf = (key, val) => { if (val != null) overrides[key] = val; };
+
+      setIf('user', mapUser(profile));
+      setIf('todaySession', mapTodaySession(latestPlan, today));
+      setIf('week', mapWeek(latestPlan, today));
+      setIf('library', mapLibrary(latestPlan));
+      setIf('macroTargets', mapMacroTargets(latestPlan, today));
+      setIf('macroEaten', mapMacroEaten(todayMeals));
+      setIf('progress', mapProgress(metrics, workouts, latestPlan));
+
+      return jsonResponse({ ok: true, overrides });
+    } catch (error) {
+      logError('studio_data_failed', error, { traceId, userId: user.uid });
+      return jsonResponse({ ok: false, overrides: {} });
+    }
+  });
+}
