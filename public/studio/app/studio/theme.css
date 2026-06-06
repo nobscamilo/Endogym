@@ -1,0 +1,163 @@
+/* ===========================================================
+   ENDOGYM STUDIO — Sistema visual "Data-driven cálido"
+   Base oscura instrumental (Whoop/Oura) + alma cálida y humana.
+   Oscuro + Claro · 4 acentos · responsive real.
+   =========================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* radii (escalables via --rs) */
+  --rs: 1;
+  --r-xs: calc(10px * var(--rs));
+  --r-sm: calc(15px * var(--rs));
+  --r-md: calc(20px * var(--rs));
+  --r-lg: calc(27px * var(--rs));
+  --r-xl: calc(34px * var(--rs));
+  --r-2xl: calc(42px * var(--rs));
+
+  /* motion — la firma fluida de la app */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.33, 1, 0.45, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t-fast: 0.18s;
+  --t-med: 0.36s;
+  --t-slow: 0.56s;
+
+  /* paleta de datos — constante en todos los acentos.
+     misma L/C, varía el tono → familia armónica para gráficas */
+  --d-move:   oklch(0.74 0.15 55);    /* entreno / esfuerzo */
+  --d-recover: oklch(0.74 0.12 232);  /* recuperación / sueño */
+  --d-nutri:  oklch(0.74 0.13 162);   /* nutrición / verde */
+  --d-heart:  oklch(0.70 0.16 18);    /* frecuencia / intensidad */
+  --d-focus:  oklch(0.70 0.14 300);   /* foco / violeta */
+
+  /* macros */
+  --protein: oklch(0.70 0.16 18);
+  --carbs:   oklch(0.78 0.14 70);
+  --fat:     oklch(0.70 0.13 300);
+
+  /* glucemia */
+  --glu-good: oklch(0.74 0.14 162);
+  --glu-mid:  oklch(0.80 0.14 78);
+  --glu-high: oklch(0.68 0.17 28);
+}
+
+/* ---------------- TEMA OSCURO (por defecto) ---------------- */
+[data-theme='dark'] {
+  --bg:        oklch(0.165 0.006 60);
+  --bg-2:      oklch(0.135 0.006 60);
+  --surface:   oklch(0.215 0.008 62);
+  --surface-2: oklch(0.255 0.009 62);
+  --surface-3: oklch(0.305 0.010 62);
+  --line:      oklch(1 0 0 / 0.07);
+  --line-2:    oklch(1 0 0 / 0.13);
+  --ink:       oklch(0.97 0.008 82);
+  --ink-2:     oklch(0.73 0.012 76);
+  --ink-3:     oklch(0.56 0.012 70);
+  --on-data:   oklch(0.18 0.01 60);
+  --glass:     oklch(0.22 0.01 62 / 0.72);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.28);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.4), 0 18px 40px rgba(0,0,0,0.46);
+  --shadow-lg: 0 32px 80px rgba(0,0,0,0.6);
+  --scrim:     oklch(0.08 0.01 60 / 0.66);
+  --grain-op:  0.04;
+}
+
+/* ---------------- TEMA CLARO ---------------- */
+[data-theme='light'] {
+  --bg:        oklch(0.955 0.007 78);
+  --bg-2:      oklch(0.925 0.009 78);
+  --surface:   oklch(0.995 0.003 80);
+  --surface-2: oklch(0.975 0.006 80);
+  --surface-3: oklch(0.945 0.008 78);
+  --line:      oklch(0.30 0.02 70 / 0.10);
+  --line-2:    oklch(0.30 0.02 70 / 0.18);
+  --ink:       oklch(0.26 0.02 62);
+  --ink-2:     oklch(0.46 0.02 62);
+  --ink-3:     oklch(0.62 0.015 62);
+  --on-data:   oklch(0.99 0.003 80);
+  --glass:     oklch(0.99 0.004 80 / 0.74);
+  --shadow-sm: 0 1px 2px rgba(40,30,20,0.05), 0 4px 14px rgba(40,30,20,0.05);
+  --shadow-md: 0 2px 8px rgba(40,30,20,0.06), 0 16px 40px rgba(40,30,20,0.09);
+  --shadow-lg: 0 30px 70px rgba(40,30,20,0.16);
+  --scrim:     oklch(0.30 0.02 60 / 0.40);
+  --grain-op:  0.025;
+}
+
+/* ---------------- ACENTOS ---------------- */
+[data-accent='ambar'] {
+  --accent:      oklch(0.74 0.15 55);
+  --accent-2:    oklch(0.82 0.14 72);
+  --accent-deep: oklch(0.55 0.13 50);
+  --accent-ink:  oklch(0.30 0.05 55);
+}
+[data-accent='cian'] {
+  --accent:      oklch(0.72 0.13 232);
+  --accent-2:    oklch(0.82 0.11 215);
+  --accent-deep: oklch(0.52 0.12 248);
+  --accent-ink:  oklch(0.32 0.06 240);
+}
+[data-accent='bosque'] {
+  --accent:      oklch(0.72 0.14 162);
+  --accent-2:    oklch(0.82 0.13 158);
+  --accent-deep: oklch(0.50 0.10 165);
+  --accent-ink:  oklch(0.30 0.05 165);
+}
+[data-accent='violeta'] {
+  --accent:      oklch(0.70 0.14 300);
+  --accent-2:    oklch(0.80 0.12 305);
+  --accent-deep: oklch(0.50 0.13 300);
+  --accent-ink:  oklch(0.32 0.06 300);
+}
+
+/* soft / on-accent derivados (mezcla con superficie) */
+:root {
+  --on-accent: oklch(0.99 0.005 80);
+}
+[data-theme='dark'] [data-accent], [data-theme='dark'][data-accent] {
+  --accent-soft:  color-mix(in oklch, var(--accent) 18%, var(--surface));
+  --accent-soft-2: color-mix(in oklch, var(--accent) 28%, var(--surface));
+  --accent-tint:  color-mix(in oklch, var(--accent) 12%, transparent);
+  --accent-on-soft: var(--accent-2);
+}
+[data-theme='light'] [data-accent], [data-theme='light'][data-accent] {
+  --accent-soft:  color-mix(in oklch, var(--accent) 14%, white);
+  --accent-soft-2: color-mix(in oklch, var(--accent) 22%, white);
+  --accent-tint:  color-mix(in oklch, var(--accent) 14%, transparent);
+  --accent-on-soft: var(--accent-deep);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+#root { height: 100%; }
+::selection { background: var(--accent-soft-2); color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* tipografía base */
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.mono { font-family: var(--font-mono); }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-on-soft);
+  margin: 0;
+}
+.num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+.tiny { font-size: 0.78rem; }

@@ -104,6 +104,10 @@ Reglas importantes:
 - El **índice vectorial** se crea con `gcloud` (ver `docs/DEPLOYMENT.md`); el service-account del repo no tiene permiso para crearlo.
 - Estado al 6 jun 2026: `guidelines`=226 docs (fallback); `guideline_passages`=7.128 pasajes con vector. Índice vectorial: **pendiente de crear por el usuario**.
 
+## Rediseño Studio (rama `redesign/endogym-studio`)
+
+Existe un rediseño completo "data-driven cálido" en la ruta **`/studio`**, montado como bundle estático en `public/studio/app/` dentro de un iframe (`src/app/studio/page.js`). NO toca el dashboard anterior. Coach IA cableado a Gemini real vía `/api/coach-chat`; auth del iframe vía `/api/public-config`; datos reales (perfil) vía `/api/studio-data` con fusión sobre datos de muestra. `next.config.mjs` aplica CSP relajada SOLO a `/studio*` (Babel-in-browser necesita `unsafe-eval`). Detalle completo y pendientes en `docs/STUDIO_REDESIGN.md`.
+
 ## Verificacion minima
 
 ```bash
