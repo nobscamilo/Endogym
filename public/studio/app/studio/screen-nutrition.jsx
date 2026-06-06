@@ -437,9 +437,15 @@ function NutritionGlu() {
         </SectionCard>
 
         <SectionCard title="Respuesta a lo largo del día" icon="heart"
-          action={<span className="pill tiny"><Icon name="drop" size={12} /> II medio {g.insulinIndex}</span>}>
-          <div style={{ marginTop: 10 }}><Spark data={g.points} color="var(--glu-mid)" height={130} /></div>
-          <div className="glu-scale" style={{ marginTop: 6 }}><span>08h</span><span>12h</span><span>16h</span><span>21h</span></div>
+          action={g.insulinIndex != null ? <span className="pill tiny"><Icon name="drop" size={12} /> II medio {g.insulinIndex}</span> : null}>
+          {Array.isArray(g.points) && g.points.length ? (
+            <React.Fragment>
+              <div style={{ marginTop: 10 }}><Spark data={g.points} color="var(--glu-mid)" height={130} /></div>
+              <div className="glu-scale" style={{ marginTop: 6 }}><span>08h</span><span>12h</span><span>16h</span><span>21h</span></div>
+            </React.Fragment>
+          ) : (
+            <div className="empty" style={{ lineHeight: 1.5 }}>La curva continua necesita un sensor de glucosa (CGM). Mostramos tu <strong>carga estimada</strong> por comidas e impacto por plato.</div>
+          )}
         </SectionCard>
       </div>
 

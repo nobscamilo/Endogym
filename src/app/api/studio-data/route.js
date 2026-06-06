@@ -221,8 +221,46 @@ function mapMacroEaten(meals) {
   };
 }
 
+// Glucemia real desde las comidas logueadas de hoy (no hay sensor continuo → sin curva).
+function mapGlycemic(meals) {
+  if (!Array.isArray(meals) || !meals.length) return null;
+  let load = 0; let iiSum = 0; let iiN = 0; let has = false;
+  for (const m of meals) {
+    const t = m.totals || {};
+    if (Number.isFinite(Number(t.glycemicLoad))) { load += Number(t.glycemicLoad); has = true; }
+    if (Number.isFinite(Number(t.insulinIndex))) { iiSum += Number(t.insulinIndex); iiN += 1; }
+  }
+  if (!has) return null;
+  const dayLoad = Math.round(load);
+  const dayClass = dayLoad < 25 ? 'good' : dayLoad < 50 ? 'mid' : 'high';
+  return {
+    dayLoad,
+    dayClass,
+    insulinIndex: iiN ? Math.round(iiSum / iiN) : null,
+    note: 'Carga glucémica estimada a partir de tus comidas registradas hoy.',
+    points: null, // sin sensor de glucosa continua
+  };
+}
+
+const MUSCLE_GROUPS = [
+  ['Pecho', ['pecho', 'pectoral', 'chest']],
+  ['Espalda', ['espalda', 'dorsal', 'lat', 'lumbar', 'trapecio', 'back', 'romboide']],
+  ['Pierna', ['cuadricep', 'quad', 'isquio', 'femoral', 'hamstring', 'gluteo', 'glute', 'pierna', 'gemelo', 'pantorrilla', 'aductor']],
+  ['Hombro', ['hombro', 'deltoid', 'shoulder']],
+  ['Brazo', ['biceps', 'triceps', 'brazo', 'antebrazo', 'forearm']],
+  ['Core', ['core', 'abs', 'abdomen', 'oblicuo', 'oblique']],
+];
+function groupOf(muscle) {
+  const n = String(muscle || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  for (const [g, terms] of MUSCLE_GROUPS) if (terms.some((t) => n.includes(t))) return g;
+  return null;
+}
+
 function mapProgress(metrics, workouts, plan) {
   const out = {};
+  const wlist = Array.isArray(workouts) ? workouts : [];
+
+  // Peso (métricas)
   const weights = (Array.isArray(metrics) ? metrics : [])
     .filter((m) => Number.isFinite(Number(m.weightKg)) && m.performedAt)
     .sort((a, b) => String(a.performedAt).localeCompare(String(b.performedAt)))
@@ -233,13 +271,67 @@ function mapProgress(metrics, workouts, plan) {
     out.weightNow = series[series.length - 1];
     out.weightDelta6w = Number((series[series.length - 1] - series[0]).toFixed(1));
     out.weightDeltaWk = Number((series[series.length - 1] - series[Math.max(0, series.length - 2)]).toFixed(1));
+  } else {
+    out.weightSeries = weights.length === 1 ? weights : [];
+    out.weightNow = weights.length === 1 ? weights[0] : null;
+    out.weightDelta6w = null;
+    out.weightDeltaWk = null;
   }
+
+  // Sesiones / adherencia / volumen (plan + entrenos)
   const planDays = Array.isArray(plan?.days) ? plan.days : [];
   const sessionsPlan = planDays.filter((d) => d.isTrainingDay).length;
   if (sessionsPlan) out.sessionsPlan = sessionsPlan;
-  if (Array.isArray(workouts)) {
-    out.sessionsDone = workouts.filter((w) => w.completed !== false).length;
+  const done = wlist.filter((w) => w.completed !== false && w.source !== 'daily_checkin' || (w.source === 'daily_checkin' && w.completed === true)).length;
+  out.sessionsDone = done;
+  if (sessionsPlan) out.adherence = Math.min(100, Math.round((done / sessionsPlan) * 100));
+  const planVolMin = planDays.reduce((a, d) => a + (d.isTrainingDay ? Number(d.workout?.durationMinutes) || 0 : 0), 0);
+  if (planVolMin) out.volumeWk = Number((planVolMin / 60).toFixed(1));
+
+  // Strain (últimos 7 días) desde check-ins/entrenos: RPE del día (0-10).
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const strain = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(today); d.setUTCDate(today.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const w = wlist.find((x) => String(x.performedAt || '').slice(0, 10) === key);
+    strain.push(w && Number.isFinite(Number(w.sessionRpe)) ? Number(w.sessionRpe) : 0);
   }
+  out.strain = strain.some((v) => v > 0) ? strain : [];
+
+  // Recovery (proxy del último check-in con sueño/fatiga)
+  const lastCheckin = wlist
+    .filter((w) => w.source === 'daily_checkin' && (Number.isFinite(Number(w.sleepHours)) || Number.isFinite(Number(w.fatigue))))
+    .sort((a, b) => String(b.performedAt).localeCompare(String(a.performedAt)))[0];
+  if (lastCheckin) {
+    const sleep = Number(lastCheckin.sleepHours);
+    const fatigue = Number(lastCheckin.fatigue);
+    let rec = 50;
+    if (Number.isFinite(sleep)) rec = (Math.min(8, sleep) / 8) * 55;
+    if (Number.isFinite(fatigue)) rec += (10 - fatigue) * 4.5;
+    out.recovery = Math.max(0, Math.min(100, Math.round(rec)));
+  } else {
+    out.recovery = null;
+  }
+
+  // Volumen por grupo muscular (desde los ejercicios del plan)
+  const counts = {};
+  planDays.forEach((d) => (d.workout?.exercises || []).forEach((e) => {
+    (e.primaryMuscles || [e.category]).forEach((m) => { const g = groupOf(m); if (g) counts[g] = (counts[g] || 0) + 1; });
+  }));
+  const maxC = Math.max(0, ...Object.values(counts));
+  out.muscleVolume = maxC > 0 ? MUSCLE_GROUPS.map(([g]) => ({ m: g, v: Number(((counts[g] || 0) / maxC).toFixed(2)) })) : [];
+
+  // PRs (récords) desde entrenos manuales con ejercicios y carga.
+  const prByLift = {};
+  wlist.forEach((w) => (w.exercises || []).forEach((e) => {
+    const kg = Number(e.weightKg);
+    if (e.name && Number.isFinite(kg) && kg > 0) {
+      if (!prByLift[e.name] || kg > prByLift[e.name]) prByLift[e.name] = kg;
+    }
+  }));
+  out.pr = Object.entries(prByLift).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([lift, kg]) => ({ lift, val: `${kg} kg`, delta: '' }));
+
   return Object.keys(out).length ? out : null;
 }
 
@@ -259,17 +351,14 @@ export async function GET(request) {
       const today = todayStrUTC();
       const startOfTodayIso = `${today}T00:00:00.000Z`;
       const since6wIso = new Date(Date.now() - 42 * 24 * 3600 * 1000).toISOString();
-      const startOfWeek = new Date();
-      startOfWeek.setUTCHours(0, 0, 0, 0);
-      startOfWeek.setUTCDate(startOfWeek.getUTCDate() - 6);
-      const startOfWeekIso = startOfWeek.toISOString();
+      const since60dIso = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
 
       const [profile, latestPlan, todayMeals, metrics, workouts] = await Promise.all([
         getUserProfile(user.uid),
         getLatestWeeklyPlan(user.uid).catch(() => null),
         listMealsSince(user.uid, startOfTodayIso, 50).catch(() => []),
         listMetricsSince(user.uid, since6wIso, 200).catch(() => []),
-        listWorkoutsSince(user.uid, startOfWeekIso, 50).catch(() => []),
+        listWorkoutsSince(user.uid, since60dIso, 200).catch(() => []),
       ]);
 
       const overrides = {};
@@ -281,6 +370,7 @@ export async function GET(request) {
       setIf('library', mapLibrary(latestPlan));
       setIf('macroTargets', mapMacroTargets(latestPlan, today));
       setIf('macroEaten', mapMacroEaten(todayMeals));
+      setIf('glycemic', mapGlycemic(todayMeals));
       setIf('progress', mapProgress(metrics, workouts, latestPlan));
 
       return jsonResponse({ ok: true, overrides });

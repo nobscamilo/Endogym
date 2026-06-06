@@ -4,14 +4,25 @@ const { useState: useStateP } = React;
 /* ============ PROGRESO ============ */
 function ProgressScreen() {
   const D = window.STUDIO;
-  const p = D.progress;
+  const p = D.progress || {};
   const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
   const [ask, setAsk] = useStateP(false);
+
+  const rec = Number.isFinite(p.recovery) ? p.recovery : null;
+  const strain = Array.isArray(p.strain) ? p.strain : [];
+  const hasStrain = strain.some((v) => v > 0);
+  const strainTotal = strain.reduce((a, b) => a + (Number(b) || 0), 0);
+  const strainDays = strain.filter((v) => v > 0).length;
+  const ws = Array.isArray(p.weightSeries) ? p.weightSeries : [];
+  const mv = (Array.isArray(p.muscleVolume) ? p.muscleVolume : []).filter((m) => m.v > 0);
+  const pr = Array.isArray(p.pr) ? p.pr : [];
+  const fmt = (n) => (n == null ? '—' : String(n).replace('.', ','));
+
   return (
-    <div className="page stagger screen-enter" data-comment-anchor="891f2ca371-div-10-5">
+    <div className="page stagger screen-enter">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Progreso · Semana 6</p>
+          <p className="eyebrow">Progreso</p>
           <h1>Tu evolución</h1>
           <p className="sub">Recuperación, carga y fuerza en un mismo sitio. Los datos que mueven tu plan.</p>
         </div>
@@ -23,62 +34,85 @@ function ProgressScreen() {
       <div className="grid g-2" style={{ gridTemplateColumns: '0.85fr 1.15fr' }}>
         <div className="card lg" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div className="mb-label" style={{ alignSelf: 'flex-start' }}>Recuperación hoy</div>
-          <Arc value={p.recovery} max={100} size={220} stroke={18} color="var(--d-recover)">
-            <div><div className="a-num num">{p.recovery}<span style={{ fontSize: '0.4em', color: 'var(--ink-3)' }}>%</span></div><div className="a-lbl">Buena</div></div>
-          </Arc>
-          <p className="muted tiny" style={{ textAlign: 'center', margin: '4px 0 0', lineHeight: 1.5 }}>Tu sistema nervioso está recuperado. Buen día para entrenar con intensidad.</p>
+          {rec != null ? (
+            <React.Fragment>
+              <Arc value={rec} max={100} size={220} stroke={18} color="var(--d-recover)">
+                <div><div className="a-num num">{rec}<span style={{ fontSize: '0.4em', color: 'var(--ink-3)' }}>%</span></div><div className="a-lbl">{rec >= 66 ? 'Buena' : rec >= 40 ? 'Media' : 'Baja'}</div></div>
+              </Arc>
+              <p className="muted tiny" style={{ textAlign: 'center', margin: '4px 0 0', lineHeight: 1.5 }}>Estimación a partir de tu último check-in (sueño y fatiga).</p>
+            </React.Fragment>
+          ) : (
+            <div className="empty" style={{ padding: '40px 10px' }}>Haz tu check-in diario en Entreno para estimar tu recuperación.</div>
+          )}
         </div>
 
-        <SectionCard title="Carga semanal" icon="bolt" sub="Esfuerzo acumulado por día (escala 0–10)">
-          <div style={{ marginTop: 8 }}>
-            <Bars data={p.strain} color="var(--d-move)" height={150} labels={days} activeIdx={0} />
-          </div>
-          <div className="row between" style={{ marginTop: 14 }}>
-            <Stat num="34,7" label="Carga total semana" />
-            <Stat num="4,9" label="Media diaria" color="var(--d-move)" />
-          </div>
+        <SectionCard title="Carga semanal" icon="bolt" sub="Esfuerzo (RPE) por día de tus check-ins">
+          {hasStrain ? (
+            <React.Fragment>
+              <div style={{ marginTop: 8 }}>
+                <Bars data={strain} color="var(--d-move)" height={150} labels={days} activeIdx={6} />
+              </div>
+              <div className="row between" style={{ marginTop: 14 }}>
+                <Stat num={fmt(Number(strainTotal.toFixed(1)))} label="Carga total semana" />
+                <Stat num={fmt(strainDays ? Number((strainTotal / strainDays).toFixed(1)) : 0)} label="Media por sesión" color="var(--d-move)" />
+              </div>
+            </React.Fragment>
+          ) : (
+            <div className="empty">Registra tus sesiones con el check-in para ver tu carga semanal.</div>
+          )}
         </SectionCard>
       </div>
 
       {/* Peso */}
       <SectionCard title="Peso corporal" icon="scale"
-      action={<span className="pill tiny num">{p.weightDelta6w} kg · 6 sem</span>}>
-        <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
-          <Stat num="74,8" unit="kg" label={`↓ ${Math.abs(p.weightDeltaWk)} kg esta semana`} color="var(--glu-good)" />
-          <div style={{ flex: 1, maxWidth: 480 }}><Spark data={p.weightSeries} color="var(--accent)" height={96} /></div>
-        </div>
+        action={p.weightDelta6w != null ? <span className="pill tiny num">{p.weightDelta6w} kg · 6 sem</span> : null}>
+        {ws.length >= 2 ? (
+          <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
+            <Stat num={fmt(p.weightNow)} unit="kg" label={p.weightDeltaWk != null ? `${p.weightDeltaWk <= 0 ? '↓' : '↑'} ${Math.abs(p.weightDeltaWk)} kg esta semana` : 'Tu evolución'} color="var(--glu-good)" />
+            <div style={{ flex: 1, maxWidth: 480 }}><Spark data={ws} color="var(--accent)" height={96} /></div>
+          </div>
+        ) : (
+          <div className="empty">Registra tu peso para ver tu evolución.</div>
+        )}
       </SectionCard>
 
       {/* Volumen por músculo + PRs */}
       <div className="grid g-2" style={{ alignItems: 'start' }}>
-        <SectionCard title="Volumen por grupo" icon="target" sub="Equilibrio de tu semana">
-          <div className="stack" style={{ marginTop: 4 }}>
-            {p.muscleVolume.map((m, i) =>
-            <div key={i} className="vol-row">
-                <span className="vol-name">{m.m}</span>
-                <div className="vol-bar"><i style={{ width: m.v * 100 + '%' }} /></div>
-                <span className="vol-pct num">{Math.round(m.v * 100)}%</span>
-              </div>
-            )}
-          </div>
+        <SectionCard title="Volumen por grupo" icon="target" sub="Reparto de tu plan actual">
+          {mv.length ? (
+            <div className="stack" style={{ marginTop: 4 }}>
+              {mv.map((m, i) => (
+                <div key={i} className="vol-row">
+                  <span className="vol-name">{m.m}</span>
+                  <div className="vol-bar"><i style={{ width: m.v * 100 + '%' }} /></div>
+                  <span className="vol-pct num">{Math.round(m.v * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty">Genera un plan de entreno para ver el volumen por grupo.</div>
+          )}
         </SectionCard>
 
-        <SectionCard title="Récords recientes" icon="flame" sub="Tus mejores marcas este mes">
-          <div className="stack">
-            {p.pr.map((r, i) =>
-            <div key={i} className="pr-row">
-                <span className="pr-lift">{r.lift}</span>
-                <span className="pr-val">{r.val}</span>
-                <span className="pill good tiny num">{r.delta}</span>
-              </div>
-            )}
-          </div>
+        <SectionCard title="Récords recientes" icon="flame" sub="Tus mejores marcas">
+          {pr.length ? (
+            <div className="stack">
+              {pr.map((r, i) => (
+                <div key={i} className="pr-row">
+                  <span className="pr-lift">{r.lift}</span>
+                  <span className="pr-val">{r.val}</span>
+                  {r.delta ? <span className="pill good tiny num">{r.delta}</span> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty">Aún sin récords. Registra entrenos con carga para verlos aquí.</div>
+          )}
         </SectionCard>
       </div>
 
       <AskCoach open={ask} onClose={() => setAsk(false)} />
     </div>);
-
 }
 
 /* ============ PERFIL ============ */
