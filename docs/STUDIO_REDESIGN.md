@@ -51,7 +51,9 @@ El diseño es un SPA React. Para máxima fidelidad y aislamiento total del resto
   - `macroTargets` / `macroEaten` — objetivo nutricional del plan y suma de comidas logueadas hoy.
   - `progress` — serie de peso (métricas), peso actual y deltas, sesiones hechas/planificadas.
 
-  **Sigue en MUESTRA** (no existe equivalente en backend todavía): recetas de comidas (ingredientes/pasos), lista de compra, batch cooking, curva glucémica del día, y en progreso: strain/recovery/volumen muscular/PRs.
+  **Glucemia y Progreso reales (6 jun, de-sample):** carga glucémica e índice insulínico del día desde las comidas registradas; en Progreso: peso, sesiones, adherencia, **strain** (RPE de check-ins), **recovery** (proxy sueño/fatiga del último check-in), **volumen por grupo** (del plan) y **PRs** (entrenos con carga). Todo con **estados vacíos honestos** cuando no hay datos. La **curva continua** de glucosa muestra una nota (necesita CGM). Recetas/compra/batch se generan con IA (botón).
+
+  **Sigue en MUESTRA** solo en modo demo (sin login): los datos de ejemplo de `data.js`. Con sesión, el contenido es real o vacío.
 
 ## Seguridad (CSP)
 
