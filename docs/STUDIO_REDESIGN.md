@@ -14,6 +14,13 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
 
 > Estas features se editan en `public/studio/app/studio/{screen-train,screen-nutrition}.jsx` + `screens.css` y requieren **regenerar el bundle** (`npm run build:studio`, mantenedor) y commitearlo.
 
+## Disponibilidad y swap (epic Endogym, por fases)
+
+- **Fase 1 — Encuesta de disponibilidad (hecha):** en Perfil (`AvailabilitySurvey`): objetivo, equipo (→`trainingModality`), min/sesión (`preferredDurationMinutes`), días/semana (`daysPerWeek`), comidas/día, y cada cuántas semanas re-preguntar (`resurveyWeeks`). Endpoint **`/api/studio-availability`** (merge PARCIAL del perfil con `upsertUserProfile`, no resetea; marca `studioAvailability:true`). Al guardar, regenera el plan (`/api/weekly-plan`) y refresca datos. El planner honra `preferredDurationMinutes` **solo si `studioAvailability===true`** (no altera defaults ni tests).
+  - **Objetivo, equipo y comidas re-ajustan el plan/macros de verdad** (el planner ya los usa).
+  - **`daysPerWeek` se persiste pero el planner aún NO cambia la frecuencia** (las plantillas son de 7 días fijos). Honrarlo requiere tocar `MODALITY_TEMPLATES`/planner con tests — pendiente.
+- **Fase 2 — Swap de ejercicios (pendiente):** el backend tiene `suggestExerciseAlternatives()` (lógica del coach: no repetir) y el plan acepta `exerciseSwapsByDate`/`sessionSwapsByDate`/`durationOverridesByDate` (PATCH). Falta exponer alternativas vía API y cablear la UI (botón "Cambiar" por ejercicio y por sesión). Nota: la lógica que APLICA las customizations al plan mostrado vivía en el cliente viejo; conviene un endpoint que aplique en servidor y devuelva la sesión.
+
 ## Marca Ignios (logo oficial)
 
 El logo oficial es la **llama de Ignios** (de *ignis*; hereda el color de acento de la app vía `var(--accent)`/`var(--accent-2)`). Implementado en el componente `Logo` de `public/studio/app/studio/icons.jsx`. Favicon del Studio en `public/studio/app/favicon.svg` (llama ámbar fija). La **hoja de marca** oficial (lockups, escalas, acentos en claro/oscuro) está como página autónoma en **`/studio/marca.html`**.
