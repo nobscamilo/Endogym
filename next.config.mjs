@@ -74,9 +74,10 @@ const nextConfig = {
         source: '/studio/:path*',
         headers: studioSecurityHeaders,
       },
-      // Resto de la app: CSP estricta. Se excluye /studio para no duplicar la cabecera CSP.
+      // Resto de la app: CSP estricta. Se excluye /studio y /studio/* (no /studious) para
+      // no duplicar la cabecera CSP en esas rutas.
       {
-        source: '/((?!studio).*)',
+        source: '/((?!studio$|studio/).*)',
         headers: securityHeaders,
       },
     ];
