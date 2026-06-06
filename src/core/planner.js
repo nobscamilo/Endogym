@@ -779,6 +779,18 @@ export function generateWeeklyPlan({
     };
   });
 
+  // Disponibilidad (encuesta del Studio): si el usuario fijó minutos por sesión, ajusta la
+  // duración de los días de entreno. Gated por `studioAvailability` para no alterar el
+  // comportamiento por defecto ni los tests existentes.
+  if (profile.studioAvailability === true) {
+    const prefMin = Math.round(Number(profile.preferredDurationMinutes));
+    if (Number.isFinite(prefMin) && prefMin >= 20 && prefMin <= 150) {
+      days.forEach((d) => {
+        if (d.isTrainingDay && d.workout) d.workout.durationMinutes = clamp(prefMin, 20, 150);
+      });
+    }
+  }
+
   const acsmPrescription = buildAcsmPrescription(goal, modality);
   const clinicalAuditTrail = buildClinicalAuditTrail({
     preparticipationScreening,

@@ -115,6 +115,72 @@ function ProgressScreen() {
     </div>);
 }
 
+/* ---- Encuesta de disponibilidad: ajusta plan y comidas ---- */
+const AV_GOALS = [['recomposition', 'Recomposición'], ['weight_loss', 'Bajar peso'], ['hypertrophy', 'Hipertrofia'], ['strength', 'Fuerza'], ['endurance', 'Resistencia'], ['glycemic_control', 'Glucémico']];
+const AV_EQUIP = [['full_gym', 'Gimnasio'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
+function AvailabilitySurvey() {
+  const D = window.STUDIO;
+  const [goal, setGoal] = useStateP('recomposition');
+  const [equip, setEquip] = useStateP('full_gym');
+  const [mins, setMins] = useStateP(60);
+  const [days, setDays] = useStateP(5);
+  const [meals, setMeals] = useStateP(4);
+  const [weeks, setWeeks] = useStateP(4);
+  const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth
+
+  async function save() {
+    setStatus('saving');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setStatus('noauth'); return; }
+      const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
+      const r = await fetch('/api/studio-availability', {
+        method: 'POST', headers,
+        body: JSON.stringify({ goal, trainingModality: equip, sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks) }),
+      });
+      if (!r.ok) { setStatus('err'); return; }
+      await fetch('/api/weekly-plan', { method: 'POST', headers, body: '{}' }).catch(() => {});
+      try {
+        const d = await fetch('/api/studio-data', { headers: { authorization: 'Bearer ' + token } });
+        if (d.ok) {
+          const j = await d.json();
+          const o = j && j.ok ? j.overrides : null;
+          if (o) ['user', 'todaySession', 'week', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+        }
+      } catch (e) { /* noop */ }
+      setStatus('ok'); setTimeout(() => setStatus('idle'), 3500);
+    } catch (e) { setStatus('err'); }
+  }
+
+  return (
+    <SectionCard title="Disponibilidad y ajuste" icon="settings" sub="Adapta tu plan y comidas a tu tiempo y equipo. Repítela cada cierto tiempo.">
+      <div className="stack" style={{ gap: 14 }}>
+        <div>
+          <div className="mb-label">Objetivo</div>
+          <div className="chips">{AV_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${goal === v ? 'accent' : ''}`} onClick={() => setGoal(v)}>{l}</button>)}</div>
+        </div>
+        <div>
+          <div className="mb-label">Equipo disponible</div>
+          <div className="chips">{AV_EQUIP.map(([v, l]) => <button key={v} type="button" className={`pill ${equip === v ? 'accent' : ''}`} onClick={() => setEquip(v)}>{l}</button>)}</div>
+        </div>
+        <div className="grid g-4" style={{ gap: 10 }}>
+          <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
+          <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
+          <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
+          <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
+        </div>
+        <div className="row ac" style={{ gap: 12 }}>
+          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="sparkles" size={16} /> {status === 'saving' ? 'Ajustando plan…' : 'Guardar y reajustar plan'}</button>
+          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan y comidas reajustados ✨</span> : null}
+          {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
+          {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
+        </div>
+        <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>Al guardar, regeneramos tu plan de entreno y tus macros según tu objetivo, equipo y tiempo. Los días/semana se guardan para tu seguimiento.</p>
+      </div>
+    </SectionCard>
+  );
+}
+
 /* ============ PERFIL ============ */
 function ProfileScreen({ theme, setTheme, notif, setNotif }) {
   const D = window.STUDIO;
@@ -141,6 +207,8 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
           <button className="btn ghost"><Icon name="edit" size={16} /> Editar</button>
         </div>
       </div>
+
+      <AvailabilitySurvey />
 
       <div className="grid g-2" style={{ alignItems: 'start' }}>
         <SectionCard title="Datos y objetivo" icon="profile">
