@@ -76,11 +76,11 @@ function AskCoach({ open, onClose }) {
     const question = (text || q).trim();
     if (!question || busy) return;
     setQ(''); setLog((l) => [...l, { role: 'user', text: question }]); setBusy(true);
-    const sys = 'Eres el Coach IA de Ignios, una app de fitness y nutrición. La usuaria es Marta: objetivo recomposición + control glucémico, 74,8 kg, entrena en gimnasio 5 días, semana 6 de su plan, racha 12 días, hoy hizo empuje. Responde en español de España, breve (2-4 frases), cercano, motivador y práctico. Escribe en texto plano, sin markdown ni asteriscos. No des consejo médico ni diagnósticos.';
+    const sys = 'Eres el Coach IA de Ignios, una app de fitness y nutrición. Responde en español de España, breve (2-4 frases), cercano, motivador y práctico. Escribe en texto plano, sin markdown ni asteriscos. No des consejo médico ni diagnósticos. Usa el contexto del usuario que se te proporcione (perfil, objetivo y plan); si no hay contexto, responde de forma general.';
     let answer = '';
     try {
       if (window.claude && window.claude.complete) {
-        answer = await window.claude.complete(`${sys}\n\nPregunta de Marta: ${question}`);
+        answer = await window.claude.complete(`${sys}\n\nPregunta del usuario: ${question}`);
       }
     } catch (e) { answer = ''; }
     if (!answer) answer = COACH_FALLBACK.default;

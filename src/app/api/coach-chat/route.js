@@ -6,6 +6,29 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
+import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
+
+async function buildUserContext(uid) {
+  try {
+    const [profile, plan] = await Promise.all([
+      getUserProfile(uid).catch(() => null),
+      getLatestWeeklyPlan(uid).catch(() => null),
+    ]);
+    if (!profile && !plan) return '';
+    const parts = [];
+    const name = profile?.firstName || profile?.name || profile?.displayName;
+    if (name) parts.push(`Nombre: ${name}.`);
+    if (profile?.goal) parts.push(`Objetivo: ${profile.goal}.`);
+    if (profile?.trainingModality || profile?.trainingMode) parts.push(`Modalidad: ${profile.trainingModality || profile.trainingMode}.`);
+    if (Number.isFinite(Number(profile?.weightKg))) parts.push(`Peso: ${profile.weightKg} kg.`);
+    if (Number.isFinite(Number(profile?.age))) parts.push(`Edad: ${profile.age}.`);
+    if (profile?.medicalConditions) parts.push(`Condiciones: ${profile.medicalConditions}.`);
+    const today = Array.isArray(plan?.days) ? (plan.days.find((d) => d?.today) || plan.days[0]) : null;
+    if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
+    if (!parts.length) return '';
+    return `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`;
+  } catch { return ''; }
+}
 
 // Chat "Pregúntale al coach" del rediseño Studio.
 // Recibe { prompt } (el frontend ya incluye el system + contexto del usuario) y
@@ -47,12 +70,14 @@ export async function POST(request) {
       return errorResponse('Modelo Gemini inválido.', 500);
     }
 
+    const userContext = await buildUserContext(user.uid);
+
     try {
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
         timeoutMs: 12000,
-        parts: [{ text: prompt }],
+        parts: [{ text: prompt + userContext }],
         generationConfig: {
           temperature: 0.6,
           topP: 0.9,

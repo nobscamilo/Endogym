@@ -40,6 +40,12 @@ function App() {
   const setTheme = (v) => setTweak('theme', v);
   const [notif, setNotif] = useStateA(true);
 
+  // Usuario real (lo rellena /api/studio-data tras login); fallback a muestra en modo demo.
+  const u = (window.STUDIO && window.STUDIO.user) || {};
+  const userName = `${u.name || ''} ${u.last || ''}`.trim() || 'Tu perfil';
+  const userInitials = u.initials || (u.name ? u.name[0].toUpperCase() : 'U');
+  const userPlan = u.plan || (u.goalShort ? u.goalShort : 'Plan personalizado');
+
   useEffectA(() => {
     const r = document.documentElement;
     r.setAttribute('data-theme', t.theme);
@@ -110,8 +116,8 @@ function App() {
                     {!mini ? <button className="btn block" onClick={() => setSheet(true)}><Icon name="plus" size={17} /> Registro rápido</button>
                       : <button className="btn icon-only" onClick={() => setSheet(true)} title="Registro rápido"><Icon name="plus" size={20} /></button>}
                     <div className="user-card" onClick={() => go('profile')}>
-                      <span className="avatar">M</span>
-                      <div className="user-meta"><strong>Marta García</strong><span>Plan adaptativo · S6</span></div>
+                      <span className="avatar">{userInitials}</span>
+                      <div className="user-meta"><strong>{userName}</strong><span>{userPlan}</span></div>
                     </div>
                   </div>
                 </aside>
