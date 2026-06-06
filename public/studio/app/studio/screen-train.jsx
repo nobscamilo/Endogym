@@ -1,50 +1,99 @@
 /* ENDOGYM STUDIO — Pantalla ENTRENO (sesión · semana · vídeos) */
 const { useState: useStateTr } = React;
 
-/* ---- Mapa muscular (atlas Endogym recuperado): base + capas recoloreadas por drop-shadow ---- */
+/* ---- Mapa muscular (atlas Endogym): base limpia + spots con pulso magenta/índigo ---- */
 function __normMuscle(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
-// Cada término (ES/EN) -> capas PNG que se iluminan (alineadas 1:1 con la base).
-const MUSCLE_LAYERS = [
-  [['pecho', 'pectoral', 'chest'], ['front-chest']],
-  [['hombro', 'deltoid', 'shoulder'], ['front-front_shoulders', 'back-rear_shoulders']],
-  [['triceps'], ['back-triceps']],
-  [['biceps'], ['front-biceps']],
-  [['espalda alta', 'upper back', 'trapecio', 'trapezius'], ['back-upper_back']],
-  [['dorsal', 'dorsales', 'lats', 'lat ', 'espalda'], ['back-lats', 'back-upper_back']],
-  [['lumbar', 'low back', 'espalda baja', 'core', 'abdomen', 'abs', 'abdominal'], ['front-abs', 'front-obliques']],
-  [['oblicuo', 'oblique'], ['front-obliques']],
-  [['lumbar', 'lower back'], ['back-lower_back']],
-  [['cuadriceps', 'quadriceps', 'quad', 'pierna', 'leg'], ['front-quadriceps']],
-  [['isquio', 'femoral', 'hamstring'], ['back-hamstrings']],
-  [['gluteo', 'glute'], ['back-glutes']],
-  [['gemelo', 'pantorrilla', 'calf', 'calves'], ['front-calves', 'back-calves']],
-  [['antebrazo', 'forearm'], ['front-forearms']],
-  [['aductor', 'adductor'], ['front-adductors']],
+// Centros (top/left) y tamaño de cada región sobre la figura (translate -50%,-50%).
+const REGION_COORDS = {
+  front: {
+    front_shoulders: [{ top: '26%', left: '40%', width: '8%', height: '8%' }, { top: '26%', left: '60%', width: '8%', height: '8%' }],
+    chest: [{ top: '30.5%', left: '45%', width: '10%', height: '7%' }, { top: '30.5%', left: '55%', width: '10%', height: '7%' }],
+    biceps: [{ top: '35%', left: '38%', width: '7%', height: '9%' }, { top: '35%', left: '62%', width: '7%', height: '9%' }],
+    forearms: [{ top: '45%', left: '35%', width: '7%', height: '10%' }, { top: '45%', left: '65%', width: '7%', height: '10%' }],
+    abs: [{ top: '39%', left: '50%', width: '12%', height: '14%' }],
+    obliques: [{ top: '39%', left: '45%', width: '7%', height: '12%' }, { top: '39%', left: '55%', width: '7%', height: '12%' }],
+    quadriceps: [{ top: '57%', left: '45%', width: '11%', height: '17%' }, { top: '57%', left: '55%', width: '11%', height: '17%' }],
+    adductors: [{ top: '61%', left: '50%', width: '8%', height: '12%' }],
+    calves: [{ top: '77%', left: '46%', width: '8%', height: '12%' }, { top: '77%', left: '54%', width: '8%', height: '12%' }],
+  },
+  back: {
+    rear_shoulders: [{ top: '26%', left: '40%', width: '8%', height: '8%' }, { top: '26%', left: '60%', width: '8%', height: '8%' }],
+    upper_back: [{ top: '24%', left: '50%', width: '16%', height: '11%' }],
+    lats: [{ top: '35%', left: '44%', width: '8%', height: '14%' }, { top: '35%', left: '56%', width: '8%', height: '14%' }],
+    triceps: [{ top: '34%', left: '38%', width: '7%', height: '11%' }, { top: '34%', left: '62%', width: '7%', height: '11%' }],
+    lower_back: [{ top: '43%', left: '50%', width: '12%', height: '8%' }],
+    glutes: [{ top: '51%', left: '46%', width: '10%', height: '11%' }, { top: '51%', left: '54%', width: '10%', height: '11%' }],
+    hamstrings: [{ top: '64%', left: '45%', width: '10%', height: '17%' }, { top: '64%', left: '55%', width: '10%', height: '17%' }],
+    calves: [{ top: '78%', left: '45%', width: '8%', height: '12%' }, { top: '78%', left: '55%', width: '8%', height: '12%' }],
+  },
+};
+// Término (ES/EN) -> regiones {front:[], back:[]}.
+const MUSCLE_REGIONS = [
+  [['pecho', 'pectoral', 'chest'], { front: ['chest'] }],
+  [['hombro', 'deltoid', 'shoulder'], { front: ['front_shoulders'], back: ['rear_shoulders'] }],
+  [['triceps'], { back: ['triceps'] }],
+  [['biceps'], { front: ['biceps'] }],
+  [['espalda alta', 'trapecio', 'upper back'], { back: ['upper_back'] }],
+  [['dorsal', 'lats', 'espalda'], { back: ['lats', 'upper_back'] }],
+  [['core', 'abdomen', 'abs', 'abdominal'], { front: ['abs'] }],
+  [['oblicuo', 'oblique'], { front: ['obliques'] }],
+  [['lumbar', 'espalda baja', 'lower back'], { back: ['lower_back'] }],
+  [['cuadricep', 'quad', 'pierna'], { front: ['quadriceps'] }],
+  [['isquio', 'femoral', 'hamstring'], { back: ['hamstrings'] }],
+  [['gluteo', 'glute'], { back: ['glutes'] }],
+  [['gemelo', 'pantorrilla', 'calf', 'calves'], { front: ['calves'], back: ['calves'] }],
+  [['antebrazo', 'forearm'], { front: ['forearms'] }],
+  [['aductor', 'adductor'], { front: ['adductors'] }],
 ];
-function layersFor(muscles) {
-  const set = new Set();
+function regionsFor(muscles) {
+  const front = new Set(); const back = new Set();
   (muscles || []).forEach((m) => {
     const n = __normMuscle(m);
-    MUSCLE_LAYERS.forEach(([terms, layers]) => {
-      if (terms.some((t) => n.includes(t.trim()))) layers.forEach((l) => set.add(l));
+    MUSCLE_REGIONS.forEach(([terms, r]) => {
+      if (terms.some((t) => n.includes(t))) { (r.front || []).forEach((x) => front.add(x)); (r.back || []).forEach((x) => back.add(x)); }
     });
   });
-  return set;
+  return { front, back };
+}
+function Spots({ view, regions, tone }) {
+  const out = [];
+  regions.forEach((rg) => {
+    (REGION_COORDS[view] && REGION_COORDS[view][rg] || []).forEach((c, i) => {
+      out.push(<span key={`${view}-${rg}-${tone}-${i}`} className={`fiber-activation ${tone}`} style={{ top: c.top, left: c.left, width: c.width, height: c.height }} aria-hidden="true" />);
+    });
+  });
+  return out;
 }
 function MuscleMap({ primary = [], secondary = [] }) {
-  const prim = layersFor(primary);
-  const sec = layersFor(secondary);
-  sec.forEach((l) => { if (prim.has(l)) sec.delete(l); }); // primario gana
-  const all = [...prim, ...sec];
+  const p = regionsFor(primary);
+  const s = regionsFor(secondary);
+  [...s.front].forEach((x) => { if (p.front.has(x)) s.front.delete(x); });
+  [...s.back].forEach((x) => { if (p.back.has(x)) s.back.delete(x); });
   return (
-    <div className="mmap">
-      <img className="mmap-base" src="assets/anatomy/vector-muscles-base.png" alt="Mapa muscular" loading="lazy" />
-      {all.map((layer) => (
-        <img key={layer} className={`mmap-layer ${prim.has(layer) ? 'prim' : 'sec'}`}
-          src={`assets/anatomy/vector-layers/${layer}.png`} alt="" aria-hidden="true" loading="lazy" />
-      ))}
+    <div className="muscle-atlas-stage double-view">
+      <div className="view-panel">
+        <span className="panel-kicker">VISTA FRONTAL</span>
+        <div className="anatomy-view-container">
+          <img className="muscle-atlas-base-new" src="/anatomy/gray-back.png" alt="Vista frontal" />
+          <div className="muscle-atlas-layer-stack">
+            <Spots view="front" regions={[...s.front]} tone="secondary" />
+            <Spots view="front" regions={[...p.front]} tone="primary" />
+          </div>
+        </div>
+      </div>
+      <div className="view-panel">
+        <span className="panel-kicker">VISTA POSTERIOR</span>
+        <div className="anatomy-view-container">
+          <img className="muscle-atlas-base-new" src="/anatomy/gray-front.png" alt="Vista posterior" />
+          <div className="muscle-atlas-layer-stack">
+            <Spots view="back" regions={[...s.back]} tone="secondary" />
+            <Spots view="back" regions={[...p.back]} tone="primary" />
+          </div>
+        </div>
+      </div>
+      <div className="muscle-atlas-vignette" aria-hidden="true" />
     </div>
   );
 }
@@ -52,7 +101,30 @@ function MuscleMap({ primary = [], secondary = [] }) {
 function TrainScreen({ initialTab }) {
   const D = window.STUDIO;
   const [tab, setTab] = useStateTr(initialTab || 'sesion');
+  const [gen, setGen] = useStateTr(0);
+  const [genStatus, setGenStatus] = useStateTr('idle'); // idle|loading|ok|err|noauth
   const TABS = [{ id: 'sesion', label: 'Sesión' }, { id: 'semana', label: 'Semana' }, { id: 'videos', label: 'Vídeos' }];
+
+  async function regenerate() {
+    setGenStatus('loading');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setGenStatus('noauth'); return; }
+      const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
+      const post = await fetch('/api/weekly-plan', { method: 'POST', headers, body: '{}' });
+      if (!post.ok) { setGenStatus('err'); return; }
+      // Refrescar sesión/semana reales tras el nuevo plan generado por el coach.
+      const r = await fetch('/api/studio-data', { headers: { authorization: 'Bearer ' + token } });
+      if (r.ok) {
+        const j = await r.json();
+        const o = j && j.ok ? j.overrides : null;
+        if (o) { if (o.todaySession) D.todaySession = o.todaySession; if (o.week) D.week = o.week; if (o.library) D.library = o.library; }
+      }
+      setGen((g) => g + 1);
+      setGenStatus('ok');
+    } catch (e) { setGenStatus('err'); }
+  }
+
   return (
     <div className="page stagger screen-enter">
       <div className="page-head">
@@ -61,11 +133,19 @@ function TrainScreen({ initialTab }) {
           <h1>Entreno</h1>
           <p className="sub">Tu sesión guiada, el plan de la semana y vídeos para perfeccionar la técnica.</p>
         </div>
+        <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
+          <button className="btn" onClick={regenerate} disabled={genStatus === 'loading'}>
+            <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Regenerando…' : 'Regenerar plan con IA'}
+          </button>
+          {genStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo regenerar. Reintenta.</span> : null}
+          {genStatus === 'noauth' ? <span className="tiny muted">Inicia sesión para regenerar.</span> : null}
+          {genStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan actualizado ✨</span> : null}
+        </div>
       </div>
       <SegTabs tabs={TABS} value={tab} onChange={setTab} />
-      {tab === 'sesion' && <TrainSession />}
-      {tab === 'semana' && <TrainWeek />}
-      {tab === 'videos' && <TrainVideos />}
+      {tab === 'sesion' && <TrainSession key={`s-${gen}`} />}
+      {tab === 'semana' && <TrainWeek key={`w-${gen}`} />}
+      {tab === 'videos' && <TrainVideos key={`v-${gen}`} />}
     </div>
   );
 }
@@ -234,9 +314,9 @@ function TrainSession() {
       <SectionCard title="Activación muscular" icon="target" sub="Qué trabaja la sesión de hoy">
         <div className="stack" style={{ gap: 14 }}>
           <MuscleMap primary={s.primaryMuscles} secondary={s.secondaryMuscles} />
-          <div className="mmap-legend">
-            <span><i className="mll prim" /> Primarios</span>
-            <span><i className="mll sec" /> Secundarios</span>
+          <div className="muscle-map-legend-inline" style={{ justifyContent: 'center' }}>
+            <span><i className="legend-swatch primary" /> Primario</span>
+            <span><i className="legend-swatch secondary" /> Secundario</span>
           </div>
           <div>
             <div className="mb-label">Primarios</div>
