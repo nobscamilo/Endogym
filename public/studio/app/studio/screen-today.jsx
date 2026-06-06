@@ -4,20 +4,22 @@ const { useState: useStateT } = React;
 function TodayHub({ go, variant }) {
   const D = window.STUDIO;
   const { user, todaySession: s, macroTargets: mt, macroEaten: me, progress } = D;
+  const now = new Date();
+  const fecha = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  const saludo = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
+  const ws = Array.isArray(progress.weightSeries) ? progress.weightSeries : [];
   return (
     <div className="page stagger screen-enter">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Lunes · 2 de junio</p>
-          <h1>Buenos días, {user.name}</h1>
-          <p className="sub">Vas {user.streak} días cumpliendo tu plan. Hoy toca empuje y tu cuerpo está al {s.readiness}% de disposición.</p>
+          <p className="eyebrow" style={{ textTransform: 'capitalize' }}>{fecha}</p>
+          <h1>{saludo}, {user.name}</h1>
+          <p className="sub">Hoy: {s.title}{s.focus ? ` · ${s.focus}` : ''}.{rec != null ? ` Tu disposición está al ${rec}%.` : ''}</p>
         </div>
-        <span className="pill accent"><Icon name="flame" size={15} /> Racha {user.streak}</span>
       </div>
 
-      {variant === 'anillos' && <HeroAnillos go={go} />}
-      {variant === 'resumen' && <HeroResumen go={go} />}
-      {variant === 'editorial' && <HeroEditorial go={go} />}
+      {variant === 'resumen' ? <HeroResumen go={go} /> : variant === 'editorial' ? <HeroEditorial go={go} /> : <HeroAnillos go={go} />}
 
       {/* Coach + sesión */}
       <div className="grid g-2" style={{ gridTemplateColumns: '0.95fr 1.05fr' }}>
@@ -33,11 +35,11 @@ function TodayHub({ go, variant }) {
           </div>
           <div className="tiles">
             <div className="tile"><div className="t-num num">{s.list.length}</div><div className="t-lbl">Ejercicios</div></div>
-            <div className="tile"><div className="t-num num">{s.durationMin}'</div><div className="t-lbl">Duración</div></div>
-            <div className="tile"><div className="t-num num">{s.kcal}</div><div className="t-lbl">kcal aprox</div></div>
+            <div className="tile"><div className="t-num num">{s.durationMin || '—'}'</div><div className="t-lbl">Duración</div></div>
+            <div className="tile"><div className="t-num num">{s.intensity || '—'}</div><div className="t-lbl">Intensidad</div></div>
           </div>
           <div className="chips" style={{ marginTop: 14 }}>
-            {s.primaryMuscles.map((m) => <span key={m} className="pill tiny">{m}</span>)}
+            {(s.primaryMuscles || []).map((m) => <span key={m} className="pill tiny">{m}</span>)}
           </div>
         </SectionCard>
       </div>
@@ -53,17 +55,21 @@ function TodayHub({ go, variant }) {
           </div>
           <div className="divider" style={{ margin: '14px 0' }} />
           <div className="row between">
-            <span className="muted tiny">Próxima: Merienda · 17:30</span>
-            <span className="pill good"><span className="dot" /> Glucemia en rango</span>
+            <span className="muted tiny">{me.kcal} de {mt.kcal} kcal hoy</span>
+            {D.glycemic && D.glycemic.dayClass ? <span className={`pill ${D.glycemic.dayClass === 'good' ? 'good' : ''} tiny`}><span className="dot" /> Glucemia {D.glycemic.dayClass === 'good' ? 'en rango' : D.glycemic.dayClass === 'mid' ? 'moderada' : 'alta'}</span> : null}
           </div>
         </SectionCard>
 
         <SectionCard title="Progreso de peso" icon="scale"
-          action={<span className="pill tiny">{progress.weightDelta6w} kg · 6 sem</span>}>
-          <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
-            <Stat num="74,8" unit="kg" label={`↓ ${Math.abs(progress.weightDeltaWk)} kg esta semana`} color="var(--glu-good)" />
-            <div style={{ flex: 1, maxWidth: 320 }}><Spark data={progress.weightSeries} color="var(--accent)" height={70} /></div>
-          </div>
+          action={progress.weightDelta6w != null ? <span className="pill tiny">{progress.weightDelta6w} kg · 6 sem</span> : null}>
+          {ws.length >= 2 ? (
+            <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
+              <Stat num={String(progress.weightNow).replace('.', ',')} unit="kg" label={progress.weightDeltaWk != null ? `${progress.weightDeltaWk <= 0 ? '↓' : '↑'} ${Math.abs(progress.weightDeltaWk)} kg esta semana` : 'Tu evolución'} color="var(--glu-good)" />
+              <div style={{ flex: 1, maxWidth: 320 }}><Spark data={ws} color="var(--accent)" height={70} /></div>
+            </div>
+          ) : (
+            <div className="empty" style={{ marginBottom: 8 }}>Registra tu peso para ver tu evolución.</div>
+          )}
           <button className="btn ghost sm block" onClick={() => go('progress')}><Icon name="progress" size={15} /> Ver progreso completo</button>
         </SectionCard>
       </div>
@@ -82,11 +88,15 @@ function TodayHub({ go, variant }) {
 /* ---- Hero variante A: anillos ---- */
 function HeroAnillos({ go }) {
   const D = window.STUDIO;
-  const { macroTargets: mt, macroEaten: me, progress, user } = D;
+  const { macroTargets: mt, macroEaten: me, progress } = D;
+  const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
+  const done = Number.isFinite(progress.sessionsDone) ? progress.sessionsDone : 0;
+  const plan = Number.isFinite(progress.sessionsPlan) ? progress.sessionsPlan : 5;
+  const kcalPct = mt.kcal ? Math.round((me.kcal / mt.kcal) * 100) : 0;
   const rings = [
-    { value: 2, max: 5, color: 'var(--d-move)', label: 'Entreno' },
-    { value: me.kcal, max: mt.kcal, color: 'var(--d-nutri)', label: 'Nutrición' },
-    { value: progress.recovery, max: 100, color: 'var(--d-recover)', label: 'Recuperación' },
+    { value: done, max: plan || 1, color: 'var(--d-move)', label: 'Entreno' },
+    { value: me.kcal, max: mt.kcal || 1, color: 'var(--d-nutri)', label: 'Nutrición' },
+    { value: rec != null ? rec : 0, max: 100, color: 'var(--d-recover)', label: 'Recuperación' },
   ];
   return (
     <div className="card lg hero-card">
@@ -95,11 +105,11 @@ function HeroAnillos({ go }) {
         <TripleRing rings={rings} size={168} />
         <div className="readiness-metrics">
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-move)' }}><Icon name="train" size={18} /></span>
-            <div><strong className="num">2 / 5</strong><div className="rm-sub">sesiones esta semana</div></div></div>
+            <div><strong className="num">{done} / {plan}</strong><div className="rm-sub">sesiones esta semana</div></div></div>
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-nutri)' }}><Icon name="nutrition" size={18} /></span>
-            <div><strong className="num">{me.kcal} / {mt.kcal}</strong><div className="rm-sub">kcal · 63% del objetivo</div></div></div>
+            <div><strong className="num">{me.kcal} / {mt.kcal}</strong><div className="rm-sub">kcal · {kcalPct}% del objetivo</div></div></div>
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-recover)' }}><Icon name="heart" size={18} /></span>
-            <div><strong className="num">{progress.recovery}%</strong><div className="rm-sub">recuperación · dormiste {user.sleep} h</div></div></div>
+            <div><strong className="num">{rec != null ? rec + '%' : '—'}</strong><div className="rm-sub">{rec != null ? 'recuperación' : 'haz tu check-in en Entreno'}</div></div></div>
         </div>
       </div>
     </div>
@@ -123,7 +133,7 @@ function HeroResumen({ go }) {
           <div className="tiles">
             <div className="tile"><div className="t-num num">{user.sleep}h</div><div className="t-lbl">Sueño</div></div>
             <div className="tile"><div className="t-num num">{user.restHr}</div><div className="t-lbl">FC reposo</div></div>
-            <div className="tile"><div className="t-num num">{progress.recovery}%</div><div className="t-lbl">Recuperación</div></div>
+            <div className="tile"><div className="t-num num">{Number.isFinite(progress.recovery) ? progress.recovery : '—'}%</div><div className="t-lbl">Recuperación</div></div>
           </div>
           <button className="btn block" onClick={() => go('train')}>Ver sesión de hoy <Icon name="arrowRight" size={17} /></button>
         </div>
@@ -154,7 +164,7 @@ function HeroEditorial({ go }) {
           <div><strong className="num">{user.restHr} ppm</strong><div className="rm-sub">FC en reposo</div></div></div>
         <div className="divider" />
         <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-nutri)' }}><Icon name="target" size={17} /></span>
-          <div><strong className="num">{progress.recovery}%</strong><div className="rm-sub">recuperación</div></div></div>
+          <div><strong className="num">{Number.isFinite(progress.recovery) ? progress.recovery : '—'}%</strong><div className="rm-sub">recuperación</div></div></div>
       </div>
     </div>
   );
@@ -162,19 +172,22 @@ function HeroEditorial({ go }) {
 
 /* ---- Coach card (compartida) ---- */
 function CoachCard({ go }) {
+  const D = window.STUDIO;
+  const s = D.todaySession || {};
+  const rec = Number.isFinite(D.progress && D.progress.recovery) ? D.progress.recovery : null;
   return (
     <div className="card lg coach stack" style={{ justifyContent: 'space-between' }}>
       <div>
         <div className="coach-head">
           <span className="coach-av"><Icon name="sparkles" size={20} /></span>
-          <div><strong>Coach Ignios</strong><span>Recomendación de hoy · ahora</span></div>
+          <div><strong>Coach Ignios</strong><span>Tu plan de hoy</span></div>
         </div>
-        <h3>Hoy prioriza la técnica, no la carga.</h3>
-        <p>Dormiste 7 h y tu fatiga es baja. Mantén el press a 22 kg y sube una repetición si la última serie sale limpia.</p>
+        <h3>{s.title ? `Hoy: ${s.title}.` : 'Tu plan, ajustado a ti.'}</h3>
+        <p>El coach adapta tu entrenamiento y nutrición a tus datos. Abre tu sesión, regístrala con el check-in o pregúntale lo que quieras en Progreso.</p>
         <div className="coach-chips">
-          <span><Icon name="moon" size={14} /> Sueño 7 h</span>
-          <span><Icon name="heart" size={14} /> Fatiga baja</span>
-          <span><Icon name="target" size={14} /> Disposición 82%</span>
+          {rec != null ? <span><Icon name="target" size={14} /> Disposición {rec}%</span> : null}
+          {s.intensity ? <span><Icon name="bolt" size={14} /> {s.intensity}</span> : null}
+          {s.focus ? <span><Icon name="train" size={14} /> {s.focus}</span> : null}
         </div>
       </div>
       <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => go('train')}>Ver sesión de hoy <Icon name="arrowRight" size={17} /></button>
