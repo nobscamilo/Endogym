@@ -27,7 +27,9 @@ const securityHeaders = [
 // fuentes de Google (style/font) e imágenes de miniaturas de YouTube. script-src es 'self'.
 const studioContentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self'",
+  // 'unsafe-inline' es necesario para los scripts inline de hidratación de Next.js en la
+  // página /studio (igual que la CSP global). El bundle del iframe es externo y no usa eval.
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://i.ytimg.com",

@@ -132,6 +132,14 @@ function Spark({ data = [], color = 'var(--accent)', height = 64, fill = true })
   const ref = useRef(null);
   const [w, setW] = useState(300);
   useEffect(() => { if (!ref.current) return; const ro = new ResizeObserver((e) => setW(e[0].contentRect.width)); ro.observe(ref.current); return () => ro.disconnect(); }, []);
+  // Sin datos suficientes: línea base (evita romper con arrays vacíos/de 1 punto).
+  if (!Array.isArray(data) || data.length < 2) {
+    return (
+      <div ref={ref} style={{ width: '100%', height, display: 'flex', alignItems: 'center' }}>
+        <div style={{ width: '100%', borderTop: '2px dashed var(--line)', opacity: 0.7 }} />
+      </div>
+    );
+  }
   const min = Math.min(...data), max = Math.max(...data), span = max - min || 1, pad = 6;
   const pts = data.map((d, i) => [pad + (i / (data.length - 1)) * (w - pad * 2), pad + (1 - (d - min) / span) * (height - pad * 2)]);
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
