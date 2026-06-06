@@ -41,6 +41,8 @@ const studioContentSecurityPolicy = [
 
 const studioSecurityHeaders = [
   { key: 'Content-Security-Policy', value: studioContentSecurityPolicy },
+  // Evita servir un bundle/HTML viejo en caché tras un deploy: revalidar siempre.
+  { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },

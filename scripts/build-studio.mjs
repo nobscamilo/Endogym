@@ -155,5 +155,15 @@ await esbuild.build({
   outfile: outFile,
 });
 
+// Cache-busting: versiona la referencia al bundle en index.html con un hash de su contenido,
+// para que el navegador/CDN nunca sirva un bundle viejo tras un deploy.
+const crypto = await import('node:crypto');
+const buf = fs.readFileSync(outFile);
+const hash = crypto.createHash('md5').update(buf).digest('hex').slice(0, 10);
+const idxPath = path.join(repoRoot, 'public', 'studio', 'app', 'index.html');
+let html = fs.readFileSync(idxPath, 'utf8');
+html = html.replace(/studio\.bundle\.js(\?v=[a-f0-9]+)?/g, `studio.bundle.js?v=${hash}`);
+fs.writeFileSync(idxPath, html);
+
 const kb = Math.round(fs.statSync(outFile).size / 1024);
-console.log(`✔ studio.bundle.js generado (${kb} KB)`);
+console.log(`✔ studio.bundle.js generado (${kb} KB) · v=${hash}`);
