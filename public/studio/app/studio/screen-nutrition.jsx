@@ -131,7 +131,37 @@ function NutritionScreen({ layout }) {
   const D = window.STUDIO;
   const [tab, setTab] = useStateN('hoy');
   const [day, setDay] = useStateN(2);
+  const [gen, setGen] = useStateN(0);
+  const [genStatus, setGenStatus] = useStateN('idle'); // idle|loading|ok|err|noauth
   const TABS = [{ id: 'hoy', label: 'Qué comer hoy' }, { id: 'compra', label: 'Compra & Batch' }, { id: 'glu', label: 'Glucemia' }];
+
+  async function generate() {
+    setGenStatus('loading');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setGenStatus('noauth'); return; }
+      const r = await fetch('/api/studio-nutrition', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token } });
+      if (!r.ok) { setGenStatus('err'); return; }
+      const j = await r.json();
+      if (!j || !j.ok || !j.nutrition) { setGenStatus('err'); return; }
+      const n = j.nutrition;
+      if (Array.isArray(n.meals) && n.meals.length) {
+        // Normaliza campos que el diseño espera (emoji/hue/done/time…).
+        const palette = [55, 78, 18, 162, 232, 300];
+        D.meals = n.meals.map((m, i) => ({
+          done: false, hue: palette[i % palette.length], emoji: m.emoji || '🍽️', time: m.time || '',
+          glClass: m.glClass || 'good', gl: m.gl ?? 0, ii: m.ii ?? 0, mins: m.mins ?? 10,
+          ingredients: m.ingredients || [], steps: m.steps || [], serving: m.serving || '',
+          ...m,
+        }));
+      }
+      if (Array.isArray(n.shopping) && n.shopping.length) D.shopping = n.shopping.map((c) => ({ icon: '🛒', ...c }));
+      if (Array.isArray(n.batch) && n.batch.length) D.batch = n.batch.map((b) => ({ emoji: '🍳', ...b }));
+      setGen((g) => g + 1);
+      setGenStatus('ok');
+    } catch (e) { setGenStatus('err'); }
+  }
+
   return (
     <div className="page stagger screen-enter">
       <div className="page-head">
@@ -139,6 +169,14 @@ function NutritionScreen({ layout }) {
           <p className="eyebrow">Nutrición</p>
           <h1>Tu plan de comidas</h1>
           <p className="sub">Qué comer hoy de un vistazo, la lista de la compra lista para el súper y cómo responde tu glucosa.</p>
+        </div>
+        <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
+          <button className="btn" onClick={generate} disabled={genStatus === 'loading'}>
+            <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Generando…' : 'Generar mi plan con IA'}
+          </button>
+          {genStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo generar. Reintenta.</span> : null}
+          {genStatus === 'noauth' ? <span className="tiny muted">Inicia sesión para generar.</span> : null}
+          {genStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan generado para ti ✨</span> : null}
         </div>
       </div>
 
@@ -154,9 +192,9 @@ function NutritionScreen({ layout }) {
 
       <SegTabs tabs={TABS} value={tab} onChange={setTab} />
 
-      {tab === 'hoy' && <NutritionToday layout={layout} />}
-      {tab === 'compra' && <NutritionShop />}
-      {tab === 'glu' && <NutritionGlu />}
+      {tab === 'hoy' && <NutritionToday key={`hoy-${gen}`} layout={layout} />}
+      {tab === 'compra' && <NutritionShop key={`shop-${gen}`} />}
+      {tab === 'glu' && <NutritionGlu key={`glu-${gen}`} />}
     </div>
   );
 }
