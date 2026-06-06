@@ -4,10 +4,16 @@
 
 Implementación del diseño entregado por Claude Design (handoff bundle) — visión "data-driven cálido" (estilo Whoop/Oura oscuro con alma cálida). Se implementó **tal cual el diseño**, sin adaptarlo al dashboard anterior, en una rama separada para no perder la UI previa.
 
+## Marca Ignios (logo oficial)
+
+El logo oficial es la **llama de Ignios** (de *ignis*; hereda el color de acento de la app vía `var(--accent)`/`var(--accent-2)`). Implementado en el componente `Logo` de `public/studio/app/studio/icons.jsx`. Favicon del Studio en `public/studio/app/favicon.svg` (llama ámbar fija). La **hoja de marca** oficial (lockups, escalas, acentos en claro/oscuro) está como página autónoma en **`/studio/marca.html`**.
+
+Pendiente (fase C, cuando Studio sea la UI por defecto): aplicar el logo/favicon Ignios también al dashboard/landing legacy y a `src/app/icon.svg` (hoy siguen con la marca Endogym).
+
 ## Cómo verlo
 
 1. `npm run dev`
-2. Abrir **`/studio`** (el dashboard anterior sigue intacto en `/dashboard`).
+2. Abrir **`/studio`** (el dashboard anterior sigue intacto en `/dashboard`). La hoja de marca en **`/studio/marca.html`**.
 
 ## Arquitectura de la implementación
 
