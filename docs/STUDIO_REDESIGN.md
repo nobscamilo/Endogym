@@ -1,6 +1,13 @@
-# Rediseño "Endogym Studio" (rama `redesign/endogym-studio`)
+# Rediseño "Ignios" (Studio) — rama `redesign/endogym-studio` (mergeada a `main`)
 
-Última actualización: **6 de junio de 2026**.
+Última actualización: **6 de junio de 2026 — LANZAMIENTO**.
+
+## Lanzamiento oficial (6 jun 2026)
+
+- **Studio es la app por defecto**: tras login, `/` redirige a **`/studio`** (`src/app/page.js`). El dashboard legacy sigue accesible en `/dashboard` como fallback.
+- **Marca Ignios solo de cara al usuario**: landing/login (`page.js`), `metadata` (`layout.js`) y `manifest.js` dicen "Ignios". **Infra intacta** (proyecto Firebase/GCP `endogym`, bucket, dominio `endogym.vercel.app`).
+- **Días/semana**: el planner ahora honra `daysPerWeek` (convierte días sobrantes en descanso activo) y `preferredDurationMinutes`, **gated por `studioAvailability`** (test: `tests/core/studio-availability-planner.test.js`).
+- **Pendiente del go-live**: `git push origin main` + `vercel --prod` (requiere credenciales del usuario). Marca: clearance legal de "Ignios" antes de registro/dominio propio.
 
 Implementación del diseño entregado por Claude Design (handoff bundle) — visión "data-driven cálido" (estilo Whoop/Oura oscuro con alma cálida). Se implementó **tal cual el diseño**, sin adaptarlo al dashboard anterior, en una rama separada para no perder la UI previa.
 
@@ -20,7 +27,7 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
   - **Objetivo, equipo y comidas re-ajustan el plan/macros de verdad** (el planner ya los usa).
   - **`daysPerWeek` se persiste pero el planner aún NO cambia la frecuencia** (las plantillas son de 7 días fijos). Honrarlo requiere tocar `MODALITY_TEMPLATES`/planner con tests — pendiente.
 - **Fase 2 — Swap de ejercicios (hecho):** endpoint **`/api/studio-swap`** (POST) cambia un ejercicio (`scope:'one'` + `exerciseId`) o toda la sesión de hoy (`scope:'all'`) con alternativas de `suggestExerciseAlternatives()` y **lógica no-repeat** (evita ejercicios de otros días del plan). `reason`: `variety` | `time` (recorta nº de ejercicios) | `equipment`. Aplica en servidor (persiste el plan) y el cliente refresca `/api/studio-data`. UI en Entreno: botón "Cambiar" por ejercicio (necesita `id`, ya expuesto en `studio-data`) y "Cambiar sesión" con selector de motivo.
-  - Pendiente opcional: honor de `daysPerWeek` en el planner (frecuencia) con su test.
+  - **Honor de `daysPerWeek` (hecho):** el planner convierte los días de entreno sobrantes en descanso activo cuando `daysPerWeek` es menor (gated por `studioAvailability`).
 
 ## Marca Ignios (logo oficial)
 

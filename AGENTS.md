@@ -104,9 +104,11 @@ Reglas importantes:
 - El **índice vectorial** se crea con `gcloud` (ver `docs/DEPLOYMENT.md`); el service-account del repo no tiene permiso para crearlo.
 - Estado al 6 jun 2026: `guidelines`=226 docs (fallback); `guideline_passages`=7.128 pasajes con vector. Índice vectorial: **pendiente de crear por el usuario**.
 
-## Rediseño Studio (rama `redesign/endogym-studio`)
+## Ignios Studio (LANZADO — app por defecto)
 
-Existe un rediseño completo "data-driven cálido" en la ruta **`/studio`**, montado como bundle estático en `public/studio/app/` dentro de un iframe (`src/app/studio/page.js`). NO toca el dashboard anterior. Coach IA cableado a Gemini real vía `/api/coach-chat`; auth del iframe vía `/api/public-config`; datos reales (perfil) vía `/api/studio-data` con fusión sobre datos de muestra. `next.config.mjs` aplica CSP relajada SOLO a `/studio*` (Babel-in-browser necesita `unsafe-eval`). Detalle completo y pendientes en `docs/STUDIO_REDESIGN.md`.
+El rediseño "Ignios" (data-driven cálido) es la **UI por defecto**: tras login, `/` redirige a **`/studio`** (`src/app/page.js`). El dashboard legacy sigue en `/dashboard` como fallback. Marca **Ignios solo de cara al usuario** (landing/metadata/manifest); infra sigue "endogym" (NO renombrar).
+
+Studio = bundle React **pre-compilado** con esbuild (`scripts/build-studio.mjs` → `public/studio/app/studio.bundle.js`, artefacto commiteado; esbuild NO es dependencia, ver `docs/STUDIO_REDESIGN.md`). Se sirve en iframe (`src/app/studio/page.js`). Endpoints propios: `/api/studio-data` (datos reales: perfil, hoy, semana, biblioteca, macros, glucemia, progreso), `/api/coach-chat` (coach IA con perfil real), `/api/studio-nutrition` (recetas/compra con Gemini), `/api/studio-availability` (encuesta), `/api/studio-swap` (cambiar ejercicios), `/api/public-config`. CSP estricta scoped a `/studio*` en `next.config.mjs`. **Tras editar `public/studio/app/studio/*` hay que regenerar el bundle (`npm run build:studio`) y commitearlo.** Detalle en `docs/STUDIO_REDESIGN.md`.
 
 ## Verificacion minima
 
