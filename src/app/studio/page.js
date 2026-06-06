@@ -1,41 +1,29 @@
 'use client';
 
-// Endogym/Ignios Studio — rediseño servido como bundle compilado aislado en un iframe.
-// Gating: si Firebase está configurado y no hay sesión, redirige a "/" (donde está el login).
-// En modo demo (sin Firebase configurado) se muestra con datos de ejemplo.
+// Ignios Studio — bundle compilado aislado servido en iframe.
+// Gating "fail-open": renderiza el Studio de inmediato (nunca se cuelga) y comprueba la
+// sesión en segundo plano; si Firebase está configurado y se confirma que NO hay usuario,
+// redirige a "/" (login). En demo o si la comprobación tarda/falla, se queda en el Studio
+// (el coach y los datos reales caen a su fallback sin sesión).
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getFirebaseClient, isFirebaseClientConfigured } from '../../lib/firebaseClient.js';
 
 export default function StudioPage() {
   const router = useRouter();
-  const [state, setState] = useState('checking'); // checking | ok | redirecting
 
   useEffect(() => {
-    if (!isFirebaseClientConfigured()) { setState('ok'); return undefined; }
-    const client = getFirebaseClient();
-    if (!client) { setState('ok'); return undefined; }
+    if (!isFirebaseClientConfigured()) return undefined;
+    let client;
+    try { client = getFirebaseClient(); } catch (e) { client = null; }
+    if (!client || !client.auth) return undefined;
     const unsub = onAuthStateChanged(client.auth, (user) => {
-      if (user) setState('ok');
-      else { setState('redirecting'); router.replace('/'); }
+      if (!user) router.replace('/'); // sin sesión → al login
     });
     return () => { if (unsub) unsub(); };
   }, [router]);
-
-  if (state !== 'ok') {
-    return (
-      <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: '#1a1714', color: '#e8843f', fontFamily: 'system-ui, sans-serif', zIndex: 50 }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>Ignios Studio</div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: 6 }}>
-            {state === 'redirecting' ? 'Inicia sesión para continuar…' : 'Cargando…'}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <iframe
