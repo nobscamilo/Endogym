@@ -9,7 +9,8 @@ export default function StudioPage() {
   return (
     <iframe
       src="/studio/app/index.html"
-      title="Endogym Studio"
+      title="Ignios Studio"
+      allow="camera; fullscreen"
       style={{
         position: 'fixed',
         inset: 0,

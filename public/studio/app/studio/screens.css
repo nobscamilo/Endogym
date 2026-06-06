@@ -330,3 +330,32 @@
 /* ============ YouTube real en el reproductor ============ */
 .player-iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .player-yt-badge { position: absolute; top: 16px; right: 60px; display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 700; color: #fff; background: rgba(0,0,0,0.45); padding: 4px 9px; border-radius: 999px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* ---- Mapa muscular (atlas recuperado de Endogym) ---- */
+.mmap { position: relative; width: 100%; max-width: 540px; margin: 2px auto 0; aspect-ratio: 1600 / 1394; }
+.mmap-base, .mmap-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.mmap-base { opacity: 0.92; }
+[data-theme="dark"] .mmap-base { filter: brightness(0.9) contrast(1.02); }
+.mmap-layer { transform: translateX(-2200px); pointer-events: none; }
+.mmap-layer.prim { filter: drop-shadow(2200px 0 0 var(--accent)); }
+.mmap-layer.sec { filter: drop-shadow(2200px 0 0 var(--accent-2)); opacity: 0.6; }
+.mmap-legend { display: flex; gap: 18px; justify-content: center; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.mmap-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.mll { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.mll.prim { background: var(--accent); }
+.mll.sec { background: var(--accent-2); opacity: 0.6; }
+
+/* ---- Check-in de sesión ---- */
+.scale10 { display: flex; gap: 6px; flex-wrap: wrap; }
+.s10 { flex: 1; min-width: 30px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; cursor: pointer; transition: all var(--t-fast) var(--ease); }
+.s10:hover { border-color: var(--accent); }
+.s10.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.num-input { width: 84px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-1); font-family: var(--font-mono); font-weight: 700; text-align: center; font-size: 0.9rem; padding: 0 10px; }
+.checkin-done { display: flex; align-items: center; gap: 14px; }
+.checkin-done .cd-ic { flex: none; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-on-soft); }
+
+/* ---- Inputs de añadir alimento ---- */
+.text-input { width: 100%; height: 40px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-1); font-family: var(--font-body); font-size: 0.9rem; padding: 0 13px; transition: border-color var(--t-fast) var(--ease); }
+.text-input::placeholder { color: var(--ink-3); }
+.text-input:focus { outline: none; border-color: var(--accent); }
+.text-input[type="number"] { font-family: var(--font-mono); }

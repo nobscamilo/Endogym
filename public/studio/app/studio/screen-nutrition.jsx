@@ -1,6 +1,132 @@
 /* ENDOGYM STUDIO — Pantalla NUTRICIÓN (qué comer · compra · glucemia) + variaciones */
 const { useState: useStateN } = React;
 
+/* ---- Añadir producto consumido (manual o por código de barras) → /api/meals ---- */
+function AddFood({ onAdded }) {
+  const [open, setOpen] = useStateN(false);
+  const [f, setF] = useStateN({ name: '', calories: '', proteinGrams: '', carbsGrams: '', fatGrams: '' });
+  const [code, setCode] = useStateN('');
+  const [status, setStatus] = useStateN('idle'); // idle|looking|saving|ok|err|noauth|notfound
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+  async function authToken() {
+    return (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+  }
+
+  async function lookup(barcode) {
+    const bc = (barcode || code).trim();
+    if (!bc) return;
+    setStatus('looking');
+    try {
+      const token = await authToken();
+      const headers = token ? { authorization: 'Bearer ' + token } : {};
+      const r = await fetch('/api/products/barcode?code=' + encodeURIComponent(bc), { headers });
+      if (!r.ok) { setStatus('notfound'); return; }
+      const j = await r.json();
+      const p = j.product || {};
+      setF({
+        name: p.name || 'Producto',
+        calories: p.calories ?? '',
+        proteinGrams: p.proteinGrams ?? '',
+        carbsGrams: p.carbsGrams ?? '',
+        fatGrams: p.fatGrams ?? '',
+      });
+      setStatus('idle');
+    } catch (e) { setStatus('notfound'); }
+  }
+
+  async function scan() {
+    try {
+      if (!('BarcodeDetector' in window)) { setStatus('err'); return; }
+      const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const video = document.createElement('video');
+      video.srcObject = stream; await video.play();
+      let tries = 0;
+      const tick = async () => {
+        tries += 1;
+        try {
+          const codes = await detector.detect(video);
+          if (codes && codes.length) {
+            stream.getTracks().forEach((t) => t.stop());
+            setCode(codes[0].rawValue);
+            lookup(codes[0].rawValue);
+            return;
+          }
+        } catch (e) { /* sigue intentando */ }
+        if (tries < 80) requestAnimationFrame(tick); else { stream.getTracks().forEach((t) => t.stop()); }
+      };
+      tick();
+    } catch (e) { setStatus('err'); }
+  }
+
+  async function save() {
+    const calories = Number(f.calories) || 0;
+    if (!f.name.trim() || calories <= 0) { setStatus('err'); return; }
+    setStatus('saving');
+    try {
+      const token = await authToken();
+      if (!token) { setStatus('noauth'); return; }
+      const food = {
+        name: f.name.trim().slice(0, 200),
+        calories,
+        proteinGrams: Number(f.proteinGrams) || 0,
+        carbsGrams: Number(f.carbsGrams) || 0,
+        fatGrams: Number(f.fatGrams) || 0,
+      };
+      const totals = { calories: food.calories, proteinGrams: food.proteinGrams, carbsGrams: food.carbsGrams, fatGrams: food.fatGrams };
+      const r = await fetch('/api/meals', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ foods: [food], totals, eatenAt: new Date().toISOString() }),
+      });
+      if (!r.ok) { setStatus('err'); return; }
+      if (onAdded) onAdded(totals);
+      setF({ name: '', calories: '', proteinGrams: '', carbsGrams: '', fatGrams: '' });
+      setCode('');
+      setStatus('ok');
+      setTimeout(() => setStatus('idle'), 2500);
+    } catch (e) { setStatus('err'); }
+  }
+
+  if (!open) {
+    return (
+      <button className="btn block" style={{ marginTop: 2 }} onClick={() => setOpen(true)}>
+        <Icon name="plus" size={17} /> Añadir alimento consumido
+      </button>
+    );
+  }
+  return (
+    <SectionCard title="Añadir alimento" icon="plus" sub="Escanea un código de barras o introdúcelo a mano"
+      action={<button className="btn ghost sm" onClick={() => setOpen(false)}><Icon name="close" size={15} /></button>}>
+      <div className="stack" style={{ gap: 12 }}>
+        <div className="row ac" style={{ gap: 8 }}>
+          <div className="search-field" style={{ flex: 1 }}>
+            <span className="s-ico"><Icon name="barcode" size={18} /></span>
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código de barras…" inputMode="numeric" />
+          </div>
+          <button className="btn soft sm" onClick={() => lookup()} disabled={status === 'looking'}>{status === 'looking' ? 'Buscando…' : 'Buscar'}</button>
+          <button className="btn ghost sm" onClick={scan} title="Escanear con cámara"><Icon name="camera" size={16} /></button>
+        </div>
+        {status === 'notfound' ? <p className="tiny muted" style={{ margin: 0 }}>Producto no encontrado. Introduce los datos a mano.</p> : null}
+        <input className="text-input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del alimento" />
+        <div className="grid g-4" style={{ gap: 8 }}>
+          <input className="text-input" type="number" value={f.calories} onChange={(e) => set('calories', e.target.value)} placeholder="kcal" />
+          <input className="text-input" type="number" value={f.proteinGrams} onChange={(e) => set('proteinGrams', e.target.value)} placeholder="Proteína g" />
+          <input className="text-input" type="number" value={f.carbsGrams} onChange={(e) => set('carbsGrams', e.target.value)} placeholder="Carbs g" />
+          <input className="text-input" type="number" value={f.fatGrams} onChange={(e) => set('fatGrams', e.target.value)} placeholder="Grasa g" />
+        </div>
+        <div className="row ac" style={{ gap: 12 }}>
+          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando…' : 'Añadir a hoy'}</button>
+          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>¡Añadido!</span> : null}
+          {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Revisa nombre y kcal.</span> : null}
+          {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 function NutritionScreen({ layout }) {
   const D = window.STUDIO;
   const [tab, setTab] = useStateN('hoy');
@@ -38,7 +164,14 @@ function NutritionScreen({ layout }) {
 /* ---------- QUÉ COMER HOY ---------- */
 function NutritionToday({ layout }) {
   const D = window.STUDIO;
-  const { macroTargets: mt, macroEaten: me, meals } = D;
+  const { macroTargets: mt, meals } = D;
+  const [me, setMe] = useStateN(D.macroEaten);
+  const onAdded = (t) => setMe((p) => ({
+    kcal: p.kcal + Math.round(Number(t.calories) || 0),
+    protein: p.protein + Math.round(Number(t.proteinGrams) || 0),
+    carbs: p.carbs + Math.round(Number(t.carbsGrams) || 0),
+    fat: p.fat + Math.round(Number(t.fatGrams) || 0),
+  }));
   const next = meals.find((m) => !m.done) || meals[0];
   return (
     <React.Fragment>
@@ -76,6 +209,9 @@ function NutritionToday({ layout }) {
           </div>
         </div>
       </div>
+
+      {/* Añadir alimento consumido (manual o por código de barras) */}
+      <AddFood onAdded={onAdded} />
 
       {/* Comidas — según variante */}
       <CoachBanner screen="nutrition_today" />
