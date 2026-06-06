@@ -1,5 +1,23 @@
 # Deploy de Endogym en Vercel
 
+## RAG semántico: crear el índice vectorial de Firestore (acción requerida, 6 jun 2026)
+
+El RAG semántico (`findNearest` sobre `guideline_passages`) requiere un índice vectorial que **no** puede crear el service-account del repo (sin permiso `indexAdmin`). Créalo una vez con `gcloud` autenticado como un usuario con rol Owner/Editor o `roles/datastore.indexAdmin`:
+
+```bash
+gcloud firestore indexes composite create \
+  --project=endogym-vtety8 \
+  --collection-group=guideline_passages \
+  --query-scope=COLLECTION \
+  --field-config=vector-config='{"dimension":"768","flat": "{}"}',field-path=embedding
+```
+(Formato exacto sugerido por el propio Firestore en el error `FAILED_PRECONDITION`.)
+
+- Tarda unos minutos en construirse sobre 7.128 pasajes.
+- Mientras no exista, `findNearest` falla y el retriever degrada automáticamente a búsqueda por keywords (sin romper producción).
+- Verificación tras crearlo: en Runtime Logs debe aparecer `guidelines_vector_matches` (modo vector) en vez de `guidelines_vector_fallback_keywords` al generar un plan.
+- Para re-generar embeddings de libros nuevos: `node --env-file=.env.local scripts/embed_guidelines.mjs` (resumable).
+
 ## Estado verificado
 
 Sonda pública repetida el **2 de junio de 2026**:

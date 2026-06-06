@@ -73,6 +73,19 @@ Ultima actualizacion: **2 de junio de 2026 (auditoría local y pública)**.
 - [x] Normalizar `performedAt` al mediodía UTC de la fecha seleccionada, permitir pasado/hoy local y bloquear futuro desde UI.
 - [ ] Sincronizar `origin/main` con los cinco commits locales y los cambios manualmente desplegados.
 
+## P2 - RAG: de léxico a semántico (implementado 6 jun 2026)
+
+Mejora a búsqueda semántica respetando "no Vertex". Estado:
+
+- [x] **Embeddings con Gemini Developer API** (`gemini-embedding-001`, 768 dims, L2-normalizados) — `requestGoogleEmbeddings()` en `googleGenAiTransport.js`.
+- [x] Sub-chunking semántico: `scripts/embed_guidelines.mjs` troceó los 226 docs en **7.128 pasajes** (~800 tokens, con solape).
+- [x] Generar y almacenar vectores en la colección `guideline_passages` (`FieldValue.vector()`). 7.128 subidos y verificados.
+- [x] Reescribir el retriever a `findNearest` (COSINE) con **fallback automático** a keywords. Verificado end-to-end (degrada limpio sin índice).
+- [x] Actualizar tests (camino vectorial + fallback).
+- [ ] **Crear el índice vectorial de Firestore** (acción del usuario; el SA del repo no tiene `indexAdmin`). Comando en `docs/DEPLOYMENT.md`. Hasta entonces el RAG opera en modo keywords.
+- [ ] Tras crear el índice: verificar modo vector en producción (`npm run e2e:production` / Runtime Logs `guidelines_vector_matches`).
+- [ ] Correr `npm test` y `npm run build` en la Mac (vitest no corre en el sandbox Linux).
+
 ## P3 - Producto
 
 - [ ] Mejorar correccion manual de alimentos y porciones.

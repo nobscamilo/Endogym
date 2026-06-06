@@ -12,7 +12,12 @@ ENGLISH_KEYWORDS = [
     'cycling', 'diabetes', 'diabetic', 'glycemic', 'glucose', 'cardiovascular', 'cardiopulmonary', 'heart',
     'renal', 'pulmonary', 'pain', 'injury', 'rehabilitation', 'prevention', 'geriatrics', 'osteoporosis',
     'medical frailty', 'young athlete', 'pediatric', 'adolescent', 'immature', 'bone', 'hypertension',
-    'low back', 'spine', 'neck', 'knee', 'patella', 'patellofemoral', 'shoulder', 'glenohumeral', 'rotator cuff'
+    'low back', 'spine', 'neck', 'knee', 'patella', 'patellofemoral', 'shoulder', 'glenohumeral', 'rotator cuff',
+    # --- Nutrición y nutrición deportiva (añadido 6 jun 2026) ---
+    'nutrition', 'sports nutrition', 'protein', 'amino acid', 'protein synthesis', 'carbohydrate', 'glycogen',
+    'dietary fat', 'hydration', 'fluid', 'electrolyte', 'sodium', 'micronutrient', 'vitamin', 'mineral',
+    'iron', 'calcium', 'creatine', 'caffeine', 'nitrate', 'beta-alanine', 'bicarbonate', 'supplement',
+    'ergogenic', 'energy availability', 'energy balance', 'calorie', 'fiber', 'gastrointestinal', 'recovery'
 ]
 
 SPANISH_PORTUGUESE_MAP = {
@@ -87,7 +92,54 @@ SPANISH_PORTUGUESE_MAP = {
     'hombro': 'shoulder',
     'glenoumeral': 'glenohumeral',
     'glenohumeral': 'glenohumeral',
-    'manguito rotador': 'rotator cuff'
+    'manguito rotador': 'rotator cuff',
+    # --- Nutrición y nutrición deportiva (añadido 6 jun 2026; claves sin acentos, normalizadas) ---
+    'nutricion': 'nutrition',
+    'nutricao': 'nutrition',
+    'nutricao esportiva': 'sports nutrition',
+    'nutricion deportiva': 'sports nutrition',
+    'proteina': 'protein',
+    'aminoacido': 'amino acid',
+    'sintese proteica': 'protein synthesis',
+    'sintesis proteica': 'protein synthesis',
+    'carbohidrato': 'carbohydrate',
+    'carboidrato': 'carbohydrate',
+    'hidrato de carbono': 'carbohydrate',
+    'glucogeno': 'glycogen',
+    'glicogenio': 'glycogen',
+    'grasa': 'dietary fat',
+    'gordura': 'dietary fat',
+    'hidratacion': 'hydration',
+    'hidratacao': 'hydration',
+    'liquido': 'fluid',
+    'fluido': 'fluid',
+    'electrolito': 'electrolyte',
+    'eletrolito': 'electrolyte',
+    'sodio': 'sodium',
+    'micronutriente': 'micronutrient',
+    'vitamina': 'vitamin',
+    'mineral': 'mineral',
+    'hierro': 'iron',
+    'ferro': 'iron',
+    'calcio': 'calcium',
+    'creatina': 'creatine',
+    'cafeina': 'caffeine',
+    'nitrato': 'nitrate',
+    'beta-alanina': 'beta-alanine',
+    'betaalanina': 'beta-alanine',
+    'bicarbonato': 'bicarbonate',
+    'suplemento': 'supplement',
+    'ergogenico': 'ergogenic',
+    'ergogenica': 'ergogenic',
+    'disponibilidad energetica': 'energy availability',
+    'disponibilidade energetica': 'energy availability',
+    'balance energetico': 'energy balance',
+    'balanco energetico': 'energy balance',
+    'caloria': 'calorie',
+    'fibra': 'fiber',
+    'gastrointestinal': 'gastrointestinal',
+    'recuperacion': 'recovery',
+    'recuperacao': 'recovery'
 }
 
 def normalize_text(text):

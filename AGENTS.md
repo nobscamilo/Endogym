@@ -83,6 +83,27 @@ No habilites Vertex AI.
 - Al modificar `DashboardPage.js` o `styles.css`, ejecuta `npm run build` localmente antes de considerar el cambio listo.
 - Los componentes de atlas anatómico residen en `src/components/MuscleMapFigure.js`; las imágenes en `public/anatomy/`. No reemplaces los modelos 3D sin actualización explícita de coordenadas de superposición.
 
+## RAG de directrices médicas (cómo añadir libros)
+
+El Coach IA inyecta contexto desde la colección Firestore `guidelines`. Pipeline para añadir un libro nuevo:
+
+1. Copia el PDF a `docs/guidelines/` (o una subcarpeta; el parser camina recursivamente). Los PDFs no se suben a Vercel (`.vercelignore`).
+2. `python3 scripts/parse_pdf_improved.py` — detecta PDFs sin JSON, los trocea (chunks de 8 páginas) y extrae keywords a `docs/guidelines-json/`.
+3. `node --env-file=.env.local scripts/upload_guidelines.js` — sube cada JSON a `guidelines` (set por `id`, idempotente).
+
+El retriever (`src/services/guidelinesRetriever.js`) tiene **dos modos**:
+- **Principal — semántico (embeddings):** embebe una consulta en lenguaje natural y recupera pasajes con `findNearest` (COSINE) sobre la colección **`guideline_passages`** (7.128 pasajes, vectores `gemini-embedding-001` de 768 dims). Requiere el índice vectorial de Firestore.
+- **Fallback — léxico (keywords):** scoring por keywords sobre `guidelines` (libros completos). Se activa solo si no hay `GEMINI_API_KEY`, si el embedding falla, o si `findNearest` falla (índice ausente) o no devuelve nada.
+
+Para añadir embeddings de un libro nuevo (tras los pasos 1–3): `node --env-file=.env.local scripts/embed_guidelines.mjs` (resumable, sube a `guideline_passages`). El índice vectorial ya existente cubre los nuevos pasajes automáticamente.
+
+Reglas importantes:
+- El **vocabulario de keywords (fallback) es fuente de verdad** y vive en `scripts/parse_pdf_improved.py` (`ENGLISH_KEYWORDS` + `SPANISH_PORTUGUESE_MAP`); debe mantenerse **alineado** con `scripts/chunk_ocr_json.py`, `deriveKeywords()` y `NUTRITION_TERMS` en `guidelinesRetriever.js`. Si añades un término en uno, añádelo en todos.
+- Si cambias el vocabulario, recomputa con `python3 scripts/rekey_guidelines.py` (lee el texto ya guardado, no necesita PDFs) y vuelve a subir con `upload_guidelines.js`.
+- **Embeddings:** modelo `gemini-embedding-001`, 768 dims, L2-normalizados (obligatorio normalizar porque dim≠3072). Función `requestGoogleEmbeddings()` en `googleGenAiTransport.js`. No habilitar Vertex.
+- El **índice vectorial** se crea con `gcloud` (ver `docs/DEPLOYMENT.md`); el service-account del repo no tiene permiso para crearlo.
+- Estado al 6 jun 2026: `guidelines`=226 docs (fallback); `guideline_passages`=7.128 pasajes con vector. Índice vectorial: **pendiente de crear por el usuario**.
+
 ## Verificacion minima
 
 ```bash

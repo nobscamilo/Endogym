@@ -1,6 +1,60 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **3 de junio de 2026 (Integración de Strava y sincronización de GitHub)**.
+Ultima actualizacion: **6 de junio de 2026 (RAG semántico con embeddings + mejora nutricional)**.
+
+## Sesión del 6 de junio de 2026 (mejora del RAG nutricional)
+
+### Hallazgos iniciales (auditoría)
+
+- **Drift de ingesta:** había **226 JSON locales** en `docs/guidelines-json/` pero solo **213 subidos** a Firestore. Los 13 chunks nuevos (8 de *ACSM Guidelines* + 5 de *FUNDAMENTOS-DE-FISIOLOGIA-DO-EXERCÍCIO*, parseados el 4 de junio) estaban sin subir ni commitear.
+- **Gap de keywords en nutrición:** los libros de nutrición antiguos (`Nutrition and Athletic`, `nutrients-16-03007`, `nmab093`, `obesity`) tenían `keywords: null` (parseados el 28 de mayo con la versión vieja). Solo eran recuperables por nombre de archivo o fallback → prácticamente invisibles para el coach.
+- **Vocabulario sin cobertura nutricional:** ni `deriveKeywords()` ni el parser incluían términos de nutrición; `deriveKeywords()` nunca emitía `nutrition`.
+
+### Cambios aplicados (verificados end-to-end contra Firestore de producción)
+
+- **Vocabulario expandido (+30 términos de nutrición/suplementación)** en `scripts/parse_pdf_improved.py` y `scripts/chunk_ocr_json.py` (EN + mapeo ES/PT): `nutrition, sports nutrition, protein, amino acid, protein synthesis, carbohydrate, glycogen, dietary fat, hydration, fluid, electrolyte, sodium, micronutrient, vitamin, mineral, iron, calcium, creatine, caffeine, nitrate, beta-alanine, bicarbonate, supplement, ergogenic, energy availability, energy balance, calorie, fiber, gastrointestinal, recovery`.
+- **`deriveKeywords()` en `guidelinesRetriever.js`** ahora emite ancla nutricional base (`nutrition`, `sports nutrition`) y keywords nutricionales por objetivo (hipertrofia→`protein synthesis/amino acid/creatine`; resistencia→`glycogen/electrolyte/caffeine/nitrate`; pérdida de peso→`energy availability/calorie/fiber`; glucémico→`fiber`).
+- **Garantía de diversidad en la selección:** top-3 por puntaje; si ninguno es nutricional, se añade el libro nutricional mejor puntuado como 4º (máx. 4 docs). Constante `NUTRITION_TERMS` y flag `isNutrition`.
+- **Re-keyado masivo:** nuevo `scripts/rekey_guidelines.py` recomputó keywords de los 226 JSON desde el texto ya almacenado (sin PDFs ni red). **222 reescritos; 206 ganaron keywords de nutrición.**
+- **Subida a Firestore:** `node --env-file=.env.local scripts/upload_guidelines.js` → colección `guidelines` ahora con **226 docs** (drift eliminado). Conteos verificados: 72 docs con `nutrition`, 18 con `creatine`.
+
+### Verificación
+
+- Sonda real `retrieveGuidelinesContextWithCitations` contra Firestore de producción: para objetivos de hipertrofia y resistencia, *Nutrition and Athletic* y el capítulo *25. Sports Nutrition* aparecen ahora como resultado #1–#2 (antes invisibles). Para lesión de rodilla + fuerza siguen surgiendo *Therapeutic exercise* y *Sports medicine*.
+- `node --check` y `py_compile` OK en todos los archivos modificados.
+- **Limitación de tests:** `vitest` no corre en el sandbox Linux (binarios rolldown de macOS). Falta correr `npm test` y `npm run build` **en la Mac** antes de tratar el cambio como listo para commit/deploy.
+
+### Limitación conocida del enfoque léxico (motivó los embeddings)
+
+El re-keyado dejó claro el techo del RAG léxico: **206/226 docs quedaron marcados como "nutrición"** porque los capítulos médicos mencionan proteína/caloría/recuperación de pasada. El matching por keywords no distingue un capítulo *sobre* timing de proteína de uno que la menciona una vez.
+
+## RAG semántico con embeddings (6 de junio de 2026, sesión tarde)
+
+Se implementó búsqueda semántica como **modo principal del RAG**, con el léxico como fallback.
+
+### Implementado y verificado
+
+- **Embeddings:** `gemini-embedding-001` (Gemini Developer API, respeta "no Vertex"), **768 dims, L2-normalizados**. Nueva función `requestGoogleEmbeddings()` (batch) en `src/services/googleGenAiTransport.js`. Verificada con la key real (HTTP 200, 768 dims).
+- **Sub-chunking + ingesta:** `scripts/embed_guidelines.mjs` trocea los 226 docs en pasajes de ~800 tokens con solape y los sube a la nueva colección **`guideline_passages`** con el vector en `FieldValue.vector()`. Resumable/idempotente. **7.128 pasajes generados, embebidos y subidos** (verificado: `count()`=7128, ejemplo con `VectorValue` de 768 dims y rango de páginas).
+- **Retriever reescrito** (`src/services/guidelinesRetriever.js`): construye una consulta en lenguaje natural desde perfil/objetivo, la embebe (`RETRIEVAL_QUERY`, timeout 8s) y recupera con **`findNearest` (COSINE, limit 12, tope 20k chars)**. Citaciones con archivo, rango de páginas y distancia.
+- **Fallback robusto:** si no hay `GEMINI_API_KEY`, si el embedding falla, o si `findNearest` falla (p. ej. índice no creado) o devuelve vacío, degrada automáticamente a la búsqueda léxica por keywords sobre `guidelines`. **Verificado end-to-end:** sin índice, el retriever degradó a keywords y devolvió contexto correctamente (producción nunca queda sin contexto).
+- **Tests:** `tests/services/guidelines-retriever.test.js` actualizado (mock de `findNearest` y del transporte); añadido test del camino vectorial; conservados los de fallback léxico.
+
+### PENDIENTE CRÍTICO — acción del usuario
+
+- **Crear el índice vectorial en Firestore** (el service-account del repo NO tiene permiso `indexAdmin`). Hasta crearlo, el RAG funciona en modo keywords. Comando (también en DEPLOYMENT.md):
+
+  ```bash
+  gcloud firestore indexes composite create \
+    --project=endogym-vtety8 \
+    --collection-group=guideline_passages \
+    --query-scope=COLLECTION \
+    --field-config=vector-config='{"dimension":"768","flat": "{}"}',field-path=embedding
+  ```
+
+  El índice tarda unos minutos en construirse sobre 7.128 docs. Tras ello, el modo vector se activa solo (verificable en Runtime Logs por el evento `guidelines_vector_matches`).
+- Costo de la generación de embeddings: ~5–6M tokens ≈ **< $1** una sola vez. Recurrente: centavos/mes.
+- **Tests no corridos en sandbox** (vitest = binarios macOS). Correr `npm test` y `npm run build` en la Mac antes de commit/deploy.
 
 ## Resumen ejecutivo
 
