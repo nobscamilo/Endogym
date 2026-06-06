@@ -56,7 +56,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!authReady || !authUser || signedOutRequested) return;
-    router.replace('/dashboard');
+    router.replace('/studio');
   }, [authReady, authUser, signedOutRequested, router]);
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export default function HomePage() {
       }
 
       setStatus('Autenticación correcta. Redirigiendo...');
-      router.push('/dashboard');
+      router.push('/studio');
     } catch (error) {
       setStatus(`Error: ${error.message}`);
     } finally {
@@ -188,7 +188,7 @@ export default function HomePage() {
       }
 
       setStatus('Autenticación con Google correcta. Redirigiendo...');
-      router.push('/dashboard');
+      router.push('/studio');
     } catch (error) {
       setStatus(`Error: ${error.message}`);
     } finally {
@@ -225,7 +225,7 @@ export default function HomePage() {
       <header className="landing-header">
         <div className="landing-header-container">
           <Link href="/" className="landing-logo">
-            Endogym
+            Ignios
           </Link>
           <nav className="landing-nav">
             <a className="landing-nav-link active" href="#acceso">Acceso</a>
@@ -244,7 +244,7 @@ export default function HomePage() {
         <section className="landing-hero-section">
           <div className="landing-hero-bg">
             <Image
-              alt="Entrenamiento de fuerza en Endogym"
+              alt="Entrenamiento de fuerza en Ignios"
               src="/brand/canva/hero-canva-clean.png"
               fill
               priority
@@ -261,7 +261,7 @@ export default function HomePage() {
                 Tu seguimiento deportivo, en un solo lugar
               </h1>
               <p className="landing-subtitle">
-                Accede a tu plan semanal, registra nutrición y métricas, y revisa cómo evoluciona tu adherencia. Endogym es una herramienta educativa y no sustituye atención médica.
+                Accede a tu plan semanal, registra nutrición y métricas, y revisa cómo evoluciona tu adherencia. Ignios es una herramienta educativa y no sustituye atención médica.
               </p>
               <div className="landing-athlete-banner">
                 <span className="landing-athlete-text">Plan semanal · Nutrición · Check-in de sesión · Métricas</span>
@@ -280,7 +280,7 @@ export default function HomePage() {
                   ) : (
                     <>
                       <h2>Crear tu Cuenta</h2>
-                      <p>Únete a la precisión deportiva de Endogym</p>
+                      <p>Únete a la precisión deportiva de Ignios</p>
                     </>
                   )}
                 </div>
@@ -461,7 +461,7 @@ export default function HomePage() {
                 <div className="landing-card-footer">
                   {mode === 'login' ? (
                     <p>
-                      ¿Nuevo en Endogym?{' '}
+                      ¿Nuevo en Ignios?{' '}
                       <button type="button" onClick={() => setMode('register')}>
                         Crea una cuenta
                       </button>
@@ -565,8 +565,8 @@ export default function HomePage() {
       <footer className="landing-footer">
         <div className="landing-footer-container">
           <div className="landing-footer-brand">
-            <div className="landing-footer-logo">Endogym</div>
-            <p>© 2026 Endogym. Herramienta educativa de seguimiento deportivo.</p>
+            <div className="landing-footer-logo">Ignios</div>
+            <p>© 2026 Ignios. Herramienta educativa de seguimiento deportivo.</p>
             <p style={{ marginTop: '0.2rem', fontStyle: 'italic', fontSize: '0.78rem' }}>Uso educativo. No sustituye valoración ni prescripción médica profesional.</p>
           </div>
           <nav className="landing-footer-nav">

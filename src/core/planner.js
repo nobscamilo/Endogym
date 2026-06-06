@@ -783,6 +783,30 @@ export function generateWeeklyPlan({
   // duración de los días de entreno. Gated por `studioAvailability` para no alterar el
   // comportamiento por defecto ni los tests existentes.
   if (profile.studioAvailability === true) {
+    // Frecuencia: si el usuario indicó menos días/semana que el plan, convierte los días de
+    // entreno sobrantes en descanso activo (conservando los primeros del orden semanal).
+    const dpw = Math.round(Number(profile.daysPerWeek));
+    if (Number.isFinite(dpw) && dpw >= 1 && dpw <= 7) {
+      let kept = 0;
+      days.forEach((d) => {
+        if (!d.isTrainingDay) return;
+        if (kept < dpw) { kept += 1; return; }
+        d.isTrainingDay = false;
+        d.sessionType = 'recovery';
+        d.sessionFocus = 'recovery';
+        d.workout = {
+          title: 'Descanso activo',
+          sessionFocus: 'recovery',
+          durationMinutes: 30,
+          intensityRpe: 'RPE 2-3',
+          warmup: buildWarmupProtocol({ sessionType: 'recovery', modality }),
+          exercises: [],
+          cooldown: buildCooldownProtocol({ sessionType: 'recovery' }),
+        };
+      });
+    }
+
+    // Duración: ajusta los minutos de los días de entreno restantes a lo indicado.
     const prefMin = Math.round(Number(profile.preferredDurationMinutes));
     if (Number.isFinite(prefMin) && prefMin >= 20 && prefMin <= 150) {
       days.forEach((d) => {

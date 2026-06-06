@@ -17,12 +17,12 @@ const outfit = Outfit({
 export const metadata = {
   metadataBase: new URL(getPublicSiteUrl()),
   title: {
-    default: 'Endogym | Nutrición y entrenamiento con IA',
-    template: '%s | Endogym',
+    default: 'Ignios | Nutrición y entrenamiento con IA',
+    template: '%s | Ignios',
   },
   description:
-    'Endogym integra planificación de entrenamiento, nutrición personalizada y seguimiento de progreso con IA adaptativa.',
-  applicationName: 'Endogym',
+    'Ignios integra planificación de entrenamiento, nutrición personalizada y seguimiento de progreso con IA adaptativa.',
+  applicationName: 'Ignios',
   manifest: '/manifest.webmanifest',
   category: 'health',
   alternates: {
@@ -42,14 +42,14 @@ export const metadata = {
     type: 'website',
     locale: 'es_ES',
     url: '/',
-    siteName: 'Endogym',
-    title: 'Endogym | Nutrición y entrenamiento con IA',
+    siteName: 'Ignios',
+    title: 'Ignios | Nutrición y entrenamiento con IA',
     description:
       'Planifica tu entrenamiento y nutrición con una app que adapta cargas, dieta y adherencia con IA.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Endogym | Nutrición y entrenamiento con IA',
+    title: 'Ignios | Nutrición y entrenamiento con IA',
     description:
       'Entrenamiento, nutrición y seguimiento deportivo educativo en una sola plataforma con IA adaptativa.',
   },

@@ -4,8 +4,8 @@ export default function manifest() {
   const siteUrl = getPublicSiteUrl();
 
   return {
-    name: 'Endogym',
-    short_name: 'Endogym',
+    name: 'Ignios',
+    short_name: 'Ignios',
     description: 'Planificación de nutrición y entrenamiento con IA adaptativa.',
     start_url: '/',
     display: 'standalone',
