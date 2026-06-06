@@ -212,7 +212,13 @@ function NutritionToday({ layout }) {
     carbs: p.carbs + Math.round(Number(t.carbsGrams) || 0),
     fat: p.fat + Math.round(Number(t.fatGrams) || 0),
   }));
-  const next = meals.find((m) => !m.done) || meals[0];
+  // "Toca ahora": la próxima comida según la hora actual (avanza durante el día).
+  const nowMin = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+  const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 9999; };
+  const next = meals.find((m) => !m.done && toMin(m.time) >= nowMin)
+    || meals.find((m) => toMin(m.time) >= nowMin)
+    || meals.find((m) => !m.done)
+    || meals[meals.length - 1] || meals[0];
   return (
     <React.Fragment>
       {/* "Toca ahora" — qué comer de un vistazo */}

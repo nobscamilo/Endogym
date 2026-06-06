@@ -332,7 +332,7 @@ function TrainSession() {
         <div className="ex-list">
           {list.map((ex, i) => (
             <div key={i} className={`ex-row ${ex.done ? 'done' : ''}`}>
-              <button className="ex-thumb" style={{ background: videoGrad(ex.hue) }} onClick={(e) => { e.stopPropagation(); open(ex, e.currentTarget); }}>
+              <button className="ex-thumb" style={{ background: thumbBg(ex) }} onClick={(e) => { e.stopPropagation(); open(ex, e.currentTarget); }}>
                 <span className="vid-play sm"><Icon name="play" size={14} /></span>
                 <span className="vid-len">{ex.dur}</span>
               </button>

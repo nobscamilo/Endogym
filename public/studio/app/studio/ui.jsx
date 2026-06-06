@@ -45,6 +45,14 @@ function videoGrad(hue) {
   return `linear-gradient(140deg, oklch(0.62 0.16 ${hue}), oklch(0.42 0.13 ${(hue + 30) % 360}))`;
 }
 
+/* Fondo de miniatura: imagen real de YouTube si hay vídeo, si no el gradiente. */
+function thumbBg(item) {
+  if (item && item.yt) {
+    return `linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.42)), url(https://i.ytimg.com/vi/${item.yt}/hqdefault.jpg) center/cover no-repeat`;
+  }
+  return videoGrad(item && item.hue);
+}
+
 /* Miniatura de vídeo — clic dispara el reproductor con transición shared-element */
 function VideoThumb({ item, variant = 'card' }) {
   const { open } = useVideo();
@@ -53,7 +61,7 @@ function VideoThumb({ item, variant = 'card' }) {
   if (variant === 'row') {
     return (
       <button className="vid-row" onClick={onClick}>
-        <span className="vid-row-thumb" ref={ref} style={{ background: videoGrad(item.hue) }}>
+        <span className="vid-row-thumb" ref={ref} style={{ background: thumbBg(item) }}>
           <span className="vid-play sm"><Icon name="play" size={15} /></span>
           <span className="vid-len">{item.len || item.dur}</span>
         </span>
@@ -67,7 +75,7 @@ function VideoThumb({ item, variant = 'card' }) {
   }
   return (
     <button className="vid-card" onClick={onClick}>
-      <span className="vid-thumb" ref={ref} style={{ background: videoGrad(item.hue) }}>
+      <span className="vid-thumb" ref={ref} style={{ background: thumbBg(item) }}>
         <span className="vid-noise" />
         <span className="vid-play"><Icon name="play" size={20} /></span>
         <span className="vid-len">{item.len || item.dur}</span>
@@ -153,7 +161,7 @@ function VideoPlayer({ state, onClose }) {
     <div className={`player-scrim ${closing ? 'out' : ''}`} onClick={doClose}>
       <div className="player-card" ref={cardRef} onClick={(e) => e.stopPropagation()}>
         <div className="player-stage" ref={stageRef} style={{ background: videoGrad(it.hue) }}>
-          {embedded && hasYt ? (
+          {hasYt ? (
             <iframe className="player-iframe" src={`https://www.youtube-nocookie.com/embed/${it.yt}?autoplay=1&rel=0&modestbranding=1`}
               title={it.title || it.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -240,4 +248,4 @@ function Sheet({ open, onClose, children, title }) {
   );
 }
 
-Object.assign(window, { SectionCard, MacroLine, Stat, VideoThumb, VideoPlayer, VideoProvider, VideoCtx, useVideo, videoGrad, Sheet });
+Object.assign(window, { SectionCard, MacroLine, Stat, VideoThumb, VideoPlayer, VideoProvider, VideoCtx, useVideo, videoGrad, thumbBg, Sheet });
