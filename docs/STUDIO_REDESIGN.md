@@ -10,7 +10,9 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
 - **Check-in de sesión** (Entreno → `CheckinCard`): completada (sí/no), RPE 1-10, fatiga, sueño y síntomas de alarma (dyspnea/jointPain/dizziness/tachycardia). POST a **`/api/workouts`** con `source:'daily_checkin'`. Alimenta el gate clínico del Coach IA. Requiere sesión.
 - **Añadir/escanear alimento** (Nutrición → "Qué comer hoy" → `AddFood`): por código de barras (input → **`/api/products/barcode`**, OpenFoodFacts; + escaneo con cámara vía `BarcodeDetector` si el navegador lo soporta) o manual. POST a **`/api/meals`** y actualiza en vivo las kcal/macros consumidas. El iframe lleva `allow="camera"`.
 
-> Estas 3 features se editan en `public/studio/app/studio/{screen-train,screen-nutrition}.jsx` + `screens.css` y requieren **regenerar el bundle** (`npm run build:studio`, mantenedor) y commitearlo.
+- **Fase 3 — Plan nutricional con IA** (Nutrición → botón "Generar mi plan con IA"): genera con Gemini recetas del día (ingredientes/pasos/carga glucémica), lista de la compra por categorías y batch cooking, personalizado al perfil/objetivo/macros. Endpoint **`/api/studio-nutrition`** (POST, auth, JSON estructurado con `responseJsonSchema`). Sustituye los datos de muestra de Nutrición al pulsar el botón. Requiere sesión; coste/latencia de una llamada Gemini (~varios segundos).
+
+> Estas features se editan en `public/studio/app/studio/{screen-train,screen-nutrition}.jsx` + `screens.css` y requieren **regenerar el bundle** (`npm run build:studio`, mantenedor) y commitearlo.
 
 ## Marca Ignios (logo oficial)
 
