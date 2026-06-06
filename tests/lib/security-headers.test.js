@@ -31,8 +31,9 @@ describe('Next.js security headers', () => {
     expect(studio).toBeTruthy();
 
     const headers = headersFor(studio);
-    // El bundle Studio usa Babel-in-browser (necesita unsafe-eval) y se muestra en iframe propio.
-    expect(headers['Content-Security-Policy']).toContain("'unsafe-eval'");
+    // El bundle Studio está pre-compilado: NO debe necesitar unsafe-eval, y se muestra
+    // en un iframe del mismo origen (SAMEORIGIN, no DENY).
+    expect(headers['Content-Security-Policy']).not.toContain("'unsafe-eval'");
     expect(headers['Content-Security-Policy']).toContain("frame-ancestors 'self'");
     expect(headers['X-Frame-Options']).toBe('SAMEORIGIN');
     // Conserva el resto del hardening.

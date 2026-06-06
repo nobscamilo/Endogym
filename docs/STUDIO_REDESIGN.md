@@ -17,10 +17,14 @@ Pendiente (fase C, cuando Studio sea la UI por defecto): aplicar el logo/favicon
 
 ## Arquitectura de la implementación
 
-El diseño es un SPA React 18 + Babel-in-browser (prototipo). Para máxima fidelidad y aislamiento total del resto de la app, se monta como **bundle estático servido en un iframe**:
+El diseño es un SPA React. Para máxima fidelidad y aislamiento total del resto de la app, se monta como **bundle servido en un iframe**. **Está PRE-COMPILADO** (producción):
 
-- `public/studio/app/` — bundle del diseño tal cual (CSS, JSX, data.js, assets). Entry: `public/studio/app/index.html` (añade Google Fonts: Bricolage Grotesque + Manrope + Space Mono, y el shim de integración).
+- `public/studio/app/studio/*` — código fuente del diseño (CSS, JSX, data.js). El JSX es la **fuente de verdad**; aquí se editan/añaden features.
+- `scripts/build-studio.mjs` — compila ese JSX + **React de producción + Firebase (modular)** a un único `public/studio/app/studio.bundle.js` con **esbuild**. Sin Babel-in-browser, sin `unsafe-eval`, sin CDNs. Incluye la integración con el backend (coach `window.claude.complete`, token Firebase, fusión de datos reales). Se ejecuta en `npm run prebuild` (antes de cada `npm run build`) y manualmente con `npm run build:studio`.
+- `public/studio/app/index.html` — carga solo `studio.bundle.js` (+ Google Fonts + favicon llama).
 - `src/app/studio/page.js` — ruta Next `/studio`: iframe a pantalla completa de `/studio/app/index.html`. Aislamiento CSS/JS total respecto a la app.
+
+> Tras editar cualquier archivo en `public/studio/app/studio/`, regenera el bundle con `npm run build:studio` (o `npm run build`, que lo hace en `prebuild`).
 
 ### Integraciones con el backend real
 
@@ -40,9 +44,7 @@ El diseño es un SPA React 18 + Babel-in-browser (prototipo). Para máxima fidel
 
 ## Seguridad (CSP)
 
-El bundle usa Babel-in-browser (requiere `'unsafe-eval'`) + React/Babel desde CDN (unpkg) + Firebase web (gstatic). Por eso `next.config.mjs` aplica una **CSP relajada SOLO a `/studio*`** (con `X-Frame-Options: SAMEORIGIN` para permitir el iframe del mismo origen). **El resto de la app conserva la CSP estricta global** (la regla global excluye `/studio` con un negative-lookahead para no duplicar la cabecera CSP).
-
-> Hardening recomendado para producción: pre-compilar el bundle (eliminar Babel-in-browser y los CDNs, empaquetar React localmente) para poder retirar `'unsafe-eval'` y las fuentes CDN de la CSP de `/studio`. Eso equivale a portar el prototipo a componentes Next nativos.
+Tras la productización, la CSP de `/studio*` es **estricta**: `script-src 'self'` (sin `unsafe-eval`, sin CDNs). Lo único que se relaja respecto a la global es: `X-Frame-Options: SAMEORIGIN` + `frame-ancestors 'self'` (para el iframe del mismo origen), Google Fonts en `style-src`/`font-src`, y miniaturas de YouTube en `img-src`. **El resto de la app conserva la CSP estricta global** (la regla global excluye `/studio` y `/studio/*` con un negative-lookahead para no duplicar la cabecera). Cubierto por `tests/lib/security-headers.test.js`.
 
 ## Verificación
 

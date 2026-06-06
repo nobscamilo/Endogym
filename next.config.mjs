@@ -21,19 +21,18 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
 ];
 
-// CSP relajada SOLO para el rediseño Studio (/studio*): es un bundle estático con
-// Babel-in-browser (requiere 'unsafe-eval') + React/Babel desde CDN + Firebase web,
-// y se muestra en un iframe del mismo origen (requiere SAMEORIGIN, no DENY).
-// El resto de la app conserva la CSP estricta global.
-// NOTA de hardening: para producción, pre-compilar el bundle y eliminar Babel/unsafe-eval.
+// CSP para el rediseño Studio (/studio*). El bundle está PRE-COMPILADO (esbuild, React de
+// producción y Firebase empaquetados), así que NO necesita 'unsafe-eval' ni scripts de CDN.
+// Solo se relaja respecto a la global: framing del mismo origen (SAMEORIGIN, para el iframe),
+// fuentes de Google (style/font) e imágenes de miniaturas de YouTube. script-src es 'self'.
 const studioContentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://www.gstatic.com",
+  "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://i.ytimg.com",
   "media-src 'self' blob:",
-  "connect-src 'self' https://unpkg.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com",
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com",
   "frame-src 'self' https://*.firebaseapp.com https://www.youtube.com https://www.youtube-nocookie.com",
   "frame-ancestors 'self'",
   "base-uri 'self'",
