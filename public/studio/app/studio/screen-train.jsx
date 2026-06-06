@@ -265,9 +265,36 @@ function TrainSession() {
   const s = D.todaySession;
   const { open } = useVideo();
   const [list, setList] = useStateTr(s.list);
+  const [busy, setBusy] = useStateTr(null); // 'all' | exerciseId | null
+  const [reason, setReason] = useStateTr('variety');
   const done = list.filter((x) => x.done).length;
-  const pct = Math.round((done / list.length) * 100);
+  const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
+
+  async function refreshSession() {
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      const d = await fetch('/api/studio-data', { headers: token ? { authorization: 'Bearer ' + token } : {} });
+      if (!d.ok) return;
+      const j = await d.json();
+      const o = j && j.ok ? j.overrides : null;
+      if (o && o.todaySession) { D.todaySession = o.todaySession; setList(o.todaySession.list); }
+      if (o) ['week', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+    } catch (e) { /* noop */ }
+  }
+  async function swap(scope, exerciseId) {
+    setBusy(scope === 'all' ? 'all' : exerciseId);
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setBusy(null); return; }
+      const r = await fetch('/api/studio-swap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ scope, exerciseId, reason }),
+      });
+      if (r.ok) await refreshSession();
+    } catch (e) { /* noop */ } finally { setBusy(null); }
+  }
   return (
     <React.Fragment>
       {/* Banner sesión */}
@@ -289,7 +316,19 @@ function TrainSession() {
       </div>
 
       {/* Lista de ejercicios con vídeo */}
-      <SectionCard title="Ejercicios" icon="list" sub="Toca el vídeo para ver la técnica · marca cada serie al terminar">
+      <SectionCard title="Ejercicios" icon="list" sub="Toca el vídeo para ver la técnica · marca cada serie al terminar"
+        action={(
+          <div className="row ac" style={{ gap: 6 }}>
+            <select className="reason-select" value={reason} onChange={(e) => setReason(e.target.value)} title="Motivo del cambio">
+              <option value="variety">Variar</option>
+              <option value="time">Menos tiempo</option>
+              <option value="equipment">Otro equipo</option>
+            </select>
+            <button className="btn ghost sm" disabled={busy === 'all'} onClick={() => swap('all', null)}>
+              <Icon name="sparkles" size={14} /> {busy === 'all' ? 'Cambiando…' : 'Cambiar sesión'}
+            </button>
+          </div>
+        )}>
         <div className="ex-list">
           {list.map((ex, i) => (
             <div key={i} className={`ex-row ${ex.done ? 'done' : ''}`}>
@@ -303,6 +342,11 @@ function TrainSession() {
               </div>
               <div className="ex-sets">
                 <span className="ex-scheme">{ex.scheme}</span>
+                {ex.id ? (
+                  <button className="ex-swap" title="Cambiar ejercicio" disabled={busy === ex.id} onClick={() => swap('one', ex.id)}>
+                    <Icon name={busy === ex.id ? 'clock' : 'sparkles'} size={15} />
+                  </button>
+                ) : null}
                 <button className="ex-check" onClick={() => toggle(i)}><Icon name="check" size={16} /></button>
               </div>
             </div>

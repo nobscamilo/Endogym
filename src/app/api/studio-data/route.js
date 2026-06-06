@@ -112,6 +112,7 @@ function mapTodaySession(plan, today) {
   const ex = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
   const list = ex.map((e, i) => {
     const item = {
+      id: e.id || null,
       name: e.name || 'Ejercicio',
       scheme: schemeOf(e.prescription),
       load: loadOf(e.prescription),

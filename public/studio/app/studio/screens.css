@@ -366,3 +366,9 @@
 .legend-swatch.primary { background: radial-gradient(circle, rgba(236,72,153,1), rgba(59,130,246,0.7)); box-shadow: 0 0 6px rgba(236,72,153,0.6); }
 .legend-swatch.secondary { background: radial-gradient(circle, rgba(99,102,241,0.9), rgba(139,92,246,0.5)); }
 @media (max-width: 600px) { .muscle-atlas-stage.double-view { grid-template-columns: 1fr; } }
+
+/* ---- Swap de ejercicios ---- */
+.ex-swap { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: var(--accent-soft); color: var(--accent-on-soft); display: grid; place-items: center; cursor: pointer; transition: all var(--t-fast) var(--ease); }
+.ex-swap:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ex-swap:disabled { opacity: 0.5; cursor: default; }
+.reason-select { height: 32px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); font-size: 0.78rem; font-family: var(--font-body); padding: 0 8px; cursor: pointer; }
