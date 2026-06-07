@@ -53,7 +53,8 @@ describe('exercise muscle metadata', () => {
 
   it('uses embeds only for verified videos and falls back for unverified ids', () => {
     const verified = resolveExerciseMetadata({ id: 'gym-bench-press' });
-    const fallback = resolveExerciseMetadata({ id: 'gym-front-squat' });
+    // Ejercicio aún sin vídeo curado (yoga queda fuera del alcance de fuerza cubierto).
+    const fallback = resolveExerciseMetadata({ id: 'yoga-cobra-pose' });
 
     expect(verified.videoEmbedId).toBe('XjrsqShr-Ic');
     expect(verified.videoEmbedUrl).toContain('youtube.com/embed/XjrsqShr-Ic');

@@ -36,9 +36,9 @@ const EXERCISE_VIDEO_MAP = {
   'trx-chest-fly': 'eGjt4lk6g34',
 
   // Back / Pull
-  'gym-pullup': 'ZuV_NokRESN', // The Perfect Pull-Up (FIX THESE!)
-  'home-pull-up': 'ZuV_NokRESN',
-  'calis-pull-up-assisted': 'ZuV_NokRESN',
+  'gym-pullup': 'ZPG8OsHKXLw', // The PERFECT Pull-Up (5 Steps)
+  'home-pull-up': 'ZPG8OsHKXLw',
+  'calis-pull-up-assisted': 'ZPG8OsHKXLw',
   'gym-lat-pulldown': 'S481pmnNTYY',
   'gym-barbell-row': 'phVtqawIgbk',
   'gym-seated-row': 'G35gTqGcXXA',
@@ -57,8 +57,8 @@ const EXERCISE_VIDEO_MAP = {
   'gym-hammer-curl': 'zC3nLlEvin4',
 
   // Legs / Posterior Chain
-  'gym-barbell-back-squat': '9r-k1D_Wz3A', // FIX THESE Squat Mistakes!
-  'home-bodyweight-squat': '9r-k1D_Wz3A',
+  'gym-barbell-back-squat': 'ZaSetOZFo-k', // How To Do A Barbell Back Squat
+  'home-bodyweight-squat': 'ZaSetOZFo-k',
   'gym-conventional-deadlift': 'K8a_Ab9R-aI', // The PERFECT Deadlift Guide (Shorts)
   'gym-romanian-deadlift': 'K8a_Ab9R-aI',
   'home-single-leg-rdl': 'K8a_Ab9R-aI',
@@ -83,6 +83,86 @@ const EXERCISE_VIDEO_MAP = {
   'gym-crunch': 'Xyd_fa5zoEU',
   'gym-dumbbell-flye': 'eGjt4lk6g34',
   'gym-burpee': 'dZgVxmf6jkA',
+
+  // --- Cobertura de fuerza (ampliación): todos verificados vía oEmbed (jun 2026). Shorts de
+  // técnica. Donde no existe un Short 1:1, se usa el vídeo del MISMO patrón de movimiento. ---
+  // Tirón / espalda
+  'trx-t-fly': 'ywQsaOTRjzM',            // deltoides posterior (face pull)
+  'trx-y-fly': 'ywQsaOTRjzM',
+  'trx-reverse-fly': 'ywQsaOTRjzM',
+  'home-band-pull-apart': 'ywQsaOTRjzM',
+  'home-band-pullover': 'S481pmnNTYY',   // dorsales (jalón)
+  'trx-high-row': 'phVtqawIgbk',         // remo
+  'trx-crossover-row': 'phVtqawIgbk',
+  'calis-inverted-row': 'phVtqawIgbk',
+  'trx-power-pull': 'phVtqawIgbk',
+  // Cadena posterior
+  'calis-arch-hold': 'uexOGyxLr7E',      // superman / extensión
+  'trx-hip-hinge': 'K8a_Ab9R-aI',        // bisagra (peso muerto)
+  'home-banded-good-morning': 'K8a_Ab9R-aI',
+  'gym-leg-curl': 'HQyWDIE_ILU',         // curl femoral
+  'trx-hamstring-curl': 'HQyWDIE_ILU',
+  'trx-hamstring-runner': 'HQyWDIE_ILU',
+  'home-reverse-plank': 'bf7MS2rtfIg',   // puente glúteo
+  'trx-hip-press': '96uDbymTaHM',        // hip thrust
+  'home-hip-bridge': 'bf7MS2rtfIg',
+  'home-single-leg-glute-bridge': 'bf7MS2rtfIg',
+  'trx-glute-bridge': 'bf7MS2rtfIg',
+  // Core
+  'home-bird-dog': 'LWdKrBi9Lks',
+  'home-dead-bug': 'Aoipu_fl3HA',
+  'calis-hollow-hold': 'KgkU7yAEW90',
+  'home-band-woodchop': 'eMfhcGOzC7Y',
+  'home-plank': 'pSHjTRCQxIw',
+  'home-side-plank': 'HyAct6eyrvg',
+  'trx-side-plank': 'HyAct6eyrvg',
+  'home-suitcase-carry': 'HyAct6eyrvg',
+  'trx-oblique-crunch': 'Xyd_fa5zoEU',
+  'trx-knee-tuck': 'pSHjTRCQxIw',
+  'trx-fallout': 'pSHjTRCQxIw',
+  'trx-pike': 'pSHjTRCQxIw',
+  'trx-plank-saw': 'pSHjTRCQxIw',
+  'trx-rollout': 'pSHjTRCQxIw',
+  // Empuje superior / hombro / tríceps
+  'gym-cable-fly': 'eGjt4lk6g34',
+  'gym-incline-db-press': 'XjrsqShr-Ic',
+  'gym-lateral-raise': 'Myim1WH6Qec',
+  'home-band-lateral-raise': 'Myim1WH6Qec',
+  'gym-triceps-pushdown': 'v2fMq8RjNBw',
+  'home-band-triceps-pressdown': 'v2fMq8RjNBw',
+  'trx-triceps-extension': 'v2fMq8RjNBw',
+  'home-pike-push-up': '4LBVP2Oe7fg',    // empuje vertical (press militar)
+  'calis-hindu-push-up': 'J-vItVuxDl0',  // flexión
+  'trx-atomic-pushup': 'J-vItVuxDl0',
+  'calis-dip-assisted': '2z8JmcrW-As',   // fondos
+  'calis-bench-dip': '2z8JmcrW-As',
+  // Gemelos
+  'gym-calf-raise': 'rsOLKY02m70',
+  'home-single-leg-calf-raise': 'rsOLKY02m70',
+  // Acondicionamiento
+  'home-mountain-climber': 'hZb6jTbCLeE',
+  'trx-sprinter-start': 'hZb6jTbCLeE',
+  'home-bear-crawl': '-9L3rTrYo4Q',
+  // Movilidad
+  'yoga-cat-cow': 'MSBOBAIeLqI',
+  'mobility-ankle': 'WlRbt0hewIs',
+  'mobility-thoracic': 'j6hv8Q5QtL8',
+  // Neuromotor
+  'home-hip-airplane': 'K8a_Ab9R-aI',
+  // Pierna unilateral
+  'home-step-up': '5ksu8nrdVIE',
+  'home-cossack-squat': 'VdN137mr2mM',
+  'trx-single-leg-squat': 'or1frhkjBDc',
+  'trx-assisted-pistol-squat': 'or1frhkjBDc',
+  'home-skater-squat-box': 'or1frhkjBDc',
+  'trx-curtsy-lunge': 'D7KaRcUTQeE',
+  'trx-lunge': 'D7KaRcUTQeE',
+  'home-reverse-lunge': 'D7KaRcUTQeE',
+  // Pierna (sentadilla)
+  'trx-squat': 'ZaSetOZFo-k',
+  'gym-front-squat': 'ZaSetOZFo-k',
+  'gym-hack-squat': 'ZaSetOZFo-k',
+  'home-wall-sit': 'ZaSetOZFo-k',
 };
 
 function youtubeLinks(query, exerciseId = '') {

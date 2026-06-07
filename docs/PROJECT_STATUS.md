@@ -74,6 +74,16 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **IMPORTANTE para el usuario:** los ejercicios mostrados salen del plan **guardado**; hay que pulsar **"Regenerar plan con IA"** una vez tras el deploy para que cada persona obtenga su nueva selección.
 - Pendiente/futuro (no bloqueante): programación específica por objetivo más profunda (p. ej. fuerza→prioriza básicos pesados, resistencia→más densidad), no solo variación de semilla.
 
+### Vídeos de ejercicios — cobertura de fuerza (jun 2026)
+
+- **Antes:** de 184 ejercicios solo 34 tenían vídeo embebible; el resto caía a un enlace de búsqueda. Además 2 de los 34 estaban **caídos** (404/400): dominada `ZuV_NokRESN` y sentadilla `9r-k1D_Wz3A`.
+- **Hecho:** todos los `EXERCISE_VIDEO_MAP` se verificaron vía **oEmbed**; se reemplazaron los 2 caídos (dominada→`ZPG8OsHKXLw`, sentadilla→`ZaSetOZFo-k`) y se **añadieron 67 mapeos nuevos** para cubrir la fuerza (gym/casa/TRX/calistenia). Se buscaron Shorts reales (`WebSearch` en youtube.com) y se verificó existencia + título coherente de cada uno (20 movimientos nuevos: elevación lateral, gemelos, tríceps en polea, curl femoral, puente de glúteos, dead bug, bird dog, escaladores, gato-vaca, plancha lateral, hollow hold, step-up, sentadilla cosaca, bear crawl, rotación torácica, movilidad de tobillo, leñador, superman). Donde no hay Short 1:1, se reutiliza el del **mismo patrón** de movimiento.
+- **Resultado verificado:** **101/102 ejercicios de fuerza con vídeo** (único sin vídeo: `recovery-walk`, una caminata, no es técnica). Catálogo total: 101/184 (yoga/pilates/cardio quedan para 2ª tanda).
+- **Implementación:** `src/core/exerciseLibrary.js` (`EXERCISE_VIDEO_MAP`). No requiere recompilar el bundle (los IDs viajan en el plan → `studio-data` → STUDIO). Test `calendar-and-exercise-metadata.test.js` actualizado (el ejemplo "sin vídeo" pasó de `gym-front-squat` a `yoga-cobra-pose`).
+- **IMPORTANTE:** los vídeos viajan en el plan **guardado**; hay que **"Regenerar plan con IA"** una vez tras el deploy para que aparezcan los nuevos.
+- Riesgo conocido: oEmbed confirma que el vídeo existe, pero algún autor podría tener el **embedding deshabilitado** (se vería "no disponible" en el reproductor). Poco probable con Shorts de técnica populares; si pasa en alguno, se sustituye.
+- Pendiente/futuro: 2ª tanda para yoga (39), pilates (44) y cardio (running/cycling) — mismo método.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.
