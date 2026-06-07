@@ -182,12 +182,9 @@ export default function HomePage() {
       const credentials = await signInWithPopup(firebaseClient.auth, provider);
       const additionalInfo = getAdditionalUserInfo(credentials);
 
-      if (mode === 'login' && additionalInfo?.isNewUser) {
-        await signOut(firebaseClient.auth);
-        throw new Error('No existe cuenta previa con Google. Cambia a Registro y acepta los consentimientos.');
-      }
-
-      if (mode === 'register' || additionalInfo?.isNewUser) {
+      // Primer acceso con Google = se crea la cuenta automáticamente (también desde "Iniciar
+      // sesión"). Al crearla se registran los consentimientos legales (versión vigente).
+      if (additionalInfo?.isNewUser || mode === 'register') {
         await upsertInitialProfile(credentials.user);
       }
 
