@@ -295,8 +295,23 @@ function TrainSession() {
       if (r.ok) await refreshSession();
     } catch (e) { /* noop */ } finally { setBusy(null); }
   }
+  const adjust = D.coachAdjust;
+  const adjustVisible = adjust && Array.isArray(adjust.rules) && adjust.rules.length
+    && (adjust.volumeFactor == null || adjust.volumeFactor !== 1);
   return (
     <React.Fragment>
+      {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
+      {adjustVisible ? (
+        <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}>
+          <div className="row ac" style={{ gap: 10 }}>
+            <span className="pill accent tiny"><Icon name="heart" size={12} /> Ajuste del coach{adjust.volumeFactor != null ? ` · volumen ×${adjust.volumeFactor}` : ''}</span>
+          </div>
+          <ul className="step-list" style={{ margin: '10px 0 0' }}>
+            {adjust.rules.map((r, i) => <li key={i}><strong>{r.reason}</strong> {r.effect ? `— ${r.effect}` : ''}</li>)}
+          </ul>
+        </div>
+      ) : null}
+
       {/* Banner sesión */}
       <div className="card lg" style={{ background: 'linear-gradient(150deg, var(--accent), var(--accent-deep))', color: 'var(--on-accent)', border: 0, overflow: 'hidden' }}>
         <div className="row between wrap" style={{ gap: 16 }}>

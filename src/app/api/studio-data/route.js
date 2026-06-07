@@ -17,6 +17,17 @@ function paceLabel(secPerKm) {
   return `${m}:${String(Math.round(s % 60)).padStart(2, '0')}/km`;
 }
 
+function mapCoachAdjust(plan) {
+  const at = plan?.adaptiveTuning;
+  const rules = Array.isArray(at?.appliedRules) ? at.appliedRules : [];
+  if (!rules.length) return null;
+  return {
+    summary: at?.summary || null,
+    volumeFactor: at?.workout?.volumeFactor ?? null,
+    rules: rules.slice(0, 3).map((r) => ({ id: r.id, reason: r.reason, effect: r.effect })),
+  };
+}
+
 function mapStrava(connection, workouts) {
   const runs = (Array.isArray(workouts) ? workouts : [])
     .filter((w) => w.source === 'strava')
@@ -437,6 +448,7 @@ export async function GET(request) {
       setIf('glycemic', mapGlycemic(todayMeals));
       setIf('progress', mapProgress(metrics, workouts, latestPlan));
       setIf('strava', mapStrava(stravaConn, workouts));
+      setIf('coachAdjust', mapCoachAdjust(latestPlan));
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

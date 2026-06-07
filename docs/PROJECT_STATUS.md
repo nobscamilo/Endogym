@@ -152,7 +152,12 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - `buildProgressMemory` (progressMemory.js) calcula una señal de **FC de carrera**: compara la **FC media reciente (≤7 días)** con la **base (8-21 días)** de las carreras importadas de Strava → `cardio.hrDriftBpm` y `cardio.hrSignal` ('elevated' si +5 bpm, 'fresh' si −3, 'normal').
 - `buildAdaptiveTuning`: nueva regla **`HR_DRIFT_ELEVATED`** — si la FC media de carrera sube ≥5 bpm vs tu base (con ≥4 carreras con FC), recorta `volumeFactor ×0.9` y `rpeShift −1` (fatiga/under-recovery). Se integra con el resto del ajuste adaptativo y queda registrada en `appliedRules`/`clinicalAuditTrail`. **Verificado por script:** FC +10 bpm → regla aplicada; FC estable → no.
 - Solo cambió `src/core/progressMemory.js` (no requiere recompilar el bundle).
-- Pendiente/futuro: mostrar el motivo del recorte en la UI; usar FC también para validar que corres en la zona prescrita.
+- Pendiente/futuro: usar FC también para validar que corres en la zona prescrita.
+
+### Fixes UI (bundle `c29d93ed46`)
+- **Calendario real en Nutrición:** el day-rail mostraba fechas de muestra (Lun 2…). Ahora `weekDateNumbers()` calcula los números de día de la **semana actual** (lunes→domingo) y `applyNutrition` los usa. Coincide con el día de hoy.
+- **Motivo del ajuste del coach visible:** `studio-data` expone `coachAdjust` (resumen + reglas de `adaptiveTuning.appliedRules` + `volumeFactor`); la pantalla **Entreno** muestra un banner "Ajuste del coach · volumen ×N" con las razones (p. ej. FC media elevada, fatiga). Solo aparece si el volumen cambió.
+- Apple Watch del usuario: conectado a Strava (Apple Watch 11 → Strava → Ignios), que es la vía correcta.
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.

@@ -186,6 +186,20 @@ function normMeals(arr) {
   }));
 }
 
+// Números de día (del mes) de la semana ACTUAL, empezando en lunes — calendario real.
+function weekDateNumbers() {
+  const now = new Date();
+  const js = now.getDay(); // 0=Dom … 6=Sáb
+  const toMonday = js === 0 ? -6 : 1 - js;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + toMonday);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.getDate();
+  });
+}
+
 // Índice del día de hoy dentro de la semana (Lun=0 … Dom=6).
 function todayDowIndex(D) {
   const flagged = (D.nutritionDays || []).findIndex((d) => d.today);
@@ -218,9 +232,10 @@ function NutritionScreen({ layout }) {
     if (Array.isArray(n.days) && n.days.length) {
       const week = n.days.map((d, i) => ({ day: d.day || DOW_LABELS[i] || ('D' + i), meals: normMeals(d.meals) }));
       D.mealWeek = week;
+      const dateNums = weekDateNumbers();
       D.nutritionDays = week.map((d, i) => ({
         day: d.day,
-        date: (D.nutritionDays && D.nutritionDays[i] && D.nutritionDays[i].date) || (i + 2),
+        date: dateNums[i],
         kcal: d.meals.reduce((a, m) => a + (Number(m.kcal) || 0), 0),
         today: i === tIdx,
       }));
