@@ -159,6 +159,12 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - **Motivo del ajuste del coach visible:** `studio-data` expone `coachAdjust` (resumen + reglas de `adaptiveTuning.appliedRules` + `volumeFactor`); la pantalla **Entreno** muestra un banner "Ajuste del coach · volumen ×N" con las razones (p. ej. FC media elevada, fatiga). Solo aparece si el volumen cambió.
 - Apple Watch del usuario: conectado a Strava (Apple Watch 11 → Strava → Ignios), que es la vía correcta.
 
+### Validación de zonas (por usuario) + "Más tiempo" — bundle `0e2e3893a8`
+- **Zonas personalizadas por usuario:** `hrMaxFromAge` (Tanaka 208−0.7·edad) y `hrZone` (%FCmáx, 5 zonas) en `running.js`. La FCmáx usada = **máx(FCmáx observada en SUS carreras de Strava, estimada por su edad)** → cada usuario tiene sus propias zonas. `validateRunZone` compara la FC real de cada carrera con la zona prescrita del día (easy/long→Z2, tempo→Z3-4, intervals→Z4-5) y da veredicto (too_hard/ok/too_easy).
+- **Dónde se ve:** `studio-data` expone `runZones` (solo perfiles de carrera) → sección **"Validación de zonas"** en Progreso (FC real vs objetivo por carrera). El **coach** incluye la FCmáx por edad y el veredicto de la última carrera, e instruye a comentar la disciplina de zonas (cada usuario distinto).
+- **Caveat honesto:** la FCmáx por edad es una estimación (±10-12 bpm); se mitiga usando la máx observada del reloj. Mejorable con FCmáx medida o %HRR (Karvonen) que requeriría FC en reposo. Pendiente: campo manual de FCmáx en perfil.
+- **"Más tiempo" al cambiar sesión** (`studio-swap` reason `more_time` + UI): amplía la sesión actual a N minutos (input, hasta 180). Carrera → alarga duración y recalcula prescripción; fuerza → añade ejercicios extra (no reemplaza). "Lo que ya está + más".
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.
