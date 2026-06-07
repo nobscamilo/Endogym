@@ -11,9 +11,18 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **App oficial en la raíz "/".** `src/app/page.js`: si hay sesión activa (o demo sin Firebase), la home **renderiza el Studio en iframe en "/"** en lugar de redirigir a `/studio`. Sin sesión se muestra el landing + login. `src/app/studio/page.js` quedó como **alias que redirige a "/"** (marcadores antiguos). Se eliminaron los `router.push('/studio')` tras login. La CSP no cambió: la global ya permite `frame-src 'self'` (iframe del mismo origen) y el documento del iframe (`/studio/app/*`) sigue con su CSP relajada.
 - **Bundle regenerado:** `node scripts/build-studio.mjs` → `studio.bundle.js?v=fd2823e32d` (referencia cache-bust actualizada en `index.html`).
 
+### Fix tras 1er deploy: 502 en plan semanal (causa raíz + solución)
+
+- **Verificado en producción (deploy `fd2823e32d`):** la app abre en "/" (iframe, bundle nuevo) ✅, pero `POST /api/studio-nutrition` devolvía **502 a ~32s**. Logs de Vercel: rama `catch` (`studio_nutrition_failed`), no HTTP de Gemini.
+- **Causa raíz:** `requestGoogleGenerateContent` en `googleGenAiTransport.js` **recortaba el timeout a 30s** (`Math.min(30000, …)`), así que el `timeoutMs:55000` se ignoraba; generar 28 recetas en una sola llamada tarda >30s → `AbortController` aborta → excepción.
+- **Solución aplicada (solo backend, no requiere recompilar bundle):**
+  1. Tope del transporte subido de 30s a **60s** (`Math.min(60000, …)`).
+  2. La semana se genera en **4 trozos pequeños EN PARALELO** (`DAY_CHUNKS = [[Lun,Mar],[Mié,Jue],[Vie,Sáb],[Dom]]`) con `Promise.allSettled`; el 1er trozo trae además compra + batch semanales. Esquemas `FULL_CHUNK_SCHEMA` / `DAYS_CHUNK_SCHEMA`. Cada trozo (2 días/8 comidas) cabe de sobra bajo el límite; al ir en paralelo la latencia total baja. Tolerante a fallos: si algún trozo falla se devuelve `partial:true` con los días que sí salieron (502 solo si no sale ninguno).
+
 ### Pendiente de esta sesión
-- Correr `npm test` y `npm run build` en la Mac, `git push origin main` (Vercel auto-deploy) y verificar en Chrome: el selector de día cambia el menú, la foto del plato suma al día, y la app abre en "/" (no en "/studio").
+- Tras el `git push` de este fix: verificar en Chrome que Nutrición genera los 7 días y el selector cambia el menú; probar foto del plato.
 - Posible: el `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable por ahora.
+- Vigilar variedad entre trozos (cada trozo es independiente; podría repetir algún plato entre bloques). Si molesta, pasar a cada trozo los platos ya usados.
 
 ## Sesión del 6 de junio de 2026 (mejora del RAG nutricional)
 

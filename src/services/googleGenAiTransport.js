@@ -137,7 +137,7 @@ export async function requestGoogleGenerateContent({
   };
 
   const normalizedTimeoutMs = Number.isFinite(Number(timeoutMs))
-    ? Math.min(30000, Math.max(1000, Math.round(Number(timeoutMs))))
+    ? Math.min(60000, Math.max(1000, Math.round(Number(timeoutMs))))
     : 30000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), normalizedTimeoutMs);

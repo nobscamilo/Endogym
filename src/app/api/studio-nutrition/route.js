@@ -34,52 +34,67 @@ const MEAL_ITEM_SCHEMA = {
   },
 };
 
-const NUTRITION_SCHEMA = {
-  type: 'object',
-  required: ['days', 'shopping', 'batch'],
-  properties: {
-    days: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['day', 'meals'],
-        properties: {
-          day: { type: 'string', enum: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] },
-          meals: { type: 'array', items: MEAL_ITEM_SCHEMA },
-        },
-      },
+const DAYS_PROP = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['day', 'meals'],
+    properties: {
+      day: { type: 'string', enum: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] },
+      meals: { type: 'array', items: MEAL_ITEM_SCHEMA },
     },
-    shopping: {
-      type: 'array',
+  },
+};
+
+const SHOPPING_PROP = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['cat', 'items'],
+    properties: {
+      cat: { type: 'string' },
+      icon: { type: 'string' },
       items: {
-        type: 'object',
-        required: ['cat', 'items'],
-        properties: {
-          cat: { type: 'string' },
-          icon: { type: 'string' },
-          items: {
-            type: 'array',
-            items: { type: 'object', required: ['name', 'qty'], properties: { name: { type: 'string' }, qty: { type: 'string' } } },
-          },
-        },
-      },
-    },
-    batch: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['title', 'desc', 'time', 'day'],
-        properties: {
-          title: { type: 'string' },
-          desc: { type: 'string' },
-          time: { type: 'string' },
-          day: { type: 'string' },
-          emoji: { type: 'string' },
-        },
+        type: 'array',
+        items: { type: 'object', required: ['name', 'qty'], properties: { name: { type: 'string' }, qty: { type: 'string' } } },
       },
     },
   },
 };
+
+const BATCH_PROP = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['title', 'desc', 'time', 'day'],
+    properties: {
+      title: { type: 'string' },
+      desc: { type: 'string' },
+      time: { type: 'string' },
+      day: { type: 'string' },
+      emoji: { type: 'string' },
+    },
+  },
+};
+
+// Esquema del trozo que incluye compra + batch (primer trozo de la semana).
+const FULL_CHUNK_SCHEMA = {
+  type: 'object',
+  required: ['days', 'shopping', 'batch'],
+  properties: { days: DAYS_PROP, shopping: SHOPPING_PROP, batch: BATCH_PROP },
+};
+
+// Esquema del trozo que solo trae días (resto de la semana).
+const DAYS_CHUNK_SCHEMA = {
+  type: 'object',
+  required: ['days'],
+  properties: { days: DAYS_PROP },
+};
+
+// La semana se genera en VARIOS trozos pequeños EN PARALELO. Una sola llamada con 28 recetas
+// supera el tope de tiempo del transporte (~30-60s) y se abortaba; trozos de 2 días caben
+// holgadamente y, al ir en paralelo, la latencia total se mantiene baja.
+const DAY_CHUNKS = [['Lun', 'Mar'], ['Mié', 'Jue'], ['Vie', 'Sáb'], ['Dom']];
 
 function targetsFrom(plan) {
   const t = plan?.baseTarget || (Array.isArray(plan?.days) ? plan.days[0]?.nutritionTarget : null);
@@ -115,44 +130,68 @@ export async function POST(request) {
     const conditions = profile?.medicalConditions || 'ninguna declarada';
     const restrictions = profile?.dietaryRestrictions || profile?.allergies || 'ninguna declarada';
 
-    const prompt = `Eres un nutricionista deportivo. Genera el PLAN SEMANAL DE COMIDAS (7 días) para este usuario, en español de España.
+    const baseRules = `Eres un nutricionista deportivo. Trabajas en español de España.
 Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; restricciones/alergias: ${restrictions}.
-Objetivo nutricional diario: ~${t.kcal} kcal, proteína ${t.protein} g, carbohidratos ${t.carbs} g, grasa ${t.fat} g.
-Requisitos:
-- days: EXACTAMENTE 7 días, uno por cada day: "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" (en ese orden, sin repetir).
-- Cada día tiene EXACTAMENTE 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena". La suma de kcal de cada día debe acercarse al objetivo diario.
-- Los menús deben ser DISTINTOS entre días (no repitas el mismo plato día tras día); puedes reaprovechar ingredientes del batch cooking pero varía las recetas.
-- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).
-- shopping: lista de la compra para TODA LA SEMANA (7 días), NO para un solo día. 4-6 categorías (cat, icon emoji, items con name y qty), con cantidades agregadas para 7 días (p. ej. "Pollo 1,4 kg", "Huevos 18 ud", "Arroz 1 kg"). El usuario compra una vez para la semana.
-- batch: 3-4 tareas de batch cooking del fin de semana para dejar la semana lista (title, desc, time, day, emoji).
-- Respeta condiciones/restricciones. Comida real, variada y práctica. Devuelve SOLO el JSON del esquema.`;
+Objetivo nutricional diario: ~${t.kcal} kcal, proteína ${t.protein} g, carbohidratos ${t.carbs} g, grasa ${t.fat} g.`;
 
-    try {
+    function buildPrompt(daysList, withShoppingBatch) {
+      return `${baseRules}
+Genera el menú para ESTOS días: ${daysList.join(', ')}.
+Requisitos:
+- days: EXACTAMENTE estos ${daysList.length} días (campo "day" con el valor correspondiente: ${daysList.join(', ')}).
+- Cada día tiene EXACTAMENTE 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena". La suma de kcal de cada día debe acercarse al objetivo diario.
+- Varía las recetas entre días (no repitas el mismo plato); comida real, práctica y apetecible; respeta condiciones/restricciones.
+- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).${withShoppingBatch ? `
+- shopping: lista de la compra para TODA LA SEMANA (7 días), NO para estos días sueltos. 4-6 categorías (cat, icon emoji, items con name y qty), con cantidades agregadas para 7 días (p. ej. "Pollo 1,4 kg", "Huevos 18 ud", "Arroz 1 kg").
+- batch: 3-4 tareas de batch cooking del fin de semana (title, desc, time, day, emoji).` : ''}
+Devuelve SOLO el JSON del esquema.`;
+    }
+
+    async function genChunk(daysList, withShoppingBatch) {
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
-        timeoutMs: 55000,
-        parts: [{ text: prompt }],
+        timeoutMs: 50000,
+        parts: [{ text: buildPrompt(daysList, withShoppingBatch) }],
         generationConfig: {
           temperature: 0.7,
           topP: 0.9,
-          maxOutputTokens: 16384,
+          maxOutputTokens: withShoppingBatch ? 9000 : 7000,
           responseMimeType: 'application/json',
-          responseJsonSchema: NUTRITION_SCHEMA,
+          responseJsonSchema: withShoppingBatch ? FULL_CHUNK_SCHEMA : DAYS_CHUNK_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 },
         },
       });
-      if (!response.ok) {
-        const detail = await response.text().catch(() => '');
-        logError('studio_nutrition_http', new Error(`HTTP ${response.status}`), { traceId, userId: user.uid, detail: detail.slice(0, 200) });
-        return errorResponse('No se pudo generar el plan ahora mismo.', 502);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
-      let parsed;
-      try { parsed = JSON.parse(text); } catch { return errorResponse('Respuesta IA no parseable.', 502); }
-      if (!parsed || !Array.isArray(parsed.days) || !parsed.days.length) return errorResponse('Plan IA incompleto.', 502);
-      return jsonResponse({ ok: true, nutrition: parsed });
+      const parsed = JSON.parse(text);
+      if (!parsed || !Array.isArray(parsed.days)) throw new Error('chunk sin days');
+      return parsed;
+    }
+
+    try {
+      // Trozos en paralelo: el primero trae además compra + batch (semanales).
+      const results = await Promise.allSettled(DAY_CHUNKS.map((days, i) => genChunk(days, i === 0)));
+
+      const days = [];
+      let shopping = [];
+      let batch = [];
+      results.forEach((r) => {
+        if (r.status !== 'fulfilled') return;
+        if (Array.isArray(r.value.days)) days.push(...r.value.days);
+        if (Array.isArray(r.value.shopping) && r.value.shopping.length) shopping = r.value.shopping;
+        if (Array.isArray(r.value.batch) && r.value.batch.length) batch = r.value.batch;
+      });
+
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length) {
+        logError('studio_nutrition_chunk_failed', failed[0].reason || new Error('chunk error'),
+          { traceId, userId: user.uid, failedChunks: failed.length, daysOk: days.length });
+      }
+      if (!days.length) return errorResponse('No se pudo generar el plan ahora mismo.', 502);
+
+      return jsonResponse({ ok: true, nutrition: { days, shopping, batch }, partial: failed.length > 0 });
     } catch (error) {
       logError('studio_nutrition_failed', error, { traceId, userId: user.uid });
       return errorResponse('No se pudo generar el plan ahora mismo.', 502);
