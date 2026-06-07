@@ -18,6 +18,7 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **Solución aplicada (solo backend, no requiere recompilar bundle):**
   1. Tope del transporte subido de 30s a **60s** (`Math.min(60000, …)`).
   2. La semana se genera en **4 trozos pequeños EN PARALELO** (`DAY_CHUNKS = [[Lun,Mar],[Mié,Jue],[Vie,Sáb],[Dom]]`) con `Promise.allSettled`; el 1er trozo trae además compra + batch semanales. Esquemas `FULL_CHUNK_SCHEMA` / `DAYS_CHUNK_SCHEMA`. Cada trozo (2 días/8 comidas) cabe de sobra bajo el límite; al ir en paralelo la latencia total baja. Tolerante a fallos: si algún trozo falla se devuelve `partial:true` con los días que sí salieron (502 solo si no sale ninguno).
+  3. **Verificado tras deploy:** `POST /api/studio-nutrition` → **200 en ~27s** con menús distintos por día. En la 1ª prueba salió `partial:true` con 5/7 días (falló el trozo Vie-Sáb, probable truncación). Se añadió **un reintento por trozo** (`genChunkSafe`) y se subió `maxOutputTokens` (9000 días / 12000 con compra) para evitar truncación → objetivo 7/7. (Pendiente de re-verificar tras el push de este ajuste.)
 
 ### Pendiente de esta sesión
 - Tras el `git push` de este fix: verificar en Chrome que Nutrición genera los 7 días y el selector cambia el menú; probar foto del plato.

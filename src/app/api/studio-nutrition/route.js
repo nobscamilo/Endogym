@@ -156,7 +156,7 @@ Devuelve SOLO el JSON del esquema.`;
         generationConfig: {
           temperature: 0.7,
           topP: 0.9,
-          maxOutputTokens: withShoppingBatch ? 9000 : 7000,
+          maxOutputTokens: withShoppingBatch ? 12000 : 9000,
           responseMimeType: 'application/json',
           responseJsonSchema: withShoppingBatch ? FULL_CHUNK_SCHEMA : DAYS_CHUNK_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 },
@@ -166,13 +166,22 @@ Devuelve SOLO el JSON del esquema.`;
       const data = await response.json();
       const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
       const parsed = JSON.parse(text);
-      if (!parsed || !Array.isArray(parsed.days)) throw new Error('chunk sin days');
+      if (!parsed || !Array.isArray(parsed.days) || !parsed.days.length) throw new Error('chunk sin days');
       return parsed;
+    }
+
+    // Un reintento por trozo: cubre truncaciones puntuales o errores transitorios de Gemini.
+    async function genChunkSafe(daysList, withShoppingBatch) {
+      try {
+        return await genChunk(daysList, withShoppingBatch);
+      } catch (e1) {
+        return genChunk(daysList, withShoppingBatch);
+      }
     }
 
     try {
       // Trozos en paralelo: el primero trae además compra + batch (semanales).
-      const results = await Promise.allSettled(DAY_CHUNKS.map((days, i) => genChunk(days, i === 0)));
+      const results = await Promise.allSettled(DAY_CHUNKS.map((days, i) => genChunkSafe(days, i === 0)));
 
       const days = [];
       let shopping = [];
