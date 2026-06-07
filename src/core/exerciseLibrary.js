@@ -954,6 +954,12 @@ const SESSION_FOCUS_CATEGORY_MAP = {
   lower_conditioning: new Set(['lower_body_strength', 'lower_body_unilateral', 'lower_body_accessory', 'posterior_chain', 'conditioning', 'core']),
   full_body: new Set(['upper_push', 'upper_pull', 'lower_body_strength', 'lower_body_unilateral', 'posterior_chain', 'conditioning', 'core']),
   cardio: SESSION_CATEGORY_MAP.aerobic,
+  // Sub-focos de cardio para diferenciar el TIPO de sesión de carrera/bici por día.
+  cardio_easy: new Set(['cardio_base']),
+  cardio_long: new Set(['cardio_base']),
+  cardio_tempo: new Set(['cardio_threshold']),
+  cardio_intervals: new Set(['cardio_interval']),
+  cardio_drills: new Set(['cardio_skill']),
   mindbody: SESSION_CATEGORY_MAP.mindbody,
   recovery: SESSION_CATEGORY_MAP.recovery,
   general_resistance: SESSION_CATEGORY_MAP.resistance,
@@ -968,6 +974,11 @@ const SESSION_FOCUS_PRIORITY = {
   lower_conditioning: ['lower_body_strength', 'posterior_chain', 'lower_body_unilateral', 'conditioning', 'core'],
   full_body: ['lower_body_strength', 'upper_push', 'upper_pull', 'posterior_chain', 'core'],
   cardio: ['cardio_base', 'cardio_threshold', 'cardio_interval', 'cardio_skill'],
+  cardio_easy: ['cardio_base'],
+  cardio_long: ['cardio_base'],
+  cardio_tempo: ['cardio_threshold'],
+  cardio_intervals: ['cardio_interval'],
+  cardio_drills: ['cardio_skill'],
   mindbody: ['mobility_strength', 'mobility', 'core_mobility', 'neuromotor', 'recovery', 'posterior_chain', 'core'],
   recovery: ['recovery', 'mobility', 'core'],
   general_resistance: ['upper_push', 'upper_pull', 'lower_body_strength', 'posterior_chain', 'core'],
@@ -985,7 +996,15 @@ export function resolveSessionFocus({ modality = null, sessionType = '', session
   const title = normalizeSearchText(sessionTitle);
 
   if (sessionType === 'recovery') return 'recovery';
-  if (sessionType === 'aerobic') return 'cardio';
+  if (sessionType === 'aerobic') {
+    // Diferencia el TIPO de sesión de cardio por el título (rodaje, series, tempo, larga…).
+    if (/(interval|series|cuesta|hill|hiit|sprint)/.test(title)) return 'cardio_intervals';
+    if (/(tempo|umbral|threshold|fartlek|sweet|sweet spot)/.test(title)) return 'cardio_tempo';
+    if (/(larga|long|tirada)/.test(title)) return 'cardio_long';
+    if (/(rodaje|suave|zona 2|zona2|z2|base|facil|continu|recuperaci)/.test(title)) return 'cardio_easy';
+    if (/(tecnica|skip|drill|cadencia|aceleraci|stride)/.test(title)) return 'cardio_drills';
+    return 'cardio';
+  }
   if (sessionType === 'mindbody') return 'mindbody';
 
   if (
@@ -1045,7 +1064,10 @@ function modalityFallback(modality) {
   }
   if (modality === TrainingModality.MIXED) return [TrainingModality.FULL_GYM, TrainingModality.HOME, TrainingModality.TRX];
   if (modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING) {
-    return [TrainingModality.HOME, TrainingModality.FULL_GYM, TrainingModality.MIXED];
+    // Sin 'mixed': evita que un plan de CARRERA muestre sesiones de ciclismo (y viceversa),
+    // ya que run-zone2/cycle-zone2 comparten la etiqueta 'mixed'. La fuerza complementaria
+    // sigue saliendo de casa/gimnasio.
+    return [TrainingModality.HOME, TrainingModality.FULL_GYM];
   }
   if (modality === TrainingModality.YOGA || modality === TrainingModality.PILATES) {
     return [TrainingModality.HOME, TrainingModality.MIXED];

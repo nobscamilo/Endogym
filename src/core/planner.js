@@ -172,8 +172,10 @@ const EXTRA_SESSION_VARIATIONS = {
   [TrainingModality.HYBRID_RUN_GYM]: [
     { sessionType: 'resistance', sessionFocus: 'lower', title: 'Gym · Pierna (fuerza)', durationMinutes: 60, descriptor: 'Fuerza de tren inferior; separada de la tirada larga' },
     { sessionType: 'resistance', sessionFocus: 'upper', title: 'Gym · Torso (fuerza)', durationMinutes: 55, descriptor: 'Empuje y tracción superior, bajo impacto en piernas' },
-    { sessionType: 'aerobic', sessionFocus: 'cardio', title: 'Rodaje suave (Zona 2)', durationMinutes: 40, descriptor: 'Carrera aeróbica fácil para volumen' },
-    { sessionType: 'aerobic', sessionFocus: 'cardio', title: 'Series / Intervalos', durationMinutes: 45, descriptor: 'Trabajo de alta intensidad de carrera' },
+    { sessionType: 'aerobic', sessionFocus: 'cardio_easy', title: 'Rodaje suave (Zona 2)', durationMinutes: 40, descriptor: 'Carrera aeróbica fácil para volumen' },
+    { sessionType: 'aerobic', sessionFocus: 'cardio_intervals', title: 'Series / Intervalos', durationMinutes: 45, descriptor: 'Trabajo de alta intensidad de carrera' },
+    { sessionType: 'aerobic', sessionFocus: 'cardio_tempo', title: 'Tempo / Umbral', durationMinutes: 45, descriptor: 'Ritmo controlado en umbral' },
+    { sessionType: 'aerobic', sessionFocus: 'cardio_long', title: 'Tirada larga', durationMinutes: 70, descriptor: 'Volumen aeróbico continuo' },
   ],
 };
 

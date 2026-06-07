@@ -94,7 +94,13 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
   - **Verificado** (script): plan híbrido → Lun/Mié gym puro (6 ejercicios c/u, todos con vídeo), Mar/Jue/Sáb carrera (con vídeo), recuperación con movilidad. Único sin vídeo: `recovery-walk`.
 - **Vídeos de cardio** añadidos (verificados oEmbed): `run-zone2/tempo` (técnica de carrera), `run-fartlek/intervals`, `run-hill-repeats`, `run-strides`, `run-a-skip-drill`, y `cycle-*` (cadencia/técnica). Bundle `3840a715ee`.
 - **IMPORTANTE:** para usar el híbrido, en Perfil elegir "Correr + Gym" y **Regenerar plan con IA**.
-- Pendiente/futuro: que cada día aeróbico muestre el ejercicio de carrera específico de su tipo (ahora el título distingue rodaje/series/tirada, pero los ejercicios listados son genéricos de carrera); 2ª tanda de vídeos de yoga/pilates (no seleccionables aún en el Studio).
+
+#### Pulido de la rama running (cada día de cardio = su ejercicio específico)
+- Sub-focos de cardio en `exerciseLibrary.js` (`cardio_easy/long/tempo/intervals/drills`) en `SESSION_FOCUS_CATEGORY_MAP` y `SESSION_FOCUS_PRIORITY`.
+- `resolveSessionFocus` detecta el TIPO por el título del día (rodaje/zona2/base→easy; series/intervalos/cuestas/hiit→intervals; tempo/umbral/fartlek→tempo; larga/tirada→long; técnica/skip/cadencia→drills). Aplica a Running e Híbrido sin tocar la generación.
+- **Verificado:** Híbrido → rodaje=run-zone2, series=run-intervals+run-hill-repeats, larga=run-zone2; gym puro en días de fuerza. Running → easy/long=zone2, intervalos=intervals+cuestas, tempo=tempo+fartlek. **Todos con vídeo** (salvo recovery-walk).
+- **Fix de fuga de ciclismo:** `run-zone2`/`cycle-zone2` comparten etiqueta `mixed`; se quitó `mixed` del `modalityFallback` de RUNNING/CYCLING para que un plan de carrera no muestre sesiones de bici (y viceversa). La fuerza complementaria sigue saliendo de casa/gimnasio.
+- Pendiente/futuro: drills (strides/A-skip) como calentamiento en días de calidad; 2ª tanda de vídeos de yoga/pilates (no seleccionables aún en el Studio).
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
