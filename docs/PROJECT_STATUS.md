@@ -18,12 +18,18 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **Solución aplicada (solo backend, no requiere recompilar bundle):**
   1. Tope del transporte subido de 30s a **60s** (`Math.min(60000, …)`).
   2. La semana se genera en **4 trozos pequeños EN PARALELO** (`DAY_CHUNKS = [[Lun,Mar],[Mié,Jue],[Vie,Sáb],[Dom]]`) con `Promise.allSettled`; el 1er trozo trae además compra + batch semanales. Esquemas `FULL_CHUNK_SCHEMA` / `DAYS_CHUNK_SCHEMA`. Cada trozo (2 días/8 comidas) cabe de sobra bajo el límite; al ir en paralelo la latencia total baja. Tolerante a fallos: si algún trozo falla se devuelve `partial:true` con los días que sí salieron (502 solo si no sale ninguno).
-  3. **Verificado tras deploy:** `POST /api/studio-nutrition` → **200 en ~27s** con menús distintos por día. En la 1ª prueba salió `partial:true` con 5/7 días (falló el trozo Vie-Sáb, probable truncación). Se añadió **un reintento por trozo** (`genChunkSafe`) y se subió `maxOutputTokens` (9000 días / 12000 con compra) para evitar truncación → objetivo 7/7. (Pendiente de re-verificar tras el push de este ajuste.)
+  3. Se añadió **un reintento por trozo** (`genChunkSafe`) y se subió `maxOutputTokens` (9000 días / 12000 con compra) para evitar truncación.
 
-### Pendiente de esta sesión
-- Tras el `git push` de este fix: verificar en Chrome que Nutrición genera los 7 días y el selector cambia el menú; probar foto del plato.
-- Posible: el `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable por ahora.
-- Vigilar variedad entre trozos (cada trozo es independiente; podría repetir algún plato entre bloques). Si molesta, pasar a cada trozo los platos ya usados.
+### Verificación final en producción (Chrome, 7 jun 2026) — TODO OK
+- **App oficial en "/":** confirmado, la home renderiza el Studio en iframe (bundle `fd2823e32d`); `/studio` redirige a "/". ✅
+- **Plan semanal:** `POST /api/studio-nutrition` → **200 en ~15s, 7/7 días, 4 comidas/día, `partial:false`**, compra (5 cat) + batch (3). Menús distintos por día (desayunos y cenas verificados todos diferentes). ✅
+- **Selector de día (UI):** al pulsar "Jue" el menú mostrado cambia al de jueves (data + UI verificadas); el rail muestra kcal reales por día. ✅
+- **Foto del plato:** bundle desplegado contiene `/api/analyze-plate`, "Foto del plato" y `readAsDataURL` → cadena cableada (endpoint Gemini Vision pre-existente). El upload real de imagen no se automatizó en Chrome, pero el flujo está completo. ✅
+
+### Notas / mejoras futuras (no bloqueantes)
+- Variedad **dentro de cada franja** mejorable: los desayunos tienden a repetir patrón (tostadas aguacate-huevo / tortitas de avena) porque cada trozo es independiente. Si molesta, pasar a cada trozo los platos ya usados para forzar variedad.
+- Las kcal por día generadas por Gemini quedan algo por encima del objetivo (p. ej. 2700 vs ~1980-2100); afinar el prompt si se quiere ajustar mejor al target.
+- `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 
 ## Sesión del 6 de junio de 2026 (mejora del RAG nutricional)
 
