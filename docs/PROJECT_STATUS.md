@@ -145,7 +145,14 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - `POST /api/strava/webhook-setup` (con sesión): registra la suscripción push apuntando a `/api/strava/webhook` (solo se permite 1 por app). Botón "Activar sync automático" en la tarjeta de Strava (Perfil).
 - **Puede requerir** un índice de Firestore para la consulta collectionGroup `integrations` por `athleteId` (si falla, Firestore da un enlace para crearlo en los logs).
 - **No verificable sin credenciales/deploy:** el OAuth y el webhook reales se prueban tras poner env vars + push. Código revisado y compila.
-- Pendiente/futuro: usar la FC importada en el ajuste adaptativo de carga; FC reposo/HRV vía app nativa.
+- FC reposo/HRV: pendiente (requiere app nativa/Garmin).
+
+### Ajuste adaptativo de carga por FC media (Strava) — verificado
+- **Verificado en producción:** `/api/strava/connect` devuelve URL válida con `client_id` → credenciales OK en Vercel; bundle `8594c0f534` desplegado. Falta que el usuario conecte y sincronice.
+- `buildProgressMemory` (progressMemory.js) calcula una señal de **FC de carrera**: compara la **FC media reciente (≤7 días)** con la **base (8-21 días)** de las carreras importadas de Strava → `cardio.hrDriftBpm` y `cardio.hrSignal` ('elevated' si +5 bpm, 'fresh' si −3, 'normal').
+- `buildAdaptiveTuning`: nueva regla **`HR_DRIFT_ELEVATED`** — si la FC media de carrera sube ≥5 bpm vs tu base (con ≥4 carreras con FC), recorta `volumeFactor ×0.9` y `rpeShift −1` (fatiga/under-recovery). Se integra con el resto del ajuste adaptativo y queda registrada en `appliedRules`/`clinicalAuditTrail`. **Verificado por script:** FC +10 bpm → regla aplicada; FC estable → no.
+- Solo cambió `src/core/progressMemory.js` (no requiere recompilar el bundle).
+- Pendiente/futuro: mostrar el motivo del recorte en la UI; usar FC también para validar que corres en la zona prescrita.
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.

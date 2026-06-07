@@ -121,6 +121,29 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     .map((entry) => ({ date: entry.takenAt || entry.createdAt || entry.date, value: toNumber(entry.fastingGlucoseMgDl) }))
     .filter((entry) => entry.value != null);
 
+  // Señal de FC de carrera (Strava): si tu FC media en carrera sube respecto a tu base
+  // reciente, suele indicar fatiga/under-recovery → el ajuste adaptativo recortará carga.
+  const median = (arr) => {
+    if (!arr.length) return null;
+    const s = [...arr].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const runHr = recentWorkouts
+    .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')) && toNumber(w.avgHeartRate))
+    .map((w) => ({ d: normalizeDate(w.performedAt || w.createdAt), hr: toNumber(w.avgHeartRate) }))
+    .filter((x) => x.d);
+  const hrCut = new Date(nowDate);
+  hrCut.setUTCDate(hrCut.getUTCDate() - 7);
+  const recentRunHr = runHr.filter((x) => x.d >= hrCut).map((x) => x.hr);
+  const baseRunHr = runHr.filter((x) => x.d < hrCut).map((x) => x.hr);
+  let hrDriftBpm = null;
+  let hrSignal = 'unknown';
+  if (recentRunHr.length >= 2 && baseRunHr.length >= 2) {
+    hrDriftBpm = Math.round(median(recentRunHr) - median(baseRunHr));
+    hrSignal = hrDriftBpm >= 5 ? 'elevated' : (hrDriftBpm <= -3 ? 'fresh' : 'normal');
+  }
+
   const completionComponent = (completionRate ?? 0.6) * 30;
   const adherenceComponent = ((avgNutritionAdherence ?? 65) / 100) * 30;
   const fatigueComponent = ((10 - clamp(avgFatigue ?? 5.5, 0, 10)) / 10) * 25;
@@ -167,6 +190,13 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
       alarmSymptoms: [...new Set(alarmSymptomEntries.map((entry) => entry.label))],
       latestAlarmSymptomAt,
       readinessGate: alarmSymptomEntries.length > 0 ? 'stop' : 'ok',
+    },
+    cardio: {
+      runsWithHr: runHr.length,
+      recentAvgHr: recentRunHr.length ? Math.round(median(recentRunHr)) : null,
+      baselineAvgHr: baseRunHr.length ? Math.round(median(baseRunHr)) : null,
+      hrDriftBpm,
+      hrSignal,
     },
   };
 }
@@ -253,6 +283,20 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
           highSessionRpe: thresholds.highSessionRpe,
         })}`,
         'Deload adicional y soporte de recuperación.'
+      )
+    );
+  }
+
+  const cardio = progressMemory?.cardio || {};
+  if (cardio.hrSignal === 'elevated' && (cardio.runsWithHr ?? 0) >= 4) {
+    volumeFactor *= 0.9;
+    rpeShift -= 1;
+    appliedRules.push(
+      createRule(
+        'HR_DRIFT_ELEVATED',
+        'FC media de carrera elevada frente a tu base reciente (posible fatiga o falta de recuperación).',
+        `recent=${cardio.recentAvgHr} bpm, base=${cardio.baselineAvgHr} bpm, drift=+${cardio.hrDriftBpm} bpm`,
+        'Recorte de volumen e intensidad para favorecer la recuperación.'
       )
     );
   }
