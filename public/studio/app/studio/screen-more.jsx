@@ -1,5 +1,5 @@
 /* ENDOGYM STUDIO — Pantallas PROGRESO + PERFIL */
-const { useState: useStateP } = React;
+const { useState: useStateP, useEffect: useEffectP } = React;
 
 /* ============ PROGRESO ============ */
 function ProgressScreen() {
@@ -234,6 +234,84 @@ function AvailabilitySurvey() {
   );
 }
 
+/* ---- Conexión con Strava (importa entrenos con FC) ---- */
+function StravaCard() {
+  const D = window.STUDIO;
+  const s = D.strava || { connected: false, recent: [] };
+  const [status, setStatus] = useStateP('idle'); // idle|connecting|syncing|ok|err
+  const [info, setInfo] = useStateP(null);
+
+  async function token() { return window.__getIdToken ? window.__getIdToken() : Promise.resolve(null); }
+
+  async function sync() {
+    setStatus('syncing');
+    try {
+      const t = await token(); if (!t) { setStatus('err'); return; }
+      const r = await fetch('/api/strava/sync', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + t } });
+      if (!r.ok) { setStatus('err'); return; }
+      setInfo(await r.json());
+      const d = await fetch('/api/studio-data', { headers: { authorization: 'Bearer ' + t } });
+      if (d.ok) { const o = (await d.json()).overrides; if (o && o.strava) D.strava = o.strava; if (o && o.progress) D.progress = o.progress; }
+      setStatus('ok');
+    } catch (e) { setStatus('err'); }
+  }
+
+  async function connect() {
+    setStatus('connecting');
+    try {
+      const t = await token(); if (!t) { setStatus('err'); return; }
+      const r = await fetch('/api/strava/connect', { headers: { authorization: 'Bearer ' + t } });
+      const j = await r.json();
+      if (j && j.url) { (window.top || window).location.href = j.url; } else setStatus('err');
+    } catch (e) { setStatus('err'); }
+  }
+
+  // Al volver del OAuth (?strava=ok) sincroniza automáticamente y limpia la URL.
+  useEffectP(() => {
+    try {
+      const w = window.top || window;
+      if (/[?&]strava=ok\b/.test(w.location.search)) {
+        sync();
+        try { w.history.replaceState({}, '', w.location.pathname); } catch (e) { /* noop */ }
+      }
+    } catch (e) { /* noop */ }
+  }, []);
+
+  return (
+    <SectionCard title="Strava · FC y entrenos" icon="bolt" sub={s.connected ? 'Conectado' : 'Importa ritmo, distancia y frecuencia cardiaca'}>
+      {!s.connected ? (
+        <div className="stack" style={{ gap: 10 }}>
+          <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>Conecta Strava para traer tus carreras con FC. Tu Apple Watch sincroniza a Strava y nosotros leemos de ahí.</p>
+          <button className="btn" onClick={connect} disabled={status === 'connecting'}><Icon name="bolt" size={16} /> {status === 'connecting' ? 'Abriendo Strava…' : 'Conectar Strava'}</button>
+          {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo conectar. Reintenta más tarde.</span> : null}
+        </div>
+      ) : (
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="row ac wrap" style={{ gap: 12 }}>
+            <button className="btn soft" onClick={sync} disabled={status === 'syncing'}><Icon name="sparkles" size={15} /> {status === 'syncing' ? 'Sincronizando…' : 'Sincronizar ahora'}</button>
+            {s.lastSyncAt ? <span className="tiny muted">Último: {String(s.lastSyncAt).slice(0, 10)}</span> : null}
+            {status === 'ok' && info ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Importadas {info.imported} ({info.withHeartRate} con FC) ✨</span> : null}
+            {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo sincronizar.</span> : null}
+          </div>
+          {Array.isArray(s.recent) && s.recent.length ? (
+            <div className="stack" style={{ gap: 6 }}>
+              {s.recent.map((w, i) => (
+                <div key={i} className="row between" style={{ padding: '8px 4px', borderBottom: i < s.recent.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <div style={{ minWidth: 0 }}><strong style={{ fontSize: '0.9rem' }}>{w.title}</strong><div className="tiny muted num">{w.date}{w.distanceKm ? ` · ${w.distanceKm} km` : ''}{w.pace ? ` · ${w.pace}` : ''}</div></div>
+                  <div className="row ac" style={{ gap: 6 }}>
+                    {w.avgHr ? <span className="pill tiny"><Icon name="heart" size={12} /> {w.avgHr}</span> : null}
+                    {w.maxHr ? <span className="pill tiny">máx {w.maxHr}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : <p className="tiny muted" style={{ margin: 0 }}>Aún no hay actividades. Pulsa "Sincronizar ahora".</p>}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 /* ============ PERFIL ============ */
 function ProfileScreen({ theme, setTheme, notif, setNotif }) {
   const D = window.STUDIO;
@@ -261,6 +339,8 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
 
       <AvailabilitySurvey />
 
+      <StravaCard />
+
       <div>
         <SectionCard title="Apariencia y avisos" icon="settings">
           <div className="set-row">
@@ -276,8 +356,7 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
             <div className={`switch ${notif ? 'on' : ''}`} onClick={() => setNotif(!notif)}><i /></div>
           </div>
           <div className="set-row">
-            <div><strong style={{ fontSize: '0.92rem' }}>Sincronizar wearable</strong><div className="tiny muted">Apple Health · Garmin</div></div>
-            <button className="btn ghost sm">Conectar</button>
+            <div><strong style={{ fontSize: '0.92rem' }}>Wearable</strong><div className="tiny muted">Conecta Strava arriba (Apple Watch → Strava → Ignios)</div></div>
           </div>
           <div className="set-row">
             <div><strong style={{ fontSize: '0.92rem' }}>Sesión</strong><div className="tiny muted">Cierra tu sesión en este dispositivo</div></div>

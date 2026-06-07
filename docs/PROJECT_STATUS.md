@@ -125,6 +125,21 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - **IMPORTANTE:** Perfil → "Correr + Gym" → objetivo + (marca) + **fecha de carrera** → Regenerar plan. La nutrición se cachea por semana: pulsar "Generar mi plan con IA" en Nutrición para refrescarla tras cambiar el entreno.
 - Pendiente/futuro: que el meal-plan cacheado se invalide automáticamente al regenerar el entreno (hoy es manual).
 
+### Integración Strava (FC y entrenos) — bundle `dfad737fdd`
+
+- **Realidad técnica:** Apple Watch NO se conecta directo a una web (HealthKit es nativo on-device). Vía: **Apple Watch → Strava → Ignios**. Strava da FC media/máx por sesión, ritmo y distancia (no FC en reposo/HRV fiables → eso requeriría app nativa/Garmin).
+- **Implementado (OAuth + import):**
+  - `src/services/stravaClient.js`: authorize URL, intercambio/refresh de tokens, `getActivities`, `mapActivityToWorkout`, y `state` firmado con HMAC (ata el callback al uid sin almacenamiento temporal).
+  - Rutas: `GET /api/strava/connect` (devuelve URL de OAuth), `GET /api/strava/callback` (canjea code, guarda tokens, redirige a `/?strava=ok`), `POST /api/strava/sync` (importa actividades desde el último sync, idempotente por id → workouts `source:'strava'` con FC/ritmo/distancia).
+  - Repositorio: `saveStravaConnection/getStravaConnection` (doc `users/{uid}/integrations/strava`); `buildWorkoutRecord` ampliado con `avgHeartRate/maxHeartRate/distanceKm/avgPaceSecPerKm/sportType/stravaActivityId`; `createWorkout` idempotente (`strava-{id}`).
+  - `studio-data`: override `strava` { connected, lastSyncAt, recent[] (con FC) }. UI: tarjeta **"Strava · FC y entrenos"** en Perfil (conectar / sincronizar / lista de carreras con FC); auto-sync al volver del OAuth (`?strava=ok`). Se quitó el placeholder "Sincronizar wearable".
+- **ACCIÓN DEL USUARIO (requerida para activar):**
+  1. Crear una API Application en https://www.strava.com/settings/api — Authorization Callback Domain = **`endogym.vercel.app`** (solo el dominio).
+  2. Copiar **Client ID** y **Client Secret**.
+  3. En Vercel → Settings → Environment Variables: `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` (y opcional `STRAVA_STATE_SECRET` = cadena aleatoria). Redeploy.
+  4. En la app: Perfil → "Conectar Strava".
+- **No verificable sin credenciales:** el flujo OAuth real no se puede probar hasta que existan las env vars; el código está revisado y compila. Pendiente/futuro: webhook de Strava para sync automático; usar la FC importada en el ajuste adaptativo de carga; FC reposo/HRV vía app nativa.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

@@ -131,6 +131,13 @@ function buildWorkoutRecord({ ref, userId, payload, createdAt, updatedAt }) {
     completed: payload.completed ?? true,
     notes: typeof payload.notes === 'string' ? payload.notes.slice(0, 2000) : null,
     planId: typeof payload.planId === 'string' ? payload.planId.slice(0, 100) : null,
+    // Datos de dispositivos (Strava): FC del entreno, distancia y ritmo.
+    distanceKm: safeNumber(payload.distanceKm),
+    avgHeartRate: safeNumber(payload.avgHeartRate),
+    maxHeartRate: safeNumber(payload.maxHeartRate),
+    avgPaceSecPerKm: safeNumber(payload.avgPaceSecPerKm),
+    sportType: typeof payload.sportType === 'string' ? payload.sportType.slice(0, 40) : null,
+    stravaActivityId: payload.stravaId != null ? String(payload.stravaId).slice(0, 40) : null,
     createdAt,
     updatedAt,
   };
@@ -143,6 +150,8 @@ export async function createWorkout(userId, payload) {
   let ref;
   if (isDailyCheckin) {
     ref = workouts.doc(`daily-${payload.dailyCheckinDate}`);
+  } else if (payload.source === 'strava' && payload.stravaId != null) {
+    ref = workouts.doc(`strava-${payload.stravaId}`); // idempotente por actividad
   } else if (payload.id) {
     ref = workouts.doc(payload.id);
   } else {
@@ -206,6 +215,20 @@ export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
 
   const snapshot = await query.limit(limit).get();
   return snapshot.docs.map((doc) => doc.data());
+}
+
+// --- Integración Strava: tokens y estado de conexión (doc aparte del perfil) ---
+export async function saveStravaConnection(userId, data) {
+  const { db } = await getAdminServices();
+  const ref = db.collection('users').doc(userId).collection('integrations').doc('strava');
+  await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+  return data;
+}
+
+export async function getStravaConnection(userId) {
+  const { db } = await getAdminServices();
+  const snap = await db.collection('users').doc(userId).collection('integrations').doc('strava').get();
+  return snap.exists ? snap.data() : null;
 }
 
 export async function createMetricLog(userId, payload) {

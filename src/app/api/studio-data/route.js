@@ -7,7 +7,36 @@ import {
   listMealsSince,
   listMetricsSince,
   listWorkoutsSince,
+  getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
+
+function paceLabel(secPerKm) {
+  const s = Number(secPerKm);
+  if (!Number.isFinite(s) || s <= 0) return null;
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.round(s % 60)).padStart(2, '0')}/km`;
+}
+
+function mapStrava(connection, workouts) {
+  const runs = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => w.source === 'strava')
+    .slice(0, 8)
+    .map((w) => ({
+      date: (w.performedAt || '').slice(0, 10),
+      title: w.title || w.sportType || 'Actividad',
+      sport: w.sportType || '',
+      distanceKm: w.distanceKm ?? null,
+      durationMin: w.durationMinutes ?? null,
+      avgHr: w.avgHeartRate ?? null,
+      maxHr: w.maxHeartRate ?? null,
+      pace: paceLabel(w.avgPaceSecPerKm),
+    }));
+  return {
+    connected: Boolean(connection?.refreshToken),
+    lastSyncAt: connection?.lastSyncAt || null,
+    recent: runs,
+  };
+}
 
 // Datos reales para el rediseño Studio (fase 2). Devuelve overrides que el bundle
 // estático fusiona sobre window.STUDIO (datos de muestra) ANTES de renderizar.
@@ -386,12 +415,13 @@ export async function GET(request) {
       const since6wIso = new Date(Date.now() - 42 * 24 * 3600 * 1000).toISOString();
       const since60dIso = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
 
-      const [profile, latestPlan, todayMeals, metrics, workouts] = await Promise.all([
+      const [profile, latestPlan, todayMeals, metrics, workouts, stravaConn] = await Promise.all([
         getUserProfile(user.uid),
         getLatestWeeklyPlan(user.uid).catch(() => null),
         listMealsSince(user.uid, startOfTodayIso, 50).catch(() => []),
         listMetricsSince(user.uid, since6wIso, 200).catch(() => []),
         listWorkoutsSince(user.uid, since60dIso, 200).catch(() => []),
+        getStravaConnection(user.uid).catch(() => null),
       ]);
 
       const overrides = {};
@@ -406,6 +436,7 @@ export async function GET(request) {
       setIf('macroEaten', mapMacroEaten(todayMeals));
       setIf('glycemic', mapGlycemic(todayMeals));
       setIf('progress', mapProgress(metrics, workouts, latestPlan));
+      setIf('strava', mapStrava(stravaConn, workouts));
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {
