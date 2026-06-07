@@ -30,6 +30,27 @@ function ProgressScreen() {
 
       <CoachBanner screen="progress" ask onAsk={() => setAsk(true)} />
 
+      {/* Validación de zonas (corredores con Strava) */}
+      {D.runZones && Array.isArray(D.runZones.items) && D.runZones.items.length ? (
+        <SectionCard title="Validación de zonas" icon="heart" sub={`Comparo tu FC real con la zona prescrita · FCmáx ~${D.runZones.hrMax} ppm`}>
+          <div className="stack" style={{ gap: 8 }}>
+            {D.runZones.items.map((r, i) => {
+              const color = r.verdict === 'too_hard' ? 'var(--glu-high)' : r.verdict === 'too_easy' ? 'var(--glu-mid)' : 'var(--glu-good)';
+              return (
+                <div key={i} className="row between" style={{ padding: '10px 4px', borderBottom: i < D.runZones.items.length - 1 ? '1px solid var(--line)' : 'none', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <strong style={{ fontSize: '0.9rem' }}>{r.title}</strong>
+                    <div className="tiny muted num">{r.date} · {r.avgHr} ppm{r.target ? ` · objetivo ${r.target}` : ''}</div>
+                    {r.message ? <div className="tiny" style={{ marginTop: 4, lineHeight: 1.45, color }}>{r.message}</div> : null}
+                  </div>
+                  {r.zone ? <span className="pill tiny" style={{ borderColor: color, color }}>Z{r.zone}{r.pct ? ` · ${r.pct}%` : ''}</span> : null}
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      ) : null}
+
       {/* Recuperación + carga */}
       <div className="grid g-2" style={{ gridTemplateColumns: '0.85fr 1.15fr' }}>
         <div className="card lg" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>

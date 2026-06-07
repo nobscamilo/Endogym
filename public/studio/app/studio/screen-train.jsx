@@ -267,6 +267,7 @@ function TrainSession() {
   const [list, setList] = useStateTr(s.list);
   const [busy, setBusy] = useStateTr(null); // 'all' | exerciseId | null
   const [reason, setReason] = useStateTr('variety');
+  const [moreMin, setMoreMin] = useStateTr('');
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -291,6 +292,20 @@ function TrainSession() {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
         body: JSON.stringify({ scope, exerciseId, reason }),
+      });
+      if (r.ok) await refreshSession();
+    } catch (e) { /* noop */ } finally { setBusy(null); }
+  }
+  async function extend() {
+    setBusy('all');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setBusy(null); return; }
+      const target = Number(moreMin) || ((s.durationMin || 60) + 30);
+      const r = await fetch('/api/studio-swap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ scope: 'all', reason: 'more_time', targetMinutes: target }),
       });
       if (r.ok) await refreshSession();
     } catch (e) { /* noop */ } finally { setBusy(null); }
@@ -361,15 +376,27 @@ function TrainSession() {
       {/* Lista de ejercicios con vídeo */}
       <SectionCard title="Ejercicios" icon="list" sub="Toca el vídeo para ver la técnica · marca cada serie al terminar"
         action={(
-          <div className="row ac" style={{ gap: 6 }}>
+          <div className="row ac wrap" style={{ gap: 6 }}>
             <select className="reason-select" value={reason} onChange={(e) => setReason(e.target.value)} title="Motivo del cambio">
               <option value="variety">Variar</option>
               <option value="time">Menos tiempo</option>
+              <option value="more_time">Más tiempo</option>
               <option value="equipment">Otro equipo</option>
             </select>
-            <button className="btn ghost sm" disabled={busy === 'all'} onClick={() => swap('all', null)}>
-              <Icon name="sparkles" size={14} /> {busy === 'all' ? 'Cambiando…' : 'Cambiar sesión'}
-            </button>
+            {reason === 'more_time' ? (
+              <React.Fragment>
+                <input className="text-input" type="number" min={(s.durationMin || 60) + 5} max="180" step="5"
+                  style={{ width: 78 }} placeholder={`${(s.durationMin || 60) + 30}`}
+                  value={moreMin} onChange={(e) => setMoreMin(e.target.value)} title="Minutos totales" />
+                <button className="btn ghost sm" disabled={busy === 'all'} onClick={extend}>
+                  <Icon name="plus" size={14} /> {busy === 'all' ? 'Ampliando…' : 'Ampliar sesión'}
+                </button>
+              </React.Fragment>
+            ) : (
+              <button className="btn ghost sm" disabled={busy === 'all'} onClick={() => swap('all', null)}>
+                <Icon name="sparkles" size={14} /> {busy === 'all' ? 'Cambiando…' : 'Cambiar sesión'}
+              </button>
+            )}
           </div>
         )}>
         <div className="ex-list">

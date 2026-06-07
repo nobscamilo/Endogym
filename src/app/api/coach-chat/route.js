@@ -6,13 +6,16 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
-import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
+import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince } from '../../../lib/repositories/firestoreRepository.js';
+import { hrMaxFromAge, validateRunZone } from '../../../core/running.js';
 
 async function buildUserContext(uid) {
   try {
-    const [profile, plan] = await Promise.all([
+    const sinceIso = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
+    const [profile, plan, workouts] = await Promise.all([
       getUserProfile(uid).catch(() => null),
       getLatestWeeklyPlan(uid).catch(() => null),
+      listWorkoutsSince(uid, sinceIso, 60).catch(() => []),
     ]);
     if (!profile && !plan) return '';
     const parts = [];
@@ -42,6 +45,25 @@ async function buildUserContext(uid) {
     if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
     if (today?.workout?.runPrescription?.structure) parts.push(`Prescripción de hoy: ${today.workout.runPrescription.structure}`);
     if (today?.nutritionTarget?.carbLevel) parts.push(`Carbohidratos hoy: nivel ${today.nutritionTarget.carbLevel}. ${today.nutritionTarget.carbTiming || ''}`);
+
+    // Validación de zonas (personalizada por edad/FCmáx): compara la última carrera con la
+    // zona prescrita. Solo para perfiles de carrera.
+    const isRunner = modality === 'hybrid_run_gym' || modality === 'running' || (profile?.runRaceGoal && profile.runRaceGoal !== 'health');
+    if (isRunner) {
+      const runs = (Array.isArray(workouts) ? workouts : [])
+        .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')) && Number(w.avgHeartRate))
+        .sort((a, b) => String(b.performedAt || '').localeCompare(String(a.performedAt || '')));
+      const observedMax = Math.max(0, ...runs.map((w) => Number(w.maxHeartRate) || 0));
+      const hrMax = Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null;
+      if (runs.length && hrMax) {
+        const last = runs[0];
+        const date = String(last.performedAt || '').slice(0, 10);
+        const runType = (Array.isArray(plan?.days) ? plan.days.find((d) => d.date === date) : null)?.workout?.runPrescription?.runType || null;
+        const v = validateRunZone({ avgHr: Number(last.avgHeartRate), hrMax, runType: runType || 'easy' });
+        if (v) parts.push(`FCmáx estimada ~${hrMax} ppm (por su edad). Última carrera: ${v.message}`);
+      }
+      parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en Z2, apretar en los días de calidad) usando SU FCmáx por edad/medida; cada usuario es distinto.');
+    }
     if (!parts.length) return '';
     return `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`;
   } catch { return ''; }

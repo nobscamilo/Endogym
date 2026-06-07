@@ -270,6 +270,59 @@ export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal }) {
   return { level, factor, timing, note };
 }
 
+// ============================================================================
+// VALIDACIÓN DE ZONAS de FC: compara la FC real de una carrera con la zona prescrita.
+// ============================================================================
+// FC máxima estimada (Tanaka 2001): 208 − 0.7·edad. Mejor si hay una FC máx observada.
+export function hrMaxFromAge(age) {
+  const a = Number(age);
+  return Number.isFinite(a) && a > 0 ? Math.round(208 - 0.7 * a) : null;
+}
+
+// Zona por % de FC máx (modelo de 5 zonas).
+export function hrZone(avgHr, hrMax) {
+  const hr = Number(avgHr);
+  const max = Number(hrMax);
+  if (!hr || !max) return null;
+  const pct = hr / max;
+  let zone;
+  if (pct < 0.60) zone = 1;
+  else if (pct < 0.70) zone = 2;
+  else if (pct < 0.80) zone = 3;
+  else if (pct < 0.90) zone = 4;
+  else zone = 5;
+  return { zone, pct: Math.round(pct * 100) };
+}
+
+export function targetZoneForRunType(runType) {
+  switch (runType) {
+    case 'easy':
+    case 'long': return { min: 2, max: 2, label: 'Z2' };
+    case 'tempo': return { min: 3, max: 4, label: 'Z3–4 (umbral)' };
+    case 'intervals': return { min: 4, max: 5, label: 'Z4–5' };
+    case 'drills': return { min: 1, max: 3, label: 'Z1–3' };
+    default: return { min: 1, max: 5, label: 'libre' };
+  }
+}
+
+export function validateRunZone({ avgHr, hrMax, runType }) {
+  const z = hrZone(avgHr, hrMax);
+  if (!z) return null;
+  const t = targetZoneForRunType(runType);
+  const niceType = (runType === 'easy' || runType === 'long') ? 'rodaje fácil'
+    : runType === 'tempo' ? 'tempo/umbral' : runType === 'intervals' ? 'series' : runType || 'carrera';
+  let verdict = 'ok';
+  let message = `En zona objetivo (Z${z.zone}, ${t.label}). 👌`;
+  if (z.zone > t.max) {
+    verdict = 'too_hard';
+    message = `Fuiste en Z${z.zone} (${z.pct}% FCmáx) en un día de ${niceType}; el objetivo era ${t.label}. Baja el ritmo para sumar volumen sin fatiga extra.`;
+  } else if (z.zone < t.min) {
+    verdict = 'too_easy';
+    message = `Fuiste en Z${z.zone}; el objetivo era ${t.label}. En días de calidad puedes apretar un poco más.`;
+  }
+  return { actualZone: z.zone, pct: z.pct, target: t.label, verdict, message };
+}
+
 // Resumen de ritmos para el coach / cabecera (texto corto). Devuelve null si no hay marca.
 export function pacesSummary(paces) {
   if (!paces) return null;

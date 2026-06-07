@@ -9,12 +9,42 @@ import {
   listWorkoutsSince,
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
+import { hrMaxFromAge, hrZone, validateRunZone } from '../../../core/running.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
   if (!Number.isFinite(s) || s <= 0) return null;
   const m = Math.floor(s / 60);
   return `${m}:${String(Math.round(s % 60)).padStart(2, '0')}/km`;
+}
+
+// Validación de zonas: compara la FC real de cada carrera de Strava con la zona prescrita ese
+// día. Solo para perfiles de carrera (híbrido/running o con objetivo de carrera).
+function mapRunZones(workouts, plan, profile) {
+  const modality = profile?.trainingModality || '';
+  const isRunner = modality === 'hybrid_run_gym' || modality === 'running'
+    || (profile?.runRaceGoal && profile.runRaceGoal !== 'health');
+  if (!isRunner) return null;
+  const runs = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')) && Number(w.avgHeartRate));
+  if (!runs.length) return null;
+  const observedMax = Math.max(0, ...runs.map((w) => Number(w.maxHeartRate) || 0));
+  const hrMax = Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null;
+  if (!hrMax) return null;
+  const typeByDate = {};
+  (plan?.days || []).forEach((d) => { if (d.workout?.runPrescription) typeByDate[d.date] = d.workout.runPrescription.runType; });
+  const items = runs.slice(0, 8).map((w) => {
+    const date = String(w.performedAt || '').slice(0, 10);
+    const runType = typeByDate[date] || null;
+    const z = hrZone(Number(w.avgHeartRate), hrMax);
+    const v = runType ? validateRunZone({ avgHr: Number(w.avgHeartRate), hrMax, runType }) : null;
+    return {
+      date, title: w.title || 'Carrera', avgHr: Number(w.avgHeartRate),
+      zone: z ? z.zone : null, pct: z ? z.pct : null,
+      target: v ? v.target : null, verdict: v ? v.verdict : null, message: v ? v.message : null,
+    };
+  });
+  return { hrMax, items };
 }
 
 function mapCoachAdjust(plan) {
@@ -449,6 +479,7 @@ export async function GET(request) {
       setIf('progress', mapProgress(metrics, workouts, latestPlan));
       setIf('strava', mapStrava(stravaConn, workouts));
       setIf('coachAdjust', mapCoachAdjust(latestPlan));
+      setIf('runZones', mapRunZones(workouts, latestPlan, profile));
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

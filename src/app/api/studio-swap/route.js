@@ -4,6 +4,7 @@ import { withTrace, logError } from '../../../lib/logger.js';
 import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
 import { suggestExerciseAlternatives } from '../../../core/exerciseLibrary.js';
+import { resolveRaceGoal, estimate5kPaceSecPerKm, deriveRunPaces, buildRunPrescription } from '../../../core/running.js';
 
 // Swap de ejercicios del Studio (fase 2). Cambia un ejercicio (scope 'one') o toda la sesión
 // de hoy (scope 'all'), eligiendo alternativas con la lógica del coach (suggestExerciseAlternatives)
@@ -29,8 +30,8 @@ export async function POST(request) {
 
     let body;
     try { body = await request.json(); } catch { return errorResponse('JSON inválido.', 400); }
-    const scope = body?.scope === 'all' ? 'all' : 'one';
-    const reason = ['time', 'equipment', 'variety'].includes(body?.reason) ? body.reason : 'variety';
+    const reason = ['time', 'equipment', 'variety', 'more_time'].includes(body?.reason) ? body.reason : 'variety';
+    const scope = (body?.scope === 'all' || reason === 'more_time') ? 'all' : 'one';
     const exerciseId = typeof body?.exerciseId === 'string' ? body.exerciseId : null;
     if (scope === 'one' && !exerciseId) return errorResponse('Falta exerciseId.', 400);
 
@@ -72,6 +73,44 @@ export async function POST(request) {
         const alts = suggestExerciseAlternatives({ currentExerciseId: ex.id, currentExercise: ex, ...ctx, limit: 14 }) || [];
         return alts.find((a) => a && a.name && !exclude.has(norm(a.name))) || alts[0] || null;
       };
+
+      // "Más tiempo": extiende la sesión actual (no reemplaza). Para carrera alarga la duración
+      // y recalcula la prescripción; para fuerza añade ejercicios extra hasta el nuevo tiempo.
+      if (reason === 'more_time') {
+        const cur = Number(day.workout?.durationMinutes) || 60;
+        let target = Number(body?.targetMinutes);
+        if (!Number.isFinite(target)) target = cur + 30;
+        target = Math.min(180, Math.max(cur + 5, Math.round(target)));
+        day.workout.durationMinutes = target;
+
+        if (day.sessionType === 'aerobic') {
+          const raceGoal = resolveRaceGoal(profile?.runRaceGoal);
+          const p5 = estimate5kPaceSecPerKm(profile?.runRefDistanceMeters, profile?.runRefTimeSeconds);
+          const paces = deriveRunPaces(p5);
+          day.workout.runPrescription = buildRunPrescription({
+            sessionFocus: day.sessionFocus || day.workout?.sessionFocus,
+            durationMinutes: target, raceGoal, paces, phase: plan.phase,
+          });
+        } else {
+          const desired = Math.max(exercises.length + 1, Math.min(9, Math.round((target - 10) / 8)));
+          const exclude = new Set(usedOtherDays);
+          (day.workout.exercises || []).forEach((e) => exclude.add(norm(e.name)));
+          let guard = 0;
+          while ((day.workout.exercises || []).length < desired && guard < 14) {
+            guard += 1;
+            const seed = day.workout.exercises[day.workout.exercises.length - 1] || exercises[0];
+            const alt = pickAlt(seed, exclude);
+            if (!alt) break;
+            day.workout.exercises.push(alt);
+            exclude.add(norm(alt.name));
+          }
+        }
+
+        const { db: dbx } = await getAdminServices();
+        await dbx.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
+          .update({ days: plan.days, updatedAt: new Date().toISOString() });
+        return jsonResponse({ ok: true, extendedTo: target });
+      }
 
       let swapped = 0;
       if (scope === 'one') {
