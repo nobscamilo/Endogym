@@ -14,6 +14,14 @@ import {
 } from './exerciseLibrary.js';
 import { buildMacroPlan } from './nutrition.js';
 import { buildWeeklyNutritionPlan } from './nutritionPlanner.js';
+import {
+  RACE_GOAL_META,
+  resolveRaceGoal,
+  estimate5kPaceSecPerKm,
+  deriveRunPaces,
+  buildRunPrescription,
+  pacesSummary,
+} from './running.js';
 
 const ACTIVITY_FACTORS = {
   sedentary: 1.2,
@@ -770,6 +778,11 @@ export function generateWeeklyPlan({
   const template = rotateTemplateToDate(baseTemplate, start);
   const userSeed = computeUserSeed(profile, goal, userId);
 
+  // Objetivo de carrera + ritmos derivados de una marca reciente (si la hay).
+  const raceGoal = resolveRaceGoal(profile.runRaceGoal);
+  const p5 = estimate5kPaceSecPerKm(profile.runRefDistanceMeters, profile.runRefTimeSeconds);
+  const runPaces = deriveRunPaces(p5);
+
   const days = template.map((templateDay, index) => {
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + index);
@@ -793,31 +806,42 @@ export function generateWeeklyPlan({
       sessionMinutes: templateDay.durationMinutes,
     });
 
+    // Duración planificada. La tirada larga la fija el objetivo de carrera (no la volumeFactor).
+    let durationMinutes = clamp(
+      Math.round(templateDay.durationMinutes * (templateDay.sessionType === 'recovery' ? 1 : workoutVolumeFactor)),
+      20,
+      150
+    );
+    if (templateDay.sessionType === 'aerobic' && sessionFocus === 'cardio_long') {
+      durationMinutes = clamp(RACE_GOAL_META[raceGoal].longRunMin, 30, RACE_GOAL_META[raceGoal].longRunCapMin);
+    }
+
+    const workout = {
+      title: templateDay.title,
+      sessionFocus,
+      durationMinutes,
+      intensityRpe: adjustRpeByAdaptive(
+        getSessionRpeRange(goal, templateDay.sessionType),
+        adaptiveTuning,
+        preparticipationScreening
+      ),
+      warmup: buildWarmupProtocol({ sessionType: templateDay.sessionType, modality }),
+      exercises: sessionExercises,
+      cooldown: buildCooldownProtocol({ sessionType: templateDay.sessionType }),
+    };
+
+    // Prescripción de carrera (ritmo objetivo, estructura, drills) en días aeróbicos.
+    if (templateDay.sessionType === 'aerobic') {
+      workout.runPrescription = buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces: runPaces });
+    }
+
     return {
       date: date.toISOString().slice(0, 10),
       dayName: formatSpanishWeekday(date),
       isTrainingDay: templateDay.sessionType !== 'recovery',
       sessionType: templateDay.sessionType,
       sessionFocus,
-      workout: {
-        title: templateDay.title,
-        sessionFocus,
-        durationMinutes: clamp(
-          Math.round(
-            templateDay.durationMinutes * (templateDay.sessionType === 'recovery' ? 1 : workoutVolumeFactor)
-          ),
-          20,
-          150
-        ),
-        intensityRpe: adjustRpeByAdaptive(
-          getSessionRpeRange(goal, templateDay.sessionType),
-          adaptiveTuning,
-          preparticipationScreening
-        ),
-        warmup: buildWarmupProtocol({ sessionType: templateDay.sessionType, modality }),
-        exercises: sessionExercises,
-        cooldown: buildCooldownProtocol({ sessionType: templateDay.sessionType }),
-      },
+      workout,
       nutritionTarget,
       meals: splitMealsForDay(nutritionTarget, mealsPerDay),
     };
@@ -854,7 +878,17 @@ export function generateWeeklyPlan({
     const prefMin = Math.round(Number(profile.preferredDurationMinutes));
     if (Number.isFinite(prefMin) && prefMin >= 20 && prefMin <= 150) {
       days.forEach((d) => {
-        if (d.isTrainingDay && d.workout) d.workout.durationMinutes = clamp(prefMin, 20, 150);
+        if (!d.isTrainingDay || !d.workout) return;
+        // La tirada larga NO se aplana al tiempo diario: la marca el objetivo de carrera.
+        if (d.sessionFocus === 'cardio_long') {
+          d.workout.durationMinutes = clamp(Math.max(prefMin, RACE_GOAL_META[raceGoal].longRunMin), 30, RACE_GOAL_META[raceGoal].longRunCapMin);
+        } else {
+          d.workout.durationMinutes = clamp(prefMin, 20, 150);
+        }
+        // Recalcula la prescripción de carrera si cambió la duración.
+        if (d.sessionType === 'aerobic') {
+          d.workout.runPrescription = buildRunPrescription({ sessionFocus: d.sessionFocus, durationMinutes: d.workout.durationMinutes, raceGoal, paces: runPaces });
+        }
       });
     }
   }
@@ -874,6 +908,8 @@ export function generateWeeklyPlan({
     goal,
     trainingMode,
     trainingModality: modality,
+    raceGoal,
+    runPaces: pacesSummary(runPaces),
     metabolicProfile,
     mealsPerDay,
     baseTarget,

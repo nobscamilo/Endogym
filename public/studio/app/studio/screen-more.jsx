@@ -118,11 +118,18 @@ function ProgressScreen() {
 /* ---- Encuesta de disponibilidad: ajusta plan y comidas ---- */
 const AV_GOALS = [['recomposition', 'Recomposición'], ['weight_loss', 'Bajar peso'], ['hypertrophy', 'Hipertrofia'], ['strength', 'Fuerza'], ['endurance', 'Resistencia'], ['glycemic_control', 'Glucémico']];
 const AV_EQUIP = [['full_gym', 'Gimnasio'], ['hybrid_run_gym', 'Correr + Gym'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
+const RUN_GOALS = [['health', 'Salud'], ['race_5k', '5K'], ['race_10k', '10K'], ['race_21k', '21K'], ['race_42k', '42K']];
+const RUN_REF_DIST = [['', '—'], ['5000', '5K'], ['10000', '10K'], ['21097', '21K'], ['42195', '42K']];
+function secsToMMSS(s) { const n = Number(s); if (!Number.isFinite(n) || n <= 0) return ''; const m = Math.floor(n / 60); const r = Math.round(n % 60); return `${m}:${String(r).padStart(2, '0')}`; }
+function mmssToSecs(str) { const m = /^(\d{1,3}):([0-5]?\d)$/.exec(String(str || '').trim()); if (!m) return null; return Number(m[1]) * 60 + Number(m[2]); }
 function AvailabilitySurvey() {
   const D = window.STUDIO;
   const u = D.user || {};
   const [goal, setGoal] = useStateP(u.goalRaw || 'recomposition');
   const [equip, setEquip] = useStateP(u.modalityRaw || 'full_gym');
+  const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
+  const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
+  const [refTime, setRefTime] = useStateP(secsToMMSS(u.runRefTimeSeconds));
   const [sex, setSex] = useStateP(u.sex || 'male');
   const [age, setAge] = useStateP(u.age != null ? u.age : 30);
   const [weight, setWeight] = useStateP(u.weightKg != null ? u.weightKg : 75);
@@ -145,6 +152,10 @@ function AvailabilitySurvey() {
           goal, trainingModality: equip, sex,
           age: Number(age), weightKg: Number(weight), heightCm: Number(height),
           sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks),
+          // Carrera: objetivo + marca de referencia (para ritmos numéricos).
+          runRaceGoal: raceGoal,
+          runRefDistanceMeters: refDist ? Number(refDist) : null,
+          runRefTimeSeconds: mmssToSecs(refTime),
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
@@ -176,6 +187,25 @@ function AvailabilitySurvey() {
           <div className="mb-label">Sexo</div>
           <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
         </div>
+
+        {equip === 'hybrid_run_gym' ? (
+          <div className="card" style={{ background: 'var(--accent-soft)', borderColor: 'transparent', padding: 14 }}>
+            <div className="mb-label">Objetivo de carrera</div>
+            <div className="chips">{RUN_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${raceGoal === v ? 'accent' : ''}`} onClick={() => setRaceGoal(v)}>{l}</button>)}</div>
+            <div className="mb-label" style={{ marginTop: 12 }}>Marca reciente (opcional → ritmos numéricos)</div>
+            <div className="row ac" style={{ gap: 10 }}>
+              <div className="field" style={{ flex: 1 }}><label>Distancia</label>
+                <select className="text-input" value={refDist} onChange={(e) => setRefDist(e.target.value)}>
+                  {RUN_REF_DIST.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1 }}><label>Tiempo (m:ss)</label>
+                <input className="text-input" type="text" inputMode="numeric" placeholder="25:00" value={refTime} onChange={(e) => setRefTime(e.target.value)} />
+              </div>
+            </div>
+            <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Sin marca, los ritmos se dan por zona (zona 2, umbral, intervalo). Con marca, calculamos tu ritmo objetivo en min/km.</p>
+          </div>
+        ) : null}
         <div className="grid g-4" style={{ gap: 10 }}>
           <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" value={age} onChange={(e) => setAge(e.target.value)} /></div>
           <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>

@@ -102,6 +102,19 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **Fix de fuga de ciclismo:** `run-zone2`/`cycle-zone2` comparten etiqueta `mixed`; se quitó `mixed` del `modalityFallback` de RUNNING/CYCLING para que un plan de carrera no muestre sesiones de bici (y viceversa). La fuerza complementaria sigue saliendo de casa/gimnasio.
 - Pendiente/futuro: drills (strides/A-skip) como calentamiento en días de calidad; 2ª tanda de vídeos de yoga/pilates (no seleccionables aún en el Studio).
 
+### Sistema de entrenamiento de carrera (4 mejoras) — bundle `0bb78ec65f`
+
+Nuevo motor `src/core/running.js` + integración completa:
+1. **Drills de calentamiento** en días de calidad (series/tempo): movilidad, A-skip, strides (en `runPrescription.drills`).
+2. **Prescripción real por día**: cada sesión aeróbica lleva `runPrescription` { runType, zoneLabel, targetPace, targetRange, structure, drills, note }. Estructura concreta (ej. "12' cal + 5×1000 m a umbral rec 90s + 8' enf"). Ritmos **numéricos si hay marca** (Riegel → 5K-equivalente → desfases Daniels por zona: fácil/larga/umbral/intervalo), **cualitativos** si no.
+3. **Objetivo de carrera** (`RaceGoal`: salud/5K/10K/21K/42K): ajusta la **tirada larga** (50→165 min según objetivo, exenta del recorte por tiempo/sesión) y el **esquema de series** (5K=6×800, 10K=5×1000, 21K=4×1500, 42K=5×1000 a umbral, salud=8×1').
+4. **Coach IA para corredores**: `coach-chat` inyecta objetivo de carrera, ritmos y nota de entrenamiento concurrente; el RAG ya añade "concurrente fuerza+resistencia" a la consulta.
+
+Integración: `planner.js` adjunta `runPrescription` y expone `weeklyPlan.raceGoal/runPaces`; encuesta (`screen-more.jsx`) con sección de carrera (objetivo + marca m:ss) visible en "Correr + Gym"; `studio-availability` persiste `runRaceGoal/runRefDistanceMeters/runRefTimeSeconds`; `studio-data` mapea `runPrescription` + `runPaces` y prefija la encuesta; UI (`screen-train.jsx`) muestra tarjeta "Tu sesión de carrera" (ritmo objetivo, estructura, drills, nota). **Verificado por script**: maratón con 10K=45:00 → fácil 5:39, umbral 4:41, larga 95 min, series 5×1000; 5K sin marca → cualitativo, 6×800, tempo 30 min.
+
+**IMPORTANTE:** Perfil → "Correr + Gym" → fijar objetivo (+marca opcional) → **Regenerar plan con IA**.
+Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el ajuste es por semana según objetivo.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

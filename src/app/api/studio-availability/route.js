@@ -9,7 +9,8 @@ import { upsertUserProfile } from '../../../lib/repositories/firestoreRepository
 // Marca `studioAvailability: true` para que el planner honre la duración de forma segura.
 
 const GOALS = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'endurance', 'glycemic_control']);
-const MODALITIES = new Set(['full_gym', 'home', 'trx', 'mixed']);
+const MODALITIES = new Set(['full_gym', 'home', 'trx', 'mixed', 'hybrid_run_gym']);
+const RACE_GOALS = new Set(['health', 'race_5k', 'race_10k', 'race_21k', 'race_42k']);
 
 export async function POST(request) {
   return withTrace('studio_availability', async ({ traceId }) => {
@@ -46,6 +47,14 @@ export async function POST(request) {
     const heightCm = Number(body?.heightCm);
     if (Number.isFinite(heightCm)) patch.heightCm = Math.min(230, Math.max(120, Math.round(heightCm)));
     if (['male', 'female'].includes(body?.sex)) patch.sex = body.sex;
+    // Carrera: objetivo + marca de referencia (para ritmos numéricos).
+    if (RACE_GOALS.has(body?.runRaceGoal)) patch.runRaceGoal = body.runRaceGoal;
+    const refDist = Number(body?.runRefDistanceMeters);
+    if (Number.isFinite(refDist) && refDist >= 800 && refDist <= 100000) patch.runRefDistanceMeters = Math.round(refDist);
+    else if (body?.runRefDistanceMeters === null) patch.runRefDistanceMeters = null;
+    const refTime = Number(body?.runRefTimeSeconds);
+    if (Number.isFinite(refTime) && refTime >= 120 && refTime <= 36000) patch.runRefTimeSeconds = Math.round(refTime);
+    else if (body?.runRefTimeSeconds === null) patch.runRefTimeSeconds = null;
 
     try {
       await upsertUserProfile(user.uid, patch);

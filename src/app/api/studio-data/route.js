@@ -60,6 +60,10 @@ function mapUser(profile, authUser) {
   if (num(p.mealsPerDay) !== undefined) out.mealsPerDay = num(p.mealsPerDay);
   if (num(p.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(p.preferredDurationMinutes);
   if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
+  // Carrera (para prefijar la encuesta).
+  if (p.runRaceGoal) out.runRaceGoal = p.runRaceGoal;
+  if (num(p.runRefDistanceMeters) !== undefined) out.runRefDistanceMeters = num(p.runRefDistanceMeters);
+  if (num(p.runRefTimeSeconds) !== undefined) out.runRefTimeSeconds = num(p.runRefTimeSeconds);
   return out;
 }
 
@@ -162,6 +166,8 @@ function mapTodaySession(plan, today) {
   const cooldown = mapSteps(day.workout?.cooldown);
   if (warmup.length) out.warmup = warmup;
   if (cooldown.length) out.cooldown = cooldown;
+  if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;
+  out.sessionType = day.sessionType || '';
   return out;
 }
 
@@ -391,6 +397,7 @@ export async function GET(request) {
       const setIf = (key, val) => { if (val != null) overrides[key] = val; };
 
       setIf('user', mapUser(profile, user));
+      setIf('runPaces', latestPlan?.runPaces || null);
       setIf('todaySession', mapTodaySession(latestPlan, today));
       setIf('week', mapWeek(latestPlan, today));
       setIf('library', mapLibrary(latestPlan));

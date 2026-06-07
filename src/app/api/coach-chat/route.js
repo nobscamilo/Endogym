@@ -23,8 +23,21 @@ async function buildUserContext(uid) {
     if (Number.isFinite(Number(profile?.weightKg))) parts.push(`Peso: ${profile.weightKg} kg.`);
     if (Number.isFinite(Number(profile?.age))) parts.push(`Edad: ${profile.age}.`);
     if (profile?.medicalConditions) parts.push(`Condiciones: ${profile.medicalConditions}.`);
+    // Contexto de carrera: objetivo, ritmos y entrenamiento concurrente (correr + gimnasio).
+    const modality = profile?.trainingModality || profile?.trainingMode || '';
+    if (profile?.runRaceGoal && profile.runRaceGoal !== 'health') {
+      parts.push(`Objetivo de carrera: ${profile.runRaceGoal.replace('race_', '').toUpperCase()}.`);
+    }
+    if (plan?.runPaces) {
+      const rp = plan.runPaces;
+      parts.push(`Ritmos de carrera: fácil ${rp.facil}, larga ${rp.larga}, umbral ${rp.umbral}, intervalos ${rp.intervalos}.`);
+    }
+    if (modality === 'hybrid_run_gym') {
+      parts.push('Entrena CONCURRENTE (correr + gimnasio): ten en cuenta el efecto de interferencia, el orden de sesiones (no fuerza pesada de pierna antes de la tirada larga) y la recuperación entre estímulos.');
+    }
     const today = Array.isArray(plan?.days) ? (plan.days.find((d) => d?.today) || plan.days[0]) : null;
     if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
+    if (today?.workout?.runPrescription?.structure) parts.push(`Prescripción de hoy: ${today.workout.runPrescription.structure}`);
     if (!parts.length) return '';
     return `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`;
   } catch { return ''; }

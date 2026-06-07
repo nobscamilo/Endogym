@@ -315,6 +315,33 @@ function TrainSession() {
         <div className="bar" style={{ background: 'rgba(255,255,255,0.25)' }}><i style={{ width: pct + '%', background: '#fff' }} /></div>
       </div>
 
+      {/* Prescripción de carrera (solo días de carrera) */}
+      {s.runPrescription ? (() => {
+        const rp = s.runPrescription;
+        return (
+          <SectionCard title="Tu sesión de carrera" icon="bolt" sub={rp.zoneLabel}>
+            <div className="stack" style={{ gap: 12 }}>
+              {rp.targetPace ? (
+                <div className="row ac wrap" style={{ gap: 8 }}>
+                  <span className="pill accent"><Icon name="clock" size={13} /> Ritmo objetivo {rp.targetPace}</span>
+                  {rp.targetRange ? <span className="pill tiny">{rp.targetRange}</span> : null}
+                </div>
+              ) : (
+                <span className="pill tiny muted">Ritmo por sensación ({rp.zoneLabel}). Añade una marca en Perfil para ritmos en min/km.</span>
+              )}
+              <p style={{ margin: 0, lineHeight: 1.5, fontWeight: 600 }}>{rp.structure}</p>
+              {Array.isArray(rp.drills) && rp.drills.length ? (
+                <div>
+                  <div className="mb-label">Calentamiento técnico</div>
+                  <ul className="step-list">{rp.drills.map((d, i) => <li key={i}>{d}</li>)}</ul>
+                </div>
+              ) : null}
+              {rp.note ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>{rp.note}</p> : null}
+            </div>
+          </SectionCard>
+        );
+      })() : null}
+
       {/* Lista de ejercicios con vídeo */}
       <SectionCard title="Ejercicios" icon="list" sub="Toca el vídeo para ver la técnica · marca cada serie al terminar"
         action={(
