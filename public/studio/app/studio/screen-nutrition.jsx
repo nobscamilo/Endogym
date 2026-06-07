@@ -212,6 +212,34 @@ function NutritionScreen({ layout }) {
     }
   }
 
+  // Vuelca un plan (días + compra + batch) en window.STUDIO y refresca la vista.
+  function applyNutrition(n) {
+    if (!n) return false;
+    if (Array.isArray(n.days) && n.days.length) {
+      const week = n.days.map((d, i) => ({ day: d.day || DOW_LABELS[i] || ('D' + i), meals: normMeals(d.meals) }));
+      D.mealWeek = week;
+      D.nutritionDays = week.map((d, i) => ({
+        day: d.day,
+        date: (D.nutritionDays && D.nutritionDays[i] && D.nutritionDays[i].date) || (i + 2),
+        kcal: d.meals.reduce((a, m) => a + (Number(m.kcal) || 0), 0),
+        today: i === tIdx,
+      }));
+      D.meals = (week[Math.min(dayIdx, week.length - 1)] || week[0]).meals;
+    } else if (Array.isArray(n.meals) && n.meals.length) {
+      // Compatibilidad con la forma antigua (un solo día).
+      const single = normMeals(n.meals);
+      D.mealWeek = [{ day: DOW_LABELS[tIdx], meals: single }];
+      D.meals = single;
+    } else {
+      return false;
+    }
+    if (Array.isArray(n.shopping) && n.shopping.length) D.shopping = n.shopping.map((c) => ({ icon: '🛒', ...c }));
+    if (Array.isArray(n.batch) && n.batch.length) D.batch = n.batch.map((b) => ({ emoji: '🍳', ...b }));
+    setGen((g) => g + 1);
+    return true;
+  }
+
+  // Genera (o regenera) el plan semanal con IA y lo guarda en el servidor (POST).
   async function generate() {
     setGenStatus('loading');
     try {
@@ -220,37 +248,35 @@ function NutritionScreen({ layout }) {
       const r = await fetch('/api/studio-nutrition', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token } });
       if (!r.ok) { setGenStatus('err'); return; }
       const j = await r.json();
-      if (!j || !j.ok || !j.nutrition) { setGenStatus('err'); return; }
-      const n = j.nutrition;
-      if (Array.isArray(n.days) && n.days.length) {
-        // Plan semanal: 7 días, cada uno con sus comidas.
-        const week = n.days.map((d, i) => ({ day: d.day || DOW_LABELS[i] || ('D' + i), meals: normMeals(d.meals) }));
-        D.mealWeek = week;
-        D.nutritionDays = week.map((d, i) => ({
-          day: d.day,
-          date: (D.nutritionDays && D.nutritionDays[i] && D.nutritionDays[i].date) || (i + 2),
-          kcal: d.meals.reduce((a, m) => a + (Number(m.kcal) || 0), 0),
-          today: i === tIdx,
-        }));
-        D.meals = (week[Math.min(dayIdx, week.length - 1)] || week[0]).meals;
-      } else if (Array.isArray(n.meals) && n.meals.length) {
-        // Compatibilidad con la forma antigua (un solo día).
-        const single = normMeals(n.meals);
-        D.mealWeek = [{ day: DOW_LABELS[tIdx], meals: single }];
-        D.meals = single;
-      }
-      if (Array.isArray(n.shopping) && n.shopping.length) D.shopping = n.shopping.map((c) => ({ icon: '🛒', ...c }));
-      if (Array.isArray(n.batch) && n.batch.length) D.batch = n.batch.map((b) => ({ emoji: '🍳', ...b }));
-      setGen((g) => g + 1);
+      if (!j || !j.ok || !applyNutrition(j.nutrition)) { setGenStatus('err'); return; }
       setGenStatus('ok');
     } catch (e) { setGenStatus('err'); }
   }
 
-  // Auto-generar el plan de comidas la primera vez que se abre Nutrición (una vez por sesión).
+  // Carga el plan ya guardado de esta semana (GET, sin gastar IA). Devuelve true si había uno.
+  async function loadCached() {
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) return false;
+      const r = await fetch('/api/studio-nutrition', { headers: { authorization: 'Bearer ' + token } });
+      if (!r.ok) return false;
+      const j = await r.json();
+      if (j && j.ok && j.nutrition) return applyNutrition(j.nutrition);
+      return false;
+    } catch (e) { return false; }
+  }
+
+  // Al abrir Nutrición (una vez por sesión): primero intenta cargar el plan guardado de la
+  // semana; si no hay, lo genera con IA una sola vez. Así no se regenera en cada visita.
   useEffectN(() => {
     if (window.__studioNutriAuto) return;
     window.__studioNutriAuto = true;
-    generate();
+    (async () => {
+      setGenStatus('loading');
+      const had = await loadCached();
+      if (had) { setGenStatus('ok'); return; }
+      await generate();
+    })();
   }, []);
 
   return (

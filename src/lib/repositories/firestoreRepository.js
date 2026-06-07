@@ -323,6 +323,37 @@ export async function getLatestWeeklyPlan(userId) {
   return plans[0] ?? null;
 }
 
+// --- Plan SEMANAL de comidas del Studio (cacheado por semana para no regenerar en cada visita) ---
+function sanitizeWeekKey(weekKey) {
+  const k = String(weekKey || '').slice(0, 20);
+  // Solo permitimos AAAA-MM-DD (lunes de la semana) para usarlo como id de documento.
+  return /^\d{4}-\d{2}-\d{2}$/.test(k) ? k : null;
+}
+
+export async function saveStudioNutritionPlan(userId, weekKey, plan) {
+  const key = sanitizeWeekKey(weekKey);
+  if (!key || !plan || typeof plan !== 'object') return null;
+  const { db } = await getAdminServices();
+  const ref = db.collection('users').doc(userId).collection('studioNutrition').doc(key);
+  const record = {
+    weekKey: key,
+    nutrition: plan,
+    updatedAt: new Date().toISOString(),
+  };
+  await ref.set(record);
+  return record;
+}
+
+export async function getStudioNutritionPlan(userId, weekKey) {
+  const key = sanitizeWeekKey(weekKey);
+  if (!key) return null;
+  const { db } = await getAdminServices();
+  const snapshot = await db.collection('users').doc(userId).collection('studioNutrition').doc(key).get();
+  if (!snapshot.exists) return null;
+  const data = snapshot.data() || {};
+  return data.nutrition && Array.isArray(data.nutrition.days) ? data.nutrition : null;
+}
+
 export async function updateWeeklyPlanCustomizations(userId, planId, customizations) {
   if (!planId || typeof planId !== 'string' || planId.includes('/')) {
     return null;

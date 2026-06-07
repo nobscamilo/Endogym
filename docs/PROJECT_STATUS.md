@@ -26,10 +26,20 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **Selector de día (UI):** al pulsar "Jue" el menú mostrado cambia al de jueves (data + UI verificadas); el rail muestra kcal reales por día. ✅
 - **Foto del plato:** bundle desplegado contiene `/api/analyze-plate`, "Foto del plato" y `readAsDataURL` → cadena cableada (endpoint Gemini Vision pre-existente). El upload real de imagen no se automatizó en Chrome, pero el flujo está completo. ✅
 
+### Mejoras 7 jun (tarde): persistencia del plan + calidad del prompt — bundle `4b6165d4fe`
+
+- **Persistencia del plan semanal (Firestore).** El plan ya NO se regenera en cada visita. Nuevas funciones en `firestoreRepository.js`: `saveStudioNutritionPlan(uid, weekKey, plan)` / `getStudioNutritionPlan(uid, weekKey)` (doc en `users/{uid}/studioNutrition/{AAAA-MM-DD del lunes}`). En la ruta:
+  - `GET /api/studio-nutrition` → devuelve el plan guardado de la semana (`cached:true`) sin gastar IA, o `{ ok:true, empty:true }` si no hay.
+  - `POST` → genera, y si el plan está completo (7 días) lo **guarda** con `currentWeekKey()` (lunes UTC).
+  - Frontend (`screen-nutrition.jsx`): al abrir Nutrición intenta `loadCached()` (GET) y solo si no hay plan lanza `generate()` (POST). El botón "Generar mi plan con IA" regenera y sobrescribe. Helper `applyNutrition()` extraído. Resultado: estable durante la semana, sin esperas ni coste repetido.
+- **Calidad del prompt (#2).** kcal/día forzadas a **±5% del objetivo** (con recordatorio p·4+c·4+f·9 ≈ kcal); prohibido repetir proteína principal en días consecutivos; y **pistas de estilo de desayuno por bloque** (`CHUNK_STYLE_HINTS`: salado / avena / lácteos-fruta / pan-repostería) para diversificar entre los 7 días (los bloques van en paralelo y no se ven entre sí, por eso el reparto se fija en el código).
+
+### Pendiente de esta sesión
+- Tras `git push`: verificar en Chrome que (a) al revisitar Nutrición NO regenera (carga el cacheado, sin espera) y (b) las kcal/día quedan más cerca del objetivo y los desayunos varían.
+
 ### Notas / mejoras futuras (no bloqueantes)
-- Variedad **dentro de cada franja** mejorable: los desayunos tienden a repetir patrón (tostadas aguacate-huevo / tortitas de avena) porque cada trozo es independiente. Si molesta, pasar a cada trozo los platos ya usados para forzar variedad.
-- Las kcal por día generadas por Gemini quedan algo por encima del objetivo (p. ej. 2700 vs ~1980-2100); afinar el prompt si se quiere ajustar mejor al target.
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
+- El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.
 
 ## Sesión del 6 de junio de 2026 (mejora del RAG nutricional)
 
