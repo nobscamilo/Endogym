@@ -31,7 +31,7 @@ function initialsFrom(name, last) {
 }
 
 const GOAL_LABELS = { weight_loss: 'Pérdida de peso', recomposition: 'Recomposición', hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia', glycemic_control: 'Control glucémico' };
-const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Mixto' };
+const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Mixto', hybrid_run_gym: 'Correr + Gym', running: 'Carrera', cycling: 'Ciclismo', yoga: 'Yoga', pilates: 'Pilates' };
 
 function mapUser(profile, authUser) {
   // IMPORTANTE: nunca devolvemos null ni dejamos el nombre sin asignar; si lo hiciéramos, el

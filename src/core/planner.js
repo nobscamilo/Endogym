@@ -103,6 +103,15 @@ const MODALITY_TEMPLATES = {
     { dayName: 'Sábado', sessionType: 'mixed', title: 'Circuito calisténico', durationMinutes: 40, exercises: ['Circuito full body'] },
     { dayName: 'Domingo', sessionType: 'recovery', title: 'Descanso', durationMinutes: 20, exercises: ['Movilidad suave'] },
   ],
+  [TrainingModality.HYBRID_RUN_GYM]: [
+    { dayName: 'Lunes', sessionType: 'resistance', title: 'Gym · Pierna (fuerza)', durationMinutes: 60, exercises: ['Sentadilla', 'Peso muerto rumano', 'Zancadas', 'Core'] },
+    { dayName: 'Martes', sessionType: 'aerobic', title: 'Rodaje suave (Zona 2)', durationMinutes: 40, exercises: ['Carrera zona 2'] },
+    { dayName: 'Miércoles', sessionType: 'resistance', title: 'Gym · Torso (fuerza)', durationMinutes: 55, exercises: ['Press banca', 'Remo', 'Press militar', 'Dominadas'] },
+    { dayName: 'Jueves', sessionType: 'aerobic', title: 'Series / Intervalos', durationMinutes: 45, exercises: ['Intervalos de carrera'] },
+    { dayName: 'Viernes', sessionType: 'recovery', title: 'Recuperación activa', durationMinutes: 30, exercises: ['Caminata', 'Movilidad'] },
+    { dayName: 'Sábado', sessionType: 'aerobic', title: 'Tirada larga', durationMinutes: 70, exercises: ['Carrera continua zona 2'] },
+    { dayName: 'Domingo', sessionType: 'recovery', title: 'Descanso', durationMinutes: 20, exercises: ['Movilidad suave'] },
+  ],
   [TrainingModality.PILATES]: [
     { dayName: 'Lunes', sessionType: 'mindbody', title: 'Pilates control central', durationMinutes: 50, exercises: ['Mat core flow'] },
     { dayName: 'Martes', sessionType: 'aerobic', title: 'Cardio base', durationMinutes: 40, exercises: ['Caminata o bici'] },
@@ -159,6 +168,12 @@ const EXTRA_SESSION_VARIATIONS = {
     { sessionType: 'resistance', sessionFocus: 'full_body', title: 'Full body controlado', durationMinutes: 58, descriptor: 'Trabajo global sin castigar cadenas consecutivas' },
     { sessionType: 'resistance', sessionFocus: 'upper', title: 'Torso mixto', durationMinutes: 56, descriptor: 'Empuje y tracción superior con densidad media' },
     { sessionType: 'mixed', sessionFocus: 'full_body', title: 'Engine mixto', durationMinutes: 44, descriptor: 'Acondicionamiento útil con base de fuerza' },
+  ],
+  [TrainingModality.HYBRID_RUN_GYM]: [
+    { sessionType: 'resistance', sessionFocus: 'lower', title: 'Gym · Pierna (fuerza)', durationMinutes: 60, descriptor: 'Fuerza de tren inferior; separada de la tirada larga' },
+    { sessionType: 'resistance', sessionFocus: 'upper', title: 'Gym · Torso (fuerza)', durationMinutes: 55, descriptor: 'Empuje y tracción superior, bajo impacto en piernas' },
+    { sessionType: 'aerobic', sessionFocus: 'cardio', title: 'Rodaje suave (Zona 2)', durationMinutes: 40, descriptor: 'Carrera aeróbica fácil para volumen' },
+    { sessionType: 'aerobic', sessionFocus: 'cardio', title: 'Series / Intervalos', durationMinutes: 45, descriptor: 'Trabajo de alta intensidad de carrera' },
   ],
 };
 

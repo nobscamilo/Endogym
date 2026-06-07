@@ -117,7 +117,7 @@ function ProgressScreen() {
 
 /* ---- Encuesta de disponibilidad: ajusta plan y comidas ---- */
 const AV_GOALS = [['recomposition', 'Recomposición'], ['weight_loss', 'Bajar peso'], ['hypertrophy', 'Hipertrofia'], ['strength', 'Fuerza'], ['endurance', 'Resistencia'], ['glycemic_control', 'Glucémico']];
-const AV_EQUIP = [['full_gym', 'Gimnasio'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
+const AV_EQUIP = [['full_gym', 'Gimnasio'], ['hybrid_run_gym', 'Correr + Gym'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
 function AvailabilitySurvey() {
   const D = window.STUDIO;
   const u = D.user || {};

@@ -84,6 +84,18 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - Riesgo conocido: oEmbed confirma que el vídeo existe, pero algún autor podría tener el **embedding deshabilitado** (se vería "no disponible" en el reproductor). Poco probable con Shorts de técnica populares; si pasa en alguno, se sustituye.
 - Pendiente/futuro: 2ª tanda para yoga (39), pilates (44) y cardio (running/cycling) — mismo método.
 
+### Modalidad híbrida "Correr + Gym" (entrenamiento concurrente) + vídeos de cardio
+
+- **Pregunta del usuario:** ¿se puede ser runner y usar el gimnasio a la vez? Antes NO (la encuesta solo daba Gimnasio/Mixto/TRX/Casa). Implementado:
+  - Nueva modalidad `HYBRID_RUN_GYM` (`models.js`) + plantilla semanal concurrente (`planner.js`): 2 días de **gimnasio** (Pierna / Torso) + 3 de **carrera** (rodaje Z2, series, tirada larga) + 2 recuperación, ordenados para minimizar interferencia (pierna lejos de la tirada larga).
+  - `modalityFallback(HYBRID_RUN_GYM)` = `[FULL_GYM, RUNNING]`: los días de fuerza tiran de ejercicios de **gimnasio** y los aeróbicos de **carrera** (el `sessionType` de cada día filtra). Sin casa ni ciclismo (es híbrido de carrera). `EXTRA_SESSION_VARIATIONS` añadidas para el swap.
+  - Encuesta del Studio (`screen-more.jsx` AV_EQUIP) con opción **"Correr + Gym"**; etiqueta en `studio-data` (`MODALITY_LABELS`).
+  - **RAG concurrente:** `buildQueryText` ahora incluye la modalidad y, si es híbrida/mixta, pide guías de **entrenamiento concurrente** (efecto de interferencia, orden de sesiones, recuperación). La ruta ya pasa `weeklyPlan.trainingModality` al retriever. (El RAG ya tenía el conocimiento; antes no se le pedía explícitamente.)
+  - **Verificado** (script): plan híbrido → Lun/Mié gym puro (6 ejercicios c/u, todos con vídeo), Mar/Jue/Sáb carrera (con vídeo), recuperación con movilidad. Único sin vídeo: `recovery-walk`.
+- **Vídeos de cardio** añadidos (verificados oEmbed): `run-zone2/tempo` (técnica de carrera), `run-fartlek/intervals`, `run-hill-repeats`, `run-strides`, `run-a-skip-drill`, y `cycle-*` (cadencia/técnica). Bundle `3840a715ee`.
+- **IMPORTANTE:** para usar el híbrido, en Perfil elegir "Correr + Gym" y **Regenerar plan con IA**.
+- Pendiente/futuro: que cada día aeróbico muestre el ejercicio de carrera específico de su tipo (ahora el título distingue rodaje/series/tirada, pero los ejercicios listados son genéricos de carrera); 2ª tanda de vídeos de yoga/pilates (no seleccionables aún en el Studio).
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

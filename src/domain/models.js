@@ -32,6 +32,9 @@ export const TrainingModality = Object.freeze({
   CYCLING: 'cycling',
   PILATES: 'pilates',
   MIXED: 'mixed',
+  // Híbrido concurrente: combina días reales de carrera (aeróbico) con días de gimnasio
+  // (fuerza). Pensado para el runner que además entrena fuerza en el gimnasio.
+  HYBRID_RUN_GYM: 'hybrid_run_gym',
 });
 
 export const MetabolicProfile = Object.freeze({

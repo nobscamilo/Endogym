@@ -39,6 +39,18 @@ function buildQueryText(profile, weeklyPlan) {
   const goal = weeklyPlan.goal || '';
   if (goal) parts.push(`Objetivo de entrenamiento: ${goal}.`);
 
+  const modality = weeklyPlan.trainingModality || profile.trainingModality || profile.trainingMode || '';
+  if (modality) parts.push(`Modalidad de entrenamiento: ${modality}.`);
+  // Entrenamiento concurrente (correr + gimnasio): pide guías específicas de interferencia,
+  // orden de sesiones y recuperación entre fuerza y resistencia.
+  if (modality === 'hybrid_run_gym' || modality === 'mixed') {
+    parts.push(
+      'Entrenamiento concurrente de fuerza y resistencia (correr + gimnasio): minimizar el '
+      + 'efecto de interferencia, ordenar sesiones (separar fuerza de piernas de tiradas largas), '
+      + 'gestionar volumen e intensidad y recuperación entre estímulos.'
+    );
+  }
+
   const age = Number(profile.age);
   if (Number.isFinite(age)) parts.push(`Edad: ${age} años.`);
   if (profile.sex) parts.push(`Sexo: ${profile.sex}.`);

@@ -163,6 +163,22 @@ const EXERCISE_VIDEO_MAP = {
   'gym-front-squat': 'ZaSetOZFo-k',
   'gym-hack-squat': 'ZaSetOZFo-k',
   'home-wall-sit': 'ZaSetOZFo-k',
+
+  // --- Cardio (carrera/ciclismo): para la modalidad híbrida runner+gym y planes con cardio ---
+  'run-zone2': 'UmJbXtnwopI',          // técnica de carrera
+  'run-tempo': 'UmJbXtnwopI',
+  'run-fartlek': 'V8u_llDIJSQ',        // intervalos
+  'run-intervals': 'V8u_llDIJSQ',
+  'run-hill-repeats': 'afvcZEgF9M0',   // cuestas
+  'run-strides': 'KSoL-w9bNns',        // aceleraciones
+  'run-a-skip-drill': 'O9wh-huxbxU',   // técnica A-skip
+  'cycle-zone2': 'lm0XnGDC1DE',        // cadencia/técnica ciclismo
+  'cycle-intervals': 'lm0XnGDC1DE',
+  'cycle-sweet-spot': 'lm0XnGDC1DE',
+  'cycle-cadence-drill': 'lm0XnGDC1DE',
+  'cycle-spin-ups': 'lm0XnGDC1DE',
+  'cycle-low-cadence-climb': 'lm0XnGDC1DE',
+  'cycle-standing-climb': 'lm0XnGDC1DE',
 };
 
 function youtubeLinks(query, exerciseId = '') {
@@ -1020,6 +1036,13 @@ function resolveFocusCategories(sessionType, sessionFocus) {
 }
 
 function modalityFallback(modality) {
+  // Híbrido runner+gym: los días de fuerza tiran de ejercicios de gimnasio/casa y los días
+  // aeróbicos de carrera; el sessionType de cada día filtra cuál corresponde.
+  if (modality === TrainingModality.HYBRID_RUN_GYM) {
+    // Fuerza desde el gimnasio; cardio desde carrera. Sin casa (prefiere material de gym) ni
+    // ciclismo (es un híbrido de CARRERA). El sessionType de cada día filtra cuál aplica.
+    return [TrainingModality.FULL_GYM, TrainingModality.RUNNING];
+  }
   if (modality === TrainingModality.MIXED) return [TrainingModality.FULL_GYM, TrainingModality.HOME, TrainingModality.TRX];
   if (modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING) {
     return [TrainingModality.HOME, TrainingModality.FULL_GYM, TrainingModality.MIXED];
