@@ -157,17 +157,52 @@ export async function POST(request) {
     const conditions = profile?.medicalConditions || 'ninguna declarada';
     const restrictions = profile?.dietaryRestrictions || profile?.allergies || 'ninguna declarada';
 
+    // Contexto de entrenamiento por día (para "fuel for the work required"): tipo de sesión,
+    // nivel de carbohidratos, timing y objetivos de macros específicos de cada día.
+    const RACE_LABELS = { health: 'salud/forma', race_5k: '5K', race_10k: '10K', race_21k: 'media maratón', race_42k: 'maratón' };
+    const DOW_FULL = { lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', miercoles: 'Mié', jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', sabado: 'Sáb', domingo: 'Dom' };
+    const dayCtx = {};
+    if (Array.isArray(plan?.days)) {
+      for (const d of plan.days) {
+        const key = DOW_FULL[String(d.dayName || '').toLowerCase()];
+        if (!key) continue;
+        const nt = d.nutritionTarget || {};
+        dayCtx[key] = {
+          title: d.workout?.title || (d.isTrainingDay ? 'Entreno' : 'Descanso'),
+          type: d.sessionType || 'recovery',
+          carbLevel: nt.carbLevel || 'medio',
+          timing: nt.carbTiming || '',
+          kcal: Math.round(Number(nt.calories) || t.kcal),
+          carbs: Math.round(Number(nt.carbsGrams) || t.carbs),
+          protein: Math.round(Number(nt.proteinGrams) || t.protein),
+          fat: Math.round(Number(nt.fatGrams) || t.fat),
+        };
+      }
+    }
+    const raceLabel = RACE_LABELS[plan?.raceGoal] || null;
+    const phaseLabel = plan?.phaseLabel || null;
+
     const baseRules = `Eres un nutricionista deportivo. Trabajas en español de España.
-Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; restricciones/alergias: ${restrictions}.
-Objetivo nutricional diario: ~${t.kcal} kcal, proteína ${t.protein} g, carbohidratos ${t.carbs} g, grasa ${t.fat} g.`;
+Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; restricciones/alergias: ${restrictions}.${raceLabel ? `
+Objetivo de carrera: ${raceLabel}.${phaseLabel ? ` Fase de entrenamiento: ${phaseLabel}.` : ''}` : ''}
+PRINCIPIO "fuel for the work required": ajusta los carbohidratos a la demanda de CADA día (más en tirada larga/series/pierna, menos en descanso). Carbohidratos de absorción LENTA lejos del entreno y RÁPIDA peri-entreno. Cada día abajo trae su objetivo de kcal/macros y su nivel/timing de carbohidratos: respétalos.`;
+
+    function dayLine(day) {
+      const c = dayCtx[day];
+      if (!c) return `- ${day}: objetivo ~${t.kcal} kcal (C ${t.carbs} g / P ${t.protein} g / F ${t.fat} g).`;
+      return `- ${day}: sesión "${c.title}" (${c.type}); carbohidratos ${c.carbLevel}; objetivo ${c.kcal} kcal (C ${c.carbs} g / P ${c.protein} g / F ${c.fat} g).${c.timing ? ` Timing: ${c.timing}` : ''}`;
+    }
 
     function buildPrompt(daysList, withShoppingBatch, styleHint) {
       return `${baseRules}
 Genera el menú para ESTOS días: ${daysList.join(', ')}.
+Contexto de entrenamiento y objetivo por día (ajusta las comidas y el timing a esto):
+${daysList.map(dayLine).join('\n')}
 Requisitos:
 - days: EXACTAMENTE estos ${daysList.length} días (campo "day" con el valor correspondiente: ${daysList.join(', ')}).
 - Cada día tiene EXACTAMENTE 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena".
-- IMPORTANTE: la suma de kcal de CADA día debe quedar dentro de ±5% del objetivo (${t.kcal} kcal). Ajusta las porciones (gramos) para lograrlo; revisa que p·4 + c·4 + f·9 ≈ kcal del día.
+- IMPORTANTE: la suma de kcal de CADA día debe quedar dentro de ±7% del objetivo de ESE día (ver arriba). Ajusta las porciones (gramos); revisa que p·4 + c·4 + f·9 ≈ kcal del día.
+- Refleja el TIMING de carbohidratos del día en los slots y en el campo "serving" (p. ej. en día de fuerza, carbos lentos en la comida previa/posterior; en tirada larga, desayuno alto en carbos y recarga después).
 - Varía las recetas entre días: NO repitas el mismo plato y NO uses la misma proteína principal en días consecutivos. Comida real, práctica y apetecible; respeta condiciones/restricciones.${styleHint ? `
 - ${styleHint}` : ''}
 - Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).${withShoppingBatch ? `

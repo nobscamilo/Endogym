@@ -122,9 +122,10 @@ function intervalScheme(raceGoal) {
 }
 
 // Construye la prescripción de una sesión de carrera.
-export function buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces }) {
+export function buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces, phase }) {
   const runType = runTypeFromFocus(sessionFocus);
   const goal = resolveRaceGoal(raceGoal);
+  const phaseKey = PHASE_PARAMS[phase] ? phase : null;
   const dur = Math.max(20, Math.round(toNum(durationMinutes) || 40));
   const hasPaces = !!paces;
   const p = (key) => (hasPaces ? formatPace(paces[key]) : null);
@@ -156,8 +157,12 @@ export function buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, 
     out.drills = QUALITY_DRILLS;
   } else if (runType === 'intervals') {
     const sch = intervalScheme(goal);
+    let reps = sch.reps;
+    if (phaseKey === 'taper') reps = Math.max(3, Math.round(reps * 0.6));
+    else if (phaseKey === 'deload') reps = Math.max(3, reps - 1);
+    else if (phaseKey === 'peak') reps = reps + 1;
     out.targetPace = p(sch.at); out.targetRange = range(sch.at);
-    out.structure = `Calentamiento 12 min + drills. ${sch.reps} × ${sch.dist} a ritmo ${sch.at === 'tempo' ? 'umbral' : 'intervalo'} (rec. ${sch.recovery}). Enfriamiento 8 min.`;
+    out.structure = `Calentamiento 12 min + drills. ${reps} × ${sch.dist} a ritmo ${sch.at === 'tempo' ? 'umbral' : 'intervalo'} (rec. ${sch.recovery}). Enfriamiento 8 min.`;
     out.note = 'Mantén todas las series al mismo ritmo; si decaes, recorta el número.';
     out.drills = QUALITY_DRILLS;
   } else { // drills
@@ -167,7 +172,102 @@ export function buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, 
     out.drills = QUALITY_DRILLS;
   }
 
+  if (phaseKey) {
+    out.phase = phaseKey;
+    out.phaseLabel = PHASE_PARAMS[phaseKey].label;
+  }
+
   return out;
+}
+
+// ============================================================================
+// PERIODIZACIÓN multi-semana (base → build → pico → tapering / descarga)
+// ============================================================================
+export const TrainingPhase = Object.freeze({
+  BASE: 'base', BUILD: 'build', PEAK: 'peak', TAPER: 'taper', DELOAD: 'deload',
+});
+
+// Factores por fase: volumen (duraciones), intensidad (reps de calidad), tirada larga.
+export const PHASE_PARAMS = {
+  base: { label: 'Base aeróbica', volumeFactor: 1.0, intensityFactor: 0.9, longRunFactor: 1.0, note: 'Construye base aeróbica: mucho rodaje fácil, poca intensidad.' },
+  build: { label: 'Construcción', volumeFactor: 1.05, intensityFactor: 1.0, longRunFactor: 1.1, note: 'Sube el trabajo de umbral e intervalos manteniendo volumen.' },
+  peak: { label: 'Pico', volumeFactor: 1.0, intensityFactor: 1.1, longRunFactor: 1.15, note: 'Trabajo específico de carrera; máxima calidad antes del afinamiento.' },
+  taper: { label: 'Afinamiento (taper)', volumeFactor: 0.6, intensityFactor: 1.0, longRunFactor: 0.5, note: 'Reduce volumen, mantén algo de intensidad para llegar fresco.' },
+  deload: { label: 'Descarga', volumeFactor: 0.7, intensityFactor: 0.85, longRunFactor: 0.8, note: 'Semana de descarga: recupera para asimilar la carga.' },
+};
+
+export function resolvePhaseParams(phase) {
+  return PHASE_PARAMS[phase] || PHASE_PARAMS.base;
+}
+
+function startOfDayUTC(d) {
+  const x = new Date(d);
+  x.setUTCHours(0, 0, 0, 0);
+  return x;
+}
+
+// Semanas (enteras, hacia arriba) desde el inicio de la semana hasta la carrera.
+export function weeksToRace(raceDateISO, weekStartISO) {
+  if (!raceDateISO) return null;
+  const race = new Date(raceDateISO);
+  const start = weekStartISO ? new Date(weekStartISO) : new Date();
+  if (Number.isNaN(race.getTime()) || Number.isNaN(start.getTime())) return null;
+  const ms = startOfDayUTC(race) - startOfDayUTC(start);
+  return Math.ceil(ms / (7 * 24 * 3600 * 1000));
+}
+
+// Determina la fase. Si hay fecha de carrera, periodiza hacia ella; si no, ciclo rodante
+// de 4 semanas (3 de carga progresiva + 1 de descarga) anclado al calendario.
+export function resolveTrainingPhase({ raceDateISO, weekStartISO }) {
+  const wtr = weeksToRace(raceDateISO, weekStartISO);
+  if (wtr != null) {
+    if (wtr <= 0) return TrainingPhase.BASE;   // carrera pasada → vuelta a base/recuperación
+    if (wtr <= 2) return TrainingPhase.TAPER;
+    if (wtr <= 4) return TrainingPhase.PEAK;
+    if (wtr <= 9) return TrainingPhase.BUILD;
+    return TrainingPhase.BASE;
+  }
+  // Sin fecha: ciclo rodante por nº de semana absoluto.
+  const start = weekStartISO ? new Date(weekStartISO) : new Date();
+  const weekNum = Math.floor(startOfDayUTC(start).getTime() / (7 * 24 * 3600 * 1000));
+  const pos = ((weekNum % 4) + 4) % 4;
+  return [TrainingPhase.BASE, TrainingPhase.BUILD, TrainingPhase.PEAK, TrainingPhase.DELOAD][pos];
+}
+
+// ============================================================================
+// NUTRICIÓN: "fuel for the work required" — demanda de carbohidratos por día.
+// ============================================================================
+// Devuelve nivel de carbos del día y guía de timing según el tipo de sesión.
+export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal }) {
+  const goalBase = (raceGoal === 'race_21k' || raceGoal === 'race_42k') ? 0.12 : 0; // base más alta en fondo
+  let level = 'medio';
+  let factor = 1.0; // multiplicador de carbohidratos del día
+  let timing = 'Reparte los carbohidratos a lo largo del día.';
+  let note = '';
+
+  if (sessionType === 'recovery' || !sessionType) {
+    level = 'bajo'; factor = 0.8;
+    timing = 'Día suave: prioriza proteína y verduras; carbohidratos moderados de absorción lenta.';
+    note = 'Menos carga de carbohidratos en días sin entreno intenso.';
+  } else if (sessionFocus === 'cardio_long') {
+    level = 'alto'; factor = 1.35;
+    timing = 'Desayuno rico en carbohidratos 2-3 h antes; durante (>75 min) 30-60 g/h; recarga con carbohidratos + proteína al terminar.';
+    note = 'La tirada larga vacía el glucógeno: recarga sí o sí.';
+  } else if (sessionFocus === 'cardio_intervals' || sessionFocus === 'cardio_tempo') {
+    level = 'alto'; factor = 1.2;
+    timing = 'Carbohidratos de absorción rápida 1-2 h antes de la sesión de calidad y recarga inmediata al acabar.';
+    note = 'Sesión de alta intensidad: llega con glucógeno alto.';
+  } else if (sessionType === 'resistance') {
+    level = 'medio'; factor = 1.0;
+    timing = 'Carbohidratos de absorción LENTA antes y después (avena, arroz integral, boniato) para sostener la fuerza y recuperar.';
+    note = 'Día de fuerza: carbos lentos peri-entreno + proteína suficiente.';
+  } else if (sessionFocus === 'cardio_easy') {
+    level = 'medio'; factor = 0.95;
+    timing = 'Rodaje fácil: carbohidratos moderados; no necesitas recarga agresiva.';
+  }
+
+  factor = Math.round((factor + goalBase) * 100) / 100;
+  return { level, factor, timing, note };
 }
 
 // Resumen de ritmos para el coach / cabecera (texto corto). Devuelve null si no hay marca.

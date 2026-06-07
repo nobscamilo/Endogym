@@ -321,6 +321,7 @@ function TrainSession() {
         return (
           <SectionCard title="Tu sesión de carrera" icon="bolt" sub={rp.zoneLabel}>
             <div className="stack" style={{ gap: 12 }}>
+              {rp.phaseLabel ? <span className="pill tiny" style={{ alignSelf: 'flex-start' }}>Fase: {rp.phaseLabel}</span> : null}
               {rp.targetPace ? (
                 <div className="row ac wrap" style={{ gap: 8 }}>
                   <span className="pill accent"><Icon name="clock" size={13} /> Ritmo objetivo {rp.targetPace}</span>

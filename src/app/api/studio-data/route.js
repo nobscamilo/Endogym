@@ -64,6 +64,7 @@ function mapUser(profile, authUser) {
   if (p.runRaceGoal) out.runRaceGoal = p.runRaceGoal;
   if (num(p.runRefDistanceMeters) !== undefined) out.runRefDistanceMeters = num(p.runRefDistanceMeters);
   if (num(p.runRefTimeSeconds) !== undefined) out.runRefTimeSeconds = num(p.runRefTimeSeconds);
+  if (p.raceDate) out.raceDate = p.raceDate;
   return out;
 }
 

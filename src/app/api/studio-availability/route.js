@@ -55,6 +55,9 @@ export async function POST(request) {
     const refTime = Number(body?.runRefTimeSeconds);
     if (Number.isFinite(refTime) && refTime >= 120 && refTime <= 36000) patch.runRefTimeSeconds = Math.round(refTime);
     else if (body?.runRefTimeSeconds === null) patch.runRefTimeSeconds = null;
+    // Fecha de carrera (YYYY-MM-DD) para la periodización.
+    if (typeof body?.raceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.raceDate)) patch.raceDate = body.raceDate;
+    else if (body?.raceDate === null) patch.raceDate = null;
 
     try {
       await upsertUserProfile(user.uid, patch);

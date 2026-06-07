@@ -115,6 +115,16 @@ Integración: `planner.js` adjunta `runPrescription` y expone `weeklyPlan.raceGo
 **IMPORTANTE:** Perfil → "Correr + Gym" → fijar objetivo (+marca opcional) → **Regenerar plan con IA**.
 Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el ajuste es por semana según objetivo.
 
+### Periodización multi-semana + nutrición periodizada — bundle `49ad1a777f`
+
+- **Periodización (`running.js`):** `resolveTrainingPhase` decide la fase de la semana — **por fecha de carrera** si la hay (`weeksToRace`: ≤2 taper, ≤4 pico, ≤9 build, resto base) o, sin fecha, **ciclo rodante 4 sem** (base/build/pico/descarga). `PHASE_PARAMS` aplica factores de volumen, intensidad y tirada larga. En el planner: la duración de cada día y la tirada larga se escalan por la fase; `buildRunPrescription` recibe la fase y ajusta las series (taper ×0.6, descarga −1, pico +1) y añade `phaseLabel`. `weeklyPlan` expone `phase/phaseLabel/weeksToRace`. **Verificado:** maratón a 12 sem = base (tirada 95', 5×1000); a 2 sem = taper (volumen recortado, tirada 48', 3×1000).
+- **Nutrición "fuel for the work required" (`carbStrategyForDay`):** los carbohidratos del día escalan con la demanda de la sesión y el objetivo: tirada larga ×1.35, series/tempo ×1.2, fuerza ×1.0, rodaje fácil ×0.95, descanso ×0.8; +0.12 base en 21K/42K. `adjustMacroTargetForDay` aplica el factor (carb cycling: sube/baja grasa inversa) y adjunta `carbLevel` + `carbTiming` por día. **Verificado:** tirada/series = carbos alto (563/506 g), fuerza = medio, descanso = bajo; kcal cicladas (3412 día largo, 2658 descanso).
+- **Meal plan del coach IA por día (`studio-nutrition`):** el prompt ahora incluye, por cada día, la sesión, el nivel de carbohidratos, el timing y los macros objetivo de ESE día (tomados del plan de entreno). Regla de timing: carbos lentos peri-fuerza, rápidos peri-carrera/series, recarga tras la tirada larga. kcal por día a ±7% de su objetivo propio.
+- **Encuesta/persistencia:** `screen-more.jsx` añade fecha de carrera; `studio-availability` persiste `raceDate`; `studio-data` lo prefija y la UI de Entreno muestra una pastilla de **Fase**.
+- **Coach:** `coach-chat` inyecta fase, semanas a carrera y carbohidratos/timing de hoy.
+- **IMPORTANTE:** Perfil → "Correr + Gym" → objetivo + (marca) + **fecha de carrera** → Regenerar plan. La nutrición se cachea por semana: pulsar "Generar mi plan con IA" en Nutrición para refrescarla tras cambiar el entreno.
+- Pendiente/futuro: que el meal-plan cacheado se invalide automáticamente al regenerar el entreno (hoy es manual).
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

@@ -130,6 +130,7 @@ function AvailabilitySurvey() {
   const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
   const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
   const [refTime, setRefTime] = useStateP(secsToMMSS(u.runRefTimeSeconds));
+  const [raceDate, setRaceDate] = useStateP(u.raceDate || '');
   const [sex, setSex] = useStateP(u.sex || 'male');
   const [age, setAge] = useStateP(u.age != null ? u.age : 30);
   const [weight, setWeight] = useStateP(u.weightKg != null ? u.weightKg : 75);
@@ -156,6 +157,7 @@ function AvailabilitySurvey() {
           runRaceGoal: raceGoal,
           runRefDistanceMeters: refDist ? Number(refDist) : null,
           runRefTimeSeconds: mmssToSecs(refTime),
+          raceDate: raceDate || null,
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
@@ -192,6 +194,9 @@ function AvailabilitySurvey() {
           <div className="card" style={{ background: 'var(--accent-soft)', borderColor: 'transparent', padding: 14 }}>
             <div className="mb-label">Objetivo de carrera</div>
             <div className="chips">{RUN_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${raceGoal === v ? 'accent' : ''}`} onClick={() => setRaceGoal(v)}>{l}</button>)}</div>
+            <div className="field" style={{ marginTop: 12 }}><label>Fecha de carrera (opcional → periodización)</label>
+              <input className="text-input" type="date" value={raceDate} onChange={(e) => setRaceDate(e.target.value)} />
+            </div>
             <div className="mb-label" style={{ marginTop: 12 }}>Marca reciente (opcional → ritmos numéricos)</div>
             <div className="row ac" style={{ gap: 10 }}>
               <div className="field" style={{ flex: 1 }}><label>Distancia</label>

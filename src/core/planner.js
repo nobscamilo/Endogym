@@ -21,6 +21,10 @@ import {
   deriveRunPaces,
   buildRunPrescription,
   pacesSummary,
+  resolveTrainingPhase,
+  resolvePhaseParams,
+  weeksToRace,
+  carbStrategyForDay,
 } from './running.js';
 
 const ACTIVITY_FACTORS = {
@@ -455,22 +459,17 @@ function getSessionRpeRange(goal, sessionType) {
   return sessionType === 'resistance' ? 'RPE 6-8' : 'RPE 4-6';
 }
 
-function adjustMacroTargetForDay(baseTarget, day, goal) {
-  let carbsFactor = 1;
+function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
+  const { sessionFocus = null, raceGoal = 'health' } = opts;
+  // "Fuel for the work required": los carbohidratos del día escalan con la demanda de la
+  // sesión (tirada larga/series/pierna altos; descanso bajo) y con el objetivo de carrera.
+  const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal });
+  let carbsFactor = strat.factor;
   let fatFactor = 1;
-
-  if (day.sessionType === 'resistance' || day.sessionType === 'mixed') {
-    carbsFactor += 0.1;
-    fatFactor -= 0.06;
-  }
-  if (day.sessionType === 'aerobic') {
-    carbsFactor += goal === GoalType.ENDURANCE ? 0.16 : 0.08;
-    fatFactor -= 0.04;
-  }
-  if (day.sessionType === 'recovery') {
-    carbsFactor -= 0.1;
-    fatFactor += 0.08;
-  }
+  // Compensa la grasa en sentido inverso para no disparar kcal en días de mucha demanda
+  // y mantener saciedad en días bajos (carb cycling).
+  if (carbsFactor > 1.05) fatFactor -= 0.08;
+  else if (carbsFactor < 0.95) fatFactor += 0.08;
   if (goal === GoalType.GLYCEMIC_CONTROL) {
     carbsFactor -= 0.14;
     fatFactor += 0.10;
@@ -486,6 +485,8 @@ function adjustMacroTargetForDay(baseTarget, day, goal) {
     proteinGrams,
     carbsGrams,
     fatGrams,
+    carbLevel: strat.level,      // 'alto' | 'medio' | 'bajo'
+    carbTiming: strat.timing,    // guía de timing para el plan de comidas / coach
   };
 }
 
@@ -783,6 +784,12 @@ export function generateWeeklyPlan({
   const p5 = estimate5kPaceSecPerKm(profile.runRefDistanceMeters, profile.runRefTimeSeconds);
   const runPaces = deriveRunPaces(p5);
 
+  // Periodización: fase de la semana (por fecha de carrera si la hay, si no ciclo rodante).
+  const weekStartISO = start.toISOString();
+  const trainingPhase = resolveTrainingPhase({ raceDateISO: profile.raceDate, weekStartISO });
+  const phaseParams = resolvePhaseParams(trainingPhase);
+  const wtr = weeksToRace(profile.raceDate, weekStartISO);
+
   const days = template.map((templateDay, index) => {
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + index);
@@ -792,7 +799,7 @@ export function generateWeeklyPlan({
       sessionTitle: templateDay.title,
     });
 
-    const nutritionTarget = adjustMacroTargetForDay(baseTarget, templateDay, goal);
+    const nutritionTarget = adjustMacroTargetForDay(baseTarget, templateDay, goal, { sessionFocus, raceGoal });
 
     const sessionExercises = buildSessionExercises({
       modality,
@@ -806,14 +813,13 @@ export function generateWeeklyPlan({
       sessionMinutes: templateDay.durationMinutes,
     });
 
-    // Duración planificada. La tirada larga la fija el objetivo de carrera (no la volumeFactor).
-    let durationMinutes = clamp(
-      Math.round(templateDay.durationMinutes * (templateDay.sessionType === 'recovery' ? 1 : workoutVolumeFactor)),
-      20,
-      150
-    );
+    // Duración planificada. Aplica volumen base × factor de FASE (periodización).
+    const effVolume = (templateDay.sessionType === 'recovery' ? 1 : workoutVolumeFactor) * phaseParams.volumeFactor;
+    let durationMinutes = clamp(Math.round(templateDay.durationMinutes * effVolume), 20, 150);
     if (templateDay.sessionType === 'aerobic' && sessionFocus === 'cardio_long') {
-      durationMinutes = clamp(RACE_GOAL_META[raceGoal].longRunMin, 30, RACE_GOAL_META[raceGoal].longRunCapMin);
+      // La tirada larga la fija el objetivo de carrera × factor de fase (taper la acorta).
+      const longBase = RACE_GOAL_META[raceGoal].longRunMin * phaseParams.longRunFactor;
+      durationMinutes = clamp(Math.round(longBase), 25, RACE_GOAL_META[raceGoal].longRunCapMin);
     }
 
     const workout = {
@@ -832,7 +838,7 @@ export function generateWeeklyPlan({
 
     // Prescripción de carrera (ritmo objetivo, estructura, drills) en días aeróbicos.
     if (templateDay.sessionType === 'aerobic') {
-      workout.runPrescription = buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces: runPaces });
+      workout.runPrescription = buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
     }
 
     return {
@@ -879,15 +885,16 @@ export function generateWeeklyPlan({
     if (Number.isFinite(prefMin) && prefMin >= 20 && prefMin <= 150) {
       days.forEach((d) => {
         if (!d.isTrainingDay || !d.workout) return;
-        // La tirada larga NO se aplana al tiempo diario: la marca el objetivo de carrera.
+        // La tirada larga NO se aplana al tiempo diario: la marca el objetivo × fase.
         if (d.sessionFocus === 'cardio_long') {
-          d.workout.durationMinutes = clamp(Math.max(prefMin, RACE_GOAL_META[raceGoal].longRunMin), 30, RACE_GOAL_META[raceGoal].longRunCapMin);
+          const longBase = Math.max(prefMin, RACE_GOAL_META[raceGoal].longRunMin * phaseParams.longRunFactor);
+          d.workout.durationMinutes = clamp(Math.round(longBase), 25, RACE_GOAL_META[raceGoal].longRunCapMin);
         } else {
           d.workout.durationMinutes = clamp(prefMin, 20, 150);
         }
         // Recalcula la prescripción de carrera si cambió la duración.
         if (d.sessionType === 'aerobic') {
-          d.workout.runPrescription = buildRunPrescription({ sessionFocus: d.sessionFocus, durationMinutes: d.workout.durationMinutes, raceGoal, paces: runPaces });
+          d.workout.runPrescription = buildRunPrescription({ sessionFocus: d.sessionFocus, durationMinutes: d.workout.durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
         }
       });
     }
@@ -910,6 +917,9 @@ export function generateWeeklyPlan({
     trainingModality: modality,
     raceGoal,
     runPaces: pacesSummary(runPaces),
+    phase: trainingPhase,
+    phaseLabel: phaseParams.label,
+    weeksToRace: wtr,
     metabolicProfile,
     mealsPerDay,
     baseTarget,
