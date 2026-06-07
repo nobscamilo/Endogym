@@ -17,6 +17,29 @@ import { getFirebaseClient, isFirebaseClientConfigured } from '../lib/firebaseCl
 
 const CONSENT_VERSION = '2026-04-02';
 
+// Traduce los códigos de error de Firebase Auth a mensajes claros en español.
+function friendlyAuthError(error) {
+  const code = (error && (error.code || '')) || '';
+  const map = {
+    'auth/invalid-credential': 'Email o contraseña incorrectos, o la cuenta no existe.',
+    'auth/wrong-password': 'Email o contraseña incorrectos.',
+    'auth/user-not-found': 'No existe ninguna cuenta con ese email. Cambia a Registro para crearla.',
+    'auth/email-already-in-use': 'Ya existe una cuenta con ese email. Inicia sesión.',
+    'auth/invalid-email': 'El email no tiene un formato válido.',
+    'auth/weak-password': 'La contraseña debe tener al menos 8 caracteres.',
+    'auth/missing-password': 'Escribe tu contraseña.',
+    'auth/popup-closed-by-user': 'Cerraste la ventana de Google antes de terminar.',
+    'auth/cancelled-popup-request': 'Se canceló el acceso con Google. Inténtalo de nuevo.',
+    'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permite las ventanas emergentes.',
+    'auth/account-exists-with-different-credential': 'Ya existe una cuenta con ese email usando otro método de acceso (prueba con email y contraseña).',
+    'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase Authentication.',
+    'auth/operation-not-allowed': 'Ese método de acceso no está habilitado en Firebase.',
+    'auth/network-request-failed': 'Problema de red. Revisa tu conexión e inténtalo otra vez.',
+    'auth/too-many-requests': 'Demasiados intentos. Espera un momento e inténtalo de nuevo.',
+  };
+  return map[code] || (error && error.message) || 'No se pudo completar la operación.';
+}
+
 export default function HomePage() {
   const firebaseClient = useMemo(() => getFirebaseClient(), []);
   const [authReady, setAuthReady] = useState(false);
@@ -24,7 +47,6 @@ export default function HomePage() {
   const [signedOutRequested, setSignedOutRequested] = useState(false);
 
   const [mode, setMode] = useState('login'); // 'login' or 'register'
-  const [registerStep, setRegisterStep] = useState(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -70,11 +92,6 @@ export default function HomePage() {
     });
   }, [signedOutRequested, authReady, firebaseClient]);
 
-  useEffect(() => {
-    if (mode === 'login') {
-      setRegisterStep(1);
-    }
-  }, [mode]);
 
   async function upsertInitialProfile(user) {
     const token = await user.getIdToken();
@@ -122,12 +139,6 @@ export default function HomePage() {
 
     try {
       if (mode === 'register') {
-        if (registerStep < 2) {
-          setRegisterStep(2);
-          setStatus('Revisa y acepta los consentimientos para finalizar el registro.');
-          setLoading(false);
-          return;
-        }
         if (password !== confirmPassword) {
           throw new Error('Las contraseñas no coinciden.');
         }
@@ -144,7 +155,7 @@ export default function HomePage() {
       setStatus('Autenticación correcta. Abriendo tu Studio...');
       // Sin redirección: al detectar sesión, esta misma página renderiza el Studio en "/".
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
+      setStatus(`Error: ${friendlyAuthError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -183,7 +194,7 @@ export default function HomePage() {
       setStatus('Autenticación con Google correcta. Abriendo tu Studio...');
       // Sin redirección: al detectar sesión, esta misma página renderiza el Studio en "/".
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
+      setStatus(`Error: ${friendlyAuthError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -206,7 +217,7 @@ export default function HomePage() {
       await sendPasswordResetEmail(firebaseClient.auth, email);
       setStatus('Te hemos enviado un enlace de recuperación si la cuenta existe.');
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
+      setStatus(`Error: ${friendlyAuthError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -309,55 +320,43 @@ export default function HomePage() {
                 ) : null}
 
                 <form className="landing-form" onSubmit={submitAuth}>
-                  {mode === 'register' && (
-                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 'bold' }}>
-                      <span style={{ color: registerStep === 1 ? '#a9c7ff' : 'rgba(255, 255, 255, 0.4)' }}>1. Datos de Cuenta</span>
-                      <span>·</span>
-                      <span style={{ color: registerStep === 2 ? '#a9c7ff' : 'rgba(255, 255, 255, 0.4)' }}>2. Consentimientos</span>
+                  {/* Email + contraseña (ambos modos) */}
+                  <div className="landing-field-group">
+                    <label className="landing-label" htmlFor="email">Email</label>
+                    <input
+                      id="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="landing-input"
+                      placeholder="tu@email.com"
+                    />
+                  </div>
+
+                  <div className="landing-field-group">
+                    <div className="landing-label-row">
+                      <label className="landing-label" htmlFor="password">Contraseña</label>
+                      {mode === 'login' && (
+                        <button type="button" className="landing-link-forgot" onClick={submitPasswordReset} disabled={loading}>
+                          ¿Olvidaste tu contraseña?
+                        </button>
+                      )}
                     </div>
-                  )}
+                    <input
+                      id="password"
+                      type="password"
+                      required
+                      minLength={8}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="landing-input"
+                      placeholder="••••••••"
+                    />
+                  </div>
 
-                  {/* Step 1: Login or Register Account Info */}
-                  {(mode === 'login' || registerStep === 1) && (
-                    <>
-                      <div className="landing-field-group">
-                        <label className="landing-label" htmlFor="email">Email</label>
-                        <input
-                          id="email"
-                          type="email"
-                          required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="landing-input"
-                          placeholder="tu@email.com"
-                        />
-                      </div>
-
-                      <div className="landing-field-group">
-                        <div className="landing-label-row">
-                          <label className="landing-label" htmlFor="password">Contraseña</label>
-                          {mode === 'login' && (
-                            <button type="button" className="landing-link-forgot" onClick={submitPasswordReset} disabled={loading}>
-                              ¿Olvidaste tu contraseña?
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          id="password"
-                          type="password"
-                          required
-                          minLength={8}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="landing-input"
-                          placeholder="••••••••"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {/* Step 2: Register Step 1 confirm password */}
-                  {mode === 'register' && registerStep === 1 && (
+                  {/* Registro: confirmar contraseña + consentimientos en una sola pantalla */}
+                  {mode === 'register' && (
                     <>
                       <div className="landing-field-group">
                         <label className="landing-label" htmlFor="confirmPassword">Confirmar contraseña</label>
@@ -372,77 +371,55 @@ export default function HomePage() {
                           placeholder="••••••••"
                         />
                       </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'rgba(255, 255, 255, 0.04)', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)' }}>Para crear tu cuenta (con email o con Google) acepta:</p>
+                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                          <input
+                            type="checkbox"
+                            checked={consentTerms}
+                            onChange={(e) => setConsentTerms(e.target.checked)}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <span>Acepto los <Link href="/legal/terms" target="_blank" style={{ color: '#a9c7ff', fontWeight: 'bold' }}>Términos y condiciones</Link>.</span>
+                        </label>
+                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                          <input
+                            type="checkbox"
+                            checked={consentPrivacy}
+                            onChange={(e) => setConsentPrivacy(e.target.checked)}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <span>Acepto la <Link href="/legal/privacy" target="_blank" style={{ color: '#a9c7ff', fontWeight: 'bold' }}>Política de privacidad</Link>.</span>
+                        </label>
+                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                          <input
+                            type="checkbox"
+                            checked={consentData}
+                            onChange={(e) => setConsentData(e.target.checked)}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <span>Consiento el tratamiento de datos de salud y actividad física para generar mi plan personalizado.</span>
+                        </label>
+                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                          <input
+                            type="checkbox"
+                            checked={consentMarketing}
+                            onChange={(e) => setConsentMarketing(e.target.checked)}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <span>Acepto comunicaciones informativas (opcional).</span>
+                        </label>
+                      </div>
+
                       <button
-                        type="button"
+                        type="submit"
                         className="landing-btn-submit"
-                        disabled={loading || !authConfigured || !email || !password || !confirmPassword}
-                        onClick={() => setRegisterStep(2)}
+                        disabled={loading || !authConfigured}
                       >
-                        Siguiente: consentimientos
+                        {loading ? 'Creando...' : 'Crear cuenta'}
                       </button>
                     </>
-                  )}
-
-                  {/* Step 3: Register Step 2 GDPR Consent checklist */}
-                  {mode === 'register' && registerStep === 2 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'rgba(255, 255, 255, 0.04)', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
-                        <input
-                          type="checkbox"
-                          checked={consentTerms}
-                          onChange={(e) => setConsentTerms(e.target.checked)}
-                          style={{ marginTop: '2px' }}
-                        />
-                        <span>Acepto los <Link href="/legal/terms" target="_blank" style={{ color: '#a9c7ff', fontWeight: 'bold' }}>Términos y condiciones</Link>.</span>
-                      </label>
-                      <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
-                        <input
-                          type="checkbox"
-                          checked={consentPrivacy}
-                          onChange={(e) => setConsentPrivacy(e.target.checked)}
-                          style={{ marginTop: '2px' }}
-                        />
-                        <span>Acepto la <Link href="/legal/privacy" target="_blank" style={{ color: '#a9c7ff', fontWeight: 'bold' }}>Política de privacidad</Link>.</span>
-                      </label>
-                      <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
-                        <input
-                          type="checkbox"
-                          checked={consentData}
-                          onChange={(e) => setConsentData(e.target.checked)}
-                          style={{ marginTop: '2px' }}
-                        />
-                        <span>Consiento el tratamiento de datos de salud y actividad física para generar mi plan personalizado.</span>
-                      </label>
-                      <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
-                        <input
-                          type="checkbox"
-                          checked={consentMarketing}
-                          onChange={(e) => setConsentMarketing(e.target.checked)}
-                          style={{ marginTop: '2px' }}
-                        />
-                        <span>Acepto comunicaciones informativas (opcional).</span>
-                      </label>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button
-                          type="button"
-                          className="landing-btn-google"
-                          style={{ flex: 1, padding: '0.6rem' }}
-                          onClick={() => setRegisterStep(1)}
-                          disabled={loading}
-                        >
-                          Volver
-                        </button>
-                        <button
-                          type="submit"
-                          className="landing-btn-submit"
-                          style={{ flex: 2, margin: 0, padding: '0.6rem' }}
-                          disabled={loading || !authConfigured}
-                        >
-                          {loading ? 'Creando...' : 'Crear cuenta'}
-                        </button>
-                      </div>
-                    </div>
                   )}
 
                   {/* Submission actions */}

@@ -34,8 +34,16 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
   - Frontend (`screen-nutrition.jsx`): al abrir Nutrición intenta `loadCached()` (GET) y solo si no hay plan lanza `generate()` (POST). El botón "Generar mi plan con IA" regenera y sobrescribe. Helper `applyNutrition()` extraído. Resultado: estable durante la semana, sin esperas ni coste repetido.
 - **Calidad del prompt (#2).** kcal/día forzadas a **±5% del objetivo** (con recordatorio p·4+c·4+f·9 ≈ kcal); prohibido repetir proteína principal en días consecutivos; y **pistas de estilo de desayuno por bloque** (`CHUNK_STYLE_HINTS`: salado / avena / lácteos-fruta / pan-repostería) para diversificar entre los 7 días (los bloques van en paralelo y no se ven entre sí, por eso el reparto se fija en el código).
 
-### Pendiente de esta sesión
-- Tras `git push`: verificar en Chrome que (a) al revisitar Nutrición NO regenera (carga el cacheado, sin espera) y (b) las kcal/día quedan más cerca del objetivo y los desayunos varían.
+### Verificado en producción (Chrome, bundle `4b6165d4fe`) — OK
+- **Persistencia:** `GET` vacío al inicio → `POST` genera 7/7 días (14.7s, `partial:false`) y guarda → `GET` devuelve `cached:true` en **570 ms** (sin regenerar). Plan estable. ✅
+- **Variedad de desayunos:** ahora diversos (revuelto de claras, tostadas aguacate-huevo, porridge de avena, tortitas de avena, batido tropical, bowl de fruta con yogur…). ✅
+- **kcal/día:** OJO — el objetivo real del usuario es **~2713 kcal** (no ~2000 como anoté antes; mi observación previa de "overshoot" era ERRÓNEA). Resultado: 5/7 días ~2700 (±0,5% del objetivo, perfecto); los días Vie-Sáb (bloque lácteos-fruta) quedaron en 2150 (~-20%). Variación menor por bloque; mejorable pero no bloqueante.
+
+### Fix login (registro con Google) — `src/app/page.js`
+
+- **Bug reportado por el usuario:** al registrarse con otra cuenta vía "Registrarme con Google" no pasaba nada y pedía "aceptar términos", pero **las casillas de consentimiento no estaban visibles** (estaban en el "paso 2" del asistente, al que solo se llegaba por el flujo email/contraseña). Resultado: imposible registrarse con Google. También salían **códigos `auth/...` crudos**.
+- **Solución:** el registro pasa a **una sola pantalla** (email + contraseña + confirmar + consentimientos + botones "Crear cuenta" y "Registrarme con Google" juntos). Se eliminó el asistente de 2 pasos (`registerStep` y su efecto/ indicador). Ahora los consentimientos están visibles antes de pulsar Google. Añadido `friendlyAuthError()` que traduce los códigos de Firebase Auth a mensajes claros en español (usado en los 3 `catch`: email, Google, reset). Recordatorio: el acceso con Google en modo *Iniciar sesión* con una cuenta sin registro previo sigue avisando "No existe cuenta previa con Google. Cambia a Registro…" (comportamiento intencionado).
+- Solo cambió `src/app/page.js` (componente Next; **no requiere recompilar el bundle**).
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
