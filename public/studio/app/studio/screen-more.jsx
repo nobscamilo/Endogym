@@ -240,8 +240,19 @@ function StravaCard() {
   const s = D.strava || { connected: false, recent: [] };
   const [status, setStatus] = useStateP('idle'); // idle|connecting|syncing|ok|err
   const [info, setInfo] = useStateP(null);
+  const [hook, setHook] = useStateP('idle'); // idle|setting|ok|err
 
   async function token() { return window.__getIdToken ? window.__getIdToken() : Promise.resolve(null); }
+
+  async function setupHook() {
+    setHook('setting');
+    try {
+      const t = await token(); if (!t) { setHook('err'); return; }
+      const r = await fetch('/api/strava/webhook-setup', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + t } });
+      const j = await r.json().catch(() => ({}));
+      setHook(j && (j.ok || (j.detail && JSON.stringify(j.detail).includes('already'))) ? 'ok' : 'err');
+    } catch (e) { setHook('err'); }
+  }
 
   async function sync() {
     setStatus('syncing');
@@ -292,6 +303,11 @@ function StravaCard() {
             {s.lastSyncAt ? <span className="tiny muted">Último: {String(s.lastSyncAt).slice(0, 10)}</span> : null}
             {status === 'ok' && info ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Importadas {info.imported} ({info.withHeartRate} con FC) ✨</span> : null}
             {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo sincronizar.</span> : null}
+          </div>
+          <div className="row ac wrap" style={{ gap: 10 }}>
+            <button className="btn ghost sm" onClick={setupHook} disabled={hook === 'setting'}><Icon name="bolt" size={14} /> {hook === 'setting' ? 'Activando…' : 'Activar sync automático'}</button>
+            {hook === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Sync automático activado ✓</span> : null}
+            {hook === 'err' ? <span className="tiny muted">No se pudo activar (puede que ya esté activo).</span> : null}
           </div>
           {Array.isArray(s.recent) && s.recent.length ? (
             <div className="stack" style={{ gap: 6 }}>

@@ -138,7 +138,14 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
   2. Copiar **Client ID** y **Client Secret**.
   3. En Vercel → Settings → Environment Variables: `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` (y opcional `STRAVA_STATE_SECRET` = cadena aleatoria). Redeploy.
   4. En la app: Perfil → "Conectar Strava".
-- **No verificable sin credenciales:** el flujo OAuth real no se puede probar hasta que existan las env vars; el código está revisado y compila. Pendiente/futuro: webhook de Strava para sync automático; usar la FC importada en el ajuste adaptativo de carga; FC reposo/HRV vía app nativa.
+- **Aislamiento por usuario (privacidad) — CONFIRMADO:** cada usuario conecta SU propio Strava; los tokens y actividades se guardan bajo `users/{uid}/...` y todos los reads van con `user.uid`. Ningún usuario ve datos de otro. El access/refresh token personal del dueño NO se usa en el código (solo Client ID/Secret a nivel de app, que es lo normal en OAuth).
+
+### Webhook de Strava (sync automático) — bundle `8594c0f534`
+- `GET/POST /api/strava/webhook`: GET valida la suscripción (`hub.challenge` con `STRAVA_VERIFY_TOKEN` o fallback a `STRAVA_STATE_SECRET`); POST recibe eventos y, en create/update de actividad, busca al dueño por `athleteId` (`getUserByStravaAthlete`, collectionGroup `integrations`), refresca token e importa esa actividad a SU uid. Responde 200 siempre.
+- `POST /api/strava/webhook-setup` (con sesión): registra la suscripción push apuntando a `/api/strava/webhook` (solo se permite 1 por app). Botón "Activar sync automático" en la tarjeta de Strava (Perfil).
+- **Puede requerir** un índice de Firestore para la consulta collectionGroup `integrations` por `athleteId` (si falla, Firestore da un enlace para crearlo en los logs).
+- **No verificable sin credenciales/deploy:** el OAuth y el webhook reales se prueban tras poner env vars + push. Código revisado y compila.
+- Pendiente/futuro: usar la FC importada en el ajuste adaptativo de carga; FC reposo/HRV vía app nativa.
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.

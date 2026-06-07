@@ -231,6 +231,20 @@ export async function getStravaConnection(userId) {
   return snap.exists ? snap.data() : null;
 }
 
+// Busca al usuario dueño de una cuenta de Strava (para el webhook). Aísla por atleta: solo
+// devuelve el uid cuyo token corresponde a ese athleteId.
+export async function getUserByStravaAthlete(athleteId) {
+  const { db } = await getAdminServices();
+  const snap = await db.collectionGroup('integrations')
+    .where('athleteId', '==', Number(athleteId))
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  const uid = doc.ref.parent.parent ? doc.ref.parent.parent.id : null;
+  return uid ? { uid, connection: doc.data() } : null;
+}
+
 export async function createMetricLog(userId, payload) {
   const { db } = await getAdminServices();
   const ref = db.collection('users').doc(userId).collection('metrics').doc();
