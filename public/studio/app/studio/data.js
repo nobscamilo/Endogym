@@ -1,10 +1,12 @@
 /* ENDOGYM STUDIO — datos demo */
 (function () {
+  // Identidad NEUTRA de muestra: si por algún motivo no cargan los datos reales, nunca debe
+  // verse el nombre de otra persona. El backend (/api/studio-data) siempre sobreescribe esto.
   const user = {
-    name: 'Marta', last: 'García', initials: 'M',
-    goal: 'Recomposición + control glucémico', goalShort: 'Recomposición',
-    modality: 'Gimnasio', streak: 12, plan: 'Plan adaptativo · Semana 6',
-    readiness: 82, sleep: 7.2, restHr: 54,
+    name: 'Atleta', last: '', initials: 'A',
+    goal: 'Salud y composición corporal', goalShort: 'Salud',
+    modality: 'Gimnasio', streak: 0, plan: 'Plan personalizado',
+    readiness: 0, sleep: 0, restHr: 0,
   };
 
   /* ---- Hoy: sesión de empuje (con vídeo por ejercicio) ---- */

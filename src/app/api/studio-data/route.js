@@ -33,27 +33,33 @@ function initialsFrom(name, last) {
 const GOAL_LABELS = { weight_loss: 'Pérdida de peso', recomposition: 'Recomposición', hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia', glycemic_control: 'Control glucémico' };
 const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Mixto' };
 
-function mapUser(profile) {
-  if (!profile) return null;
-  const name = profile.firstName || profile.name || profile.displayName || '';
-  const last = profile.lastName || profile.surname || '';
-  const goal = profile.goal || '';
-  const modality = profile.trainingModality || profile.trainingMode || '';
+function mapUser(profile, authUser) {
+  // IMPORTANTE: nunca devolvemos null ni dejamos el nombre sin asignar; si lo hiciéramos, el
+  // bundle conservaría el usuario de MUESTRA ("Marta García"). Derivamos un nombre real del
+  // perfil, del displayName de Google o del email; en último caso, un genérico neutro.
+  const p = profile || {};
+  const au = authUser || {};
+  const emailLocal = String(au.email || '').split('@')[0] || '';
+  const prettyEmail = emailLocal ? emailLocal.charAt(0).toUpperCase() + emailLocal.slice(1) : '';
+  const name = p.firstName || p.name || p.displayName || au.name || prettyEmail || 'Atleta';
+  const last = p.lastName || p.surname || '';
+  const goal = p.goal || '';
+  const modality = p.trainingModality || p.trainingMode || '';
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : undefined);
   const out = {};
-  if (name) out.name = name;
+  out.name = name;                       // SIEMPRE (evita heredar el nombre de muestra)
   out.last = last;                       // siempre (evita heredar el apellido de muestra)
   out.initials = initialsFrom(name, last);
   if (goal) { out.goalRaw = goal; out.goal = goal; out.goalShort = GOAL_LABELS[goal] || goal; }
   if (modality) { out.modalityRaw = modality; out.modality = MODALITY_LABELS[modality] || modality; }
   // Para prefijar el formulario de Perfil:
-  if (num(profile.age) !== undefined) out.age = num(profile.age);
-  if (num(profile.weightKg) !== undefined) out.weightKg = num(profile.weightKg);
-  if (num(profile.heightCm) !== undefined) out.heightCm = num(profile.heightCm);
-  if (profile.sex) out.sex = profile.sex;
-  if (num(profile.mealsPerDay) !== undefined) out.mealsPerDay = num(profile.mealsPerDay);
-  if (num(profile.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(profile.preferredDurationMinutes);
-  if (num(profile.daysPerWeek) !== undefined) out.daysPerWeek = num(profile.daysPerWeek);
+  if (num(p.age) !== undefined) out.age = num(p.age);
+  if (num(p.weightKg) !== undefined) out.weightKg = num(p.weightKg);
+  if (num(p.heightCm) !== undefined) out.heightCm = num(p.heightCm);
+  if (p.sex) out.sex = p.sex;
+  if (num(p.mealsPerDay) !== undefined) out.mealsPerDay = num(p.mealsPerDay);
+  if (num(p.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(p.preferredDurationMinutes);
+  if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
   return out;
 }
 
@@ -384,7 +390,7 @@ export async function GET(request) {
       const overrides = {};
       const setIf = (key, val) => { if (val != null) overrides[key] = val; };
 
-      setIf('user', mapUser(profile));
+      setIf('user', mapUser(profile, user));
       setIf('todaySession', mapTodaySession(latestPlan, today));
       setIf('week', mapWeek(latestPlan, today));
       setIf('library', mapLibrary(latestPlan));

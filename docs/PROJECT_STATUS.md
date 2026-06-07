@@ -45,6 +45,18 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **Solución:** el registro pasa a **una sola pantalla** (email + contraseña + confirmar + consentimientos + botones "Crear cuenta" y "Registrarme con Google" juntos). Se eliminó el asistente de 2 pasos (`registerStep` y su efecto/ indicador). Ahora los consentimientos están visibles antes de pulsar Google. Añadido `friendlyAuthError()` que traduce los códigos de Firebase Auth a mensajes claros en español (usado en los 3 `catch`: email, Google, reset). Recordatorio: el acceso con Google en modo *Iniciar sesión* con una cuenta sin registro previo sigue avisando "No existe cuenta previa con Google. Cambia a Registro…" (comportamiento intencionado).
 - Solo cambió `src/app/page.js` (componente Next; **no requiere recompilar el bundle**).
 
+### Fix "aparece la sesión de Marta" (identidad de muestra) — bundle `0e3d33341f`
+
+- **Bug reportado:** al entrar con cualquier correo a veces se veía el usuario de muestra **"Marta García"**.
+- **Causas (servidor + cliente):**
+  1. `mapUser(profile)` en `studio-data/route.js` devolvía **`null` si el perfil no existía** (cuenta nueva) → no se mandaba override → el bundle conservaba el usuario de muestra.
+  2. `out.name` solo se asignaba si el perfil tenía nombre → cuentas sin nombre heredaban "Marta".
+  3. Si `/api/studio-data` tardaba/fallaba (auth del iframe aún no lista, abort a 2,5s), caía a muestra.
+- **Solución:**
+  - `mapUser(profile, authUser)` **nunca** devuelve null y **siempre** asigna `name`, derivándolo de: perfil → displayName de Google → parte local del email → genérico "Atleta". Se le pasa el `user` autenticado.
+  - Identidad de muestra en `data.js` **neutralizada** ("Atleta", sin apellido) como red de seguridad: aunque algo falle, nunca se ve el nombre de otra persona.
+  - Arranque del iframe (`build-studio.mjs`) más robusto: espera de auth 1,5s→**4s**, timeout de `studio-data` 2,5s→**8s**, espera-y-reintento de token y **un reintento** del fetch.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

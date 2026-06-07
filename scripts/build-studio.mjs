@@ -70,7 +70,7 @@ const __firebaseReady = fetch('/api/public-config')
     return new Promise((res) => {
       let done = false;
       const unsub = onAuthStateChanged(__auth, () => { if (!done) { done = true; res(); if (unsub) unsub(); } });
-      setTimeout(() => { if (!done) { done = true; res(); } }, 1500);
+      setTimeout(() => { if (!done) { done = true; res(); } }, 4000);
     });
   })
   .catch(() => {});
@@ -110,22 +110,39 @@ function __applyOverrides(base, ov) {
   if (ov.todaySessionTitle && base.todaySession) base.todaySession.title = ov.todaySessionTitle;
 }
 
+async function __fetchStudioData(token) {
+  const headers = {};
+  if (token) headers['authorization'] = 'Bearer ' + token;
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch('/api/studio-data', { headers, signal: ctrl.signal });
+    clearTimeout(to);
+    return r;
+  } catch (e) { clearTimeout(to); return null; }
+}
+
 async function __mergeRealData() {
   try {
     await __firebaseReady;
     let token = null;
     try { token = await __getIdToken(); } catch (e) { token = null; }
-    const headers = {};
-    if (token) headers['authorization'] = 'Bearer ' + token;
-    const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), 2500);
-    const r = await fetch('/api/studio-data', { headers, signal: ctrl.signal });
-    clearTimeout(to);
-    if (r.ok) {
+    // La sesión puede estar restaurándose: si aún no hay token, espera un poco y reintenta.
+    if (!token) {
+      await new Promise((r) => setTimeout(r, 1200));
+      try { token = await __getIdToken(); } catch (e) { token = null; }
+    }
+    let r = await __fetchStudioData(token);
+    if (!r || !r.ok) {
+      await new Promise((res) => setTimeout(res, 800));
+      try { token = await __getIdToken(); } catch (e) { /* mantiene token previo */ }
+      r = await __fetchStudioData(token);
+    }
+    if (r && r.ok) {
       const j = await r.json();
       if (j && j.ok && j.overrides && window.STUDIO) __applyOverrides(window.STUDIO, j.overrides);
     }
-  } catch (e) { /* datos de muestra */ }
+  } catch (e) { /* datos de muestra (identidad neutra) */ }
 }
 `;
 
