@@ -63,6 +63,17 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
 - **Solución (CSP en `next.config.mjs`, global y studio):** añadidos a `script-src` `https://apis.google.com`; a `frame-src` `https://apis.google.com https://accounts.google.com`; a `connect-src` `https://apis.google.com https://accounts.google.com`; y a `img-src` `https://*.googleusercontent.com` (foto de perfil de Google). El test `security-headers.test.js` sigue verde (solo comprueba ausencia de `unsafe-eval` y `frame-ancestors`, no la CSP exacta).
 - **Además:** el primer acceso con Google **crea la cuenta automáticamente** (en `submitGoogleAuth`, `src/app/page.js`): se quitó el throw "No existe cuenta previa con Google" y se llama a `upsertInitialProfile` cuando `isNewUser`, registrando los consentimientos legales (versión vigente). Nota de cumplimiento: el consentimiento queda implícito en el alta por Google.
 
+### Fix "mismos ejercicios para todos / muy pocos" (selección heurística, NO el RAG)
+
+- **Diagnóstico:** la selección de ejercicios (`buildSessionExercises` en `exerciseLibrary.js`) dependía solo de modalidad + foco + `daySeed`, y en `planner.js` `daySeed = index` (índice del día, **idéntico para todos**). El objetivo solo cambiaba reps/series, no los ejercicios. Resultado: misma modalidad → mismos ejercicios para cualquier persona. Y el conteo caía a 4–5 si no se completaba la encuesta del Studio.
+- **El RAG NO era la causa.** Verificado en sandbox (`--env-file=.env.local`): el retriever funciona en **modo semántico (vector)**, ~20k chars de contexto + 3 citas por objetivo, y trae fuentes correctas y distintas por objetivo (hipertrofia→*Nutrition and Athletic*, *25. Sports Nutrition*; glucémico→*The Athlete With Diabetes*, *Chronic medical conditions*). El RAG alimenta al **coach IA**, no a la selección heurística.
+- **Solución (server-side):**
+  1. **Semilla por usuario+objetivo** (`computeUserSeed(profile, goal, userId)` en `planner.js`): `daySeed = index + userSeed`. La API `weekly-plan` pasa `userId: user.uid`. Dos personas (o la misma con otro objetivo) reciben ahora una selección distinta del mismo catálogo, sin romper la seguridad clínica (sigue eligiendo de las categorías correctas). Aplicado también en `normalizeWeeklyPlanSessionFocus` y `suggestSessionAlternatives`.
+  2. **Conteo escala con la duración real de la sesión** (`buildSessionExercises` usa `sessionMinutes` de la plantilla cuando no hay encuesta): `Math.max(4, Math.min(9, Math.round((min-10)/8)))` → 52min≈5, 66≈7, 72–75≈8. Los tests de conteo por intensidad (ex1–ex5) no pasan `sessionMinutes` (→ `Number(null)=0`, cae a la rama por intensidad), así que siguen verdes.
+- **Verificado** con script determinista: usuario A vs B (mismo objetivo) → ejercicios distintos; A hipertrofia vs A resistencia → distintos; conteo 8 (antes 4–5).
+- **IMPORTANTE para el usuario:** los ejercicios mostrados salen del plan **guardado**; hay que pulsar **"Regenerar plan con IA"** una vez tras el deploy para que cada persona obtenga su nueva selección.
+- Pendiente/futuro (no bloqueante): programación específica por objetivo más profunda (p. ej. fuerza→prioriza básicos pesados, resistencia→más densidad), no solo variación de semilla.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

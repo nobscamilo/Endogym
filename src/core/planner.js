@@ -703,9 +703,34 @@ export function buildHeuristicCoachPlan({ profile, weeklyPlan }) {
   };
 }
 
+// Semilla determinista por usuario+objetivo: hace que dos personas distintas (o la misma con
+// otro objetivo) reciban una SELECCIÓN de ejercicios diferente del mismo catálogo, en vez del
+// mismo set para todo el mundo. No altera la seguridad clínica (sigue eligiendo de las
+// categorías correctas), solo rota el punto de partida dentro de cada categoría.
+function hashToInt(value) {
+  const s = String(value || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function computeUserSeed(profile, goal, userId) {
+  const identity = userId
+    || profile?.userId
+    || profile?.uid
+    || profile?.id
+    || profile?.email
+    || profile?.displayName
+    || '';
+  return hashToInt(`${identity}|${goal || ''}`) % 9973;
+}
+
 export function generateWeeklyPlan({
   profile,
   startDate,
+  userId = '',
   preparticipationScreening = null,
   progressMemory = null,
   adaptiveTuning = null,
@@ -726,6 +751,7 @@ export function generateWeeklyPlan({
   }
   start.setUTCHours(0, 0, 0, 0);
   const template = rotateTemplateToDate(baseTemplate, start);
+  const userSeed = computeUserSeed(profile, goal, userId);
 
   const days = template.map((templateDay, index) => {
     const date = new Date(start);
@@ -746,7 +772,8 @@ export function generateWeeklyPlan({
       goal,
       profile,
       adaptiveTuning,
-      daySeed: index,
+      daySeed: index + userSeed,
+      sessionMinutes: templateDay.durationMinutes,
     });
 
     return {
@@ -859,6 +886,7 @@ export function normalizeWeeklyPlanSessionFocus(weeklyPlan, profile = {}) {
     weeklyPlan.trainingMode || profile.trainingMode
   );
   const goal = resolveGoal(weeklyPlan.goal || profile.goal);
+  const userSeed = computeUserSeed(profile, goal);
 
   const normalizedDays = weeklyPlan.days.map((day, index) => {
     if (!day?.workout) return day;
@@ -891,7 +919,8 @@ export function normalizeWeeklyPlanSessionFocus(weeklyPlan, profile = {}) {
         goal,
         profile,
         adaptiveTuning: weeklyPlan.adaptiveTuning || null,
-        daySeed: index,
+        daySeed: index + userSeed,
+        sessionMinutes: day.workout?.durationMinutes,
       })
       : exercises;
 
@@ -971,7 +1000,8 @@ export function suggestSessionAlternatives({
         goal,
         profile,
         adaptiveTuning,
-        daySeed: dayIndex + (variationIndex + 1) * 17,
+        daySeed: dayIndex + (variationIndex + 1) * 17 + computeUserSeed(profile, goal),
+        sessionMinutes: variation.durationMinutes || targetDay.workout?.durationMinutes,
       });
 
       return {

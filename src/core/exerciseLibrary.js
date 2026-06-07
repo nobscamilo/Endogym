@@ -1321,6 +1321,7 @@ export function buildSessionExercises({
   profile,
   adaptiveTuning,
   daySeed = 0,
+  sessionMinutes = null,
 }) {
   const resolvedSessionFocus = sessionFocus || resolveSessionFocus({ modality, sessionType, sessionTitle });
   const pool = listBaseSessionExercises(modality, sessionType, resolvedSessionFocus);
@@ -1331,8 +1332,11 @@ export function buildSessionExercises({
   const highVolumeGoals = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'cut', 'bulk']);
   const screening = profile?.preparticipation ? evaluatePreparticipationScreening(profile.preparticipation) : null;
   const isStopGate = screening?.readinessGate === 'stop';
-  // Minutos por sesión que indicó el usuario (encuesta del Studio).
-  const availMinutes = profile?.studioAvailability === true ? Number(profile.preferredDurationMinutes) : NaN;
+  // Minutos efectivos de la sesión: los que indicó el usuario en la encuesta del Studio o,
+  // si no, la duración planificada de la propia sesión (plantilla). Así el nº de ejercicios
+  // escala SIEMPRE con la duración real, no solo cuando se completó la encuesta.
+  const studioMinutes = profile?.studioAvailability === true ? Number(profile.preferredDurationMinutes) : NaN;
+  const effectiveMinutes = Number.isFinite(studioMinutes) ? studioMinutes : Number(sessionMinutes);
 
   let desiredCount = 5;
   if (sessionType === 'recovery') {
@@ -1341,9 +1345,10 @@ export function buildSessionExercises({
     desiredCount = 2;
   } else if (isStopGate) {
     desiredCount = 4; // Cap clínico por seguridad
-  } else if (Number.isFinite(availMinutes) && availMinutes >= 20) {
-    // Escala con la duración: ~9 min/ejercicio + ~14 min de calentamiento/enfriamiento.
-    desiredCount = Math.max(4, Math.min(8, Math.round((availMinutes - 14) / 9)));
+  } else if (Number.isFinite(effectiveMinutes) && effectiveMinutes >= 20) {
+    // Escala con la duración: ~1 ejercicio por cada 8 min, descontando ~10 min de
+    // calentamiento/enfriamiento. Suelo 4, techo 9 (52min→5, 60→6, 66→7, 72→8, 75→8).
+    desiredCount = Math.max(4, Math.min(9, Math.round((effectiveMinutes - 10) / 8)));
   } else if (intensity === 'vigorous') {
     desiredCount = highVolumeGoals.has(resolvedGoal) ? 7 : 6;
   } else if (intensity === 'moderate') {

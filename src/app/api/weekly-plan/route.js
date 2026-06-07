@@ -335,6 +335,7 @@ export async function POST(request) {
       const generated = generateWeeklyPlan({
         profile,
         startDate: payload.startDate,
+        userId: user.uid,
         preparticipationScreening,
         progressMemory,
         adaptiveTuning,
