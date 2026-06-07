@@ -1,6 +1,19 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **6 de junio de 2026 (RAG semántico con embeddings + mejora nutricional)**.
+Ultima actualizacion: **7 de junio de 2026 (plan semanal de comidas + foto del plato + app oficial en la raíz "/")**.
+
+## Sesión del 7 de junio de 2026 (Studio: nutrición semanal, foto del plato y lanzamiento en "/")
+
+Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `npm run build` + `git push` en la Mac; verificación posterior en Chrome):
+
+- **Plan semanal de comidas (selector de día real).** `POST /api/studio-nutrition` ahora genera con Gemini **7 días (Lun–Dom)**, cada uno con 4 comidas distintas, además de la compra semanal y el batch cooking. Nuevo esquema `days[]` (antes `meals[]` de un solo día); `maxOutputTokens` 16384, `timeoutMs` 55s y `export const maxDuration = 60` en la ruta. El front (`screen-nutrition.jsx`) guarda `window.STUDIO.mealWeek`, reconstruye `nutritionDays` con kcal reales por día y sincroniza `D.meals` con el día seleccionado: al pulsar Lun/Jue/etc. el menú **cambia**. Compatibilidad hacia atrás con la forma antigua (`meals[]`). Helpers `normMeals()`, `todayDowIndex()`, `DOW_LABELS`.
+- **Foto del plato (IA).** En `AddFood` (Nutrición) se añadió un input de cámara/galería que envía la imagen en base64 a **`POST /api/analyze-plate`** (Gemini Vision, ya existente). La ruta estima macros + carga glucémica y **registra la comida en el servidor**; el front solo suma los totales al resumen del día (no hay doble registro). Guarda de tamaño 5 MB y estados de carga/éxito/error.
+- **App oficial en la raíz "/".** `src/app/page.js`: si hay sesión activa (o demo sin Firebase), la home **renderiza el Studio en iframe en "/"** en lugar de redirigir a `/studio`. Sin sesión se muestra el landing + login. `src/app/studio/page.js` quedó como **alias que redirige a "/"** (marcadores antiguos). Se eliminaron los `router.push('/studio')` tras login. La CSP no cambió: la global ya permite `frame-src 'self'` (iframe del mismo origen) y el documento del iframe (`/studio/app/*`) sigue con su CSP relajada.
+- **Bundle regenerado:** `node scripts/build-studio.mjs` → `studio.bundle.js?v=fd2823e32d` (referencia cache-bust actualizada en `index.html`).
+
+### Pendiente de esta sesión
+- Correr `npm test` y `npm run build` en la Mac, `git push origin main` (Vercel auto-deploy) y verificar en Chrome: el selector de día cambia el menú, la foto del plato suma al día, y la app abre en "/" (no en "/studio").
+- Posible: el `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable por ahora.
 
 ## Sesión del 6 de junio de 2026 (mejora del RAG nutricional)
 

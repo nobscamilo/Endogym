@@ -5,35 +5,47 @@ import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../..
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
 
-// Fase 3: genera con Gemini el plan nutricional del día (recetas + lista de compra + batch
-// cooking) personalizado al perfil y objetivos del usuario, en JSON con la forma que consume
-// el rediseño Studio. Reemplaza los datos de muestra de Nutrición por contenido real generado.
+// Fase 3: genera con Gemini el PLAN SEMANAL de comidas (7 días, recetas + lista de compra
+// semanal + batch cooking) personalizado al perfil y objetivos del usuario, en JSON con la
+// forma que consume el rediseño Studio. Reemplaza los datos de muestra de Nutrición.
+
+// El plan semanal (28 comidas) puede tardar; ampliamos el límite de ejecución en Vercel.
+export const maxDuration = 60;
+
+const MEAL_ITEM_SCHEMA = {
+  type: 'object',
+  required: ['slot', 'dish', 'kcal', 'p', 'c', 'f', 'ingredients', 'steps', 'serving'],
+  properties: {
+    slot: { type: 'string' },
+    dish: { type: 'string' },
+    emoji: { type: 'string' },
+    time: { type: 'string' },
+    mins: { type: 'integer' },
+    kcal: { type: 'integer' },
+    p: { type: 'integer' },
+    c: { type: 'integer' },
+    f: { type: 'integer' },
+    gl: { type: 'integer' },
+    ii: { type: 'integer' },
+    glClass: { type: 'string', enum: ['good', 'mid', 'high'] },
+    ingredients: { type: 'array', items: { type: 'string' } },
+    steps: { type: 'array', items: { type: 'string' } },
+    serving: { type: 'string' },
+  },
+};
 
 const NUTRITION_SCHEMA = {
   type: 'object',
-  required: ['meals', 'shopping', 'batch'],
+  required: ['days', 'shopping', 'batch'],
   properties: {
-    meals: {
+    days: {
       type: 'array',
       items: {
         type: 'object',
-        required: ['slot', 'dish', 'kcal', 'p', 'c', 'f', 'ingredients', 'steps', 'serving'],
+        required: ['day', 'meals'],
         properties: {
-          slot: { type: 'string' },
-          dish: { type: 'string' },
-          emoji: { type: 'string' },
-          time: { type: 'string' },
-          mins: { type: 'integer' },
-          kcal: { type: 'integer' },
-          p: { type: 'integer' },
-          c: { type: 'integer' },
-          f: { type: 'integer' },
-          gl: { type: 'integer' },
-          ii: { type: 'integer' },
-          glClass: { type: 'string', enum: ['good', 'mid', 'high'] },
-          ingredients: { type: 'array', items: { type: 'string' } },
-          steps: { type: 'array', items: { type: 'string' } },
-          serving: { type: 'string' },
+          day: { type: 'string', enum: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] },
+          meals: { type: 'array', items: MEAL_ITEM_SCHEMA },
         },
       },
     },
@@ -103,12 +115,14 @@ export async function POST(request) {
     const conditions = profile?.medicalConditions || 'ninguna declarada';
     const restrictions = profile?.dietaryRestrictions || profile?.allergies || 'ninguna declarada';
 
-    const prompt = `Eres un nutricionista deportivo. Genera el PLAN DE COMIDAS DE HOY para este usuario, en español de España.
+    const prompt = `Eres un nutricionista deportivo. Genera el PLAN SEMANAL DE COMIDAS (7 días) para este usuario, en español de España.
 Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; restricciones/alergias: ${restrictions}.
-Objetivo nutricional del día: ~${t.kcal} kcal, proteína ${t.protein} g, carbohidratos ${t.carbs} g, grasa ${t.fat} g.
+Objetivo nutricional diario: ~${t.kcal} kcal, proteína ${t.protein} g, carbohidratos ${t.carbs} g, grasa ${t.fat} g.
 Requisitos:
-- Exactamente 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena". La suma de kcal debe acercarse al objetivo.
-- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (3-4 pasos), serving (consejo breve).
+- days: EXACTAMENTE 7 días, uno por cada day: "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" (en ese orden, sin repetir).
+- Cada día tiene EXACTAMENTE 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena". La suma de kcal de cada día debe acercarse al objetivo diario.
+- Los menús deben ser DISTINTOS entre días (no repitas el mismo plato día tras día); puedes reaprovechar ingredientes del batch cooking pero varía las recetas.
+- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).
 - shopping: lista de la compra para TODA LA SEMANA (7 días), NO para un solo día. 4-6 categorías (cat, icon emoji, items con name y qty), con cantidades agregadas para 7 días (p. ej. "Pollo 1,4 kg", "Huevos 18 ud", "Arroz 1 kg"). El usuario compra una vez para la semana.
 - batch: 3-4 tareas de batch cooking del fin de semana para dejar la semana lista (title, desc, time, day, emoji).
 - Respeta condiciones/restricciones. Comida real, variada y práctica. Devuelve SOLO el JSON del esquema.`;
@@ -117,12 +131,12 @@ Requisitos:
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
-        timeoutMs: 28000,
+        timeoutMs: 55000,
         parts: [{ text: prompt }],
         generationConfig: {
           temperature: 0.7,
           topP: 0.9,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 16384,
           responseMimeType: 'application/json',
           responseJsonSchema: NUTRITION_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 },
@@ -137,7 +151,7 @@ Requisitos:
       const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
       let parsed;
       try { parsed = JSON.parse(text); } catch { return errorResponse('Respuesta IA no parseable.', 502); }
-      if (!parsed || !Array.isArray(parsed.meals)) return errorResponse('Plan IA incompleto.', 502);
+      if (!parsed || !Array.isArray(parsed.days) || !parsed.days.length) return errorResponse('Plan IA incompleto.', 502);
       return jsonResponse({ ok: true, nutrition: parsed });
     } catch (error) {
       logError('studio_nutrition_failed', error, { traceId, userId: user.uid });

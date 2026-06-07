@@ -7,10 +7,44 @@ function AddFood({ onAdded }) {
   const [f, setF] = useStateN({ name: '', calories: '', proteinGrams: '', carbsGrams: '', fatGrams: '' });
   const [code, setCode] = useStateN('');
   const [status, setStatus] = useStateN('idle'); // idle|looking|saving|ok|err|noauth|notfound
+  const [photoStatus, setPhotoStatus] = useStateN('idle'); // idle|analyzing|ok|err|noauth|big
+  const fileRef = React.useRef(null);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
   async function authToken() {
     return (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+  }
+
+  // Foto del plato → /api/analyze-plate (Gemini Vision estima macros + carga glucémica y
+  // registra la comida en el servidor). Aquí solo sumamos los totales al resumen del día.
+  async function analyzePhoto(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setPhotoStatus('big'); return; }
+    setPhotoStatus('analyzing');
+    try {
+      const token = await authToken();
+      if (!token) { setPhotoStatus('noauth'); return; }
+      const dataUrl = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(file);
+      });
+      const r = await fetch('/api/analyze-plate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      });
+      if (!r.ok) { setPhotoStatus('err'); return; }
+      const j = await r.json();
+      const t = j && j.analysis && j.analysis.totals;
+      if (!t) { setPhotoStatus('err'); return; }
+      if (onAdded) onAdded({ calories: t.calories, proteinGrams: t.proteinGrams, carbsGrams: t.carbsGrams, fatGrams: t.fatGrams, glycemicLoad: t.glycemicLoad });
+      setPhotoStatus('ok');
+      setTimeout(() => setPhotoStatus('idle'), 3000);
+    } catch (err) { setPhotoStatus('err'); }
   }
 
   async function lookup(barcode) {
@@ -111,6 +145,16 @@ function AddFood({ onAdded }) {
           <button className="btn ghost sm" onClick={scan} title="Escanear con cámara"><Icon name="camera" size={16} /></button>
         </div>
         {status === 'notfound' ? <p className="tiny muted" style={{ margin: 0 }}>Producto no encontrado. Introduce los datos a mano.</p> : null}
+
+        {/* Foto del plato: la IA estima macros y carga glucémica y registra la comida. */}
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={analyzePhoto} style={{ display: 'none' }} />
+        <button className="btn soft" onClick={() => fileRef.current && fileRef.current.click()} disabled={photoStatus === 'analyzing'}>
+          <Icon name="camera" size={16} /> {photoStatus === 'analyzing' ? 'Analizando foto…' : 'Foto del plato (IA)'}
+        </button>
+        {photoStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plato analizado y añadido a hoy ✨</span> : null}
+        {photoStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo analizar la foto. Reintenta o añade a mano.</span> : null}
+        {photoStatus === 'noauth' ? <span className="tiny muted">Inicia sesión para analizar fotos.</span> : null}
+        {photoStatus === 'big' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>La imagen supera 5 MB. Usa una más ligera.</span> : null}
         <input className="text-input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del alimento" />
         <div className="grid g-4" style={{ gap: 8 }}>
           <input className="text-input" type="number" value={f.calories} onChange={(e) => set('calories', e.target.value)} placeholder="kcal" />
@@ -129,13 +173,44 @@ function AddFood({ onAdded }) {
   );
 }
 
+const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+// Normaliza una lista de comidas a los campos que espera el diseño (emoji/hue/done/time…).
+function normMeals(arr) {
+  const palette = [55, 78, 18, 162, 232, 300];
+  return (arr || []).map((m, i) => ({
+    done: false, hue: palette[i % palette.length], emoji: m.emoji || '🍽️', time: m.time || '',
+    glClass: m.glClass || 'good', gl: m.gl ?? 0, ii: m.ii ?? 0, mins: m.mins ?? 10,
+    ingredients: m.ingredients || [], steps: m.steps || [], serving: m.serving || '',
+    ...m,
+  }));
+}
+
+// Índice del día de hoy dentro de la semana (Lun=0 … Dom=6).
+function todayDowIndex(D) {
+  const flagged = (D.nutritionDays || []).findIndex((d) => d.today);
+  if (flagged >= 0) return flagged;
+  const js = new Date().getDay(); // 0=Dom … 6=Sáb
+  return js === 0 ? 6 : js - 1;
+}
+
 function NutritionScreen({ layout }) {
   const D = window.STUDIO;
   const [tab, setTab] = useStateN('hoy');
-  const [day, setDay] = useStateN(2);
+  const tIdx = todayDowIndex(D);
+  const [dayIdx, setDayIdx] = useStateN(tIdx);
   const [gen, setGen] = useStateN(0);
   const [genStatus, setGenStatus] = useStateN('idle'); // idle|loading|ok|err|noauth
   const TABS = [{ id: 'hoy', label: 'Qué comer hoy' }, { id: 'compra', label: 'Compra & Batch' }, { id: 'glu', label: 'Glucemia' }];
+
+  // Muestra las comidas del día seleccionado (D.meals se mantiene sincronizado con la selección).
+  function showDay(i) {
+    setDayIdx(i);
+    if (D.mealWeek && D.mealWeek[i]) {
+      D.meals = D.mealWeek[i].meals;
+      setGen((g) => g + 1);
+    }
+  }
 
   async function generate() {
     setGenStatus('loading');
@@ -147,15 +222,22 @@ function NutritionScreen({ layout }) {
       const j = await r.json();
       if (!j || !j.ok || !j.nutrition) { setGenStatus('err'); return; }
       const n = j.nutrition;
-      if (Array.isArray(n.meals) && n.meals.length) {
-        // Normaliza campos que el diseño espera (emoji/hue/done/time…).
-        const palette = [55, 78, 18, 162, 232, 300];
-        D.meals = n.meals.map((m, i) => ({
-          done: false, hue: palette[i % palette.length], emoji: m.emoji || '🍽️', time: m.time || '',
-          glClass: m.glClass || 'good', gl: m.gl ?? 0, ii: m.ii ?? 0, mins: m.mins ?? 10,
-          ingredients: m.ingredients || [], steps: m.steps || [], serving: m.serving || '',
-          ...m,
+      if (Array.isArray(n.days) && n.days.length) {
+        // Plan semanal: 7 días, cada uno con sus comidas.
+        const week = n.days.map((d, i) => ({ day: d.day || DOW_LABELS[i] || ('D' + i), meals: normMeals(d.meals) }));
+        D.mealWeek = week;
+        D.nutritionDays = week.map((d, i) => ({
+          day: d.day,
+          date: (D.nutritionDays && D.nutritionDays[i] && D.nutritionDays[i].date) || (i + 2),
+          kcal: d.meals.reduce((a, m) => a + (Number(m.kcal) || 0), 0),
+          today: i === tIdx,
         }));
+        D.meals = (week[Math.min(dayIdx, week.length - 1)] || week[0]).meals;
+      } else if (Array.isArray(n.meals) && n.meals.length) {
+        // Compatibilidad con la forma antigua (un solo día).
+        const single = normMeals(n.meals);
+        D.mealWeek = [{ day: DOW_LABELS[tIdx], meals: single }];
+        D.meals = single;
       }
       if (Array.isArray(n.shopping) && n.shopping.length) D.shopping = n.shopping.map((c) => ({ icon: '🛒', ...c }));
       if (Array.isArray(n.batch) && n.batch.length) D.batch = n.batch.map((b) => ({ emoji: '🍳', ...b }));
@@ -177,21 +259,22 @@ function NutritionScreen({ layout }) {
         <div>
           <p className="eyebrow">Nutrición</p>
           <h1>Tu plan de comidas</h1>
-          <p className="sub">Qué comer hoy de un vistazo, la lista de la compra lista para el súper y cómo responde tu glucosa.</p>
+          <p className="sub">Tu plan semanal: elige el día para ver su menú, la lista de la compra lista para el súper y cómo responde tu glucosa.</p>
         </div>
         <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
           <button className="btn" onClick={generate} disabled={genStatus === 'loading'}>
-            <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Generando…' : 'Generar mi plan con IA'}
+            <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Generando semana…' : 'Generar mi plan con IA'}
           </button>
+          {genStatus === 'loading' ? <span className="tiny muted">Preparando 7 días de comidas, puede tardar un poco…</span> : null}
           {genStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo generar. Reintenta.</span> : null}
           {genStatus === 'noauth' ? <span className="tiny muted">Inicia sesión para generar.</span> : null}
-          {genStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan generado para ti ✨</span> : null}
+          {genStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan semanal generado ✨</span> : null}
         </div>
       </div>
 
       <div className="day-rail">
-        {D.nutritionDays.map((d) => (
-          <button key={d.date} className={`day-pill ${day === d.date ? 'active' : ''}`} onClick={() => setDay(d.date)}>
+        {D.nutritionDays.map((d, i) => (
+          <button key={i} className={`day-pill ${dayIdx === i ? 'active' : ''}`} onClick={() => showDay(i)}>
             <div className="dp-day">{d.day}</div>
             <div className="dp-date num">{d.date}</div>
             <div className="dp-kcal num">{d.kcal} kcal</div>
@@ -201,9 +284,9 @@ function NutritionScreen({ layout }) {
 
       <SegTabs tabs={TABS} value={tab} onChange={setTab} />
 
-      {tab === 'hoy' && <NutritionToday key={`hoy-${gen}`} layout={layout} />}
+      {tab === 'hoy' && <NutritionToday key={`hoy-${dayIdx}-${gen}`} layout={layout} />}
       {tab === 'compra' && <NutritionShop key={`shop-${gen}`} />}
-      {tab === 'glu' && <NutritionGlu key={`glu-${gen}`} />}
+      {tab === 'glu' && <NutritionGlu key={`glu-${dayIdx}-${gen}`} />}
     </div>
   );
 }

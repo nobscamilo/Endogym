@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
@@ -19,7 +18,6 @@ import { getFirebaseClient, isFirebaseClientConfigured } from '../lib/firebaseCl
 const CONSENT_VERSION = '2026-04-02';
 
 export default function HomePage() {
-  const router = useRouter();
   const firebaseClient = useMemo(() => getFirebaseClient(), []);
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState(null);
@@ -53,11 +51,6 @@ export default function HomePage() {
 
     return unsubscribe;
   }, [firebaseClient]);
-
-  useEffect(() => {
-    if (!authReady || !authUser || signedOutRequested) return;
-    router.replace('/studio');
-  }, [authReady, authUser, signedOutRequested, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -148,8 +141,8 @@ export default function HomePage() {
         await signInWithEmailAndPassword(firebaseClient.auth, email, password);
       }
 
-      setStatus('Autenticación correcta. Redirigiendo...');
-      router.push('/studio');
+      setStatus('Autenticación correcta. Abriendo tu Studio...');
+      // Sin redirección: al detectar sesión, esta misma página renderiza el Studio en "/".
     } catch (error) {
       setStatus(`Error: ${error.message}`);
     } finally {
@@ -187,8 +180,8 @@ export default function HomePage() {
         await upsertInitialProfile(credentials.user);
       }
 
-      setStatus('Autenticación con Google correcta. Redirigiendo...');
-      router.push('/studio');
+      setStatus('Autenticación con Google correcta. Abriendo tu Studio...');
+      // Sin redirección: al detectar sesión, esta misma página renderiza el Studio en "/".
     } catch (error) {
       setStatus(`Error: ${error.message}`);
     } finally {
@@ -217,6 +210,30 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // App oficial en la raíz "/": si hay sesión activa, esta página ES el Studio (iframe aislado).
+  // Si no hay sesión (o se acaba de cerrar), se muestra el landing + login de abajo.
+  const showApp = authReady && !signedOutRequested && (authUser || !authConfigured);
+  if (showApp) {
+    return (
+      <iframe
+        src="/studio/app/index.html"
+        title="Ignios"
+        allow="camera; fullscreen"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          margin: 0,
+          padding: 0,
+          background: '#1a1714',
+          zIndex: 50,
+        }}
+      />
+    );
   }
 
   return (
