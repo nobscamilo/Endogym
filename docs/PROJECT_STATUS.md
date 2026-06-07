@@ -57,6 +57,12 @@ Continuación del lanzamiento de Ignios Studio. Cambios aplicados (pendiente `np
   - Identidad de muestra en `data.js` **neutralizada** ("Atleta", sin apellido) como red de seguridad: aunque algo falle, nunca se ve el nombre de otra persona.
   - Arranque del iframe (`build-studio.mjs`) más robusto: espera de auth 1,5s→**4s**, timeout de `studio-data` 2,5s→**8s**, espera-y-reintento de token y **un reintento** del fetch.
 
+### Fix login con Google: CSP bloqueaba `apis.google.com` + auto-crear cuenta
+
+- **Síntoma (consola):** `Loading the script 'https://apis.google.com/js/api.js' violates ... script-src 'self' 'unsafe-inline'`. Firebase Auth (popup de Google) carga gapi/GSI desde `apis.google.com`, bloqueado por la CSP. La cuenta del dueño entraba porque ya tenía sesión guardada (no recargaba el script); una cuenta nueva sí lo necesita.
+- **Solución (CSP en `next.config.mjs`, global y studio):** añadidos a `script-src` `https://apis.google.com`; a `frame-src` `https://apis.google.com https://accounts.google.com`; a `connect-src` `https://apis.google.com https://accounts.google.com`; y a `img-src` `https://*.googleusercontent.com` (foto de perfil de Google). El test `security-headers.test.js` sigue verde (solo comprueba ausencia de `unsafe-eval` y `frame-ancestors`, no la CSP exacta).
+- **Además:** el primer acceso con Google **crea la cuenta automáticamente** (en `submitGoogleAuth`, `src/app/page.js`): se quitó el throw "No existe cuenta previa con Google" y se llama a `upsertInitialProfile` cuando `isNewUser`, registrando los consentimientos legales (versión vigente). Nota de cumplimiento: el consentimiento queda implícito en el alta por Google.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.
