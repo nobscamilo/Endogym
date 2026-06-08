@@ -11,6 +11,7 @@ import {
   getExerciseLibraryCatalog,
   getExerciseLibrarySummary,
   isExerciseCompatibleWithSessionFocus,
+  normalizeExerciseHistoryKey,
   resolveExerciseMetadata,
   resolveSessionFocus,
   suggestExerciseAlternatives,
@@ -150,6 +151,85 @@ describe('exercise muscle metadata', () => {
         ['lower_body_strength', 'lower_body_unilateral', 'lower_body_accessory', 'posterior_chain'].includes(exercise.category)
       )
     ).toBe(false);
+  });
+
+  it('uses exercise id keyed load history for progressive strength prescriptions', () => {
+    const baseProfile = {
+      goal: GoalType.STRENGTH,
+      trainingMode: 'gym',
+      trainingModality: TrainingModality.FULL_GYM,
+      metabolicProfile: 'none',
+      activityLevel: 'moderate',
+      sex: 'male',
+      age: 30,
+      weightKg: 82,
+      heightCm: 180,
+      mealsPerDay: 4,
+    };
+    const base = generateWeeklyPlan({
+      profile: baseProfile,
+      userId: 'user-1',
+      startDate: '2026-04-06T09:00:00.000Z',
+    });
+    const target = base.days
+      .flatMap((day) => day.workout.exercises)
+      .find((exercise) => exercise.prescription?.loadKg != null);
+
+    const progressed = generateWeeklyPlan({
+      profile: baseProfile,
+      userId: 'user-1',
+      startDate: '2026-04-06T09:00:00.000Z',
+      liftHistory: {
+        [target.id]: { weightKg: 70, reps: 6 },
+      },
+    });
+    const sameExercise = progressed.days
+      .flatMap((day) => day.workout.exercises)
+      .find((exercise) => exercise.id === target.id);
+
+    expect(target.prescription.loadSource).toBe('estimate');
+    expect(sameExercise.prescription.loadSource).toBe('history');
+    expect(sameExercise.prescription.loadKg).not.toBe(target.prescription.loadKg);
+  });
+
+  it('falls back to normalized exercise names for legacy load history without ids', () => {
+    const profile = {
+      goal: GoalType.STRENGTH,
+      trainingMode: 'gym',
+      trainingModality: TrainingModality.FULL_GYM,
+      metabolicProfile: 'none',
+      activityLevel: 'moderate',
+      sex: 'male',
+      age: 30,
+      weightKg: 82,
+      heightCm: 180,
+      mealsPerDay: 4,
+    };
+    const base = generateWeeklyPlan({
+      profile,
+      userId: 'user-1',
+      startDate: '2026-04-06T09:00:00.000Z',
+    });
+    const target = base.days
+      .flatMap((day) => day.workout.exercises)
+      .find((exercise) => exercise.prescription?.loadKg != null);
+
+    const progressed = generateWeeklyPlan({
+      profile,
+      userId: 'user-1',
+      startDate: '2026-04-06T09:00:00.000Z',
+      liftHistory: {
+        __byName: {
+          [normalizeExerciseHistoryKey(target.name)]: { weightKg: 70, reps: 6 },
+        },
+      },
+    });
+    const sameExercise = progressed.days
+      .flatMap((day) => day.workout.exercises)
+      .find((exercise) => exercise.id === target.id);
+
+    expect(sameExercise.prescription.loadSource).toBe('history_name');
+    expect(sameExercise.prescription.loadKg).not.toBe(target.prescription.loadKg);
   });
 
   it('matches exercise swap suggestions to the session focus', () => {

@@ -28,7 +28,7 @@ Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos 
 
 ## Estado confirmado el 2 de junio de 2026
 
-- Vercel responde en `/` y `/api/health`; `/api/meals` sin token responde `401`. Producción fue redesplegada manualmente el 2 de junio de 2026 a `dpl_FJ2jWbaV8Ktjy9G57aKMDaVB4t9r`; vuelve a comprobarlo antes de afirmarlo en conversaciones futuras.
+- Vercel responde en `/` y `/api/health`; `/api/meals` sin token responde `401`. Producción fue redesplegada manualmente el 8 de junio de 2026 a `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`; el alias `endogym.vercel.app` tuvo que reasignarse manualmente al deployment nuevo. Vuelve a comprobarlo antes de afirmarlo en conversaciones futuras.
 - Firebase Auth, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se verificaron con sondas reales.
 - Firebase Admin y Firestore funcionan localmente y en produccion.
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu`; upload y borrado fueron verificados.
@@ -37,8 +37,14 @@ Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos 
 - `POST /api/weekly-plan` fue verificado con coaching Gemini live; usa `gemini-2.5-flash`, timeout acotado y fallback ACSM observable.
 - Las fotos caducan a los 30 dias y el bucket no conserva soft delete.
 - Las rutas IA aplican rate limiting persistente en Firestore.
+- `POST /api/coach-chat` aplica rate limiting persistente en Firestore (`coach-chat`, 20 preguntas/h por defecto) y devuelve cabeceras de rate limit.
+- Los entrenos manuales conservan `exercise.id` en Firestore; el flujo API/repositorio/planner está cubierto por tests para que `liftHistory` pueda progresar cargas por ID estable. Los registros legacy sin ID tienen fallback por nombre normalizado (`loadSource:'history_name'`), menos fiable que el ID.
+- Los bloques activos de 21 días no se regeneran automáticamente, pero `weekly-plan` y `studio-data` recalculan un **overlay adaptativo diario** (`adaptiveOverlay`) desde datos recientes para que fatiga/FC/check-in se reflejen sin romper el mesociclo.
+- `POST /api/studio-nutrition` valida drift de kcal/proteína por día, reintenta una vez ante desvíos y rechaza planes completos con drift severo antes de guardarlos. El cache semanal lleva `meta.planSignature`; `GET` devuelve `stale:true`/`empty:true` si el entreno/macros/fase ya no coinciden.
+- El Studio no debe mostrar claims personales estáticos como si fueran IA live: los banners usan datos reales (`coachAdjust`) o copia contextual honesta.
 - `npm run audit` devuelve `0` vulnerabilidades.
 - El frontend tiene Firebase Client Auth implementado; `x-dev-user-id` solo pertenece al modo local explicito.
+- La raíz `/` pasa el Firebase ID token al iframe del Studio por `postMessage` de mismo origen (`IGNIOS_AUTH_TOKEN`/`IGNIOS_TOKEN_REQUEST`) para evitar que móvil/iframe caiga al dataset demo por carrera de restauración de sesión. No pasar tokens por URL.
 - Las estimaciones nutricionales, glucemicas e insulinicas no son diagnostico medico.
 - El menú lateral es tipo hamburguesa desplegable (verificado localmente y en producción).
 - El atlas anatómico usa `gymbro-front-crop.png` (vista frontal) y `gymbro-back-crop.png` (vista posterior); colores primarios azul-magenta intenso (#7c3aed / #a855f7) y secundarios azul-magenta tenue. Vistas corregidas y posicionamiento ajustado.
@@ -108,7 +114,7 @@ Reglas importantes:
 
 El rediseño "Ignios" (data-driven cálido) es la **UI por defecto y oficial en la raíz "/"** (desde 7 jun 2026): si hay sesión activa (o demo sin Firebase), `src/app/page.js` **renderiza el Studio en iframe en "/"** (antes redirigía a `/studio`); sin sesión muestra landing + login. **`/studio` quedó como alias que redirige a "/"** (`src/app/studio/page.js`). El dashboard legacy sigue en `/dashboard` como fallback. Marca **Ignios solo de cara al usuario** (landing/metadata/manifest); infra sigue "endogym" (NO renombrar).
 
-Studio = bundle React **pre-compilado** con esbuild (`scripts/build-studio.mjs` → `public/studio/app/studio.bundle.js`, artefacto commiteado; esbuild NO es dependencia, ver `docs/STUDIO_REDESIGN.md`). El bundle se sirve como asset estático en `/studio/app/index.html` (lo embebe el iframe de "/"). Endpoints propios: `/api/studio-data` (datos reales: perfil, hoy, semana, biblioteca, macros, glucemia, progreso), `/api/coach-chat` (coach IA con perfil real), `/api/studio-nutrition` (**plan semanal de comidas con Gemini: 7 días `days[]` + compra semanal + batch; `maxDuration=60`**), `/api/analyze-plate` (foto del plato → macros/glucemia, registra la comida), `/api/studio-availability` (encuesta), `/api/studio-swap` (cambiar ejercicios), `/api/public-config`. CSP estricta global + relajada scoped a `/studio*` (assets del iframe) en `next.config.mjs`. **Tras editar `public/studio/app/studio/*` hay que regenerar el bundle (`npm run build:studio`) y commitearlo.** Detalle en `docs/STUDIO_REDESIGN.md`.
+Studio = bundle React **pre-compilado** con esbuild (`scripts/build-studio.mjs` → `public/studio/app/studio.bundle.js`, artefacto commiteado; esbuild NO es dependencia, ver `docs/STUDIO_REDESIGN.md`). El bundle se sirve como asset estático en `/studio/app/index.html` (lo embebe el iframe de "/"). Endpoints propios: `/api/studio-data` (datos reales: perfil, hoy, semana, biblioteca, macros, glucemia, progreso y overlay adaptativo del bloque activo), `/api/coach-chat` (coach IA con perfil real y rate limit persistente), `/api/studio-nutrition` (**plan semanal de comidas con Gemini: 7 días `days[]` + compra semanal + batch; `maxDuration=60`; validación per-day de macros antes de guardar; cache invalidado por `planSignature`**), `/api/analyze-plate` (foto del plato → macros/glucemia, registra la comida), `/api/studio-availability` (encuesta), `/api/studio-swap` (cambiar ejercicios), `/api/public-config`. CSP estricta global + relajada scoped a `/studio*` (assets del iframe) en `next.config.mjs`. **Tras editar `public/studio/app/studio/*` o `scripts/build-studio.mjs` hay que regenerar el bundle (`npm run build:studio`) y commitearlo.** Detalle en `docs/STUDIO_REDESIGN.md`.
 
 ## Verificacion minima
 

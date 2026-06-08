@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getUserProfile: vi.fn(),
   getLatestWeeklyPlan: vi.fn(),
   createWeeklyPlan: vi.fn(),
+  updateWeeklyPlanAdaptiveOverlay: vi.fn(),
   updateWeeklyPlanCustomizations: vi.fn(),
   listMealsSince: vi.fn(),
   listMetricsSince: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
   getUserProfile: mocks.getUserProfile,
   getLatestWeeklyPlan: mocks.getLatestWeeklyPlan,
   createWeeklyPlan: mocks.createWeeklyPlan,
+  updateWeeklyPlanAdaptiveOverlay: mocks.updateWeeklyPlanAdaptiveOverlay,
   updateWeeklyPlanCustomizations: mocks.updateWeeklyPlanCustomizations,
   listMealsSince: mocks.listMealsSince,
   listMetricsSince: mocks.listMetricsSince,
@@ -79,6 +81,7 @@ describe('/api/weekly-plan route', () => {
     mocks.getUserProfile.mockReset();
     mocks.getLatestWeeklyPlan.mockReset();
     mocks.createWeeklyPlan.mockReset();
+    mocks.updateWeeklyPlanAdaptiveOverlay.mockReset();
     mocks.updateWeeklyPlanCustomizations.mockReset();
     mocks.listMealsSince.mockReset();
     mocks.listMetricsSince.mockReset();
@@ -107,6 +110,16 @@ describe('/api/weekly-plan route', () => {
     mocks.listMealsSince.mockResolvedValue([]);
     mocks.listMetricsSince.mockResolvedValue([]);
     mocks.listWorkoutsSince.mockResolvedValue([]);
+    mocks.updateWeeklyPlanAdaptiveOverlay.mockImplementation(async (_uid, _planId, patch) => ({
+      id: _planId,
+      isBlock: true,
+      blockStartDate: '2026-06-01',
+      blockEndDate: '2026-06-21',
+      days: patch.days || [],
+      adaptiveTuning: patch.adaptiveTuning,
+      progressMemory: patch.progressMemory,
+      adaptiveOverlay: patch.adaptiveOverlay,
+    }));
   });
 
   afterEach(() => {
@@ -226,6 +239,81 @@ describe('/api/weekly-plan route', () => {
     expect(mocks.upsertUserProfile).not.toHaveBeenCalled();
   });
 
+  it('POST refreshes adaptive overlay for an active block without rebuilding it', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const days = Array.from({ length: 14 }, (_, index) => ({
+      date: index === 0 ? today : `2099-01-${String(index + 1).padStart(2, '0')}`,
+      dayName: index === 0 ? 'lunes' : 'martes',
+      isTrainingDay: true,
+      sessionType: 'resistance',
+      sessionFocus: 'fuerza',
+      workout: {
+        title: index === 0 ? 'Torso A' : 'Sesión',
+        durationMinutes: 60,
+        intensityRpe: { min: 7, max: 8 },
+        exercises: [],
+      },
+    }));
+    const activeBlock = {
+      id: 'block-1',
+      isBlock: true,
+      blockStartDate: '2026-06-01',
+      blockEndDate: '2999-12-31',
+      days,
+    };
+    mocks.getUserProfile.mockResolvedValue({
+      goal: 'recomposition',
+      trainingMode: 'gym',
+      activityLevel: 'moderate',
+      sex: 'male',
+      age: 28,
+      weightKg: 80,
+      heightCm: 178,
+      mealsPerDay: 4,
+      preparticipation: {
+        knownCardiometabolicDisease: false,
+        exerciseSymptoms: false,
+        currentlyActive: true,
+        medicalClearance: false,
+        contraindications: false,
+        desiredIntensity: 'moderate',
+      },
+    });
+    mocks.getLatestWeeklyPlan.mockResolvedValue(activeBlock);
+    mocks.listWorkoutsSince.mockResolvedValue([{
+      source: 'daily_checkin',
+      performedAt: `${today}T12:00:00.000Z`,
+      completed: true,
+      sessionRpe: 9,
+      fatigue: 9,
+      sleepHours: 5,
+    }]);
+    mocks.updateWeeklyPlanAdaptiveOverlay.mockImplementation(async (_uid, _planId, patch) => ({
+      ...activeBlock,
+      ...patch,
+    }));
+
+    const response = await POST(
+      new Request('http://localhost/api/weekly-plan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+    );
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.stable).toBe(true);
+    expect(json.plan.id).toBe('block-1');
+    expect(json.plan.adaptiveOverlay.mode).toBe('active_block_daily_overlay');
+    expect(json.plan.adaptiveOverlay.rules.some((rule) => rule.id === 'HIGH_FATIGUE')).toBe(true);
+    expect(json.plan.days.find((day) => day.date === today).adaptiveOverlay.scope).toBe('today');
+    expect(mocks.createWeeklyPlan).not.toHaveBeenCalled();
+    expect(mocks.updateWeeklyPlanAdaptiveOverlay).toHaveBeenCalledWith('user-1', 'block-1', expect.objectContaining({
+      adaptiveOverlay: expect.objectContaining({ mode: 'active_block_daily_overlay' }),
+    }));
+  });
+
   it('POST marks onboarding completed when screening was already updated', async () => {
     mocks.getUserProfile.mockResolvedValue({
       goal: 'recomposition',
@@ -329,6 +417,89 @@ describe('/api/weekly-plan route', () => {
     expect(json.plan.coachMeta.modelResolved).toBe('gemini-2.5-pro');
     expect(json.plan.coachMeta.attempts).toBe(2);
     expect(json.plan.coachWarning).toBeNull();
+  });
+
+  it('applies only bounded structured Gemini adjustments to existing strength exercises', async () => {
+    mocks.isGeminiConfigured.mockReturnValue(true);
+    mocks.getUserProfile.mockResolvedValue({
+      goal: 'strength',
+      trainingMode: 'gym',
+      trainingModality: 'full_gym',
+      activityLevel: 'moderate',
+      sex: 'male',
+      age: 28,
+      weightKg: 80,
+      heightCm: 178,
+      mealsPerDay: 4,
+      preparticipation: {
+        knownCardiometabolicDisease: false,
+        exerciseSymptoms: false,
+        currentlyActive: true,
+        medicalClearance: false,
+        contraindications: false,
+        desiredIntensity: 'moderate',
+      },
+    });
+    let target = null;
+    mocks.callGeminiExerciseCoach.mockImplementation(async ({ weeklyPlan }) => {
+      const day = weeklyPlan.days.find((d) =>
+        Array.isArray(d.workout?.exercises)
+        && d.workout.exercises.some((e) => e.prescription?.format === 'reps' && e.prescription.loadKg != null)
+      );
+      const exercise = day.workout.exercises.find((e) => e.prescription?.format === 'reps' && e.prescription.loadKg != null);
+      target = {
+        date: day.date,
+        day: `${day.dayName} ${day.date}`,
+        exercise: exercise.name,
+        loadKg: exercise.prescription.loadKg,
+        sets: exercise.prescription.sets,
+      };
+      return {
+        coachSummary: 'Resumen IA',
+        acsmJustification: 'FITT definido por objetivo.',
+        prescriptionAdjustments: [
+          {
+            day: target.day,
+            adjustment: 'Subir carga de forma controlada.',
+            rationale: 'Buena recuperación.',
+            evidence: 'readiness=85',
+          },
+        ],
+        riskFlags: [],
+        medicalDisclaimer: 'Educativo',
+        structuredAdjustments: [
+          { day: target.day, exercise: target.exercise, loadPct: 1.5, setsDelta: 4 },
+          { day: target.day, exercise: 'Ejercicio inventado', loadPct: 0.5, setsDelta: -4 },
+        ],
+        diagnostics: {
+          modelRequested: 'gemini-coach-model',
+          modelResolved: 'gemini-2.5-flash',
+          attempts: 1,
+          generatedAt: '2026-06-08T10:00:00.000Z',
+        },
+      };
+    });
+    mocks.createWeeklyPlan.mockImplementation(async (_uid, payload) => ({ id: 'plan-ai', ...payload }));
+    mocks.getLatestWeeklyPlan.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request('http://localhost/api/weekly-plan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ startDate: '2026-06-08T00:00:00.000Z' }),
+      })
+    );
+    const json = await readJson(response);
+    const adjusted = json.plan.days
+      .find((day) => day.date === target.date)
+      .workout.exercises
+      .find((exercise) => exercise.name === target.exercise);
+
+    expect(response.status).toBe(201);
+    expect(json.plan.coachMeta.structuredApplied).toBe(1);
+    expect(adjusted.prescription.loadKg).toBe(Math.round((target.loadKg * 1.1) / 2.5) * 2.5);
+    expect(adjusted.prescription.sets).toBe(target.sets + 1);
+    expect(adjusted.prescription.coachAdjusted).toBe(true);
   });
 
   it('POST keeps fallback with failure code when Gemini coach fails', async () => {

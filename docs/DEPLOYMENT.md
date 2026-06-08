@@ -20,6 +20,20 @@ gcloud firestore indexes composite create \
 
 ## Estado verificado
 
+Deploy manual más reciente del **8 de junio de 2026**:
+
+- `npx vercel --prod --yes` creó `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`, estado `Ready`, URL `https://endogym-hody8p1xq-juan-camilo-sarmientos-projects.vercel.app`.
+- La CLI quedó esperando en `Running Checks`; el deployment estaba `Ready` pero `endogym.vercel.app` seguía apuntando al deployment anterior. Se promovió manualmente con:
+
+```bash
+npx vercel alias set https://endogym-hody8p1xq-juan-camilo-sarmientos-projects.vercel.app endogym.vercel.app
+```
+
+- `https://endogym.vercel.app/studio/app/index.html?verify=b3fd227a1c` sirve `studio.bundle.js?v=b3fd227a1c`.
+- Verificado: `/` -> `200`, `/api/health` -> `200`, `/api/meals` sin token -> `401`.
+- Playwright contra producción: el puente same-origin padre→iframe entrega token (`IGNIOS_AUTH_TOKEN`) y el Studio móvil usa `Authorization` en `/api/studio-data`; sin token, el asset directo conserva demo y puede mostrar `Empuje · Fuerza`.
+- No se ejecutó `npm run e2e:production` para este deploy.
+
 Sonda pública repetida el **2 de junio de 2026**:
 
 - deployment Production inspeccionado tras redespliegue manual: `dpl_FJ2jWbaV8Ktjy9G57aKMDaVB4t9r`, estado `Ready`;
@@ -72,6 +86,8 @@ PLATE_ANALYSIS_RATE_LIMIT_MAX=10
 PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS=600
 WEEKLY_PLAN_RATE_LIMIT_MAX=4
 WEEKLY_PLAN_RATE_LIMIT_WINDOW_SECONDS=3600
+COACH_CHAT_RATE_LIMIT_MAX=20
+COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS=3600
 AUTH_DISABLED=false
 ```
 
@@ -132,6 +148,7 @@ Confirma ademas:
 - upload y borrado Storage;
 - inferencia Gemini real sin fallback;
 - coaching semanal Gemini live sin fallback;
+- chat del coach autenticado con rate limit persistente;
 - `traceId` en respuestas y logs;
 - ausencia de secretos en logs.
 

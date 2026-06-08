@@ -1,6 +1,9 @@
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { withTrace, logError } from '../../../lib/logger.js';
+import { buildActiveBlockAdaptiveOverlay, isActiveBlockPlan } from '../../../core/activeBlockOverlay.js';
+import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
+import { evaluatePreparticipationScreening } from '../../../core/screening.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -476,33 +479,58 @@ export async function GET(request) {
     try {
       const today = todayStrUTC();
       const startOfTodayIso = `${today}T00:00:00.000Z`;
+      const since21dIso = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
       const since6wIso = new Date(Date.now() - 42 * 24 * 3600 * 1000).toISOString();
       const since60dIso = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
 
-      const [profile, latestPlan, todayMeals, metrics, workouts, stravaConn] = await Promise.all([
+      const [profile, latestPlan, recentMeals, metrics, workouts, stravaConn] = await Promise.all([
         getUserProfile(user.uid),
         getLatestWeeklyPlan(user.uid).catch(() => null),
-        listMealsSince(user.uid, startOfTodayIso, 50).catch(() => []),
+        listMealsSince(user.uid, since21dIso, 250).catch(() => []),
         listMetricsSince(user.uid, since6wIso, 200).catch(() => []),
         listWorkoutsSince(user.uid, since60dIso, 200).catch(() => []),
         getStravaConnection(user.uid).catch(() => null),
       ]);
+      const todayMeals = (Array.isArray(recentMeals) ? recentMeals : [])
+        .filter((meal) => String(meal?.eatenAt || meal?.createdAt || '') >= startOfTodayIso)
+        .slice(0, 50);
+      let planForStudio = latestPlan;
+      if (profile && isActiveBlockPlan(latestPlan, today)) {
+        const progressMemory = buildProgressMemory({
+          workouts,
+          meals: recentMeals,
+          metrics,
+          lookbackDays: 21,
+          now: new Date(),
+        });
+        const adaptiveTuning = buildAdaptiveTuning({
+          profile,
+          progressMemory,
+          screening: evaluatePreparticipationScreening(profile.preparticipation),
+        });
+        planForStudio = buildActiveBlockAdaptiveOverlay({
+          plan: latestPlan,
+          adaptiveTuning,
+          progressMemory,
+          now: new Date(),
+        }).plan;
+      }
 
       const overrides = {};
       const setIf = (key, val) => { if (val != null) overrides[key] = val; };
 
       setIf('user', mapUser(profile, user));
-      setIf('runPaces', latestPlan?.runPaces || null);
-      setIf('todaySession', mapTodaySession(latestPlan, today));
-      setIf('week', mapWeek(latestPlan, today));
-      setIf('library', mapLibrary(latestPlan));
-      setIf('macroTargets', mapMacroTargets(latestPlan, today));
+      setIf('runPaces', planForStudio?.runPaces || null);
+      setIf('todaySession', mapTodaySession(planForStudio, today));
+      setIf('week', mapWeek(planForStudio, today));
+      setIf('library', mapLibrary(planForStudio));
+      setIf('macroTargets', mapMacroTargets(planForStudio, today));
       setIf('macroEaten', mapMacroEaten(todayMeals));
       setIf('glycemic', mapGlycemic(todayMeals));
-      setIf('progress', mapProgress(metrics, workouts, latestPlan));
+      setIf('progress', mapProgress(metrics, workouts, planForStudio));
       setIf('strava', mapStrava(stravaConn, workouts));
-      setIf('coachAdjust', mapCoachAdjust(latestPlan));
-      setIf('runZones', mapRunZones(workouts, latestPlan, profile));
+      setIf('coachAdjust', mapCoachAdjust(planForStudio));
+      setIf('runZones', mapRunZones(workouts, planForStudio, profile));
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

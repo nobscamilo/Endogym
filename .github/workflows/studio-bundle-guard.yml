@@ -1,0 +1,79 @@
+# Studio bundle drift guard
+#
+# El bundle de Ignios Studio (public/studio/app/studio.bundle.js) es un ARTEFACTO
+# COMMITEADO que se genera con esbuild desde public/studio/app/studio/* y
+# scripts/build-studio.mjs (ver docs/STUDIO_REDESIGN.md). esbuild NO es dependencia
+# del proyecto, por lo que el CI no puede regenerar el bundle de forma reproducible
+# (la salida minificada varía entre versiones de esbuild) sin arriesgar falsos
+# positivos.
+#
+# En lugar de regenerar y comparar bytes, este guard detecta el error más común y
+# documentado: editar la fuente del Studio y OLVIDAR regenerar/commitear el bundle.
+# Falla si un cambio toca la fuente pero no incluye studio.bundle.js en el mismo
+# conjunto de cambios.
+#
+# Limitación consciente: no detecta un bundle regenerado incorrectamente ni una
+# edición manual del bundle; solo el desajuste fuente-sin-rebuild. Para verificación
+# byte-exacta, el mantenedor regenera localmente con `npm run build:studio`.
+
+name: Studio bundle guard
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  bundle-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Studio bundle is rebuilt when its source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SOURCE_GLOB_REGEX='^(public/studio/app/studio/|scripts/build-studio\.mjs$)'
+          BUNDLE='public/studio/app/studio.bundle.js'
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          # Primer push de una rama (before = 000...0): no hay base para comparar.
+          if [ -z "${BASE_SHA}" ] || [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+            echo "Sin base de comparación (primer push). Se omite el guard."
+            exit 0
+          fi
+
+          echo "Comparando ${BASE_SHA}...${HEAD_SHA}"
+          CHANGED="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          echo "Archivos cambiados:"
+          echo "${CHANGED}"
+
+          SOURCE_TOUCHED="$(echo "${CHANGED}" | grep -E "${SOURCE_GLOB_REGEX}" || true)"
+          BUNDLE_TOUCHED="$(echo "${CHANGED}" | grep -F "${BUNDLE}" || true)"
+
+          if [ -n "${SOURCE_TOUCHED}" ] && [ -z "${BUNDLE_TOUCHED}" ]; then
+            echo ""
+            echo "::error::La fuente del Studio cambió pero ${BUNDLE} NO fue regenerado/commiteado."
+            echo "Fuente modificada:"
+            echo "${SOURCE_TOUCHED}"
+            echo ""
+            echo "Solución: regenera el bundle y commitéalo —"
+            echo "  npm i -D esbuild   # temporal, no lo dejes en el lockfile compartido"
+            echo "  npm run build:studio"
+            echo "  npm uninstall esbuild"
+            echo "  git add ${BUNDLE} public/studio/app/index.html"
+            exit 1
+          fi
+
+          echo "OK: el bundle está en sincronía con su fuente (o la fuente no cambió)."

@@ -19,10 +19,13 @@ Construir una app full-stack para nutricion, seguimiento glucemico, entrenamient
 
 | Ruta | Responsabilidad |
 |---|---|
-| `src/app/page.js` | Login y registro Firebase Client Auth. |
-| `src/app/dashboard/page.js` | Entrada al dashboard. |
+| `src/app/page.js` | Landing/login y montaje de Ignios Studio en `/` cuando hay sesión. |
+| `src/app/studio/page.js` | Alias legacy que redirige a `/`. |
+| `src/app/dashboard/page.js` | Entrada al dashboard legacy. |
 | `src/components/DashboardPage.js` | UI principal: tab Hoy, Biblioteca, Nutrición, Perfil y menú hamburguesa. |
 | `src/components/MuscleMapFigure.js` | Componente de atlas anatómico 3D con superposiciones CSS de grupos musculares. |
+| `public/studio/app/studio/*` | Fuente del Studio React pre-compilado. |
+| `public/studio/app/studio.bundle.js` | Bundle Studio compilado y commiteado. |
 | `src/app/api/**/route.js` | APIs Next.js. |
 | `src/lib/auth.js` | Validacion de ID token y bypass local explicito. |
 | `src/lib/firebaseAdmin.js` | Inicializacion Firebase Admin. |
@@ -43,6 +46,7 @@ users/{userId}/meals/{mealId}
 users/{userId}/workouts/{workoutId}
 users/{userId}/metrics/{metricId}
 users/{userId}/weeklyPlans/{planId}
+users/{userId}/studioNutrition/{weekKey}
 users/{userId}/rateLimits/{scope}
 ```
 
@@ -50,9 +54,10 @@ users/{userId}/rateLimits/{scope}
 
 1. El frontend usa Firebase Client Auth.
 2. El cliente obtiene un Firebase ID token.
-3. La API recibe `Authorization: Bearer <token>`.
-4. `src/lib/auth.js` valida el token con Firebase Admin.
-5. `AUTH_DISABLED=true` solo habilita bypass en desarrollo local.
+3. Cuando `/` monta Ignios Studio en iframe, la página padre entrega ese token al iframe por `postMessage` de mismo origen (`IGNIOS_AUTH_TOKEN`/`IGNIOS_TOKEN_REQUEST`) para evitar carreras de restauración de sesión en móvil.
+4. La API recibe `Authorization: Bearer <token>`.
+5. `src/lib/auth.js` valida el token con Firebase Admin.
+6. `AUTH_DISABLED=true` solo habilita bypass en desarrollo local.
 
 ## Flujo de plato
 
@@ -68,10 +73,34 @@ users/{userId}/rateLimits/{scope}
 ## Flujo de coaching semanal
 
 1. `POST /api/weekly-plan` genera la base determinista del plan.
-2. El coach usa Gemini Developer API con `gemini-2.5-flash` estable.
-3. El transporte rechaza identificadores que no sigan el formato `gemini-*`.
-4. El coach usa `thinkingBudget=0`, timeout de 10 segundos por intento y un reintento.
-5. Si Gemini falla o agota presupuesto, la API persiste fallback heuristico ACSM observable sin exceder el timeout Vercel.
+2. La API consume una ventana persistente de rate limit por usuario.
+3. El coach usa Gemini Developer API con `gemini-2.5-flash` estable.
+4. El transporte rechaza identificadores que no sigan el formato `gemini-*`.
+5. El coach usa `thinkingBudget=0`, timeout de 10 segundos por intento y un reintento.
+6. Si Gemini devuelve `structuredAdjustments`, el servidor aplica solo ajustes acotados a ejercicios de fuerza existentes.
+7. Si Gemini falla o agota presupuesto, la API persiste fallback heuristico ACSM observable sin exceder el timeout Vercel.
+
+### Bloque activo y overlay adaptativo
+
+- `weekly-plan` conserva el bloque de 21 dias mientras esté activo y no haya `rebuild:true`.
+- En ese caso recalcula `progressMemory`/`adaptiveTuning` con datos recientes y guarda un `adaptiveOverlay` en el plan activo, sin crear un plan nuevo.
+- `studio-data` calcula el mismo overlay en lectura para que el Studio muestre ajustes recientes aunque el usuario no haya pulsado regenerar.
+- El overlay es metadata de ajuste; no reescribe el mesociclo ni compone deloads acumulativos sobre las prescripciones base.
+
+## Flujo Coach chat Studio
+
+1. `POST /api/coach-chat` requiere Firebase ID token.
+2. La ruta valida tamaño del prompt y consume el scope persistente `coach-chat`.
+3. Construye contexto de perfil, plan, fase, carrera y entrenos recientes.
+4. Llama Gemini Developer API y devuelve texto; si el limite se supera responde `429` antes de llamar al proveedor.
+
+## Flujo nutricion Studio
+
+1. `GET /api/studio-nutrition` consulta el plan semanal cacheado en `studioNutrition/{weekKey}`.
+2. `POST /api/studio-nutrition` genera 7 dias en trozos paralelos con Gemini.
+3. La ruta calcula drift de kcal/proteina por dia antes de guardar.
+4. Si hay drift reintenta una vez; si persiste drift severo en un plan completo, responde `502` y no guarda.
+5. El cache incluye `meta.planSignature`, calculado desde plan, sesiones, fase, carrera y objetivos nutricionales. Si cambia, `GET` responde `stale:true` y el cliente regenera.
 
 ## Flujo de check-in diario
 
@@ -92,7 +121,7 @@ users/{userId}/rateLimits/{scope}
 
 - `withTrace()` genera `traceId`.
 - Los logs JSON registran inicio, fin, duracion y errores. Rechazos auth esperados usan `operation_rejected`, no `operation_failed`.
-- `plate_analysis_result`, `weekly_plan_coach_result`, `plate_image_rejected` y `rate_limit_exceeded` permiten vigilar degradacion y abuso.
+- `plate_analysis_result`, `weekly_plan_coach_result`, `weekly_plan_active_block_overlay`, `plate_image_rejected`, `rate_limit_exceeded`, `studio_nutrition_macro_retry` y `studio_nutrition_macro_invalid` permiten vigilar degradacion, coste y abuso.
 - Evita incluir imagenes, tokens o datos sensibles en logs.
 - Consulta [`OBSERVABILITY.md`](OBSERVABILITY.md).
 

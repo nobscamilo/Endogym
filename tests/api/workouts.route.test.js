@@ -81,6 +81,34 @@ describe('/api/workouts route', () => {
     expect(mocks.createWorkout).toHaveBeenCalledWith('user-1', payload);
   });
 
+  it('POST accepts manual exercise ids for future load progression', async () => {
+    const payload = {
+      title: 'Torso con cargas',
+      mode: 'studio',
+      source: 'manual',
+      performedAt: '2026-06-01T18:00:00.000Z',
+      completed: true,
+      exercises: [
+        {
+          id: 'gym-bench-press',
+          name: 'Press banca',
+          sets: 4,
+          reps: 6,
+          weightKg: 80,
+        },
+      ],
+    };
+    mocks.createWorkout.mockResolvedValue({ id: 'workout-1', ...payload });
+
+    const response = await POST(new Request('http://localhost/api/workouts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createWorkout).toHaveBeenCalledWith('user-1', payload);
+  });
+
   it('POST accepts an omitted survey only when subjective metrics are absent', async () => {
     const payload = dailyCheckinPayload({
       checkinSkipped: true,

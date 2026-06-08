@@ -82,6 +82,9 @@ export async function listMealsSince(userId, sinceIso, limit = 200) {
 function sanitizeExercise(exercise) {
   if (!exercise || typeof exercise !== 'object') return null;
   return {
+    id: typeof exercise.id === 'string' && exercise.id.trim()
+      ? exercise.id.trim().slice(0, 120)
+      : null,
     name: String(exercise.name || '').slice(0, 200),
     sets: Number.isFinite(Number(exercise.sets)) ? Number(exercise.sets) : null,
     reps: Number.isFinite(Number(exercise.reps)) ? Number(exercise.reps) : null,
@@ -358,6 +361,38 @@ export async function listWeeklyPlans(userId, limit = 4) {
 export async function getLatestWeeklyPlan(userId) {
   const plans = await listWeeklyPlans(userId, 1);
   return plans[0] ?? null;
+}
+
+export async function updateWeeklyPlanAdaptiveOverlay(userId, planId, overlayPatch) {
+  if (!planId || typeof planId !== 'string' || planId.includes('/')) {
+    return null;
+  }
+
+  const { db } = await getAdminServices();
+  const ref = db.collection('users').doc(userId).collection('weeklyPlans').doc(planId);
+  const now = new Date().toISOString();
+
+  const record = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists) return null;
+
+    const current = snapshot.data() || {};
+    const patch = {
+      adaptiveTuning: overlayPatch?.adaptiveTuning || null,
+      progressMemory: overlayPatch?.progressMemory || null,
+      adaptiveOverlay: overlayPatch?.adaptiveOverlay || null,
+      updatedAt: now,
+    };
+    if (Array.isArray(overlayPatch?.days)) {
+      patch.days = overlayPatch.days;
+    }
+
+    const merged = { ...current, ...patch };
+    transaction.set(ref, patch, { merge: true });
+    return merged;
+  });
+
+  return record;
 }
 
 // --- Plan SEMANAL de comidas del Studio (cacheado por semana para no regenerar en cada visita) ---

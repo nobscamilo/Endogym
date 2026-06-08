@@ -27,18 +27,24 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación: **2 de junio de 2026 (auditoría local, despliegue y sonda pública)**.
+Última verificación local: **8 de junio de 2026** (`check:conflicts`, `audit`, `smoke`, `test`, `build`). Último deploy público: **8 de junio de 2026**, `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`, con `/`, `/api/health`, `/api/meals` sin token y puente móvil de auth del Studio verificados. Última sonda integral `e2e:production`: **2 de junio de 2026**.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
-- `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente. La suite tiene `74` tests.
+- `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente. La suite actual tiene `103` tests.
+- `playwright` está instalado como devDependency y Chromium de Playwright está disponible para verificación visual local.
 - `npm audit` devuelve `0` vulnerabilidades tras fijar overrides transitivos seguros para `postcss` y `uuid`.
-- La producción Vercel responde en `/` y `/api/health`; `/api/meals` sin token responde `401`. Producción actual: `dpl_FJ2jWbaV8Ktjy9G57aKMDaVB4t9r`.
+- La producción Vercel responde en `/` y `/api/health`; `/api/meals` sin token responde `401`. Producción actual: `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`.
 - Firebase Authentication, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se validaron con sondas reales.
 - Firebase Admin y Firestore funcionan localmente y en producción con Firebase ID tokens reales.
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu` del proyecto Firebase/GCP; escritura y borrado fueron verificados.
 - Gemini Developer API funciona en producción con una key restringida a `generativelanguage.googleapis.com`. La key expuesta previamente fue revocada y los servicios Vertex quedaron deshabilitados.
 - `POST /api/analyze-plate` fue verificado end-to-end: guarda foto, obtiene inferencia Gemini real, persiste la comida y conserva fallback observable para fallos futuros.
 - `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
+- `POST /api/coach-chat` usa Gemini con contexto real del usuario y rate limiting persistente (`coach-chat`, 20 preguntas/h por defecto).
+- `POST /api/studio-nutrition` genera semana completa con Gemini, cachea por semana, valida kcal/proteína por día antes de guardar planes completos e invalida cache si cambia la huella del plan de entrenamiento.
+- La raíz `/` entrega el Firebase ID token al iframe del Studio por `postMessage` de mismo origen para evitar que móvil/iframe muestre el entreno demo cuando la restauración interna de Firebase Auth se retrasa.
+- Las cargas de ejercicios registradas conservan `exercise.id`, de modo que la progresión por `liftHistory` puede enlazar historial y catálogo por ID estable. Para datos legacy sin ID existe fallback por nombre normalizado.
+- Los bloques activos de 21 días conservan estabilidad, pero exponen un overlay adaptativo diario para reflejar fatiga, FC o check-ins recientes sin regenerar todo el bloque.
 - Las fotos caducan a los 30 días, el bucket no conserva copias recuperables tras borrado y las rutas IA tienen rate limiting persistente en Firestore.
 
 - La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible, atlas anatómico 3D con modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` y vistas frontal/posterior corregidas, y biblioteca de ejercicios con tarjetas colapsables por categoría y modal de detalle.

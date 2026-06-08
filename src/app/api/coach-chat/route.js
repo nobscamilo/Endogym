@@ -1,6 +1,7 @@
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
-import { logError, withTrace } from '../../../lib/logger.js';
+import { logError, logInfo, withTrace } from '../../../lib/logger.js';
+import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import {
   isValidGoogleAiModelName,
   requestGoogleGenerateContent,
@@ -104,6 +105,27 @@ export async function POST(request) {
       return errorResponse('Coach IA no configurado.', 503);
     }
 
+    const rateLimit = await enforceUserRateLimit({
+      userId: user.uid,
+      scope: RATE_LIMIT_SCOPES.COACH_CHAT,
+    });
+    const rateLimitHeaders = getRateLimitHeaders(rateLimit);
+
+    if (!rateLimit.allowed) {
+      logInfo('rate_limit_exceeded', {
+        traceId,
+        userId: user.uid,
+        scope: RATE_LIMIT_SCOPES.COACH_CHAT,
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+      });
+      return errorResponse(
+        'Demasiadas preguntas al coach. Espera antes de volver a intentarlo.',
+        429,
+        { retryAfterSeconds: rateLimit.retryAfterSeconds },
+        rateLimitHeaders
+      );
+    }
+
     const model = resolveGeminiCoachModel();
     if (!isValidGoogleAiModelName(model)) {
       return errorResponse('Modelo Gemini inválido.', 500);
@@ -145,7 +167,7 @@ export async function POST(request) {
         return errorResponse('Respuesta vacía del coach.', 502);
       }
 
-      return jsonResponse({ text });
+      return jsonResponse({ text }, 200, rateLimitHeaders);
     } catch (error) {
       logError('coach_chat_failed', error, { traceId, userId: user.uid });
       return errorResponse('El coach no pudo responder ahora mismo.', 502);

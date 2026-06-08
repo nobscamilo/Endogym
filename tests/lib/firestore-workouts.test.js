@@ -99,4 +99,30 @@ describe('Firestore workout persistence', () => {
     expect(skipped.sleepHours).toBeNull();
     expect(manual.sessionRpe).toBeNull();
   });
+
+  it('persists exercise ids so load history can match the planned catalog', async () => {
+    const manual = await createWorkout('user-1', {
+      title: 'Torso con cargas',
+      mode: 'studio',
+      source: 'manual',
+      performedAt: '2026-06-01T18:00:00.000Z',
+      exercises: [
+        {
+          id: 'gym-bench-press',
+          name: 'Press banca',
+          sets: 4,
+          reps: 6,
+          weightKg: 80,
+        },
+      ],
+    });
+
+    expect(manual.exercises[0]).toMatchObject({
+      id: 'gym-bench-press',
+      name: 'Press banca',
+      sets: 4,
+      reps: 6,
+      weightKg: 80,
+    });
+  });
 });

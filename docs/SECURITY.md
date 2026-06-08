@@ -22,6 +22,7 @@ No copies secretos a documentacion, codigo, screenshots ni salida de terminal. A
 - `x-dev-user-id` no es una credencial.
 - Google OAuth permite el dominio canonico `endogym.vercel.app`; no acumules URLs efimeras de deployments.
 - El 31 de mayo de 2026 se verifico que `/api/meals` sin token devuelve `401`.
+- Ignios Studio vive en un iframe same-origin. La página padre `/` puede pasar el ID token al iframe con `postMessage` restringido a `window.location.origin`; el iframe también valida `event.origin`. No poner tokens en query strings, hashes, logs ni almacenamiento manual.
 
 ## Storage
 
@@ -36,6 +37,7 @@ Las fotos usan `endogym-vtety8-plates-eu`, bucket privado del mismo proyecto Fir
 
 - `POST /api/analyze-plate`: 10 solicitudes cada 600 segundos por usuario.
 - `POST /api/weekly-plan`: 4 solicitudes cada 3600 segundos por usuario.
+- `POST /api/coach-chat`: 20 solicitudes cada 3600 segundos por usuario.
 - Los contadores se guardan en Firestore para que funcionen entre instancias Vercel.
 - HTTP `429` incluye `Retry-After`.
 
@@ -65,6 +67,7 @@ Estas medidas pasaron tests, `next start` local y verificación de cabeceras en 
 - El transporte rechaza nombres de modelo invalidos antes de formar el endpoint.
 - Los logs sustituyen identificadores invalidos por `<invalid-model>` para no persistir valores opacos.
 - El coach limita timeout y reintentos para responder con fallback antes del limite de Vercel.
+- El chat del coach requiere autenticacion, limita el prompt a 4000 caracteres y aplica rate limiting persistente antes de llamar Gemini.
 
 ## Dependencias
 

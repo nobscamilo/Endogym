@@ -1231,7 +1231,30 @@ function resolveTimePrescription(sessionType) {
   return { durationMinutes: 6, workRatio: 'intervalado' };
 }
 
-function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 1, historyLoad = null } = {}) {
+export function normalizeExerciseHistoryKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
+function resolveHistoryLoad(exercise, liftHistory) {
+  if (!liftHistory || !exercise) return { weightKg: null, source: null };
+  if (exercise.id && liftHistory[exercise.id]) {
+    return { weightKg: liftHistory[exercise.id].weightKg, source: 'history' };
+  }
+  const nameKey = normalizeExerciseHistoryKey(exercise.name);
+  const byName = nameKey ? liftHistory.__byName?.[nameKey] : null;
+  if (byName) {
+    return { weightKg: byName.weightKg, source: 'history_name' };
+  }
+  return { weightKg: null, source: null };
+}
+
+function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 1, historyLoad = null, historySource = null } = {}) {
   if (exercise.loadType !== 'external') {
     return { loadKg: null, source: null };
   }
@@ -1246,7 +1269,7 @@ function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 
   if (hl != null && hl >= 5) {
     // Sobrecarga progresiva REAL: parte de tu última carga registrada y progresa por fase/RPE.
     raw = hl * prog * (1 + readinessModifier);
-    source = 'history';
+    source = historySource || 'history';
   } else {
     // Estimación inicial por peso corporal × ratio del ejercicio (hasta tener historial).
     const ratio = toNumber(exercise.loadRatio, 0.15);
@@ -1277,8 +1300,12 @@ function buildExercisePrescription(exercise, { goal, sessionType, profile, adapt
   const repRange = resolveRepRange(goal);
   const setFactor = sessionType === 'mixed' ? 0.9 : 1;
   const sets = Math.max(2, Math.round(repRange.sets * toNumber(adaptiveTuning?.workout?.volumeFactor, 1) * setFactor * clamp(toNumber(setScale, 1), 0.6, 1)));
-  const historyLoad = (liftHistory && exercise.id && liftHistory[exercise.id]) ? liftHistory[exercise.id].weightKg : null;
-  const { loadKg, source } = prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression, historyLoad });
+  const historyEntry = resolveHistoryLoad(exercise, liftHistory);
+  const { loadKg, source } = prescribeLoadKg(exercise, profile, adaptiveTuning, {
+    loadProgression,
+    historyLoad: historyEntry.weightKg,
+    historySource: historyEntry.source,
+  });
 
   return {
     format: 'reps',
@@ -1286,10 +1313,10 @@ function buildExercisePrescription(exercise, { goal, sessionType, profile, adapt
     reps: repRange.reps,
     restSeconds: goal === GoalType.STRENGTH ? 120 : 75,
     loadKg,
-    loadSource: source, // 'history' (desde tu registro) | 'estimate' (estimación inicial)
+    loadSource: source, // 'history'/'history_name' (desde registro) | 'estimate' (estimación inicial)
     loadGuidance:
       loadKg != null
-        ? (source === 'history'
+        ? (source === 'history' || source === 'history_name'
           ? 'Progresa desde tu última carga registrada; termina cada serie con 1-3 reps en reserva (RIR).'
           : 'Estimación inicial: ajusta para terminar con 1-3 reps en reserva (RIR) y se afinará con tu registro.')
         : 'Usa progresión de dificultad (ángulo, palanca o tempo) para mantener RPE objetivo.',

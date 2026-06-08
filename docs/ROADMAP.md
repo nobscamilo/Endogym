@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **2 de junio de 2026 (auditoría local y pública)**.
+Ultima actualizacion: **8 de junio de 2026 (P1/P2 Coach IA + puente auth móvil Studio)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -18,7 +18,7 @@ Ultima actualizacion: **2 de junio de 2026 (auditoría local y pública)**.
 
 - [x] Ejecutar `npm install`.
 - [x] Ejecutar `npm run smoke`.
-- [x] Ejecutar `npm test`: 74 tests.
+- [x] Ejecutar `npm test`: 103 tests.
 - [x] Ejecutar `npm run build`.
 - [x] Actualizar Next a `16.2.6` y eliminar vulnerabilidades altas.
 - [x] Verificar Vercel `/` y `/api/health`.
@@ -35,8 +35,10 @@ Ultima actualizacion: **2 de junio de 2026 (auditoría local y pública)**.
 
 - [x] Validar MIME por magic bytes.
 - [x] Añadir rate limiting persistente.
+- [x] Añadir rate limiting persistente al chat del coach (`coach-chat`, 20/h por defecto).
 - [x] Automatizar E2E controlado contra produccion.
 - [x] Añadir logs estructurados y runbook de observabilidad.
+- [x] Guard de CI contra drift del bundle del Studio: `.github/workflows/studio-bundle-guard.yml` falla si un cambio toca `public/studio/app/studio/**` o `scripts/build-studio.mjs` sin regenerar/commitear `studio.bundle.js` en el mismo conjunto. No regenera bytes en CI (esbuild no es dependencia; salida minificada varía por versión) — solo detecta el olvido de rebuild documentado.
 - [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
 - [x] Aplicar retencion de fotos a 30 dias y deshabilitar soft delete.
 - [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.
@@ -46,6 +48,15 @@ Ultima actualizacion: **2 de junio de 2026 (auditoría local y pública)**.
 - [x] Añadir cabeceras HTTP de hardening: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` y política de framing. Verificado localmente y en producción.
 - [x] Separar rechazos esperados de autenticación de `operation_failed` mediante `operation_rejected`. Desplegado; Runtime Logs filtrados no se reconsultaron por limitación del CLI.
 - [x] Añadir tests de `/api/workouts`, idempotencia diaria y adaptación derivada de check-ins.
+- [x] Añadir tests del flujo `exercise.id` API/repositorio/planner para que `liftHistory` use IDs estables.
+- [x] Añadir fallback legacy de cargas por nombre normalizado (`loadSource:'history_name'`).
+- [x] Mantener bloque activo de 21 días estable con overlay adaptativo diario, sin regenerar el mesociclo.
+- [x] Añadir tests de `structuredAdjustments` del Coach IA con guardarraíles.
+- [x] Añadir validación per-day de macros en `studio-nutrition` con reintento y bloqueo de drift severo.
+- [x] Invalidar cache nutricional por huella del plan de entrenamiento (`meta.planSignature`).
+- [x] Retirar claims personales estáticos del Studio que parecían IA live sin consulta real.
+- [x] Instalar Playwright y verificar Studio localmente con Chromium.
+- [x] Evitar que el iframe del Studio caiga a datos demo en móvil cuando Firebase Auth interno tarda: puente de ID token same-origin padre→iframe verificado localmente y en producción.
 
 ## P2 - UI / Experiencia de usuario
 

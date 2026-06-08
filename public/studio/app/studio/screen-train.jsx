@@ -531,6 +531,8 @@ function TrainSession() {
 function TrainWeek() {
   const D = window.STUDIO;
   const { week, progress } = D;
+  const adjust = D.coachAdjust;
+  const adjustRules = adjust && Array.isArray(adjust.rules) ? adjust.rules : [];
   return (
     <React.Fragment>
       <div className="grid g-4">
@@ -555,16 +557,18 @@ function TrainWeek() {
       <CoachBanner screen="train_week" />
 
       <SectionCard title="Ajustes del coach" icon="sparkles" sub="Cambios automáticos según tu fatiga y adherencia">
-        <div className="grid g-2">
-          <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
-            <strong style={{ fontSize: '0.92rem' }}>Miércoles más suave</strong>
-            <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>Cambié fuerza por movilidad + cardio Z2: tu fatiga acumulada estaba alta.</p>
+        {adjustRules.length ? (
+          <div className="grid g-2">
+            {adjustRules.map((rule, i) => (
+              <div key={rule.id || i} className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
+                <strong style={{ fontSize: '0.92rem' }}>{rule.reason || rule.id || 'Ajuste aplicado'}</strong>
+                <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>{rule.effect || adjust.summary || 'Ajuste automático registrado en el plan.'}</p>
+              </div>
+            ))}
           </div>
-          <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
-            <strong style={{ fontSize: '0.92rem' }}>+1 serie el viernes</strong>
-            <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>Tu adherencia es del 82%, hay margen para subir volumen en full body.</p>
-          </div>
-        </div>
+        ) : (
+          <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>No hay ajustes automáticos activos esta semana. Cuando el coach reduzca o aumente carga por fatiga, FC o adherencia, verás aquí el motivo.</p>
+        )}
       </SectionCard>
     </React.Fragment>
   );

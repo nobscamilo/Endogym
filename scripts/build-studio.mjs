@@ -61,6 +61,46 @@ import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 
 // --- Integración con el backend (sustituye al shim inline del index.html) ---
 let __auth = null;
+let __parentToken = null;
+let __parentTokenWaiters = [];
+
+function __resolveParentToken(token) {
+  if (!token || typeof token !== 'string') return;
+  __parentToken = token;
+  const waiters = __parentTokenWaiters.splice(0);
+  waiters.forEach(function (w) {
+    clearTimeout(w.timer);
+    w.resolve(token);
+  });
+}
+
+function __requestParentToken() {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'IGNIOS_TOKEN_REQUEST' }, window.location.origin);
+    }
+  } catch (e) { /* noop */ }
+}
+
+function __waitForParentToken(timeoutMs) {
+  if (__parentToken) return Promise.resolve(__parentToken);
+  return new Promise(function (resolve) {
+    const waiter = { resolve: resolve, timer: null };
+    waiter.timer = setTimeout(function () {
+      __parentTokenWaiters = __parentTokenWaiters.filter(function (w) { return w !== waiter; });
+      resolve(null);
+    }, timeoutMs);
+    __parentTokenWaiters.push(waiter);
+  });
+}
+
+window.addEventListener('message', function (event) {
+  if (event.origin !== window.location.origin) return;
+  const data = event.data || {};
+  if (data.type === 'IGNIOS_AUTH_TOKEN') __resolveParentToken(data.token);
+});
+__requestParentToken();
+
 const __firebaseReady = fetch('/api/public-config')
   .then((r) => (r.ok ? r.json() : null))
   .then((cfg) => {
@@ -75,8 +115,17 @@ const __firebaseReady = fetch('/api/public-config')
   })
   .catch(() => {});
 
-async function __getIdToken() {
-  try { return __auth && __auth.currentUser ? await __auth.currentUser.getIdToken() : null; } catch (e) { return null; }
+async function __getIdToken(options) {
+  const forceRefresh = Boolean(options && options.forceRefresh);
+  try {
+    if (__auth && __auth.currentUser) {
+      const firebaseToken = await __auth.currentUser.getIdToken(forceRefresh);
+      if (firebaseToken) return firebaseToken;
+    }
+  } catch (e) { /* cae al token del padre */ }
+  if (__parentToken) return __parentToken;
+  __requestParentToken();
+  return await __waitForParentToken(1200);
 }
 window.__getIdToken = __getIdToken;
 window.__signOut = async function () {
@@ -133,9 +182,13 @@ async function __mergeRealData() {
       try { token = await __getIdToken(); } catch (e) { token = null; }
     }
     let r = await __fetchStudioData(token);
+    if (r && r.status === 401) {
+      try { token = await __getIdToken({ forceRefresh: true }); } catch (e) { token = null; }
+      if (token) r = await __fetchStudioData(token);
+    }
     if (!r || !r.ok) {
       await new Promise((res) => setTimeout(res, 800));
-      try { token = await __getIdToken(); } catch (e) { /* mantiene token previo */ }
+      try { token = await __getIdToken({ forceRefresh: r && r.status === 401 }); } catch (e) { /* mantiene token previo */ }
       r = await __fetchStudioData(token);
     }
     if (r && r.ok) {

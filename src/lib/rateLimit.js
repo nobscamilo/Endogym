@@ -3,6 +3,7 @@ import { getAdminServices } from './firebaseAdmin.js';
 export const RATE_LIMIT_SCOPES = Object.freeze({
   PLATE_ANALYSIS: 'plate-analysis',
   WEEKLY_PLAN_GENERATE: 'weekly-plan-generate',
+  COACH_CHAT: 'coach-chat',
 });
 
 const DEFAULT_CONFIG = Object.freeze({
@@ -17,6 +18,12 @@ const DEFAULT_CONFIG = Object.freeze({
     windowSeconds: 60 * 60,
     maxEnv: 'WEEKLY_PLAN_RATE_LIMIT_MAX',
     windowEnv: 'WEEKLY_PLAN_RATE_LIMIT_WINDOW_SECONDS',
+  },
+  [RATE_LIMIT_SCOPES.COACH_CHAT]: {
+    maxRequests: 20,
+    windowSeconds: 60 * 60,
+    maxEnv: 'COACH_CHAT_RATE_LIMIT_MAX',
+    windowEnv: 'COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS',
   },
 });
 

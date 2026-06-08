@@ -25,6 +25,7 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "playwright": "^1.60.0",
     "vitest": "^4.1.7"
   },
   "overrides": {

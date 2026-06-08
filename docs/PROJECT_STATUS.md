@@ -1,6 +1,69 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **7 de junio de 2026 (plan semanal de comidas + foto del plato + app oficial en la raíz "/")**.
+Ultima actualizacion: **8 de junio de 2026 (verificación de cambios sin commitear FASE 4+5 coach)**.
+
+### Verificación de revisión (8 jun 2026, sesión de auditoría)
+
+Revisión de los cambios en working tree (FASE 4+5 coach: periodización de fuerza por interferencia, captura de carga por ejercicio en Entreno → `liftHistory`, ajustes acotados de la IA `structuredAdjustments`; nuevo `src/core/activeBlockOverlay.js`; nuevos tests de `coach-chat` y `studio-nutrition`).
+
+- `vitest run` → **22 archivos, 103 tests, todos en verde**.
+- `npm audit --audit-level=moderate` → **0 vulnerabilidades**.
+- `node scripts/smoke-test.mjs` → OK.
+- `node scripts/check-conflict-markers.mjs` → sin marcadores de conflicto (675 archivos).
+- Revisión de código: guardarraíles de `applyCoachAdjustments` correctos (carga clamp ±10% `[0.9,1.1]`, series clamp ±1, mínimo 1 serie); `buildActiveBlockAdaptiveOverlay` bien protegido (no overlay si el bloque no está activo o `days<14`).
+- **Límite de esta verificación:** `next build` NO se pudo ejecutar en el sandbox Linux por permisos del FS montado (EPERM al borrar `.next/`; turbopack rechaza `node_modules` symlinkeado). El build queda confirmado solo por el registro previo en Mac, no re-ejecutado aquí. Tampoco se corrió `e2e:production` ni sonda autenticada live (Gemini/Firestore/Storage).
+- **Pendiente de commit:** los cambios siguen sin commitear (working tree). Había un `.git/index.lock` residual que conviene revisar antes de commitear.
+
+### Deploy producción (8 jun 2026)
+
+- **Deploy Vercel manual desde working tree local:** `npx vercel --prod --yes` creó `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg` (`https://endogym-hody8p1xq-juan-camilo-sarmientos-projects.vercel.app`), estado `Ready`. Build remoto OK: `npm run build` completado.
+- **Importante:** la CLI volvió a quedarse colgada en `Running Checks` y el alias canónico seguía apuntando al deployment intermedio (`dpl_CYjtCNvCQ4VsanzMzHzx71aAKpc1`, mismo bundle `b3fd227a1c` pero sin el microajuste final de `src/app/page.js`). Se reasignó manualmente con `npx vercel alias set https://endogym-hody8p1xq-juan-camilo-sarmientos-projects.vercel.app endogym.vercel.app`.
+- **Verificado en producción pública:** `https://endogym.vercel.app/studio/app/index.html?verify=b3fd227a1c` sirve `studio.bundle.js?v=b3fd227a1c`; `/` responde `200`; `/api/health` responde `200`; `/api/meals` sin token responde `401`; cabeceras defensivas presentes.
+- **Playwright producción:** usando assets desplegados en `https://endogym.vercel.app`, una página padre same-origin simulada respondió `IGNIOS_TOKEN_REQUEST` y el iframe llamó `/api/studio-data` con `Authorization: Bearer prod-token-parent`; en viewport móvil mostró la sesión real interceptada `Pierna · Fuerza` y no el demo `Empuje · Fuerza`, sin `pageerror`.
+- No se ejecutó `npm run e2e:production` en esta sesión; no afirmar verificación live autenticada de Gemini/Firestore/Storage para este deploy hasta correr esa sonda o probar con sesión real.
+
+### Fix móvil: entreno distinto desktop vs móvil (8 jun 2026)
+
+- **Síntoma reportado:** mismo usuario de Google veía `Pierna` en ordenador y `Torso` en móvil como "entreno de hoy".
+- **Diagnóstico reproducido:** el dataset demo del Studio (`data.js`) contiene `Empuje · Fuerza` con pecho/hombro/tríceps. En Playwright móvil, si el iframe no recibe token y `/api/studio-data` responde `401`, el Studio conserva ese demo. Eso explica el "torso" aunque el plan real del usuario sea pierna.
+- **Causa probable:** carrera de auth entre la raíz `/` (ya autenticada) y el iframe (`/studio/app/index.html`) restaurando Firebase Auth por separado. En móvil esa restauración puede llegar tarde y el primer fetch cae sin `Authorization`.
+- **Solución aplicada:** `src/app/page.js` obtiene/refresca el ID token del usuario y lo entrega al iframe por `postMessage` de mismo origen (`IGNIOS_AUTH_TOKEN`). El bundle (`scripts/build-studio.mjs` → `studio.bundle.js`) pide el token al padre con `IGNIOS_TOKEN_REQUEST`, lo usa como fallback de `__getIdToken()` y fuerza refresh si recibe `401`.
+- **Verificación local:** Playwright móvil y desktop con padre same-origin simulado: `/api/studio-data` recibió `Authorization: Bearer test-token-parent`, se mostró `Pierna · Fuerza` y no apareció `Empuje · Fuerza`. Caso contrario sin padre/token: se reprodujo el fallback demo `Empuje · Fuerza`.
+- **Límite de verificación:** no se validó contra la cuenta real del usuario ni se inspeccionó su plan privado; eso requiere sesión real en el dispositivo o una sonda autenticada autorizada.
+
+## Sesión del 8 de junio de 2026 (Coach IA: contrato real y cuatro P2)
+
+Auditoría crítica del Coach IA y cierre de los cuatro P2 detectados. Cambios aplicados, verificados **localmente** y desplegados manualmente a producción el 8 jun 2026; la verificación pública cubre endpoints básicos, bundle Studio y puente de auth móvil, no una sonda integral autenticada con Gemini/Firestore/Storage.
+
+- **Flujo `exercise.id` cerrado.** `sanitizeExercise()` en `firestoreRepository.js` conserva el ID estable de cada ejercicio registrado (`exercises[].id`) en vez de descartarlo. Esto corrige el eslabón repo/API para que `weekly-plan` pueda construir `liftHistory[id]` y el planner use `loadSource:'history'` cuando hay cargas previas. Tests añadidos en repositorio, `/api/workouts` y core planner.
+- **`structuredAdjustments` cubierto con tests.** `weekly-plan.route.test.js` verifica que los ajustes de la IA se aplican solo a ejercicios de fuerza existentes, con nombre/día válidos, y que los guardarraíles clampan carga a ±10% y series a ±1. Los ejercicios inventados por la IA se ignoran.
+- **Rate limit del chat del coach.** `/api/coach-chat` ahora consume una ventana persistente Firestore `coach-chat` antes de llamar Gemini. Default: `20` preguntas cada `3600` s (`COACH_CHAT_RATE_LIMIT_MAX`, `COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS`). Devuelve cabeceras `ratelimit-*`, `Retry-After` en 429 y log `rate_limit_exceeded`.
+- **Studio sin claims falsos de IA live.** El banner estático del Coach ya no dice `IA · ahora` ni inventa métricas personales; usa `Guía contextual`. La pantalla de Entreno muestra `coachAdjust.rules` reales o un estado vacío honesto. Bundle Studio actual: `studio.bundle.js?v=b3fd227a1c`.
+- **Nutrición Studio endurecida.** `studio-nutrition` valida `macroCheck.perDay` con ratios de kcal/proteína, reintenta una vez si hay drift diario o proteína global baja, guarda el mejor plan y rechaza con `502` si un plan completo mantiene drift severo. Logs nuevos: `studio_nutrition_macro_retry` y `studio_nutrition_macro_invalid`.
+- **Plantilla de entorno actualizada.** `.env.example` y docs de despliegue incluyen las variables de rate limit del chat.
+
+### Continuación P1 (8 jun 2026): bloque activo, historial legacy y nutrición alineada
+
+- **Bloque activo con overlay adaptativo diario.** Sigue sin regenerar el mesociclo de 21 días si está activo, pero `weekly-plan` recalcula `adaptiveTuning`/`progressMemory`, crea `adaptiveOverlay` (`mode:'active_block_daily_overlay'`) y lo persiste en el plan activo sin crear otro documento. `studio-data` también calcula ese overlay en lectura para que el Studio refleje fatiga/FC/check-in recientes aunque el usuario no pulse regenerar. Esto arregla el problema conceptual: estabilidad del bloque sin dejar al coach congelado.
+- **Fallback legacy de cargas por nombre.** Además del flujo correcto por `exercise.id`, el planner puede usar `liftHistory.__byName[normalizeExerciseHistoryKey(name)]` para entrenos antiguos sin ID. Se marca como `loadSource:'history_name'` para no confundirlo con un match fuerte por ID.
+- **Cache nutricional ligado a la huella del entreno.** `studio-nutrition` añade `nutrition.meta.planSignature` (hash de plan, fase, objetivo de carrera, sesiones y objetivos nutricionales por día). `GET /api/studio-nutrition` devuelve `{ empty:true, stale:true }` si el plan cacheado ya no corresponde al entrenamiento actual, provocando regeneración automática en el front sin gastar IA cuando no hace falta.
+- **Playwright instalado.** `playwright` quedó como devDependency y `npx playwright install chromium` completó. Se generaron capturas locales temporales para inspección visual y luego se eliminaron para no ensuciar el repo con binarios.
+
+### Verificación local (8 jun 2026)
+
+- `npm run build:studio` OK (regeneró bundle cache-bust `b3fd227a1c`).
+- `npm run check:conflicts` OK: sin marcadores de conflicto.
+- `npm run audit` OK: `0` vulnerabilidades.
+- `npm run smoke` OK.
+- Tests focalizados P1/P2 OK: **6 archivos, 38 tests**.
+- `npm test` OK: **22 archivos, 103 tests**.
+- `npm run build` OK.
+- Validación HTTP local con `npm run dev`: `/` responde `200`, `/studio/app/index.html` responde `200`, `studio.bundle.js` responde `200`; el bundle ya no contiene `IA · ahora` ni `Marta García`.
+- Verificación visual local con Playwright Chromium:
+  - `/` renderiza landing/login porque `.env.local` tiene `AUTH_DISABLED=false`.
+  - `/studio/app/index.html` renderiza Studio demo completo, sin `pageerror`.
+  - Entreno → Semana muestra `Ajustes del coach`, no muestra `Miércoles más suave` ni `+1 serie el viernes`, y sí muestra el estado vacío honesto. Los `401` de `/api/studio-data` son esperados al abrir el asset directo sin sesión.
+  - Padre same-origin simulado + viewport móvil/desktop: el iframe pide token, llama `/api/studio-data` con `Authorization` y reemplaza el demo de torso por la sesión real interceptada.
 
 ## Sesión del 7 de junio de 2026 (Studio: nutrición semanal, foto del plato y lanzamiento en "/")
 
@@ -122,8 +185,8 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - **Meal plan del coach IA por día (`studio-nutrition`):** el prompt ahora incluye, por cada día, la sesión, el nivel de carbohidratos, el timing y los macros objetivo de ESE día (tomados del plan de entreno). Regla de timing: carbos lentos peri-fuerza, rápidos peri-carrera/series, recarga tras la tirada larga. kcal por día a ±7% de su objetivo propio.
 - **Encuesta/persistencia:** `screen-more.jsx` añade fecha de carrera; `studio-availability` persiste `raceDate`; `studio-data` lo prefija y la UI de Entreno muestra una pastilla de **Fase**.
 - **Coach:** `coach-chat` inyecta fase, semanas a carrera y carbohidratos/timing de hoy.
-- **IMPORTANTE:** Perfil → "Correr + Gym" → objetivo + (marca) + **fecha de carrera** → Regenerar plan. La nutrición se cachea por semana: pulsar "Generar mi plan con IA" en Nutrición para refrescarla tras cambiar el entreno.
-- Pendiente/futuro: que el meal-plan cacheado se invalide automáticamente al regenerar el entreno (hoy es manual).
+- **IMPORTANTE:** Perfil → "Correr + Gym" → objetivo + (marca) + **fecha de carrera** → Regenerar plan. La nutrición se cachea por semana, pero desde el 8 jun se invalida automáticamente si cambia la huella del plan de entrenamiento (`meta.planSignature`).
+- Pendiente/futuro: mejorar UX del aviso de plan nutricional stale; hoy el GET devuelve `empty:true/stale:true` y el front regenera automáticamente.
 
 ### Integración Strava (FC y entrenos) — bundle `dfad737fdd`
 
@@ -197,7 +260,7 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
-- El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.
+- El plan cacheado se versiona por semana (lunes UTC) y por huella del plan de entrenamiento; al cambiar de semana o al cambiar sesiones/macros/fase, se regenera en la siguiente visita a Nutrición.
 
 ## Sesión del 6 de junio de 2026 (mejora del RAG nutricional)
 

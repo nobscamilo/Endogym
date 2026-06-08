@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
@@ -42,8 +42,10 @@ function friendlyAuthError(error) {
 
 export default function HomePage() {
   const firebaseClient = useMemo(() => getFirebaseClient(), []);
+  const studioFrameRef = useRef(null);
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState(null);
+  const [studioToken, setStudioToken] = useState(null);
   const [signedOutRequested, setSignedOutRequested] = useState(false);
 
   const [mode, setMode] = useState('login'); // 'login' or 'register'
@@ -73,6 +75,71 @@ export default function HomePage() {
 
     return unsubscribe;
   }, [firebaseClient]);
+
+  useEffect(() => {
+    let active = true;
+    let refreshTimer = null;
+
+    async function refreshStudioToken(forceRefresh = false) {
+      if (!authUser) {
+        if (active) setStudioToken(null);
+        return;
+      }
+      try {
+        const token = await authUser.getIdToken(forceRefresh);
+        if (active) setStudioToken(token || null);
+      } catch {
+        if (active) setStudioToken(null);
+      }
+    }
+
+    refreshStudioToken(false);
+    if (authUser) {
+      refreshTimer = window.setInterval(() => refreshStudioToken(true), 45 * 60 * 1000);
+    }
+
+    return () => {
+      active = false;
+      if (refreshTimer) window.clearInterval(refreshTimer);
+    };
+  }, [authUser]);
+
+  const postStudioToken = useCallback(async (targetWindow) => {
+    if (typeof window === 'undefined') return;
+    let token = studioToken;
+    if (!token && authUser) {
+      try {
+        token = await authUser.getIdToken();
+        if (token) setStudioToken(token);
+      } catch {
+        token = null;
+      }
+    }
+    if (!token) return;
+    const frameWindow = targetWindow || studioFrameRef.current?.contentWindow;
+    if (!frameWindow) return;
+    try {
+      frameWindow.postMessage({ type: 'IGNIOS_AUTH_TOKEN', token }, window.location.origin);
+    } catch {
+      // El iframe puede haberse desmontado durante el refresh del token.
+    }
+  }, [authUser, studioToken]);
+
+  useEffect(() => {
+    postStudioToken();
+  }, [postStudioToken]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    function handleStudioMessage(event) {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'IGNIOS_TOKEN_REQUEST') {
+        postStudioToken(event.source);
+      }
+    }
+    window.addEventListener('message', handleStudioMessage);
+    return () => window.removeEventListener('message', handleStudioMessage);
+  }, [postStudioToken]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -226,9 +293,11 @@ export default function HomePage() {
   if (showApp) {
     return (
       <iframe
+        ref={studioFrameRef}
         src="/studio/app/index.html"
         title="Ignios"
         allow="camera; fullscreen"
+        onLoad={() => postStudioToken()}
         style={{
           position: 'fixed',
           inset: 0,

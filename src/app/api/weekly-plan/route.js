@@ -1,4 +1,5 @@
 import { buildHeuristicCoachPlan, generateWeeklyPlan, generateBlockPlan, normalizeWeeklyPlanSessionFocus } from '../../../core/planner.js';
+import { buildActiveBlockAdaptiveOverlay, isActiveBlockPlan } from '../../../core/activeBlockOverlay.js';
 
 // Aplica los ajustes estructurados del coach IA al plan, SIEMPRE dentro de límites de seguridad
 // (carga ±10%, series ±1) y solo a ejercicios de fuerza existentes. Devuelve cuántos aplicó.
@@ -24,7 +25,7 @@ function applyCoachAdjustments(days, adjustments) {
 }
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
 import { evaluatePreparticipationScreening } from '../../../core/screening.js';
-import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
+import { normalizeExerciseHistoryKey, resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import {
   callGeminiExerciseCoach,
   isGeminiConfigured,
@@ -41,6 +42,7 @@ import {
   listMetricsSince,
   listWorkoutsSince,
   listWeeklyPlans,
+  updateWeeklyPlanAdaptiveOverlay,
   updateWeeklyPlanCustomizations,
   upsertUserProfile,
 } from '../../../lib/repositories/firestoreRepository.js';
@@ -360,17 +362,39 @@ export async function POST(request) {
       const currentPlan = await getLatestWeeklyPlan(user.uid);
       const todayStr = new Date().toISOString().slice(0, 10);
       const rebuild = payload.rebuild === true;
-      const activeBlock = currentPlan && currentPlan.isBlock
-        && typeof currentPlan.blockEndDate === 'string' && currentPlan.blockEndDate >= todayStr
-        && Array.isArray(currentPlan.days) && currentPlan.days.length >= 14;
+      const activeBlock = isActiveBlockPlan(currentPlan, todayStr);
       if (activeBlock && !rebuild) {
+        const overlayResult = buildActiveBlockAdaptiveOverlay({
+          plan: currentPlan,
+          adaptiveTuning,
+          progressMemory,
+          now,
+        });
+        const overlayPlan = overlayResult.plan || currentPlan;
+        const persistedPlan = await updateWeeklyPlanAdaptiveOverlay(user.uid, currentPlan.id, {
+          adaptiveTuning,
+          progressMemory,
+          adaptiveOverlay: overlayResult.overlay,
+          days: overlayPlan.days,
+        }).catch((error) => {
+          logError('weekly_plan_active_block_overlay_failed', error, { traceId, userId: user.uid, planId: currentPlan.id });
+          return null;
+        });
+        logInfo('weekly_plan_active_block_overlay', {
+          traceId,
+          userId: user.uid,
+          planId: currentPlan.id,
+          rules: overlayResult.overlay?.rules?.length || 0,
+          volumeFactor: overlayResult.overlay?.volumeFactor ?? null,
+        });
         return jsonResponse({
           ok: true,
           stable: true,
-          plan: currentPlan,
+          plan: persistedPlan || overlayPlan,
+          adaptiveOverlay: overlayResult.overlay,
           blockStartDate: currentPlan.blockStartDate,
           blockEndDate: currentPlan.blockEndDate,
-          message: 'Bloque activo: el plan se mantiene estable. Usa los ajustes del día para cambios pequeños.',
+          message: 'Bloque activo: se mantiene el mesociclo y se refresca el ajuste adaptativo del día.',
         });
       }
 
@@ -380,8 +404,16 @@ export async function POST(request) {
       for (const w of (recentWorkouts || [])) {
         for (const e of (Array.isArray(w.exercises) ? w.exercises : [])) {
           const wk = Number(e?.weightKg);
-          if (!e?.id || !Number.isFinite(wk) || wk <= 0 || liftHistory[e.id]) continue;
-          liftHistory[e.id] = { weightKg: wk, reps: Number(e.reps) || null };
+          if (!Number.isFinite(wk) || wk <= 0) continue;
+          const entry = { weightKg: wk, reps: Number(e.reps) || null, name: e.name || null };
+          if (e?.id && !liftHistory[e.id]) {
+            liftHistory[e.id] = { ...entry, source: 'id' };
+          }
+          const nameKey = normalizeExerciseHistoryKey(e?.name);
+          if (nameKey && !liftHistory.__byName?.[nameKey]) {
+            liftHistory.__byName = liftHistory.__byName || {};
+            liftHistory.__byName[nameKey] = { ...entry, id: e?.id || null, source: e?.id ? 'id_name_alias' : 'name' };
+          }
         }
       }
 

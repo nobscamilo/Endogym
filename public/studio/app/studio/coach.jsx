@@ -3,11 +3,11 @@ const { useState: useStateC, useEffect: useEffectC, useRef: useRefC } = React;
 
 /* Mensajes del coach según el contexto/pantalla */
 const COACH_MSGS = {
-  train_session: 'Tu volumen de empuje va equilibrado esta semana. El jueves toca tracción para compensar la espalda — hoy puedes apretar sin miedo.',
-  train_week: 'Bajé el miércoles a movilidad porque tu fatiga acumulada estaba alta, y sumé una serie el viernes: tu adherencia (82%) da margen.',
-  nutrition_today: 'Tu reparto de hoy está bien: te quedan 740 kcal y vas sobrada de proteína. Deja los carbohidratos más densos para después de entrenar.',
-  glucemia: 'Carga glucémica del día baja-moderada. Tu cena de salmón y boniato mantiene la curva plana antes de dormir — buena elección.',
-  progress: 'Vas −1,6 kg en 6 semanas perdiendo sobre todo grasa: tu fuerza sube en los tres básicos. El ritmo es sostenible, mantén la proteína alta.',
+  train_session: 'Usa la sesión como guía, registra cómo respondes y ajusta la carga real con margen técnico. El coach afina mejor cuando el dato de entrenamiento es honesto.',
+  train_week: 'La semana combina carga, recuperación y adherencia. Si aparece fatiga alta o una señal de alarma, el ajuste real se mostrará con su motivo.',
+  nutrition_today: 'Revisa el objetivo del día y reparte proteína, fibra y carbohidratos según tu entrenamiento. Las comidas registradas actualizan el resumen.',
+  glucemia: 'La carga glucémica estimada orienta decisiones, pero no sustituye un sensor ni criterio clínico. Prioriza comidas completas y observa tu respuesta.',
+  progress: 'Mira tendencias, no solo un día aislado. Peso, sesiones, sueño y cargas registradas son las señales que más ayudan al coach.',
 };
 
 /* Reveal tipo "máquina de escribir" (usa timers, fiable aunque el reloj de animación se limite) */
@@ -38,7 +38,7 @@ function CoachBanner({ screen, ask = false, onAsk }) {
     <div className="coach-banner">
       <span className="cb-av"><Icon name="sparkles" size={17} /><span className="cb-live" /></span>
       <div className="cb-body">
-        <div className="cb-head"><strong>Coach Ignios</strong><span className="cb-tag">IA · ahora</span></div>
+        <div className="cb-head"><strong>Coach Ignios</strong><span className="cb-tag">Guía contextual</span></div>
         {thinking ? (
           <div className="cb-typing"><span /><span /><span /></div>
         ) : (
@@ -60,7 +60,7 @@ const COACH_SUGGEST = [
   '¿Por qué bajaste el miércoles?',
 ];
 const COACH_FALLBACK = {
-  default: 'Vas muy bien: −1,6 kg en 6 semanas perdiendo grasa y subiendo fuerza. Mantén la proteína sobre 145 g, prioriza técnica antes que carga y descansa esta noche 7-8 h. Mañana, a por la pierna.',
+  default: 'Ahora no puedo consultar el motor IA. Usa el plan como referencia, prioriza técnica y seguridad, y registra la sesión para que el próximo ajuste tenga mejores datos.',
 };
 
 function AskCoach({ open, onClose }) {

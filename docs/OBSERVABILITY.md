@@ -1,6 +1,6 @@
 # Observabilidad operativa
 
-Ultima actualizacion: **2 de junio de 2026**.
+Ultima actualizacion: **8 de junio de 2026**.
 
 ## Estado real
 
@@ -17,7 +17,13 @@ Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel e
 | `plate_analysis_result` | Resultado de plato persistido. | Vigilar `fallbackApplied` y `storageSaved`. |
 | `weekly_plan_coach_result` | Resultado de generacion semanal. | Vigilar `fallbackApplied` y `coachFailureCode`. |
 | `plate_image_rejected` | La firma MIME o el Content-Type de una imagen no es valido. | Investigar picos por cliente defectuoso o abuso. |
-| `rate_limit_exceeded` | Un usuario supero una ventana persistente. | Investigar picos y ajustar limites solo con evidencia. |
+| `rate_limit_exceeded` | Un usuario supero una ventana persistente. | Revisar `scope` (`plate-analysis`, `weekly-plan-generate`, `coach-chat`) antes de ajustar limites. |
+| `weekly_plan_active_block_overlay` | Un bloque activo fue refrescado con overlay adaptativo sin regenerar el mesociclo. | Vigilar `rules` y `volumeFactor`; confirma que check-ins/FC se reflejan. |
+| `weekly_plan_active_block_overlay_failed` | Fallo al persistir el overlay adaptativo del bloque activo. | La respuesta puede usar overlay en memoria, pero Studio futuro podría quedar stale. |
+| `studio_nutrition_macro_retry` | El plan semanal IA tuvo drift de macros y se reintento una vez. | Vigilar frecuencia; si sube, ajustar prompt o umbrales. |
+| `studio_nutrition_macro_invalid` | El plan completo mantuvo drift severo y no se guardo. | Revisar `severeDriftDays`, proveedor y calidad del prompt. |
+| `coach_chat_failed` | El chat del coach no pudo responder tras llamar Gemini. | Revisar status del proveedor, payload y `traceId`. |
+| `coach_chat_http_error` | Gemini respondio HTTP no OK para el chat. | Revisar status y detalle truncado. |
 
 No registres imagenes, tokens, API keys ni datos nutricionales completos en logs.
 
@@ -33,7 +39,11 @@ npx vercel logs --environment production --since 1h --query 'operation_rejected'
 npx vercel logs --environment production --since 1h --query 'gemini_call_failed' --no-branch
 npx vercel logs --environment production --since 1h --query 'plate_analysis_result' --no-branch
 npx vercel logs --environment production --since 1h --query 'weekly_plan_coach_result' --no-branch
+npx vercel logs --environment production --since 1h --query 'weekly_plan_active_block_overlay' --no-branch
 npx vercel logs --environment production --since 1h --query 'rate_limit_exceeded' --no-branch
+npx vercel logs --environment production --since 1h --query 'studio_nutrition_macro_retry' --no-branch
+npx vercel logs --environment production --since 1h --query 'studio_nutrition_macro_invalid' --no-branch
+npx vercel logs --environment production --since 1h --query 'coach_chat_failed' --no-branch
 npx vercel logs --environment production --since 1h --status-code 500 --no-branch
 ```
 
@@ -48,6 +58,7 @@ Cuando se habilite un canal de alertas:
 | `fallbackApplied=true` | Mas del 10% de analisis o planes en 15 minutos. |
 | `storageSaved=false` | Cualquier evento en produccion. |
 | `rate_limit_exceeded` | Mas de 5 eventos por usuario o pico global en 10 minutos. |
+| `studio_nutrition_macro_invalid` | Cualquier pico repetido; un evento aislado puede ser variabilidad del proveedor. |
 
 ## Pendiente externo
 

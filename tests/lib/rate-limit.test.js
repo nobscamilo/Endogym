@@ -44,6 +44,8 @@ describe('persistent Firestore rate limit', () => {
   const envBackup = {
     PLATE_ANALYSIS_RATE_LIMIT_MAX: process.env.PLATE_ANALYSIS_RATE_LIMIT_MAX,
     PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS: process.env.PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS,
+    COACH_CHAT_RATE_LIMIT_MAX: process.env.COACH_CHAT_RATE_LIMIT_MAX,
+    COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS: process.env.COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS,
   };
 
   beforeEach(() => {
@@ -52,11 +54,18 @@ describe('persistent Firestore rate limit', () => {
     mocks.getAdminServices.mockResolvedValue({ db });
     process.env.PLATE_ANALYSIS_RATE_LIMIT_MAX = '2';
     process.env.PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS = '60';
+    process.env.COACH_CHAT_RATE_LIMIT_MAX = '3';
+    process.env.COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS = '120';
   });
 
   afterEach(() => {
-    process.env.PLATE_ANALYSIS_RATE_LIMIT_MAX = envBackup.PLATE_ANALYSIS_RATE_LIMIT_MAX;
-    process.env.PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS = envBackup.PLATE_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS;
+    for (const [key, value] of Object.entries(envBackup)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
   });
 
   it('allows requests until the distributed window is exhausted', async () => {
@@ -127,6 +136,27 @@ describe('persistent Firestore rate limit', () => {
       'ratelimit-remaining': '0',
       'ratelimit-reset': '60',
       'retry-after': '60',
+    });
+  });
+
+  it('supports a separate coach chat budget', async () => {
+    const now = new Date('2026-06-08T20:00:00.000Z');
+    await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.COACH_CHAT, now });
+    await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.COACH_CHAT, now });
+    const third = await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.COACH_CHAT, now });
+    const fourth = await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.COACH_CHAT, now });
+
+    expect(third).toEqual({
+      allowed: true,
+      limit: 3,
+      remaining: 0,
+      retryAfterSeconds: 120,
+    });
+    expect(fourth).toEqual({
+      allowed: false,
+      limit: 3,
+      remaining: 0,
+      retryAfterSeconds: 120,
     });
   });
 });

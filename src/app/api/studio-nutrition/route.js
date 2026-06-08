@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { withTrace, logError, logInfo } from '../../../lib/logger.js';
@@ -28,6 +29,51 @@ function currentWeekKey() {
   const diff = day === 0 ? -6 : 1 - day; // días hasta el lunes
   const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diff));
   return monday.toISOString().slice(0, 10);
+}
+
+function stableRound(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.round(numeric) : null;
+}
+
+function compactNutritionTarget(target = {}) {
+  return {
+    kcal: stableRound(target.targetCalories ?? target.calories),
+    protein: stableRound(target.proteinGrams),
+    carbs: stableRound(target.carbsGrams),
+    fat: stableRound(target.fatGrams),
+    carbLevel: target.carbLevel || null,
+    carbTiming: target.carbTiming || null,
+  };
+}
+
+function planNutritionSignature(plan) {
+  if (!plan || typeof plan !== 'object') return 'no-weekly-plan';
+  const days = Array.isArray(plan.days) ? plan.days : [];
+  const payload = {
+    version: 1,
+    planId: plan.id || null,
+    isBlock: plan.isBlock === true,
+    blockStartDate: plan.blockStartDate || null,
+    blockEndDate: plan.blockEndDate || null,
+    phase: plan.phase || null,
+    phaseLabel: plan.phaseLabel || null,
+    raceGoal: plan.raceGoal || null,
+    weeksToRace: Number.isFinite(Number(plan.weeksToRace)) ? Number(plan.weeksToRace) : null,
+    runPaces: plan.runPaces || null,
+    baseTarget: compactNutritionTarget(plan.baseTarget),
+    days: days.map((day) => ({
+      date: day.date || null,
+      sessionType: day.sessionType || null,
+      sessionFocus: day.sessionFocus || day.workout?.sessionFocus || null,
+      title: day.workout?.title || null,
+      durationMinutes: stableRound(day.workout?.durationMinutes),
+      runType: day.workout?.runPrescription?.runType || null,
+      runStructure: day.workout?.runPrescription?.structure || null,
+      nutritionTarget: compactNutritionTarget(day.nutritionTarget),
+    })),
+  };
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 16);
 }
 
 // Pistas de estilo de desayuno por bloque, para diversificar entre días (los bloques se
@@ -263,6 +309,8 @@ Devuelve SOLO el JSON del esquema.`;
     }
 
     // Verificación de macros en servidor: compara los totales reales por día con el objetivo.
+    // El prompt pide ±7% kcal y proteína prioritaria. Reintentamos ante drift diario y bloqueamos
+    // solo desviaciones severas para evitar guardar un plan claramente malo sin fragilizar la ruta.
     function macroCheck(days) {
       let pAct = 0; let pTgt = 0; let kAct = 0; let kTgt = 0; let n = 0;
       const perDay = [];
@@ -274,29 +322,77 @@ Devuelve SOLO el JSON del esquema.`;
           kcal: a.kcal + (Number(m.kcal) || 0), p: a.p + (Number(m.p) || 0),
         }), { kcal: 0, p: 0 });
         pAct += sum.p; pTgt += ctx.protein; kAct += sum.kcal; kTgt += ctx.kcal; n += 1;
-        perDay.push({ day: d.day, kcal: sum.kcal, protein: sum.p, kcalTarget: ctx.kcal, proteinTarget: ctx.protein });
+        const kcalRatio = ctx.kcal ? sum.kcal / ctx.kcal : 1;
+        const proteinRatio = ctx.protein ? sum.p / ctx.protein : 1;
+        perDay.push({
+          day: d.day,
+          kcal: sum.kcal,
+          protein: sum.p,
+          kcalTarget: ctx.kcal,
+          proteinTarget: ctx.protein,
+          kcalRatio: Math.round(kcalRatio * 100) / 100,
+          proteinRatio: Math.round(proteinRatio * 100) / 100,
+          kcalOutOfRange: kcalRatio < 0.93 || kcalRatio > 1.07,
+          proteinOutOfRange: proteinRatio < 0.90 || proteinRatio > 1.15,
+          severeDrift: kcalRatio < 0.85 || kcalRatio > 1.15 || proteinRatio < 0.75,
+        });
       }
       const proteinRatio = pTgt ? pAct / pTgt : 1;
       const kcalRatio = kTgt ? kAct / kTgt : 1;
-      return { n, proteinRatio: Math.round(proteinRatio * 100) / 100, kcalRatio: Math.round(kcalRatio * 100) / 100, perDay };
+      const driftDays = perDay.filter((d) => d.kcalOutOfRange || d.proteinOutOfRange);
+      const severeDriftDays = perDay.filter((d) => d.severeDrift);
+      return {
+        n,
+        proteinRatio: Math.round(proteinRatio * 100) / 100,
+        kcalRatio: Math.round(kcalRatio * 100) / 100,
+        driftDays: driftDays.map((d) => d.day),
+        severeDriftDays: severeDriftDays.map((d) => d.day),
+        perDay,
+      };
     }
 
     try {
       let best = await generateAll();
       let check = macroCheck(best.days);
-      // Si la proteína queda claramente por debajo del objetivo, reintenta UNA vez y quédate
-      // con el mejor de los dos (verificación con coste acotado).
-      if (best.days.length >= 7 && check.n >= 4 && check.proteinRatio < 0.82) {
+      // Si hay drift diario o proteína global claramente baja, reintenta UNA vez y quédate con
+      // el mejor de los dos (verificación con coste acotado).
+      if (best.days.length >= 7 && check.n >= 4 && (check.proteinRatio < 0.82 || check.driftDays.length > 0)) {
         const retry = await generateAll();
         const rc = macroCheck(retry.days);
-        if (retry.days.length >= 7 && rc.proteinRatio > check.proteinRatio) { best = retry; check = rc; }
-        logInfo('studio_nutrition_protein_retry', { traceId, userId: user.uid, proteinRatio: check.proteinRatio });
+        const score = (c) => c.severeDriftDays.length * 10 + c.driftDays.length + Math.max(0, 0.9 - c.proteinRatio) * 10;
+        if (retry.days.length >= 7 && score(rc) < score(check)) { best = retry; check = rc; }
+        logInfo('studio_nutrition_macro_retry', {
+          traceId,
+          userId: user.uid,
+          proteinRatio: check.proteinRatio,
+          driftDays: check.driftDays,
+          severeDriftDays: check.severeDriftDays,
+        });
       }
 
       const { days, shopping, batch, failed } = best;
       if (!days.length) return errorResponse('No se pudo generar el plan ahora mismo.', 502);
+      if (days.length >= 7 && check.severeDriftDays.length > 0) {
+        logError('studio_nutrition_macro_invalid', new Error('Macro drift severo en plan IA'), {
+          traceId,
+          userId: user.uid,
+          severeDriftDays: check.severeDriftDays,
+        });
+        return errorResponse('El plan generado no cumplió los objetivos nutricionales. Inténtalo de nuevo.', 502, { macroCheck: check });
+      }
 
-      const nutrition = { days, shopping, batch };
+      const nutrition = {
+        days,
+        shopping,
+        batch,
+        meta: {
+          version: 1,
+          weekKey: currentWeekKey(),
+          planId: plan?.id || null,
+          planSignature: planNutritionSignature(plan),
+          generatedAt: new Date().toISOString(),
+        },
+      };
       if (days.length >= 7) {
         await saveStudioNutritionPlan(user.uid, currentWeekKey(), nutrition).catch(() => null);
       }
@@ -320,8 +416,23 @@ export async function GET(request) {
       if (error instanceof AuthenticationError) return errorResponse('Autenticación requerida.', 401);
       throw error;
     }
-    const nutrition = await getStudioNutritionPlan(user.uid, currentWeekKey()).catch(() => null);
+    const [nutrition, plan] = await Promise.all([
+      getStudioNutritionPlan(user.uid, currentWeekKey()).catch(() => null),
+      getLatestWeeklyPlan(user.uid).catch(() => null),
+    ]);
     if (!nutrition) return jsonResponse({ ok: true, empty: true });
-    return jsonResponse({ ok: true, nutrition, cached: true });
+    const expectedSignature = planNutritionSignature(plan);
+    const cachedSignature = nutrition?.meta?.planSignature || null;
+    if (cachedSignature !== expectedSignature) {
+      return jsonResponse({
+        ok: true,
+        empty: true,
+        stale: true,
+        cached: false,
+        reason: cachedSignature ? 'training_plan_changed' : 'legacy_cache_missing_signature',
+        planSignature: expectedSignature,
+      });
+    }
+    return jsonResponse({ ok: true, nutrition, cached: true, planSignature: expectedSignature });
   });
 }
