@@ -786,6 +786,11 @@ function hashToInt(value) {
   return h;
 }
 
+// Factor de interferencia (concurrente correr+gym): cuánto se reduce el volumen de FUERZA
+// según la fase de carrera. En fases de alta carga (pico/taper) se baja más para priorizar
+// la recuperación y el rendimiento en carrera.
+const INTERFERENCE_BY_PHASE = { base: 1.0, build: 0.9, peak: 0.82, taper: 0.8, deload: 0.85 };
+
 function computeUserSeed(profile, goal, userId) {
   const identity = userId
     || profile?.userId
@@ -859,6 +864,9 @@ export function generateWeeklyPlan({
       sessionMinutes: templateDay.durationMinutes,
       loadProgression: phaseParams.loadFactor || 1,
       liftHistory,
+      interferenceScale: ((modality === TrainingModality.HYBRID_RUN_GYM || modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING)
+        && (templateDay.sessionType === 'resistance' || templateDay.sessionType === 'mixed'))
+        ? (INTERFERENCE_BY_PHASE[trainingPhase] ?? 1) : 1,
     });
 
     // Duración planificada. Aplica volumen base × factor de FASE (periodización).

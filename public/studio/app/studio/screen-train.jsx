@@ -271,6 +271,8 @@ function TrainSession() {
   const [busy, setBusy] = useStateTr(null); // 'all' | exerciseId | null
   const [reason, setReason] = useStateTr('variety');
   const [moreMin, setMoreMin] = useStateTr('');
+  const [logKg, setLogKg] = useStateTr({});
+  const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -298,6 +300,32 @@ function TrainSession() {
       });
       if (r.ok) await refreshSession();
     } catch (e) { /* noop */ } finally { setBusy(null); }
+  }
+  async function logSession() {
+    setLogStatus('saving');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setLogStatus('err'); return; }
+      const today = new Date().toISOString().slice(0, 10);
+      const exercises = list
+        .filter((e) => e.loadKg != null)
+        .map((e) => ({
+          id: e.id || null,
+          name: e.name,
+          weightKg: Number(logKg[e.id] ?? e.loadKg) || null,
+          reps: e.reps ?? null,
+          sets: e.sets ?? null,
+        }))
+        .filter((e) => e.id && e.weightKg);
+      if (!exercises.length) { setLogStatus('err'); return; }
+      const r = await fetch('/api/workouts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ source: 'manual', performedAt: `${today}T12:00:00.000Z`, title: (s.title || 'Sesión'), mode: 'studio', completed: true, exercises }),
+      });
+      setLogStatus(r.ok ? 'ok' : 'err');
+      if (r.ok) setTimeout(() => setLogStatus('idle'), 3000);
+    } catch (e) { setLogStatus('err'); }
   }
   async function extend() {
     setBusy('all');
@@ -415,6 +443,11 @@ function TrainSession() {
               </div>
               <div className="ex-sets">
                 <span className="ex-scheme">{ex.scheme}</span>
+                {ex.loadKg != null ? (
+                  <input className="text-input" type="number" min="0" step="2.5" style={{ width: 62 }}
+                    title="Carga usada (kg)" placeholder={`${ex.loadKg}`}
+                    value={logKg[ex.id] ?? ''} onChange={(e) => setLogKg((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                ) : null}
                 {ex.id ? (
                   <button className="ex-swap" title="Cambiar ejercicio" disabled={busy === ex.id} onClick={() => swap('one', ex.id)}>
                     <Icon name={busy === ex.id ? 'clock' : 'sparkles'} size={15} />
@@ -425,6 +458,16 @@ function TrainSession() {
             </div>
           ))}
         </div>
+        {list.some((e) => e.loadKg != null) ? (
+          <div className="row ac wrap" style={{ gap: 12, marginTop: 14 }}>
+            <button className="btn" onClick={logSession} disabled={logStatus === 'saving'}>
+              <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : 'Registrar sesión hecha'}
+            </button>
+            {logStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Registrado · tus cargas afinarán la progresión ✨</span> : null}
+            {logStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo registrar.</span> : null}
+            <span className="tiny muted">Anota la carga real de cada ejercicio para que el coach progrese desde tus datos.</span>
+          </div>
+        ) : null}
       </SectionCard>
 
       {/* Calentamiento y enfriamiento */}

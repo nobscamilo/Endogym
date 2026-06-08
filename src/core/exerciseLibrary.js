@@ -1258,7 +1258,7 @@ function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 
   return { loadKg: roundToStep(bounded, 2.5), source };
 }
 
-function buildExercisePrescription(exercise, { goal, sessionType, profile, adaptiveTuning, loadProgression = 1, liftHistory = null }) {
+function buildExercisePrescription(exercise, { goal, sessionType, profile, adaptiveTuning, loadProgression = 1, liftHistory = null, setScale = 1 }) {
   if (exercise.loadType === 'time') {
     const time = resolveTimePrescription(sessionType);
     const baseMinutes = time.durationMinutes;
@@ -1276,7 +1276,7 @@ function buildExercisePrescription(exercise, { goal, sessionType, profile, adapt
 
   const repRange = resolveRepRange(goal);
   const setFactor = sessionType === 'mixed' ? 0.9 : 1;
-  const sets = Math.max(2, Math.round(repRange.sets * toNumber(adaptiveTuning?.workout?.volumeFactor, 1) * setFactor));
+  const sets = Math.max(2, Math.round(repRange.sets * toNumber(adaptiveTuning?.workout?.volumeFactor, 1) * setFactor * clamp(toNumber(setScale, 1), 0.6, 1)));
   const historyLoad = (liftHistory && exercise.id && liftHistory[exercise.id]) ? liftHistory[exercise.id].weightKg : null;
   const { loadKg, source } = prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression, historyLoad });
 
@@ -1466,6 +1466,7 @@ export function buildSessionExercises({
   sessionMinutes = null,
   loadProgression = 1,
   liftHistory = null,
+  interferenceScale = 1,
 }) {
   const resolvedSessionFocus = sessionFocus || resolveSessionFocus({ modality, sessionType, sessionTitle });
   const pool = listBaseSessionExercises(modality, sessionType, resolvedSessionFocus);
@@ -1501,6 +1502,12 @@ export function buildSessionExercises({
     desiredCount = 4;
   }
 
+  // Interferencia (concurrente correr+gym): reduce el nº de ejercicios de fuerza en fases de
+  // alta carga de carrera para no comprometer la recuperación ni el rendimiento de carrera.
+  if ((sessionType === 'resistance' || sessionType === 'mixed') && interferenceScale < 1) {
+    desiredCount = Math.max(3, Math.round(desiredCount * interferenceScale));
+  }
+
   const selectedPool = selectExercisesFromPool(pool, {
     desiredCount: Math.min(desiredCount, pool.length),
     sessionType,
@@ -1531,6 +1538,7 @@ export function buildSessionExercises({
         adaptiveTuning,
         loadProgression,
         liftHistory,
+        setScale: (sessionType === 'resistance' || sessionType === 'mixed') ? interferenceScale : 1,
       }),
     };
   });

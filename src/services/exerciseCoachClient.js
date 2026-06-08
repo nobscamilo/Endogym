@@ -32,6 +32,20 @@ const COACH_SCHEMA = {
       items: { type: 'string' },
     },
     medicalDisclaimer: { type: 'string' },
+    // Ajustes ESTRUCTURADOS y acotados que el servidor aplica al plan (con guardarraíles).
+    structuredAdjustments: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['day', 'exercise'],
+        properties: {
+          day: { type: 'string' },
+          exercise: { type: 'string' },
+          loadPct: { type: 'number' },
+          setsDelta: { type: 'integer' },
+        },
+      },
+    },
   },
 };
 
@@ -156,6 +170,22 @@ function sanitizeCoachPayload(payload) {
       typeof payload?.medicalDisclaimer === 'string' && payload.medicalDisclaimer.trim()
         ? payload.medicalDisclaimer.trim()
         : 'Este contenido no reemplaza valoración médica individual.',
+    // Ajustes estructurados ACOTADOS (guardarraíles): carga ±10%, series ±1.
+    structuredAdjustments: Array.isArray(payload?.structuredAdjustments)
+      ? payload.structuredAdjustments
+        .filter((a) => a && typeof a.day === 'string' && typeof a.exercise === 'string' && a.day.trim() && a.exercise.trim())
+        .map((a) => {
+          const lp = Number(a.loadPct);
+          const sd = Number(a.setsDelta);
+          return {
+            day: a.day.trim(),
+            exercise: a.exercise.trim(),
+            loadPct: Number.isFinite(lp) ? Math.min(1.1, Math.max(0.9, lp)) : 1,
+            setsDelta: Number.isFinite(sd) ? Math.min(1, Math.max(-1, Math.round(sd))) : 0,
+          };
+        })
+        .slice(0, 8)
+      : [],
   };
 }
 

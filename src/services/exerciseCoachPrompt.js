@@ -109,7 +109,10 @@ Formato requerido:
     }
   ],
   "riskFlags": ["string"],
-  "medicalDisclaimer": "string"
+  "medicalDisclaimer": "string",
+  "structuredAdjustments": [
+    { "day": "string (uno de la lista de días)", "exercise": "string (nombre EXACTO del ejercicio del plan)", "loadPct": 1.05, "setsDelta": 0 }
+  ]
 }
 
 Reglas:
@@ -128,5 +131,6 @@ Reglas:
 13) Evita texto genérico; cada ajuste debe mencionar la sesión o patrón muscular al que aplica.
 14) Si el plan ya es razonable, el ajuste puede ser "mantener" pero debe incluir condición clara de progresión o deload.
 15) coachSummary debe ser motivador, concreto y compacto; si hay progreso positivo, reconócelo brevemente. acsmJustification debe ser técnico pero comprensible. No repitas el prompt.
+16) structuredAdjustments (OPCIONAL, máx 8): cambios ACOTADOS y seguros sobre ejercicios de FUERZA ya existentes en el plan. SOLO se permite: loadPct entre 0.90 y 1.10 (±10% de carga) y setsDelta entre -1 y +1. Usa el nombre EXACTO del ejercicio tal como aparece en el plan y un "day" de la lista. NO inventes ejercicios ni cambios fuera de esos rangos. El servidor los aplicará con límites de seguridad; si no estás seguro, deja la lista vacía.
   `.trim();
 }

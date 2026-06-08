@@ -1,4 +1,27 @@
 import { buildHeuristicCoachPlan, generateWeeklyPlan, generateBlockPlan, normalizeWeeklyPlanSessionFocus } from '../../../core/planner.js';
+
+// Aplica los ajustes estructurados del coach IA al plan, SIEMPRE dentro de límites de seguridad
+// (carga ±10%, series ±1) y solo a ejercicios de fuerza existentes. Devuelve cuántos aplicó.
+function applyCoachAdjustments(days, adjustments) {
+  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  let applied = 0;
+  for (const adj of (adjustments || [])) {
+    const dayKey = norm(adj.day);
+    const day = (days || []).find((d) => dayKey.includes(norm(d.dayName)) || (d.date && dayKey.includes(String(d.date))) || norm(d.workout?.title) === norm(adj.day));
+    if (!day || !Array.isArray(day.workout?.exercises)) continue;
+    const ex = day.workout.exercises.find((e) => norm(e.name) === norm(adj.exercise));
+    if (!ex || !ex.prescription || ex.prescription.format !== 'reps') continue;
+    const loadPct = Math.min(1.1, Math.max(0.9, Number(adj.loadPct) || 1));
+    const setsDelta = Math.min(1, Math.max(-1, Math.round(Number(adj.setsDelta) || 0)));
+    if (ex.prescription.loadKg != null && loadPct !== 1) {
+      ex.prescription.loadKg = Math.round((ex.prescription.loadKg * loadPct) / 2.5) * 2.5;
+    }
+    if (setsDelta) ex.prescription.sets = Math.max(1, (Number(ex.prescription.sets) || 3) + setsDelta);
+    ex.prescription.coachAdjusted = true;
+    applied += 1;
+  }
+  return applied;
+}
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
 import { evaluatePreparticipationScreening } from '../../../core/screening.js';
 import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
@@ -429,6 +452,11 @@ export async function POST(request) {
             ...aiCoach,
             source: 'gemini',
           };
+          // Aplica los ajustes ESTRUCTURADOS del coach al plan, con guardarraíles (±10% carga,
+          // ±1 serie). Solo afecta ejercicios de fuerza existentes; el resto queda intacto.
+          if (Array.isArray(aiCoach.structuredAdjustments) && aiCoach.structuredAdjustments.length) {
+            coachMeta.structuredApplied = applyCoachAdjustments(generated.days, aiCoach.structuredAdjustments);
+          }
           coachMeta = {
             ...coachMeta,
             source: 'gemini',

@@ -185,7 +185,15 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - **Historial:** `weekly-plan` construye `liftHistory` (última carga por ejercicio desde `recentWorkouts`) y lo pasa a `generateBlockPlan`→`generateWeeklyPlan`→`buildSessionExercises`. RPE adaptativo sigue modulando (`rpeShift`).
 - **Verificado:** press banca registrado a 70 kg → bloque 70→72.5→75 kg (base→build→pico); ejercicios sin registro → estimación. Solo backend (no bundle).
 - Nota: el check-in del Studio aún no captura carga por ejercicio; cuando se registre (o vía edición), la progresión se vuelve totalmente data-driven. La Fase 5 puede añadir captura de carga en la UI.
-- **PENDIENTE:** 4) Periodizar la fuerza (interferencia con carrera); 5) IA aplica ajustes acotados con la heurística como guardarraíl.
+#### FASE 4 — Periodizar la fuerza por interferencia (HECHO)
+- `INTERFERENCE_BY_PHASE` (base 1.0, build 0.9, pico 0.82, taper 0.8, descarga 0.85). En modalidades de carrera (`hybrid_run_gym`/`running`/`cycling`), los días de fuerza reducen volumen según la fase de carrera: `buildSessionExercises` recibe `interferenceScale` → recorta nº de ejercicios y `setScale` recorta series. **Verificado:** pierna pasa de 6 ej × 3 series (base) a 5 ej × 2 series (fase de alta carga). Gym puro no se ve afectado.
+
+#### FASE 5 — IA aplica ajustes acotados + captura de carga (HECHO, bundle `86412ddde4`)
+- **Captura de carga en la UI (cierra el bucle de la Fase 3):** en Entreno cada ejercicio de fuerza tiene un input de kg (prefijado con la carga prescrita) y un botón **"Registrar sesión hecha"** que hace `POST /api/workouts` con `exercises:[{id,name,weightKg,reps,sets}]`. Esas cargas alimentan `liftHistory` → la próxima generación progresa desde datos reales. `studio-data` expone `loadKg/sets/reps/loadSource` por ejercicio.
+- **IA aplica ajustes (con guardarraíles):** el esquema del coach añade `structuredAdjustments [{day, exercise, loadPct, setsDelta}]` (opcional). `weekly-plan` los **aplica al plan** con límites duros: carga ×0.90–1.10 (redondeo a 2.5 kg) y series ±1, solo a ejercicios de fuerza existentes (match por nombre+día). Marca `prescription.coachAdjusted`. Si la IA no devuelve nada, el plan heurístico queda intacto. Prompt reforzado con la regla 16 (rangos permitidos, nombre exacto).
+- Solo el meal-log toca el bundle; el resto es backend.
+
+**Resumen del plan de 5 fases: COMPLETO.** El coach pasó de "heurístico + texto IA" a: bloque estable de 21 días periodizado, proteína g/kg + verificación de macros, sobrecarga progresiva desde historial, periodización de fuerza por interferencia, y la IA aplicando ajustes acotados con la heurística como límite de seguridad.
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.

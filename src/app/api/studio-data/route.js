@@ -216,6 +216,10 @@ function mapTodaySession(plan, today) {
     };
     if (e.videoEmbedId) item.yt = e.videoEmbedId;
     if (Array.isArray(e.cues) && e.cues.length) item.cues = e.cues.slice(0, 3);
+    if (e.prescription?.loadKg != null) item.loadKg = e.prescription.loadKg;
+    if (e.prescription?.sets != null) item.sets = e.prescription.sets;
+    if (e.prescription?.reps != null) item.reps = e.prescription.reps;
+    if (e.prescription?.loadSource) item.loadSource = e.prescription.loadSource;
     return item;
   });
   if (!list.length) return null;
