@@ -189,11 +189,11 @@ export const TrainingPhase = Object.freeze({
 
 // Factores por fase: volumen (duraciones), intensidad (reps de calidad), tirada larga.
 export const PHASE_PARAMS = {
-  base: { label: 'Base aeróbica', volumeFactor: 1.0, intensityFactor: 0.9, longRunFactor: 1.0, note: 'Construye base aeróbica: mucho rodaje fácil, poca intensidad.' },
-  build: { label: 'Construcción', volumeFactor: 1.05, intensityFactor: 1.0, longRunFactor: 1.1, note: 'Sube el trabajo de umbral e intervalos manteniendo volumen.' },
-  peak: { label: 'Pico', volumeFactor: 1.0, intensityFactor: 1.1, longRunFactor: 1.15, note: 'Trabajo específico de carrera; máxima calidad antes del afinamiento.' },
-  taper: { label: 'Afinamiento (taper)', volumeFactor: 0.6, intensityFactor: 1.0, longRunFactor: 0.5, note: 'Reduce volumen, mantén algo de intensidad para llegar fresco.' },
-  deload: { label: 'Descarga', volumeFactor: 0.7, intensityFactor: 0.85, longRunFactor: 0.8, note: 'Semana de descarga: recupera para asimilar la carga.' },
+  base: { label: 'Base aeróbica', volumeFactor: 1.0, intensityFactor: 0.9, longRunFactor: 1.0, loadFactor: 1.0, note: 'Construye base aeróbica: mucho rodaje fácil, poca intensidad.' },
+  build: { label: 'Construcción', volumeFactor: 1.05, intensityFactor: 1.0, longRunFactor: 1.1, loadFactor: 1.04, note: 'Sube el trabajo de umbral e intervalos manteniendo volumen.' },
+  peak: { label: 'Pico', volumeFactor: 1.0, intensityFactor: 1.1, longRunFactor: 1.15, loadFactor: 1.07, note: 'Trabajo específico de carrera; máxima calidad antes del afinamiento.' },
+  taper: { label: 'Afinamiento (taper)', volumeFactor: 0.6, intensityFactor: 1.0, longRunFactor: 0.5, loadFactor: 0.95, note: 'Reduce volumen, mantén algo de intensidad para llegar fresco.' },
+  deload: { label: 'Descarga', volumeFactor: 0.7, intensityFactor: 0.85, longRunFactor: 0.8, loadFactor: 0.9, note: 'Semana de descarga: recupera para asimilar la carga.' },
 };
 
 export function resolvePhaseParams(phase) {

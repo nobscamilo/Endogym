@@ -179,7 +179,13 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - **Proteína anclada al peso** (`planner.js`): `proteinPerKgForGoal` (hipertrofia/fuerza/recomp 2.0; pérdida/glucémico 2.2; resistencia 1.7; resto 1.8) × `proteinFactor` adaptativo. `anchorProteinToBodyweight` fija P por g/kg y recalcula C/F manteniendo kcal (grasa ≥0.8 g/kg y ≥20% kcal). Antes la proteína era % de kcal. **Verificado:** 80kg hipertrofia→160g (2.0), 95kg pérdida→209g (2.2), 62kg resistencia→105g (1.7), calorías preservadas. Expone `proteinPerKg`.
 - **Verificación de macros en servidor** (`studio-nutrition`): tras generar, `macroCheck` suma los totales reales por día (kcal/proteína) vs el objetivo de ese día → `proteinRatio`/`kcalRatio` + `perDay`. Prompt reforzado: la proteína es prioridad (±5%, ≥25-30 g/comida). Si `proteinRatio < 0.82` (≥4 días), **reintenta UNA vez** y se queda con el mejor (coste acotado). Se devuelve `macroCheck` en la respuesta.
 - Solo backend (planner + studio-nutrition); no requiere recompilar el bundle.
-- **PENDIENTE:** 3) Sobrecarga progresiva real desde historial/Strava; 4) Periodizar la fuerza (interferencia con carrera); 5) IA aplica ajustes acotados con la heurística como guardarraíl.
+#### FASE 3 — Sobrecarga progresiva real (HECHO)
+- `prescribeLoadKg` ahora acepta `{ loadProgression, historyLoad }` y devuelve `{ loadKg, source }`. Si hay **carga registrada** para el ejercicio (`liftHistory[id].weightKg`), parte de ella y progresa; si no, estimación por peso×ratio. `buildExercisePrescription` expone `loadSource` ('history'|'estimate') y guía RIR acorde.
+- **Progresión por bloque:** `PHASE_PARAMS.loadFactor` (base 1.0, build 1.04, pico 1.07, taper 0.95, descarga 0.9). `generateWeeklyPlan` pasa `loadProgression = phaseParams.loadFactor` → las cargas suben semana a semana dentro del bloque y bajan en descarga.
+- **Historial:** `weekly-plan` construye `liftHistory` (última carga por ejercicio desde `recentWorkouts`) y lo pasa a `generateBlockPlan`→`generateWeeklyPlan`→`buildSessionExercises`. RPE adaptativo sigue modulando (`rpeShift`).
+- **Verificado:** press banca registrado a 70 kg → bloque 70→72.5→75 kg (base→build→pico); ejercicios sin registro → estimación. Solo backend (no bundle).
+- Nota: el check-in del Studio aún no captura carga por ejercicio; cuando se registre (o vía edición), la progresión se vuelve totalmente data-driven. La Fase 5 puede añadir captura de carga en la UI.
+- **PENDIENTE:** 4) Periodizar la fuerza (interferencia con carrera); 5) IA aplica ajustes acotados con la heurística como guardarraíl.
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.

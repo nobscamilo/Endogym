@@ -802,6 +802,7 @@ export function generateWeeklyPlan({
   startDate,
   userId = '',
   seedOffset = 0,
+  liftHistory = null,
   preparticipationScreening = null,
   progressMemory = null,
   adaptiveTuning = null,
@@ -856,6 +857,8 @@ export function generateWeeklyPlan({
       adaptiveTuning,
       daySeed: index + userSeed,
       sessionMinutes: templateDay.durationMinutes,
+      loadProgression: phaseParams.loadFactor || 1,
+      liftHistory,
     });
 
     // Duración planificada. Aplica volumen base × factor de FASE (periodización).
@@ -992,6 +995,7 @@ export function generateBlockPlan({
   profile,
   startDate,
   userId = '',
+  liftHistory = null,
   preparticipationScreening = null,
   progressMemory = null,
   adaptiveTuning = null,
@@ -1013,6 +1017,7 @@ export function generateBlockPlan({
       startDate: ws.toISOString(),
       userId,
       seedOffset: w * 97, // varía la selección de ejercicios entre semanas
+      liftHistory,
       preparticipationScreening,
       progressMemory,
       adaptiveTuning,

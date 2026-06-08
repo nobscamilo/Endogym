@@ -351,10 +351,22 @@ export async function POST(request) {
         });
       }
 
+      // Historial de cargas para sobrecarga progresiva: última carga registrada por ejercicio
+      // (recentWorkouts viene ordenado desc por fecha; la primera aparición es la más reciente).
+      const liftHistory = {};
+      for (const w of (recentWorkouts || [])) {
+        for (const e of (Array.isArray(w.exercises) ? w.exercises : [])) {
+          const wk = Number(e?.weightKg);
+          if (!e?.id || !Number.isFinite(wk) || wk <= 0 || liftHistory[e.id]) continue;
+          liftHistory[e.id] = { weightKg: wk, reps: Number(e.reps) || null };
+        }
+      }
+
       const generated = generateBlockPlan({
         profile,
         startDate: payload.startDate,
         userId: user.uid,
+        liftHistory,
         preparticipationScreening,
         progressMemory,
         adaptiveTuning,
