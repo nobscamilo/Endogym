@@ -1,6 +1,6 @@
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
-import { withTrace, logError } from '../../../lib/logger.js';
+import { withTrace, logError, logInfo } from '../../../lib/logger.js';
 import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import {
@@ -202,6 +202,7 @@ Requisitos:
 - days: EXACTAMENTE estos ${daysList.length} días (campo "day" con el valor correspondiente: ${daysList.join(', ')}).
 - Cada día tiene EXACTAMENTE 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena".
 - IMPORTANTE: la suma de kcal de CADA día debe quedar dentro de ±7% del objetivo de ESE día (ver arriba). Ajusta las porciones (gramos); revisa que p·4 + c·4 + f·9 ≈ kcal del día.
+- PRIORIDAD PROTEÍNA: alcanza la proteína (P) objetivo de cada día (±5%) aunque tengas que ajustar carbohidratos/grasa. Reparte la proteína entre las comidas (≥25-30 g por comida principal).
 - Refleja el TIMING de carbohidratos del día en los slots y en el campo "serving" (p. ej. en día de fuerza, carbos lentos en la comida previa/posterior; en tirada larga, desayuno alto en carbos y recarga después).
 - Varía las recetas entre días: NO repitas el mismo plato y NO uses la misma proteína principal en días consecutivos. Comida real, práctica y apetecible; respeta condiciones/restricciones.${styleHint ? `
 - ${styleHint}` : ''}
@@ -243,12 +244,11 @@ Devuelve SOLO el JSON del esquema.`;
       }
     }
 
-    try {
-      // Trozos en paralelo: el primero trae además compra + batch (semanales).
+    // Genera la semana completa (trozos en paralelo) una vez.
+    async function generateAll() {
       const results = await Promise.allSettled(
         DAY_CHUNKS.map((days, i) => genChunkSafe(days, i === 0, CHUNK_STYLE_HINTS[i] || '')),
       );
-
       const days = [];
       let shopping = [];
       let batch = [];
@@ -258,20 +258,49 @@ Devuelve SOLO el JSON del esquema.`;
         if (Array.isArray(r.value.shopping) && r.value.shopping.length) shopping = r.value.shopping;
         if (Array.isArray(r.value.batch) && r.value.batch.length) batch = r.value.batch;
       });
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      return { days, shopping, batch, failed };
+    }
 
-      const failed = results.filter((r) => r.status === 'rejected');
-      if (failed.length) {
-        logError('studio_nutrition_chunk_failed', failed[0].reason || new Error('chunk error'),
-          { traceId, userId: user.uid, failedChunks: failed.length, daysOk: days.length });
+    // Verificación de macros en servidor: compara los totales reales por día con el objetivo.
+    function macroCheck(days) {
+      let pAct = 0; let pTgt = 0; let kAct = 0; let kTgt = 0; let n = 0;
+      const perDay = [];
+      for (const d of (days || [])) {
+        const ctx = dayCtx[d.day];
+        if (!ctx) continue;
+        const meals = Array.isArray(d.meals) ? d.meals : [];
+        const sum = meals.reduce((a, m) => ({
+          kcal: a.kcal + (Number(m.kcal) || 0), p: a.p + (Number(m.p) || 0),
+        }), { kcal: 0, p: 0 });
+        pAct += sum.p; pTgt += ctx.protein; kAct += sum.kcal; kTgt += ctx.kcal; n += 1;
+        perDay.push({ day: d.day, kcal: sum.kcal, protein: sum.p, kcalTarget: ctx.kcal, proteinTarget: ctx.protein });
       }
+      const proteinRatio = pTgt ? pAct / pTgt : 1;
+      const kcalRatio = kTgt ? kAct / kTgt : 1;
+      return { n, proteinRatio: Math.round(proteinRatio * 100) / 100, kcalRatio: Math.round(kcalRatio * 100) / 100, perDay };
+    }
+
+    try {
+      let best = await generateAll();
+      let check = macroCheck(best.days);
+      // Si la proteína queda claramente por debajo del objetivo, reintenta UNA vez y quédate
+      // con el mejor de los dos (verificación con coste acotado).
+      if (best.days.length >= 7 && check.n >= 4 && check.proteinRatio < 0.82) {
+        const retry = await generateAll();
+        const rc = macroCheck(retry.days);
+        if (retry.days.length >= 7 && rc.proteinRatio > check.proteinRatio) { best = retry; check = rc; }
+        logInfo('studio_nutrition_protein_retry', { traceId, userId: user.uid, proteinRatio: check.proteinRatio });
+      }
+
+      const { days, shopping, batch, failed } = best;
       if (!days.length) return errorResponse('No se pudo generar el plan ahora mismo.', 502);
 
       const nutrition = { days, shopping, batch };
-      // Cachear la semana solo si el plan está completo (7 días); evita persistir uno parcial.
       if (days.length >= 7) {
         await saveStudioNutritionPlan(user.uid, currentWeekKey(), nutrition).catch(() => null);
       }
-      return jsonResponse({ ok: true, nutrition, partial: failed.length > 0 });
+      return jsonResponse({ ok: true, nutrition, partial: failed > 0, macroCheck: check });
     } catch (error) {
       logError('studio_nutrition_failed', error, { traceId, userId: user.uid });
       return errorResponse('No se pudo generar el plan ahora mismo.', 502);

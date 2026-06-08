@@ -175,7 +175,11 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - `studio-data` `mapWeek`: en bloques >7 días muestra solo la **semana actual** (lunes→domingo) que contiene hoy.
 - Test `weekly-plan.route.test.js`: actualizado a 21 días + `isBlock`.
 - Tensión conocida: con el bloque estable, el ajuste adaptativo (FC/fatiga) solo re-aplica al reconstruir; la Fase 5 (IA aplica ajustes acotados por día) lo resolverá en vivo.
-- **PENDIENTE (fases siguientes):** 2) Proteína g/kg + verificar macros del meal-plan en servidor; 3) Sobrecarga progresiva real desde historial/Strava; 4) Periodizar la fuerza (interferencia con carrera); 5) IA aplica ajustes acotados (±series/reps/%carga) con la heurística como guardarraíl.
+#### FASE 2 — Proteína g/kg + verificación de macros (HECHO)
+- **Proteína anclada al peso** (`planner.js`): `proteinPerKgForGoal` (hipertrofia/fuerza/recomp 2.0; pérdida/glucémico 2.2; resistencia 1.7; resto 1.8) × `proteinFactor` adaptativo. `anchorProteinToBodyweight` fija P por g/kg y recalcula C/F manteniendo kcal (grasa ≥0.8 g/kg y ≥20% kcal). Antes la proteína era % de kcal. **Verificado:** 80kg hipertrofia→160g (2.0), 95kg pérdida→209g (2.2), 62kg resistencia→105g (1.7), calorías preservadas. Expone `proteinPerKg`.
+- **Verificación de macros en servidor** (`studio-nutrition`): tras generar, `macroCheck` suma los totales reales por día (kcal/proteína) vs el objetivo de ese día → `proteinRatio`/`kcalRatio` + `perDay`. Prompt reforzado: la proteína es prioridad (±5%, ≥25-30 g/comida). Si `proteinRatio < 0.82` (≥4 días), **reintenta UNA vez** y se queda con el mejor (coste acotado). Se devuelve `macroCheck` en la respuesta.
+- Solo backend (planner + studio-nutrition); no requiere recompilar el bundle.
+- **PENDIENTE:** 3) Sobrecarga progresiva real desde historial/Strava; 4) Periodizar la fuerza (interferencia con carrera); 5) IA aplica ajustes acotados con la heurística como guardarraíl.
 
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.

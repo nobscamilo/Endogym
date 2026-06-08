@@ -433,11 +433,55 @@ function applyAdaptiveNutritionToBaseTarget(baseTarget, adaptiveTuning = null) {
   };
 }
 
+// Proteína recomendada por kg de peso según objetivo (evidencia deportiva ACSM/ISSN).
+function proteinPerKgForGoal(goal) {
+  switch (goal) {
+    case GoalType.HYPERTROPHY:
+    case GoalType.STRENGTH:
+    case GoalType.RECOMPOSITION: return 2.0;
+    case GoalType.WEIGHT_LOSS:
+    case GoalType.GLYCEMIC_CONTROL: return 2.2; // más alta en déficit para proteger masa magra
+    case GoalType.ENDURANCE: return 1.7;
+    default: return 1.8;
+  }
+}
+
+// Ancla la proteína a g/kg de peso (no a % de kcal) y recalcula carbohidratos/grasa para
+// mantener las calorías objetivo. La grasa nunca baja de ~0.8 g/kg ni de ~20% kcal.
+function anchorProteinToBodyweight(target, weightKg, goal, adaptiveTuning = null) {
+  const kcal = Math.round(toNumber(target.targetCalories, 2000));
+  const proteinFactor = toNumber(adaptiveTuning?.nutrition?.proteinFactor, 1);
+  let protein = Math.max(40, Math.round(weightKg * proteinPerKgForGoal(goal) * proteinFactor));
+  let fat = Math.max(Math.round(weightKg * 0.9), Math.round((kcal * 0.22) / 9));
+  let carbs = Math.round((kcal - protein * 4 - fat * 9) / 4);
+  if (carbs < 30) {
+    // Calorías ajustadas: recorta primero grasa hasta el mínimo, luego proteína.
+    carbs = 30;
+    fat = Math.round((kcal - protein * 4 - carbs * 4) / 9);
+    if (fat < 20) {
+      fat = 20;
+      protein = Math.max(40, Math.round((kcal - carbs * 4 - fat * 9) / 4));
+    }
+  }
+  carbs = Math.max(20, carbs);
+  fat = Math.max(20, fat);
+  return {
+    ...target,
+    proteinGrams: protein,
+    carbsGrams: carbs,
+    fatGrams: fat,
+    proteinPerKg: Math.round((protein / weightKg) * 10) / 10,
+    targetCalories: protein * 4 + carbs * 4 + fat * 9,
+  };
+}
+
 export function buildMacroTargetFromProfile(profile, adaptiveTuning = null) {
   const goal = resolveGoal(profile.goal);
   const targetCalories = toNumber(profile.targetCalories, null) ?? estimateCaloriesFromProfile(profile);
   const baseTarget = buildMacroPlan(targetCalories, resolveMacroStrategy(goal));
-  return applyAdaptiveNutritionToBaseTarget(baseTarget, adaptiveTuning);
+  const adapted = applyAdaptiveNutritionToBaseTarget(baseTarget, adaptiveTuning);
+  const weightKg = clamp(toNumber(profile.weightKg, 75), 35, 250);
+  return anchorProteinToBodyweight(adapted, weightKg, goal, adaptiveTuning);
 }
 
 function getSessionRpeRange(goal, sessionType) {
