@@ -2,6 +2,13 @@
 
 Ultima actualizacion: **8 de junio de 2026 (verificación de cambios sin commitear FASE 4+5 coach)**.
 
+### Commit y sync (8 jun 2026)
+
+- El batch de revisión (FASE 4+5 coach + guard CI del bundle Studio + docs) se commiteó como `4a72146` y se pusheó: `main` quedó **0/0 con `origin/main`**, working tree limpio.
+- Rama `redesign/endogym-studio` (ya 100% fusionada en `main`) eliminada local. La integración del Studio es por iframe: `/` (`src/app/page.js`) embebe `public/studio/app/index.html`; `/studio` (`src/app/studio/page.js`) redirige a `/`. No es fusión de carpetas — es arquitectura intencional.
+- Nuevo workflow `.github/workflows/studio-bundle-guard.yml`: falla si se toca la fuente del Studio sin regenerar/commitear `studio.bundle.js`.
+- Deploy realizado por el usuario tras el push (no re-verificado con sonda pública en esta sesión; confirmar `/`, `/api/health` y bundle si se requiere garantía).
+
 ### Verificación de revisión (8 jun 2026, sesión de auditoría)
 
 Revisión de los cambios en working tree (FASE 4+5 coach: periodización de fuerza por interferencia, captura de carga por ejercicio en Entreno → `liftHistory`, ajustes acotados de la IA `structuredAdjustments`; nuevo `src/core/activeBlockOverlay.js`; nuevos tests de `coach-chat` y `studio-nutrition`).
