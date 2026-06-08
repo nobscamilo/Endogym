@@ -243,8 +243,27 @@ function mapTodaySession(plan, today) {
 }
 
 function mapWeek(plan, today) {
-  const days = plan?.days;
+  let days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
+  // En un bloque de varias semanas, muestra solo la SEMANA actual (lunes→domingo) que
+  // contiene "today"; si today cae fuera, la primera semana del bloque.
+  if (days.length > 7) {
+    const ref = days.find((d) => d.date === today) ? new Date(today) : new Date(days[0].date);
+    if (!Number.isNaN(ref.getTime())) {
+      const js = ref.getUTCDay();
+      const monday = new Date(ref);
+      monday.setUTCDate(ref.getUTCDate() + (js === 0 ? -6 : 1 - js));
+      const mondayStr = monday.toISOString().slice(0, 10);
+      const sunday = new Date(monday);
+      sunday.setUTCDate(monday.getUTCDate() + 6);
+      const sundayStr = sunday.toISOString().slice(0, 10);
+      const windowed = days.filter((d) => d.date >= mondayStr && d.date <= sundayStr);
+      if (windowed.length) days = windowed;
+      else days = days.slice(0, 7);
+    } else {
+      days = days.slice(0, 7);
+    }
+  }
   const week = days.map((d) => {
     const training = d.isTrainingDay;
     const v = rpeAvg(d.workout?.intensityRpe);

@@ -165,6 +165,18 @@ Pendiente/futuro: periodización multi-semana (base/build/peak/taper); ahora el 
 - **Caveat honesto:** la FCmáx por edad es una estimación (±10-12 bpm); se mitiga usando la máx observada del reloj. Mejorable con FCmáx medida o %HRR (Karvonen) que requeriría FC en reposo. Pendiente: campo manual de FCmáx en perfil.
 - **"Más tiempo" al cambiar sesión** (`studio-swap` reason `more_time` + UI): amplía la sesión actual a N minutos (input, hasta 180). Carrera → alarga duración y recalcula prescripción; fuerza → añade ejercicios extra (no reemplaza). "Lo que ya está + más".
 
+### Auditoría del Coach IA + mejora de lógica (en fases)
+
+**Hallazgo de la auditoría:** la prescripción de ejercicios (split, ejercicios, series/reps/carga) es 100% HEURÍSTICA (`planner.js` + `exerciseLibrary.js`); el ajuste (volumen/RPE) es heurístico (`buildAdaptiveTuning`, incl. FC). La IA (`callGeminiExerciseCoach`) solo genera TEXTO (resumen/justificación ACSM/ajustes sugeridos/riesgos) — su esquema NO cambia series/reps/carga, así que **no aplica** cambios. Carga = peso×ratio (sin progresión real desde historial). Proteína = % de kcal (debería ser g/kg). Meal-plan IA no se verifica en servidor. Plan adjudicado: 5 fases.
+
+#### FASE 1 — Bloque estable de 21 días (HECHO, bundle `1ab267b50b`)
+- `generateBlockPlan` (planner): mesociclo de 3 semanas (21 días) reutilizando `generateWeeklyPlan` por semana, con periodización por semana (fase por fecha de carrera o ciclo rodante) y `seedOffset` para variar ejercicios entre semanas. Devuelve `isBlock`, `blockStartDate/blockEndDate`, `blockWeeks[]`. **Verificado:** 21 días, fases base→build→build, ejercicios distintos por semana.
+- `weekly-plan` POST: si hay **bloque activo** (hoy ≤ blockEndDate) y no se pide `rebuild:true`, **NO regenera** (devuelve `stable:true`). Rebuild solo cuando: no hay bloque, expiró, o explícito. La encuesta de Perfil envía `rebuild:true` (cambió el perfil). El botón de Entreno pasa a **"Nuevo bloque (21 días)"** con `confirm()` (rebuild explícito); los cambios pequeños son "Cambiar sesión"/"Más tiempo"/swaps.
+- `studio-data` `mapWeek`: en bloques >7 días muestra solo la **semana actual** (lunes→domingo) que contiene hoy.
+- Test `weekly-plan.route.test.js`: actualizado a 21 días + `isBlock`.
+- Tensión conocida: con el bloque estable, el ajuste adaptativo (FC/fatiga) solo re-aplica al reconstruir; la Fase 5 (IA aplica ajustes acotados por día) lo resolverá en vivo.
+- **PENDIENTE (fases siguientes):** 2) Proteína g/kg + verificar macros del meal-plan en servidor; 3) Sobrecarga progresiva real desde historial/Strava; 4) Periodizar la fuerza (interferencia con carrera); 5) IA aplica ajustes acotados (±series/reps/%carga) con la heurística como guardarraíl.
+
 ### Notas / mejoras futuras (no bloqueantes)
 - `analyze-plate` actualiza `D.glycemic.dayLoad` solo al refrescar `studio-data` (igual que el alta manual); aceptable.
 - El plan cacheado se versiona por semana (lunes UTC); al cambiar de semana se regenera solo en la 1ª visita.

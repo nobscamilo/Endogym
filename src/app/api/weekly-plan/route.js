@@ -1,4 +1,4 @@
-import { buildHeuristicCoachPlan, generateWeeklyPlan, normalizeWeeklyPlanSessionFocus } from '../../../core/planner.js';
+import { buildHeuristicCoachPlan, generateWeeklyPlan, generateBlockPlan, normalizeWeeklyPlanSessionFocus } from '../../../core/planner.js';
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
 import { evaluatePreparticipationScreening } from '../../../core/screening.js';
 import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
@@ -332,7 +332,26 @@ export async function POST(request) {
         screening: preparticipationScreening,
       });
 
-      const generated = generateWeeklyPlan({
+      // Plan estable por BLOQUE (≥15 días). Si ya hay un bloque activo (hoy ≤ fin del bloque)
+      // y no se pide rebuild explícito, NO se regenera: el usuario ve siempre el mismo bloque.
+      const currentPlan = await getLatestWeeklyPlan(user.uid);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const rebuild = payload.rebuild === true;
+      const activeBlock = currentPlan && currentPlan.isBlock
+        && typeof currentPlan.blockEndDate === 'string' && currentPlan.blockEndDate >= todayStr
+        && Array.isArray(currentPlan.days) && currentPlan.days.length >= 14;
+      if (activeBlock && !rebuild) {
+        return jsonResponse({
+          ok: true,
+          stable: true,
+          plan: currentPlan,
+          blockStartDate: currentPlan.blockStartDate,
+          blockEndDate: currentPlan.blockEndDate,
+          message: 'Bloque activo: el plan se mantiene estable. Usa los ajustes del día para cambios pequeños.',
+        });
+      }
+
+      const generated = generateBlockPlan({
         profile,
         startDate: payload.startDate,
         userId: user.uid,
@@ -340,7 +359,6 @@ export async function POST(request) {
         progressMemory,
         adaptiveTuning,
       });
-      const currentPlan = await getLatestWeeklyPlan(user.uid);
 
       const forceMock = parseBoolean(process.env.GEMINI_FORCE_MOCK, false);
       const fallbackEnabled = parseBoolean(process.env.GEMINI_FALLBACK_TO_MOCK, true);

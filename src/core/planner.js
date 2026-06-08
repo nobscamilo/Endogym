@@ -757,6 +757,7 @@ export function generateWeeklyPlan({
   profile,
   startDate,
   userId = '',
+  seedOffset = 0,
   preparticipationScreening = null,
   progressMemory = null,
   adaptiveTuning = null,
@@ -777,7 +778,7 @@ export function generateWeeklyPlan({
   }
   start.setUTCHours(0, 0, 0, 0);
   const template = rotateTemplateToDate(baseTemplate, start);
-  const userSeed = computeUserSeed(profile, goal, userId);
+  const userSeed = computeUserSeed(profile, goal, userId) + Number(seedOffset || 0);
 
   // Objetivo de carrera + ritmos derivados de una marca reciente (si la hay).
   const raceGoal = resolveRaceGoal(profile.runRaceGoal);
@@ -937,6 +938,58 @@ export function generateWeeklyPlan({
   };
 
   return weeklyPlan;
+}
+
+// Genera un BLOQUE/mesociclo estable de varias semanas (por defecto 21 días = 3 semanas).
+// Reutiliza generateWeeklyPlan por cada semana, de modo que la periodización (fase por fecha
+// de carrera o ciclo rodante) y la variación de ejercicios (seedOffset por semana) recorren
+// todo el bloque. El usuario ve SIEMPRE este bloque; "regenerar" no debe rehacerlo entero.
+export function generateBlockPlan({
+  profile,
+  startDate,
+  userId = '',
+  preparticipationScreening = null,
+  progressMemory = null,
+  adaptiveTuning = null,
+  blockDays = 21,
+}) {
+  const start = startDate ? new Date(startDate) : new Date();
+  if (Number.isNaN(start.getTime())) throw new Error('startDate inválido para el bloque.');
+  start.setUTCHours(0, 0, 0, 0);
+  const weeks = Math.max(1, Math.ceil(blockDays / 7));
+
+  let base = null;
+  const allDays = [];
+  const blockWeeks = [];
+  for (let w = 0; w < weeks; w += 1) {
+    const ws = new Date(start);
+    ws.setUTCDate(start.getUTCDate() + w * 7);
+    const wp = generateWeeklyPlan({
+      profile,
+      startDate: ws.toISOString(),
+      userId,
+      seedOffset: w * 97, // varía la selección de ejercicios entre semanas
+      preparticipationScreening,
+      progressMemory,
+      adaptiveTuning,
+    });
+    if (w === 0) base = wp;
+    allDays.push(...wp.days);
+    blockWeeks.push({ index: w, startDate: wp.startDate, phase: wp.phase, phaseLabel: wp.phaseLabel, weeksToRace: wp.weeksToRace });
+  }
+
+  const days = allDays.slice(0, blockDays);
+  return {
+    ...base,
+    days,
+    isBlock: true,
+    blockDays: days.length,
+    blockStartDate: days[0].date,
+    blockEndDate: days[days.length - 1].date,
+    blockWeeks,
+    startDate: days[0].date,
+    endDate: days[days.length - 1].date,
+  };
 }
 
 export function normalizeWeeklyPlanSessionFocus(weeklyPlan, profile = {}) {

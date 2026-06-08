@@ -182,7 +182,8 @@ function AvailabilitySurvey() {
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
-      await fetch('/api/weekly-plan', { method: 'POST', headers, body: '{}' }).catch(() => {});
+      // Cambió el perfil/disponibilidad → reconstruye el bloque de 21 días.
+      await fetch('/api/weekly-plan', { method: 'POST', headers, body: JSON.stringify({ rebuild: true }) }).catch(() => {});
       try {
         const d = await fetch('/api/studio-data', { headers: { authorization: 'Bearer ' + token } });
         if (d.ok) {

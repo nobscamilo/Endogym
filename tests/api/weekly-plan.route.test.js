@@ -211,7 +211,8 @@ describe('/api/weekly-plan route', () => {
     expect(response.status).toBe(201);
     expect(json.plan.id).toBe('new-plan');
     expect(json.plan.previousPlanId).toBe('previous-plan');
-    expect(json.plan.days).toHaveLength(7);
+    expect(json.plan.days).toHaveLength(21); // bloque/mesociclo de 3 semanas
+    expect(json.plan.isBlock).toBe(true);
     expect(json.plan.startDate).toBe('2026-04-06');
     expect(json.plan.coachPlan).toBeTruthy();
     expect(json.plan.coachSource).toBe('heuristic');

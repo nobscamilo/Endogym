@@ -106,12 +106,15 @@ function TrainScreen({ initialTab }) {
   const TABS = [{ id: 'sesion', label: 'Sesión' }, { id: 'semana', label: 'Semana' }, { id: 'videos', label: 'Vídeos' }];
 
   async function regenerate() {
+    // El bloque de 21 días es estable. Rehacerlo entero requiere confirmación explícita;
+    // para cambios pequeños usa "Cambiar sesión" / "Más tiempo" / swaps por ejercicio.
+    if (!window.confirm('Tu plan es un bloque de 21 días pensado para seguirse completo. ¿Crear un bloque nuevo desde cero? (Para ajustes pequeños usa "Cambiar sesión").')) return;
     setGenStatus('loading');
     try {
       const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
       if (!token) { setGenStatus('noauth'); return; }
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
-      const post = await fetch('/api/weekly-plan', { method: 'POST', headers, body: '{}' });
+      const post = await fetch('/api/weekly-plan', { method: 'POST', headers, body: JSON.stringify({ rebuild: true }) });
       if (!post.ok) { setGenStatus('err'); return; }
       // Refrescar sesión/semana reales tras el nuevo plan generado por el coach.
       const r = await fetch('/api/studio-data', { headers: { authorization: 'Bearer ' + token } });
@@ -135,7 +138,7 @@ function TrainScreen({ initialTab }) {
         </div>
         <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
           <button className="btn" onClick={regenerate} disabled={genStatus === 'loading'}>
-            <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Regenerando…' : 'Regenerar plan con IA'}
+            <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Creando bloque…' : 'Nuevo bloque (21 días)'}
           </button>
           {genStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo regenerar. Reintenta.</span> : null}
           {genStatus === 'noauth' ? <span className="tiny muted">Inicia sesión para regenerar.</span> : null}
