@@ -39,10 +39,22 @@ Petición del usuario: historial completo de sesiones previas consultable, con a
 - **UI (Progreso):** "Entrenos registrados" → **"Historial de entrenos"**: carga `/api/workout-history` al abrir (seed instantáneo con `recentWorkouts`), "Cargar más" paginado, fila expandible con cargas/fatiga/sueño y análisis del coach (pill "Analizada"); botón "Analizar esta sesión" por fila con manejo de 429.
 - **Verificación (sandbox):** vitest **23 archivos / 114 tests verdes** (4 nuevos del servicio); conflict markers OK; audit 0 vulnerabilidades. **Sonda real (uid gmail):** paginación sin solapamiento entre páginas; digest del Torso A del 8 jun (1 comparable, 6 cargas comparadas); Gemini HTTP 200 con análisis coherente (señala honestamente la falta de RPE); caché guardado y leído OK — **el Torso A del 8 jun ya quedó analizado y cacheado**. `npm run build` (Next) pendiente en la Mac (EPERM en sandbox).
 
+### Build, commit y deploy ejecutados desde la Mac vía agente (10 jun 2026, madrugada)
+
+Los comandos se ejecutaron en la Mac del usuario mediante AppleScript (`do shell script`), no en el sandbox:
+
+- **Entorno:** node v26.0.0 vía nvm (`~/.nvm/versions/node/v26.0.0/bin`; nvm NO está en el PATH de `bash -lc`/`zsh -lc`, hay que exportarlo explícitamente).
+- `npm install` en la Mac **restauró los binarios darwin** que el `npm i --no-save esbuild` del sandbox Linux había podado de `node_modules` (removed 95 packages). Recordatorio: tras trabajar en el sandbox, correr `npm install` en la Mac antes de build.
+- `npm test` → 23 archivos / 114 tests verdes (en la Mac). `npm run build` → compilado OK con las rutas nuevas (`/api/coach-analysis`, `/api/workout-history`, `/api/workout-analysis`).
+- **`.git/index.lock` reapareció** (0 bytes, creado por un proceso git del IDE que vigila la carpeta); se eliminó con `rm -f` y el commit pasó. Si vuelve a fallar un commit, revisar/borrar ese lock.
+- Commit **`d68b5f1`** ("Análisis del coach + historial de entrenos consultable en Progreso", 18 archivos, +1250) pusheado a `origin/main`.
+- Deploy: `npx vercel --prod --yes` → **`dpl_5JRtgdJ62H4ZvARZDokSVnUrxSaa`** `Ready`; la CLI volvió a colgarse en "Running Checks" (patrón conocido) y el alias se asignó manualmente: `endogym.vercel.app` → `endogym-q45q26m0l-...`.
+- **Sondas públicas verificadas:** `/` 200, `/api/health` 200, `/api/meals` 401 sin token, `/api/workout-history` 401 sin token, `POST /api/coach-analysis` 401 sin token, bundle `355c009f1a` servido (200) y referenciado por `index.html`; el bundle desplegado contiene `workout-analysis`.
+
 ### Pendiente tras esta sesión
 
-1. En la Mac: `npm run build` + commit + push + deploy (bundle `355c009f1a` ya regenerado y commiteable).
-2. Usuario: desconectar Strava de la cuenta icloud (`sarmiento0@icloud.com`) y usar solo gmail.
+1. Usuario: desconectar Strava de la cuenta icloud (`sarmiento0@icloud.com`) y usar solo gmail.
+2. Usuario: probar en la app (Progreso): "Análisis del coach" (su informe ya está pre-generado) e "Historial de entrenos" → "Analizar esta sesión".
 3. Mejora futura: capturar RPE en "Registrar sesión hecha" para alimentar la "Carga semanal"; opcional: disparar el análisis automáticamente al registrar sesión (hoy es GET cacheado + botón).
 
 ### Commit y sync (8 jun 2026)
