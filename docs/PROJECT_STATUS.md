@@ -51,10 +51,20 @@ Los comandos se ejecutaron en la Mac del usuario mediante AppleScript (`do shell
 - Deploy: `npx vercel --prod --yes` → **`dpl_5JRtgdJ62H4ZvARZDokSVnUrxSaa`** `Ready`; la CLI volvió a colgarse en "Running Checks" (patrón conocido) y el alias se asignó manualmente: `endogym.vercel.app` → `endogym-q45q26m0l-...`.
 - **Sondas públicas verificadas:** `/` 200, `/api/health` 200, `/api/meals` 401 sin token, `/api/workout-history` 401 sin token, `POST /api/coach-analysis` 401 sin token, bundle `355c009f1a` servido (200) y referenciado por `index.html`; el bundle desplegado contiene `workout-analysis`.
 
+### Saneamiento de cuentas (10 jun 2026)
+
+El usuario eliminó sus cuentas secundarias de Auth; quedaban residuos en Firestore. Verificado y saneado con Admin SDK (autorizado explícitamente por el usuario):
+
+- **Cuenta icloud (`sarmiento0@icloud.com`, uid `7Zpr…`):** Auth ya no existía pero su árbol Firestore seguía vivo (incl. conexión Strava con tokens). Se **migró el check-in `daily-2026-06-09`** (RPE 7, fatiga 4, sueño 7,5) a la cuenta principal gmail (id determinista, sin sobrescritura) y se borró el árbol completo (79 docs: integrations, profile, rateLimits, studioNutrition, 58 weeklyPlans, 16 workouts).
+- **4 árboles huérfanos** sin Auth (`IHmX…`, `LnpH…`, `TSct…`, `nP18…`) eliminados. `dev-user` se conserva (modo local).
+- **3 cuentas e2e residuales** que las sondas no auto-limpiaron (`debug.endogym.*@example.com`, `separate+*@endogym.local`, `consent+*@endogym.local`) eliminadas de Auth + Firestore.
+- **Estado final consistente:** 5 cuentas reales en Auth (la principal `juancamilo.sarmiento@gmail.com` con 19 workouts + 4 de otras personas) ↔ 6 árboles Firestore (5 reales + dev-user). Ya solo hay UNA conexión Strava (gmail).
+- Pendiente conocido sin cambios: índice `collectionGroup integrations.athleteId` sin crear → el webhook de Strava no puede resolver al dueño (el sync manual funciona; el automático no, hasta crear el índice con gcloud).
+
 ### Pendiente tras esta sesión
 
-1. Usuario: desconectar Strava de la cuenta icloud (`sarmiento0@icloud.com`) y usar solo gmail.
-2. Usuario: probar en la app (Progreso): "Análisis del coach" (su informe ya está pre-generado) e "Historial de entrenos" → "Analizar esta sesión".
+1. Usuario: probar en la app (Progreso): "Análisis del coach" (su informe ya está pre-generado) e "Historial de entrenos" → "Analizar esta sesión".
+2. Crear el índice `collectionGroup` de `integrations` por `athleteId` (gcloud) si se quiere sync automático por webhook.
 3. Mejora futura: capturar RPE en "Registrar sesión hecha" para alimentar la "Carga semanal"; opcional: disparar el análisis automáticamente al registrar sesión (hoy es GET cacheado + botón).
 
 ### Commit y sync (8 jun 2026)
