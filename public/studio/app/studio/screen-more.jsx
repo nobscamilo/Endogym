@@ -406,6 +406,7 @@ function AvailabilitySurvey() {
   const [age, setAge] = useStateP(u.age != null ? u.age : 30);
   const [weight, setWeight] = useStateP(u.weightKg != null ? u.weightKg : 75);
   const [height, setHeight] = useStateP(u.heightCm != null ? u.heightCm : 170);
+  const [hrMax, setHrMax] = useStateP(u.hrMaxBpm != null ? String(u.hrMaxBpm) : '');
   const [mins, setMins] = useStateP(u.sessionMinutes != null ? u.sessionMinutes : 60);
   const [days, setDays] = useStateP(u.daysPerWeek != null ? u.daysPerWeek : 5);
   const [meals, setMeals] = useStateP(u.mealsPerDay != null ? u.mealsPerDay : 4);
@@ -429,6 +430,8 @@ function AvailabilitySurvey() {
           runRefDistanceMeters: refDist ? Number(refDist) : null,
           runRefTimeSeconds: mmssToSecs(refTime),
           raceDate: raceDate || null,
+          // FCmáx medida (opcional): prevalece sobre la estimación por edad en zonas y coach.
+          hrMaxBpm: hrMax ? Number(hrMax) : null,
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
@@ -493,6 +496,7 @@ function AvailabilitySurvey() {
           <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
           <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
           <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
+          <div className="field"><label>FCmáx (ppm, opcional)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
         </div>
         <div className="row ac" style={{ gap: 12 }}>
           <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando…' : 'Guardar cambios'}</button>
@@ -662,4 +666,4 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
 
 }
 
-Object.assign(window, { ProgressScreen, ProfileScreen });
+Object.assign(window, { ProgressScreen, ProfileScreen, WorkoutAnalysisBlock });

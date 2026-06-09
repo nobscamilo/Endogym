@@ -176,13 +176,15 @@ describe('/api/studio-nutrition route', () => {
     const json = await readJson(response);
 
     expect(response.status).toBe(200);
-    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(8);
+    // Reintento DIRIGIDO: solo se regenera el trozo con drift (Lun-Mar) → 4 iniciales + 1.
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(5);
     expect(json.macroCheck.driftDays).toEqual([]);
     expect(json.nutrition.meta.planSignature).toMatch(/^[a-f0-9]{16}$/);
     expect(mocks.saveStudioNutritionPlan).toHaveBeenCalledTimes(1);
     expect(mocks.saveStudioNutritionPlan.mock.calls[0][2].meta.planSignature).toBe(json.nutrition.meta.planSignature);
     expect(mocks.logInfo).toHaveBeenCalledWith('studio_nutrition_macro_retry', expect.objectContaining({
       userId: 'user-1',
+      targetedChunks: [0],
     }));
   });
 

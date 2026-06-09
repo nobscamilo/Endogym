@@ -80,10 +80,21 @@ Auditoría solicitada por el usuario ("verifica Coach AI, busca errores, verific
 
 **Verificación:** 115 tests verdes en la Mac + `npm run build` OK. Sandbox ya NO corre vitest otra vez (el `npm install` de la Mac restauró binarios darwin y quitó los linux — comportamiento de vaivén esperado del node_modules compartido).
 
+### Cuatro mejoras del coach implementadas (10 jun 2026 — bundle `8867273a5c`)
+
+Las cuatro mejoras propuestas en la auditoría, implementadas y desplegadas:
+
+1. **RPE al registrar sesión (Entreno):** selector 1-10 (default 7) junto a "Registrar sesión hecha"; el POST `/api/workouts` ahora envía `sessionRpe` y `durationMinutes`. Esto alimenta la "Carga semanal" de Progreso (que solo lee `sessionRpe`) y la señal de intensidad del ajuste adaptativo.
+2. **Análisis automático al registrar:** tras registrar la sesión, el front dispara `POST /api/workout-analysis` con el `workout.id` devuelto y muestra el análisis del coach inline en Entreno (estados: analizando/limited 429/done). `WorkoutAnalysisBlock` se exporta a `window` para reutilizarlo entre pantallas.
+3. **FCmáx manual en Perfil:** campo "FCmáx (ppm, opcional)" en la encuesta (`hrMaxBpm`, 120-230, persistido por `studio-availability`, prefijado vía `mapUser`). Prioridad en `runZones` (studio-data) y coach-chat: **manual > máx observada en carreras > estimación por edad** (Tanaka). El coach indica la fuente de la FCmáx.
+4. **Nutrición — kcal bajas del bloque Vie-Sáb:** doble fix: (a) hint del bloque lácteos-fruta endurecido (exige densidad energética hasta cumplir las kcal del día); (b) el reintento ante drift ahora es **dirigido por trozo** — regenera solo los chunks con días desviados en vez de la semana entera (menos coste, conserva los días buenos). Log `studio_nutrition_macro_retry` incluye `targetedChunks`. Test adaptado (5 llamadas, no 8).
+
+Verificación: **115 tests verdes** en la Mac, `npm run build` OK, bundle regenerado en la Mac (`npm i --no-save esbuild` + `build:studio` → `8867273a5c`).
+
 ### Pendiente tras esta sesión
 
-1. Usuario: probar en la app (Progreso): "Análisis del coach" e "Historial de entrenos" → "Analizar esta sesión"; pulsar "Sincronizar ahora" en Strava (re-importa la carrera del 9 jun); verificar/activar "sync automático" una vez.
-2. Mejoras futuras propuestas (no implementadas): capturar RPE en "Registrar sesión hecha"; análisis automático al registrar sesión; campo manual de FCmáx en perfil; revisar kcal bajas del bloque Vie-Sáb en nutrición (-20% conocido).
+1. Usuario: probar en la app: registrar una sesión con RPE (ver análisis automático), campo FCmáx en Perfil, "Sincronizar ahora" en Strava (re-importa la carrera del 9 jun) y verificar "sync automático".
+2. Futuro: regenerar plan nutricional una semana y comprobar en logs que Vie-Sáb ya no cae -20% (`studio_nutrition_macro_retry.targetedChunks`).
 
 ### Commit y sync (8 jun 2026)
 

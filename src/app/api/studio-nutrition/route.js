@@ -81,7 +81,7 @@ function planNutritionSignature(plan) {
 const CHUNK_STYLE_HINTS = [
   'Desayunos de estilo salado (huevos, tortillas, tostadas saladas con proteína).',
   'Desayunos dulces a base de avena (porridge, tortitas de avena, overnight oats).',
-  'Desayunos a base de lácteos y fruta (yogur con toppings, bowls de fruta, batidos proteicos).',
+  'Desayunos a base de lácteos y fruta (yogur con toppings, bowls de fruta, batidos proteicos). OJO: este estilo tiende a quedarse CORTO de calorías; añade densidad energética (frutos secos, granola, avena, yogur griego entero, aceite de oliva, aguacate) y porciones suficientes hasta CUMPLIR las kcal objetivo de cada día — no entregues días por debajo del objetivo.',
   'Desayunos con pan integral + proteína o repostería fitness casera.',
 ];
 
@@ -354,16 +354,32 @@ Devuelve SOLO el JSON del esquema.`;
     try {
       let best = await generateAll();
       let check = macroCheck(best.days);
-      // Si hay drift diario o proteína global claramente baja, reintenta UNA vez y quédate con
-      // el mejor de los dos (verificación con coste acotado).
+      // Reintento DIRIGIDO: si hay drift diario o proteína global baja, regenera SOLO los
+      // trozos que contienen días desviados (más barato que regenerar la semana entera y
+      // conserva los días que ya cumplen). Se queda con la mejor de las dos versiones.
       if (best.days.length >= 7 && check.n >= 4 && (check.proteinRatio < 0.82 || check.driftDays.length > 0)) {
-        const retry = await generateAll();
-        const rc = macroCheck(retry.days);
-        const score = (c) => c.severeDriftDays.length * 10 + c.driftDays.length + Math.max(0, 0.9 - c.proteinRatio) * 10;
-        if (retry.days.length >= 7 && score(rc) < score(check)) { best = retry; check = rc; }
+        const failingChunks = [...new Set(
+          check.driftDays
+            .map((day) => DAY_CHUNKS.findIndex((c) => c.includes(day)))
+            .filter((i) => i >= 0),
+        )];
+        const retries = await Promise.allSettled(
+          failingChunks.map((i) => genChunkSafe(DAY_CHUNKS[i], false, CHUNK_STYLE_HINTS[i] || '')),
+        );
+        const replaced = new Map();
+        retries.forEach((r) => {
+          if (r.status === 'fulfilled') (r.value.days || []).forEach((d) => { if (d?.day) replaced.set(d.day, d); });
+        });
+        if (replaced.size) {
+          const retryDays = best.days.map((d) => replaced.get(d.day) || d);
+          const rc = macroCheck(retryDays);
+          const score = (c) => c.severeDriftDays.length * 10 + c.driftDays.length + Math.max(0, 0.9 - c.proteinRatio) * 10;
+          if (score(rc) < score(check)) { best = { ...best, days: retryDays }; check = rc; }
+        }
         logInfo('studio_nutrition_macro_retry', {
           traceId,
           userId: user.uid,
+          targetedChunks: failingChunks,
           proteinRatio: check.proteinRatio,
           driftDays: check.driftDays,
           severeDriftDays: check.severeDriftDays,

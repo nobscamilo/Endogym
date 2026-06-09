@@ -273,6 +273,9 @@ function TrainSession() {
   const [moreMin, setMoreMin] = useStateTr('');
   const [logKg, setLogKg] = useStateTr({});
   const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
+  const [logRpe, setLogRpe] = useStateTr(7);
+  const [autoStatus, setAutoStatus] = useStateTr('idle'); // idle|analyzing|done|limited|err
+  const [autoAnalysis, setAutoAnalysis] = useStateTr(null); // { analysis, source }
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -321,10 +324,35 @@ function TrainSession() {
       const r = await fetch('/api/workouts', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-        body: JSON.stringify({ source: 'manual', performedAt: `${today}T12:00:00.000Z`, title: (s.title || 'Sesión'), mode: 'studio', completed: true, exercises }),
+        body: JSON.stringify({
+          source: 'manual', performedAt: `${today}T12:00:00.000Z`, title: (s.title || 'Sesión'),
+          mode: 'studio', completed: true, exercises,
+          // RPE de la sesión: alimenta la "Carga semanal" de Progreso y el ajuste adaptativo.
+          sessionRpe: Number(logRpe) || null,
+          durationMinutes: s.durationMin || null,
+        }),
       });
       setLogStatus(r.ok ? 'ok' : 'err');
-      if (r.ok) setTimeout(() => setLogStatus('idle'), 3000);
+      if (r.ok) {
+        setTimeout(() => setLogStatus('idle'), 3000);
+        // Análisis automático del coach (no bloquea el registro; cacheado en servidor).
+        try {
+          const j = await r.json();
+          const wid = j && j.workout && j.workout.id;
+          if (wid) {
+            setAutoStatus('analyzing');
+            const ra = await fetch('/api/workout-analysis', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+              body: JSON.stringify({ workoutId: wid }),
+            });
+            const ja = await ra.json().catch(() => ({}));
+            if (ra.ok && ja.analysis) { setAutoAnalysis({ analysis: ja.analysis, source: ja.source }); setAutoStatus('done'); }
+            else if (ra.status === 429) setAutoStatus('limited');
+            else setAutoStatus('err');
+          }
+        } catch (e2) { setAutoStatus('err'); }
+      }
     } catch (e) { setLogStatus('err'); }
   }
   async function extend() {
@@ -459,13 +487,27 @@ function TrainSession() {
           ))}
         </div>
         {list.some((e) => e.loadKg != null) ? (
-          <div className="row ac wrap" style={{ gap: 12, marginTop: 14 }}>
-            <button className="btn" onClick={logSession} disabled={logStatus === 'saving'}>
-              <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : 'Registrar sesión hecha'}
-            </button>
-            {logStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Registrado · tus cargas afinarán la progresión ✨</span> : null}
-            {logStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo registrar.</span> : null}
-            <span className="tiny muted">Anota la carga real de cada ejercicio para que el coach progrese desde tus datos.</span>
+          <div className="stack" style={{ gap: 12, marginTop: 14 }}>
+            <div>
+              <div className="mb-label">Esfuerzo de la sesión (RPE) · {logRpe}/10 — alimenta tu carga semanal y al coach</div>
+              <Scale10 value={logRpe} onChange={setLogRpe} />
+            </div>
+            <div className="row ac wrap" style={{ gap: 12 }}>
+              <button className="btn" onClick={logSession} disabled={logStatus === 'saving'}>
+                <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : 'Registrar sesión hecha'}
+              </button>
+              {logStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Registrado · tus cargas afinarán la progresión ✨</span> : null}
+              {logStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo registrar.</span> : null}
+              <span className="tiny muted">Anota la carga real de cada ejercicio para que el coach progrese desde tus datos.</span>
+            </div>
+            {autoStatus === 'analyzing' ? (
+              <div className="row ac" style={{ gap: 8 }}>
+                <span className="cb-av sm"><Icon name="sparkles" size={13} /></span>
+                <span className="tiny muted">El coach está analizando tu sesión…</span>
+              </div>
+            ) : null}
+            {autoStatus === 'limited' ? <span className="tiny muted">Sesión registrada. El análisis del coach estará disponible en Progreso en un rato (límite temporal alcanzado).</span> : null}
+            {autoAnalysis ? <WorkoutAnalysisBlock analysis={autoAnalysis.analysis} source={autoAnalysis.source} /> : null}
           </div>
         ) : null}
       </SectionCard>

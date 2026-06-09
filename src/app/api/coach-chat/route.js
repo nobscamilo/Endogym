@@ -85,13 +85,17 @@ async function buildUserContext(uid) {
         .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')) && Number(w.avgHeartRate))
         .sort((a, b) => String(b.performedAt || '').localeCompare(String(a.performedAt || '')));
       const observedMax = Math.max(0, ...runs.map((w) => Number(w.maxHeartRate) || 0));
-      const hrMax = Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null;
+      const manualHrMax = Number(profile?.hrMaxBpm);
+      const hrMax = (Number.isFinite(manualHrMax) && manualHrMax >= 120)
+        ? Math.max(manualHrMax, observedMax)
+        : (Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null);
       if (runs.length && hrMax) {
         const last = runs[0];
         const date = String(last.performedAt || '').slice(0, 10);
         const runType = (Array.isArray(plan?.days) ? plan.days.find((d) => d.date === date) : null)?.workout?.runPrescription?.runType || null;
         const v = validateRunZone({ avgHr: Number(last.avgHeartRate), hrMax, runType: runType || 'easy' });
-        if (v) parts.push(`FCmáx estimada ~${hrMax} ppm (por su edad). Última carrera: ${v.message}`);
+        const hrMaxSource = (Number.isFinite(manualHrMax) && manualHrMax >= 120) ? 'medida por el usuario' : 'estimada por su edad/observada';
+        if (v) parts.push(`FCmáx ~${hrMax} ppm (${hrMaxSource}). Última carrera: ${v.message}`);
       }
       parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en Z2, apretar en los días de calidad) usando SU FCmáx por edad/medida; cada usuario es distinto.');
     }

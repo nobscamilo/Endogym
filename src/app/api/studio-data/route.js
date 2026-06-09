@@ -32,7 +32,11 @@ function mapRunZones(workouts, plan, profile) {
     .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')) && Number(w.avgHeartRate));
   if (!runs.length) return null;
   const observedMax = Math.max(0, ...runs.map((w) => Number(w.maxHeartRate) || 0));
-  const hrMax = Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null;
+  // Prioridad: FCmáx medida por el usuario (perfil) > máx observada en sus carreras > estimación por edad.
+  const manualHrMax = Number(profile?.hrMaxBpm);
+  const hrMax = (Number.isFinite(manualHrMax) && manualHrMax >= 120)
+    ? Math.max(manualHrMax, observedMax)
+    : (Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null);
   if (!hrMax) return null;
   const typeByDate = {};
   (plan?.days || []).forEach((d) => { if (d.workout?.runPrescription) typeByDate[d.date] = d.workout.runPrescription.runType; });
@@ -166,6 +170,7 @@ function mapUser(profile, authUser) {
   if (num(p.runRefDistanceMeters) !== undefined) out.runRefDistanceMeters = num(p.runRefDistanceMeters);
   if (num(p.runRefTimeSeconds) !== undefined) out.runRefTimeSeconds = num(p.runRefTimeSeconds);
   if (p.raceDate) out.raceDate = p.raceDate;
+  if (num(p.hrMaxBpm) !== undefined) out.hrMaxBpm = num(p.hrMaxBpm);
   return out;
 }
 

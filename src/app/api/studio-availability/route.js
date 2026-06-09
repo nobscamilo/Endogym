@@ -58,6 +58,10 @@ export async function POST(request) {
     // Fecha de carrera (YYYY-MM-DD) para la periodización.
     if (typeof body?.raceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.raceDate)) patch.raceDate = body.raceDate;
     else if (body?.raceDate === null) patch.raceDate = null;
+    // FCmáx medida (opcional): prevalece sobre la estimación por edad en zonas y coach.
+    const hrMax = Number(body?.hrMaxBpm);
+    if (Number.isFinite(hrMax) && hrMax >= 120 && hrMax <= 230) patch.hrMaxBpm = Math.round(hrMax);
+    else if (body?.hrMaxBpm === null) patch.hrMaxBpm = null;
 
     try {
       await upsertUserProfile(user.uid, patch);
