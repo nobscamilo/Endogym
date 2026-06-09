@@ -105,7 +105,13 @@ export async function GET(request) {
         return errorResponse('Query param "limit" debe ser un entero entre 1 y 100.', 400);
       }
 
-      const workouts = await listWorkouts(user.uid, limit);
+      // Cursor opcional de paginación: entrenos con performedAt estrictamente anterior.
+      const before = searchParams.get('before');
+      if (before != null && Number.isNaN(new Date(before).getTime())) {
+        return errorResponse('Query param "before" debe ser una fecha ISO válida.', 400);
+      }
+
+      const workouts = await listWorkouts(user.uid, limit, { before: before || null });
       return jsonResponse({ traceId, workouts });
     });
   } catch (error) {

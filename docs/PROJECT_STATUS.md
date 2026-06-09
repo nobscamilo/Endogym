@@ -1,6 +1,49 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **8 de junio de 2026 (verificación de cambios sin commitear FASE 4+5 coach)**.
+Ultima actualizacion: **9 de junio de 2026 (Análisis del coach en Progreso + historial de entrenos visible)**.
+
+## Sesión del 9 de junio de 2026 (Análisis del coach + historial visible en Progreso)
+
+**Queja del usuario:** registró 3 sesiones y sincronizó Strava pero "no hay análisis por ningún lado, es como si no hiciera nada".
+
+### Diagnóstico (verificado contra Firestore de producción)
+
+- **Los datos SÍ se guardaban.** En la cuenta `juancamilo.sarmiento@gmail.com` (uid `58aIC…`): 3 entrenos manuales (Torso A 1 jun RPE 4; Pierna A 2 jun RPE 5; Torso A 8 jun **con cargas por ejercicio**), 1 check-in (3 jun) y 15 actividades Strava con FC. El problema era de **visibilidad**: ninguna pantalla mostraba los entrenos realizados ni un análisis; el motor adaptativo corre por detrás pero solo asomaba como mini-banner en Entreno.
+- **Cuentas duplicadas:** el usuario tiene DOS cuentas con el MISMO atleta Strava (169414644) conectado: gmail (Google, sus entrenos manuales) e icloud `sarmiento0@icloud.com` (password; check-in del 9 jun). El usuario confirmó que su cuenta principal es **gmail**. Pendiente (acción del usuario): desconectar Strava de la cuenta icloud y dejar de usarla; el webhook por `athleteId` (collectionGroup) puede importar a cualquiera de las dos mientras ambas estén conectadas.
+- **"Carga semanal" en Progreso solo usa `sessionRpe` de check-ins;** las sesiones registradas con "Registrar sesión hecha" no llevan RPE → barras vacías. No se cambió (el nuevo análisis cubre la visibilidad); mejora futura: pedir RPE al registrar sesión.
+
+### Implementado (bundle `c5bdc6e8dc`)
+
+- **`GET/POST /api/coach-analysis`** (nueva ruta): analiza el último entreno, lo compara con los previos (28 días: manuales + Strava + check-ins) y explica los ajustes para próximas sesiones. Digest 100% datos reales: comparación de cargas reales vs prescritas (match por `exercise.id` y nombre), señal de FC (`progressMemory.cardio`), reglas adaptativas reales (`buildAdaptiveTuning`). Gemini devuelve JSON (`lastSession/history/adjustments/warning`); **fallback heurístico observable** sin IA desde las mismas señales (`source:'heuristic'`, etiquetado honesto en UI). Informe cacheado en `users/{uid}/coachReports/latest` con **firma de entrenos** → `GET` marca `stale:true` si entrenó después. Rate limit persistente `coach-analysis` (6/h, env `COACH_ANALYSIS_RATE_LIMIT_*`).
+- **Lógica extraída a `src/services/coachAnalysis.js`** (testeable/sondeable); la ruta solo orquesta auth/rate-limit/IA/persistencia.
+- **`/api/studio-data` expone `recentWorkouts`** (últimos 10 entrenos hechos con fecha, fuente, duración, FC, RPE y cargas).
+- **Progreso (UI, `screen-more.jsx`):** nuevas tarjetas **"Análisis del coach"** (GET al abrir; botones Analizar/Actualizar/Re-analizar; secciones último entreno / cómo vas / qué voy a ajustar / alerta; pill de fuente IA vs heurístico) y **"Entrenos registrados"** (historial visible). 
+- **Fix de datos:** `Number(null)===0` hacía imprimir "null km", "FC media null", "0 min" en digest y `recentWorkouts`; corregido con guard `posNum` (con test).
+- `.env.example` actualizado con las vars de rate limit nuevas.
+
+### Verificación (9 jun 2026, sandbox Linux)
+
+- **Vitest SÍ corre ahora en el sandbox:** `npx vitest run` → **23 archivos, 110 tests verdes** (incluye `tests/services/coach-analysis.test.js` nuevo, 7 tests).
+- `npm audit` → 0 vulnerabilidades. `check-conflict-markers` OK (679 archivos). `smoke-test` OK.
+- **Sonda end-to-end con datos reales del usuario** (uid gmail): digest con 17 sesiones/28 días, comparación de cargas (6 ejercicios, 0% desvío), Gemini HTTP 200 con informe coherente y personalizado, `saveCoachAnalysis`/`getCoachAnalysis`/`stale:false` verificados contra Firestore de producción. **El primer informe ya quedó guardado** para la cuenta gmail (firma `17-c356db3c`).
+- Bundle regenerado: `npm i --no-save esbuild` (linux, sin tocar lockfile) + `node scripts/build-studio.mjs` → `studio.bundle.js?v=c5bdc6e8dc` (contiene `CoachAnalysisCard`/`RecentWorkoutsCard`).
+- **Límites:** `npm run build` (Next) sigue sin poder ejecutarse en el sandbox (EPERM sobre `.next/` en FS montado) → **correr en la Mac antes de commit/deploy**. No se hizo deploy ni commit en esta sesión.
+
+### Historial consultable + análisis por sesión (9 jun 2026, sesión tarde — bundle `355c009f1a`)
+
+Petición del usuario: historial completo de sesiones previas consultable, con análisis del coach IA por sesión. Decisiones acordadas: análisis **bajo demanda con caché permanente** (no automático: coste IA sin valor para sesiones viejas) y ubicación **en Progreso expandible** (sin pestaña nueva).
+
+- **`GET /api/workout-history?limit&before`**: historial paginado por cursor (`performedAt < before`) de entrenos HECHOS, con `workoutId` y el análisis cacheado **inline** (`analysis`/`analysisSource`) vía `getWorkoutAnalysesByIds` (db.getAll batcheado). Pide `limit+1` para `hasMore`/`nextBefore` sin segunda consulta.
+- **`POST /api/workout-analysis { workoutId }`**: analiza UNA sesión comparándola con previas comparables (mismo título normalizado → fallback mismo tipo carrera/fuerza, `findComparableSessions`), cargas vs plan VIGENTE (aproximación honesta, el prompt lo aclara) y check-in cercano (±1 día). **Caché permanente** `users/{uid}/workoutAnalyses/{workoutId}`; hits de caché no consumen rate limit; generación comparte scope `coach-analysis` (6/h). Fallback heurístico observable.
+- **Repositorio:** `listWorkouts`/`listWorkoutsSince` devuelven `id` (doc.id, cubre legacy sin campo id); `listWorkouts` acepta `{ before }`; nuevos `getWorkoutById`, `saveWorkoutAnalysis`, `getWorkoutAnalysis`, `getWorkoutAnalysesByIds`. `GET /api/workouts` también acepta `before`.
+- **UI (Progreso):** "Entrenos registrados" → **"Historial de entrenos"**: carga `/api/workout-history` al abrir (seed instantáneo con `recentWorkouts`), "Cargar más" paginado, fila expandible con cargas/fatiga/sueño y análisis del coach (pill "Analizada"); botón "Analizar esta sesión" por fila con manejo de 429.
+- **Verificación (sandbox):** vitest **23 archivos / 114 tests verdes** (4 nuevos del servicio); conflict markers OK; audit 0 vulnerabilidades. **Sonda real (uid gmail):** paginación sin solapamiento entre páginas; digest del Torso A del 8 jun (1 comparable, 6 cargas comparadas); Gemini HTTP 200 con análisis coherente (señala honestamente la falta de RPE); caché guardado y leído OK — **el Torso A del 8 jun ya quedó analizado y cacheado**. `npm run build` (Next) pendiente en la Mac (EPERM en sandbox).
+
+### Pendiente tras esta sesión
+
+1. En la Mac: `npm run build` + commit + push + deploy (bundle `355c009f1a` ya regenerado y commiteable).
+2. Usuario: desconectar Strava de la cuenta icloud (`sarmiento0@icloud.com`) y usar solo gmail.
+3. Mejora futura: capturar RPE en "Registrar sesión hecha" para alimentar la "Carga semanal"; opcional: disparar el análisis automáticamente al registrar sesión (hoy es GET cacheado + botón).
 
 ### Commit y sync (8 jun 2026)
 

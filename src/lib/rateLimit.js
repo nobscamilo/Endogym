@@ -4,6 +4,7 @@ export const RATE_LIMIT_SCOPES = Object.freeze({
   PLATE_ANALYSIS: 'plate-analysis',
   WEEKLY_PLAN_GENERATE: 'weekly-plan-generate',
   COACH_CHAT: 'coach-chat',
+  COACH_ANALYSIS: 'coach-analysis',
 });
 
 const DEFAULT_CONFIG = Object.freeze({
@@ -24,6 +25,12 @@ const DEFAULT_CONFIG = Object.freeze({
     windowSeconds: 60 * 60,
     maxEnv: 'COACH_CHAT_RATE_LIMIT_MAX',
     windowEnv: 'COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS',
+  },
+  [RATE_LIMIT_SCOPES.COACH_ANALYSIS]: {
+    maxRequests: 6,
+    windowSeconds: 60 * 60,
+    maxEnv: 'COACH_ANALYSIS_RATE_LIMIT_MAX',
+    windowEnv: 'COACH_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS',
   },
 });
 

@@ -64,7 +64,7 @@ describe('/api/workouts route', () => {
     const json = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mocks.listWorkouts).toHaveBeenCalledWith('user-1', 10);
+    expect(mocks.listWorkouts).toHaveBeenCalledWith('user-1', 10, { before: null });
     expect(json.workouts).toEqual([{ id: 'workout-1' }]);
   });
 

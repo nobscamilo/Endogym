@@ -50,6 +50,34 @@ function mapRunZones(workouts, plan, profile) {
   return { hrMax, items };
 }
 
+// Historial visible de entrenos realizados (manuales + check-ins completados + Strava).
+// Antes este dato existía en Firestore pero NO se mostraba en ninguna pantalla: el usuario
+// registraba sesiones y "desaparecían". Alimenta la sección de Progreso.
+function mapRecentWorkouts(workouts) {
+  const done = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => (w.source === 'daily_checkin' ? w.completed === true : w.completed !== false))
+    .sort((a, b) => String(b.performedAt || '').localeCompare(String(a.performedAt || '')))
+    .slice(0, 10)
+    .map((w) => {
+      const lifts = (Array.isArray(w.exercises) ? w.exercises : [])
+        .filter((e) => e?.name && Number(e.weightKg) > 0)
+        .map((e) => ({ name: e.name, kg: Number(e.weightKg), sets: e.sets ?? null }));
+      // Number(null) === 0 (finito): descarta null/'' antes de convertir para no mostrar 0 falsos.
+      const pos = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      return {
+        date: String(w.performedAt || '').slice(0, 10),
+        title: w.title || w.sportType || 'Sesión',
+        source: w.source === 'strava' ? 'strava' : w.source === 'daily_checkin' ? 'checkin' : 'app',
+        durationMin: pos(w.durationMinutes) ? Math.round(Number(w.durationMinutes)) : null,
+        distanceKm: pos(w.distanceKm),
+        avgHr: pos(w.avgHeartRate),
+        rpe: pos(w.sessionRpe),
+        lifts: lifts.slice(0, 8),
+      };
+    });
+  return done.length ? done : null;
+}
+
 function mapCoachAdjust(plan) {
   const at = plan?.adaptiveTuning;
   const rules = Array.isArray(at?.appliedRules) ? at.appliedRules : [];
@@ -530,6 +558,7 @@ export async function GET(request) {
       setIf('progress', mapProgress(metrics, workouts, planForStudio));
       setIf('strava', mapStrava(stravaConn, workouts));
       setIf('coachAdjust', mapCoachAdjust(planForStudio));
+      setIf('recentWorkouts', mapRecentWorkouts(workouts));
       setIf('runZones', mapRunZones(workouts, planForStudio, profile));
 
       return jsonResponse({ ok: true, overrides });

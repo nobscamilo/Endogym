@@ -54,6 +54,10 @@ Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos 
 - El mapa de vídeos conserva solo las 14 asociaciones verificadas por YouTube oEmbed el 2 de junio; el resto usa fallback SVG local.
 - Las cabeceras HTTP defensivas están activas en producción. La separación de rechazos auth esperados en logs está desplegada; no se reconsultaron Runtime Logs filtrados por limitación del CLI.
 - `main` local está cinco commits por delante de `origin/main` y conserva cambios sin commit desplegados manualmente; sincroniza GitHub antes de tratar el runtime como reproducible desde el repositorio remoto.
+- **Análisis del coach (9 jun 2026):** `GET/POST /api/coach-analysis` genera/cachea un informe del coach sobre los entrenos realizados (lógica en `src/services/coachAnalysis.js`, informe en `users/{uid}/coachReports/latest` con firma de invalidación, rate limit `coach-analysis` 6/h, fallback heurístico observable). Progreso muestra "Análisis del coach" y el historial (`recentWorkouts` en `studio-data`).
+- **Historial + análisis por sesión (9 jun 2026, tarde):** `GET /api/workout-history` (paginado por cursor `before`, análisis inline) y `POST /api/workout-analysis { workoutId }` (análisis de UNA sesión, caché permanente en `users/{uid}/workoutAnalyses/{workoutId}`, hits de caché sin rate limit). UI en Progreso: "Historial de entrenos" expandible con "Cargar más" y "Analizar esta sesión". Bundle `355c009f1a`. Verificado con sonda real + 114 tests en sandbox; `npm run build` pendiente en la Mac.
+- **Cuentas duplicadas del usuario:** existen dos cuentas con el mismo atleta Strava conectado (gmail = principal, con el historial; icloud = secundaria). No unificar ni borrar datos sin orden explícita; recomendar usar solo gmail y desconectar Strava en icloud.
+- **El sandbox Linux ya ejecuta vitest** (verificado 9 jun: 23 archivos/110 tests); `npm run build` (Next) sigue fallando ahí por EPERM en `.next/` → ejecutar en la Mac.
 
 ## Arquitectura acordada
 

@@ -191,17 +191,22 @@ export async function createWorkout(userId, payload) {
   return record;
 }
 
-export async function listWorkouts(userId, limit = 20) {
+export async function listWorkouts(userId, limit = 20, { before = null } = {}) {
   const { db } = await getAdminServices();
-  const snapshot = await db
+  let query = db
     .collection('users')
     .doc(userId)
     .collection('workouts')
-    .orderBy('performedAt', 'desc')
-    .limit(limit)
-    .get();
+    .orderBy('performedAt', 'desc');
 
-  return snapshot.docs.map((doc) => doc.data());
+  // Cursor de paginación para el historial: entrenos estrictamente anteriores a `before`.
+  if (before) {
+    query = query.where('performedAt', '<', before);
+  }
+
+  const snapshot = await query.limit(limit).get();
+  // doc.id como id autoritativo: los registros nuevos ya guardan `id`, los legacy no.
+  return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 }
 
 export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
@@ -217,7 +222,55 @@ export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
   }
 
   const snapshot = await query.limit(limit).get();
-  return snapshot.docs.map((doc) => doc.data());
+  return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+}
+
+function sanitizeWorkoutId(workoutId) {
+  const id = String(workoutId || '').trim();
+  return id && id.length <= 80 && !id.includes('/') ? id : null;
+}
+
+export async function getWorkoutById(userId, workoutId) {
+  const id = sanitizeWorkoutId(workoutId);
+  if (!id) return null;
+  const { db } = await getAdminServices();
+  const snapshot = await db.collection('users').doc(userId).collection('workouts').doc(id).get();
+  if (!snapshot.exists) return null;
+  return { ...snapshot.data(), id: snapshot.id };
+}
+
+// --- Análisis del coach por sesión (caché permanente: una sesión pasada es inmutable) ---
+export async function saveWorkoutAnalysis(userId, workoutId, analysis) {
+  const id = sanitizeWorkoutId(workoutId);
+  if (!id || !analysis || typeof analysis !== 'object') return null;
+  const { db } = await getAdminServices();
+  const ref = db.collection('users').doc(userId).collection('workoutAnalyses').doc(id);
+  const record = { ...analysis, workoutId: id, updatedAt: new Date().toISOString() };
+  await ref.set(record);
+  return record;
+}
+
+export async function getWorkoutAnalysis(userId, workoutId) {
+  const id = sanitizeWorkoutId(workoutId);
+  if (!id) return null;
+  const { db } = await getAdminServices();
+  const snapshot = await db.collection('users').doc(userId).collection('workoutAnalyses').doc(id).get();
+  if (!snapshot.exists) return null;
+  return snapshot.data() || null;
+}
+
+// Análisis cacheados de un conjunto de sesiones (para servir el historial con el análisis inline).
+export async function getWorkoutAnalysesByIds(userId, workoutIds) {
+  const ids = (Array.isArray(workoutIds) ? workoutIds : []).map(sanitizeWorkoutId).filter(Boolean);
+  if (!ids.length) return {};
+  const { db } = await getAdminServices();
+  const col = db.collection('users').doc(userId).collection('workoutAnalyses');
+  const snapshots = await db.getAll(...ids.map((id) => col.doc(id)));
+  const out = {};
+  for (const snap of snapshots) {
+    if (snap.exists) out[snap.id] = snap.data();
+  }
+  return out;
 }
 
 // --- Integración Strava: tokens y estado de conexión (doc aparte del perfil) ---
@@ -424,6 +477,23 @@ export async function getStudioNutritionPlan(userId, weekKey) {
   if (!snapshot.exists) return null;
   const data = snapshot.data() || {};
   return data.nutrition && Array.isArray(data.nutrition.days) ? data.nutrition : null;
+}
+
+// --- Análisis del coach (informe post-entreno cacheado; se invalida por firma de entrenos) ---
+export async function saveCoachAnalysis(userId, report) {
+  if (!report || typeof report !== 'object') return null;
+  const { db } = await getAdminServices();
+  const ref = db.collection('users').doc(userId).collection('coachReports').doc('latest');
+  const record = { ...report, updatedAt: new Date().toISOString() };
+  await ref.set(record);
+  return record;
+}
+
+export async function getCoachAnalysis(userId) {
+  const { db } = await getAdminServices();
+  const snapshot = await db.collection('users').doc(userId).collection('coachReports').doc('latest').get();
+  if (!snapshot.exists) return null;
+  return snapshot.data() || null;
 }
 
 export async function updateWeeklyPlanCustomizations(userId, planId, customizations) {

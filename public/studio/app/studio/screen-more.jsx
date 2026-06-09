@@ -2,6 +2,250 @@
 const { useState: useStateP, useEffect: useEffectP } = React;
 
 /* ============ PROGRESO ============ */
+
+/* ---- Historial de entrenos: paginado, con detalle y análisis del coach por sesión ---- */
+const RW_SOURCE = { app: 'App', checkin: 'Check-in', strava: 'Strava' };
+
+function WorkoutAnalysisBlock({ analysis, source }) {
+  return (
+    <div className="card" style={{ background: 'var(--accent-soft)', borderColor: 'transparent', padding: 12, marginTop: 8 }}>
+      <div className="row between ac" style={{ marginBottom: 6 }}>
+        <strong style={{ fontSize: '0.85rem' }}>Análisis del coach</strong>
+        <span className="pill tiny">{source === 'heuristic' ? 'Resumen automático (sin IA)' : 'Coach IA'}</span>
+      </div>
+      <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.55 }}>{analysis.session}</p>
+      {analysis.progression ? <p style={{ margin: '8px 0 0', fontSize: '0.88rem', lineHeight: 1.55 }}>{analysis.progression}</p> : null}
+      {Array.isArray(analysis.tips) && analysis.tips.length ? (
+        <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+          {analysis.tips.map((t, i) => (
+            <div key={i} className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ color: 'var(--accent)', marginTop: 2 }}><Icon name="check" size={13} /></span>
+              <span style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>{t}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {analysis.warning ? <p className="tiny" style={{ margin: '8px 0 0', color: 'var(--glu-high)', lineHeight: 1.5 }}>{analysis.warning}</p> : null}
+    </div>
+  );
+}
+
+function HistoryItem({ w, onAnalyzed }) {
+  const [open, setOpen] = useStateP(false);
+  const [busy, setBusy] = useStateP(false);
+  const [err, setErr] = useStateP(null);
+
+  async function analyze() {
+    if (!w.workoutId) return;
+    setBusy(true); setErr(null);
+    try {
+      const t = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!t) { setErr('Inicia sesión.'); setBusy(false); return; }
+      const r = await fetch('/api/workout-analysis', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + t },
+        body: JSON.stringify({ workoutId: w.workoutId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.analysis) onAnalyzed(w.workoutId, j.analysis, j.source);
+      else if (r.status === 429) setErr('Límite de análisis alcanzado. Vuelve en un rato.');
+      else setErr('No se pudo analizar. Reintenta.');
+    } catch (e) { setErr('No se pudo analizar. Reintenta.'); }
+    setBusy(false);
+  }
+
+  return (
+    <div style={{ padding: '10px 4px', borderBottom: '1px solid var(--line)' }}>
+      <div className="row between" style={{ gap: 10, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
+        <div style={{ minWidth: 0 }}>
+          <strong style={{ fontSize: '0.9rem' }}>{w.title}</strong>
+          <div className="tiny muted num">
+            {w.date}{w.durationMin ? ` · ${w.durationMin} min` : ''}{w.distanceKm ? ` · ${w.distanceKm} km` : ''}{w.avgHr ? ` · FC ${w.avgHr}` : ''}{w.rpe != null ? ` · RPE ${w.rpe}` : ''}
+          </div>
+        </div>
+        <div className="row ac" style={{ gap: 6 }}>
+          {w.analysis ? <span className="pill tiny" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}><Icon name="sparkles" size={11} /> Analizada</span> : null}
+          <span className="pill tiny">{RW_SOURCE[w.source] || w.source}</span>
+        </div>
+      </div>
+      {open ? (
+        <div style={{ marginTop: 6 }}>
+          {Array.isArray(w.lifts) && w.lifts.length ? (
+            <div className="tiny muted" style={{ lineHeight: 1.6 }}>
+              {w.lifts.map((l) => `${l.name} ${l.kg} kg${l.sets ? ` ×${l.sets}` : ''}`).join(' · ')}
+            </div>
+          ) : null}
+          {(w.fatigue != null || w.sleepHours != null) ? (
+            <div className="tiny muted num" style={{ marginTop: 4 }}>
+              {w.fatigue != null ? `Fatiga ${w.fatigue}/10` : ''}{w.fatigue != null && w.sleepHours != null ? ' · ' : ''}{w.sleepHours != null ? `Sueño ${w.sleepHours} h` : ''}
+            </div>
+          ) : null}
+          {w.analysis ? (
+            <WorkoutAnalysisBlock analysis={w.analysis} source={w.analysisSource} />
+          ) : w.workoutId ? (
+            <div className="row ac wrap" style={{ gap: 10, marginTop: 8 }}>
+              <button className="btn soft sm" onClick={(e) => { e.stopPropagation(); analyze(); }} disabled={busy}>
+                <Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Analizar esta sesión'}
+              </button>
+              {err ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{err}</span> : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RecentWorkoutsCard() {
+  const D = window.STUDIO;
+  // Placeholder instantáneo con lo que ya trae studio-data; el fetch lo sustituye con
+  // workoutId + análisis cacheados y habilita la paginación.
+  const seed = (Array.isArray(D.recentWorkouts) ? D.recentWorkouts : []).map((w) => ({ ...w, workoutId: null }));
+  const [items, setItems] = useStateP(seed);
+  const [hasMore, setHasMore] = useStateP(false);
+  const [nextBefore, setNextBefore] = useStateP(null);
+  const [loading, setLoading] = useStateP(false);
+
+  async function token() { return window.__getIdToken ? window.__getIdToken() : Promise.resolve(null); }
+
+  async function fetchPage(before) {
+    const t = await token(); if (!t) return null;
+    const qs = new URLSearchParams({ limit: '15' });
+    if (before) qs.set('before', before);
+    const r = await fetch('/api/workout-history?' + qs.toString(), { headers: { authorization: 'Bearer ' + t } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok ? j : null;
+  }
+
+  useEffectP(() => {
+    (async () => {
+      const j = await fetchPage(null);
+      if (j) { setItems(j.items); setHasMore(j.hasMore); setNextBefore(j.nextBefore); }
+    })();
+  }, []);
+
+  async function loadMore() {
+    setLoading(true);
+    const j = await fetchPage(nextBefore);
+    if (j) { setItems((p) => p.concat(j.items)); setHasMore(j.hasMore); setNextBefore(j.nextBefore); }
+    setLoading(false);
+  }
+
+  function onAnalyzed(workoutId, analysis, source) {
+    setItems((p) => p.map((w) => (w.workoutId === workoutId ? { ...w, analysis, analysisSource: source } : w)));
+  }
+
+  return (
+    <SectionCard title="Historial de entrenos" icon="train" sub="Todas tus sesiones guardadas. Toca una para ver el detalle y pedir análisis del coach.">
+      {items.length ? (
+        <div className="stack" style={{ gap: 0 }}>
+          {items.map((w, i) => <HistoryItem key={w.workoutId || `${w.date}-${i}`} w={w} onAnalyzed={onAnalyzed} />)}
+          {hasMore ? (
+            <button className="btn ghost sm" style={{ alignSelf: 'center', marginTop: 10 }} onClick={loadMore} disabled={loading}>
+              {loading ? 'Cargando…' : 'Cargar más'}
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="empty">Aún no hay entrenos registrados. Usa "Registrar sesión hecha" en Entreno o conecta Strava.</div>
+      )}
+    </SectionCard>
+  );
+}
+
+/* ---- Análisis del coach: último entreno, tendencia y próximos ajustes ---- */
+function CoachAnalysisCard() {
+  const [state, setState] = useStateP({ phase: 'loading', report: null, source: null, stale: false, generatedAt: null });
+  const [busy, setBusy] = useStateP(false);
+
+  async function token() { return window.__getIdToken ? window.__getIdToken() : Promise.resolve(null); }
+
+  async function load() {
+    try {
+      const t = await token(); if (!t) { setState((s) => ({ ...s, phase: 'noauth' })); return; }
+      const r = await fetch('/api/coach-analysis', { headers: { authorization: 'Bearer ' + t } });
+      if (!r.ok) { setState((s) => ({ ...s, phase: 'err' })); return; }
+      const j = await r.json();
+      if (j.empty || !j.report) { setState({ phase: 'empty', report: null, source: null, stale: false, generatedAt: null }); return; }
+      setState({ phase: 'ready', report: j.report, source: j.source, stale: Boolean(j.stale), generatedAt: j.generatedAt });
+    } catch (e) { setState((s) => ({ ...s, phase: 'err' })); }
+  }
+
+  async function generate() {
+    setBusy(true);
+    try {
+      const t = await token(); if (!t) { setBusy(false); return; }
+      const r = await fetch('/api/coach-analysis', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + t } });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.report) setState({ phase: 'ready', report: j.report, source: j.source, stale: false, generatedAt: j.generatedAt });
+      else if (r.ok && j.empty) setState({ phase: 'empty', report: null, source: null, stale: false, generatedAt: null });
+      else setState((s) => ({ ...s, phase: s.report ? 'ready' : 'err' }));
+    } catch (e) { setState((s) => ({ ...s, phase: s.report ? 'ready' : 'err' })); }
+    setBusy(false);
+  }
+
+  useEffectP(() => { load(); }, []);
+
+  const rep = state.report;
+  const srcLabel = state.source === 'heuristic' ? 'Resumen automático (sin IA)' : 'Coach IA';
+  return (
+    <SectionCard title="Análisis del coach" icon="sparkles"
+      sub="Qué dice el coach de tu último entreno y cómo ajustará los siguientes"
+      action={rep ? <span className="pill tiny">{srcLabel}</span> : null}>
+      {state.phase === 'loading' ? <div className="empty">Cargando análisis…</div> : null}
+      {state.phase === 'noauth' ? <div className="empty">Inicia sesión para ver tu análisis.</div> : null}
+      {state.phase === 'err' && !rep ? <div className="empty">No se pudo cargar el análisis. Reintenta más tarde.</div> : null}
+      {state.phase === 'empty' ? (
+        <div className="stack" style={{ gap: 10 }}>
+          <div className="empty">Aún no hay análisis. Cuando registres un entreno (o sincronices Strava), el coach lo analizará aquí.</div>
+          <button className="btn" onClick={generate} disabled={busy}><Icon name="sparkles" size={16} /> {busy ? 'Analizando…' : 'Analizar mis entrenos'}</button>
+        </div>
+      ) : null}
+      {rep ? (
+        <div className="stack" style={{ gap: 14 }}>
+          {state.stale ? (
+            <div className="row ac wrap" style={{ gap: 10 }}>
+              <span className="tiny" style={{ color: 'var(--glu-mid)' }}>Tienes entrenos nuevos sin analizar.</span>
+              <button className="btn soft sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Actualizar análisis'}</button>
+            </div>
+          ) : null}
+          <div>
+            <div className="mb-label">Tu último entreno</div>
+            <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.lastSession}</p>
+          </div>
+          {rep.history ? (
+            <div>
+              <div className="mb-label">Cómo vas (últimas semanas)</div>
+              <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.history}</p>
+            </div>
+          ) : null}
+          {Array.isArray(rep.adjustments) && rep.adjustments.length ? (
+            <div>
+              <div className="mb-label">Próximas sesiones: qué voy a ajustar</div>
+              <div className="stack" style={{ gap: 6 }}>
+                {rep.adjustments.map((a, i) => (
+                  <div key={i} className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+                    <span style={{ color: 'var(--accent)', marginTop: 2 }}><Icon name="check" size={14} /></span>
+                    <span style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>{a}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {rep.warning ? (
+            <p className="tiny" style={{ margin: 0, color: 'var(--glu-high)', lineHeight: 1.5 }}>{rep.warning}</p>
+          ) : null}
+          <div className="row ac wrap between" style={{ gap: 10 }}>
+            <span className="tiny muted">{state.generatedAt ? `Generado: ${String(state.generatedAt).slice(0, 16).replace('T', ' ')}` : ''}</span>
+            {!state.stale ? <button className="btn ghost sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Re-analizar'}</button> : null}
+          </div>
+        </div>
+      ) : null}
+    </SectionCard>
+  );
+}
+
 function ProgressScreen() {
   const D = window.STUDIO;
   const p = D.progress || {};
@@ -29,6 +273,12 @@ function ProgressScreen() {
       </div>
 
       <CoachBanner screen="progress" ask onAsk={() => setAsk(true)} />
+
+      {/* Análisis del coach: último entreno, tendencia y próximos ajustes */}
+      <CoachAnalysisCard />
+
+      {/* Historial visible de entrenos realizados */}
+      <RecentWorkoutsCard />
 
       {/* Validación de zonas (corredores con Strava) */}
       {D.runZones && Array.isArray(D.runZones.items) && D.runZones.items.length ? (

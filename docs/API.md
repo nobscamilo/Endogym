@@ -21,6 +21,9 @@
 | `POST` | `/api/analyze-plate` | Analizar foto y persistir comida. |
 | `GET` | `/api/studio-data` | Datos reales normalizados para Ignios Studio. |
 | `POST` | `/api/coach-chat` | Preguntar al Coach IA con contexto real del usuario. |
+| `GET`, `POST` | `/api/coach-analysis` | Consultar o generar el análisis del coach de los entrenos realizados (Progreso). |
+| `GET` | `/api/workout-history` | Historial paginado de entrenos hechos (cursor `before`, análisis cacheado inline). |
+| `POST` | `/api/workout-analysis` | Analizar UNA sesión del historial (caché permanente por workout). |
 | `GET`, `POST` | `/api/studio-nutrition` | Consultar o generar el plan semanal de comidas del Studio. |
 | `POST` | `/api/studio-availability` | Guardar encuesta de disponibilidad y regenerar plan. |
 | `POST` | `/api/studio-swap` | Cambiar ejercicios o ampliar sesión en el plan guardado. |
@@ -53,6 +56,7 @@ Las operaciones IA costosas usan ventanas persistentes por usuario en Firestore:
 | `POST /api/analyze-plate` | 10 solicitudes cada 600 segundos. |
 | `POST /api/weekly-plan` | 4 solicitudes cada 3600 segundos. |
 | `POST /api/coach-chat` | 20 solicitudes cada 3600 segundos. |
+| `POST /api/coach-analysis` | 6 solicitudes cada 3600 segundos. |
 
 Al superar el limite responden HTTP `429`, cabecera `Retry-After` y `details.retryAfterSeconds`.
 
@@ -83,6 +87,18 @@ Payload:
 ```
 
 Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y `details.retryAfterSeconds`.
+
+## Análisis del coach (Progreso)
+
+- `GET /api/coach-analysis` devuelve el informe guardado (`users/{uid}/coachReports/latest`) con `stale:true` si hay entrenos nuevos desde la última generación (firma de entrenos de 28 días), o `{ "empty": true }` si no hay informe.
+- `POST /api/coach-analysis` construye un digest REAL (entrenos manuales + Strava + check-ins de 28 días, comparación de cargas reales vs prescritas, señal de FC y reglas adaptativas del planner) y pide a Gemini un informe JSON (`lastSession`, `history`, `adjustments[]`, `warning`). Si Gemini falla, genera un informe heurístico observable desde las mismas señales (`source:'heuristic'`); el front lo etiqueta honestamente como "Resumen automático (sin IA)". Consume el rate limit `coach-analysis` y guarda el informe con la firma para invalidación.
+- La lógica vive en `src/services/coachAnalysis.js` (testeada en `tests/services/coach-analysis.test.js`).
+
+## Historial de entrenos y análisis por sesión
+
+- `GET /api/workout-history?limit=15&before=<ISO>` devuelve `{ items, hasMore, nextBefore }`: entrenos HECHOS (app + check-ins completados + Strava) en orden descendente, con `workoutId`, métricas de display y el análisis del coach cacheado inline (`analysis`, `analysisSource`) si existe. El cursor `before` filtra `performedAt < before`.
+- `POST /api/workout-analysis` con `{ "workoutId": "..." }` analiza UNA sesión: la compara con sesiones previas comparables (mismo título normalizado, o mismo tipo carrera/fuerza), con las cargas del plan vigente (aproximación honesta para sesiones antiguas) y con el check-in cercano. **Caché permanente** en `users/{uid}/workoutAnalyses/{workoutId}` (las sesiones pasadas son inmutables): los hits de caché responden `cached:true` y NO consumen rate limit; la generación comparte el scope `coach-analysis` (6/h). Fallback heurístico observable (`source:'heuristic'`).
+- `GET /api/workouts` acepta ahora cursor `before` además de `limit`, y `listWorkouts`/`listWorkoutsSince` devuelven `id` (doc.id) también para registros legacy.
 
 ## Nutrición Studio
 
