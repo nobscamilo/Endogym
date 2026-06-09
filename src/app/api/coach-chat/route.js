@@ -8,7 +8,7 @@ import {
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince } from '../../../lib/repositories/firestoreRepository.js';
-import { hrMaxFromAge, validateRunZone } from '../../../core/running.js';
+import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
@@ -96,6 +96,16 @@ async function buildUserContext(uid) {
         const v = validateRunZone({ avgHr: Number(last.avgHeartRate), hrMax, runType: runType || 'easy' });
         const hrMaxSource = (Number.isFinite(manualHrMax) && manualHrMax >= 120) ? 'medida por el usuario' : 'estimada por su edad/observada';
         if (v) parts.push(`FCmáx ~${hrMax} ppm (${hrMaxSource}). Última carrera: ${v.message}`);
+      }
+      // Forma aeróbica real: eficiencia ritmo/FC y predicción con sus mejores esfuerzos.
+      const efTrend = buildEfficiencyTrend(runs);
+      if (efTrend) {
+        parts.push(`Eficiencia aeróbica (m/min por ppm): reciente ${efTrend.recentEf} vs base ${efTrend.baselineEf} (${efTrend.trendPct >= 0 ? '+' : ''}${efTrend.trendPct}%).`);
+      }
+      const targetMeters = RACE_GOAL_METERS[profile?.runRaceGoal] || null;
+      if (targetMeters) {
+        const pred = predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs });
+        if (pred) parts.push(`Predicción actual para su objetivo (${profile.runRaceGoal.replace('race_', '').toUpperCase()}, Riegel sobre su mejor esfuerzo real del ${pred.basedOn.date}): ~${formatRaceTime(pred.seconds)}.`);
       }
       parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en Z2, apretar en los días de calidad) usando SU FCmáx por edad/medida; cada usuario es distinto.');
     }

@@ -280,6 +280,30 @@ function ProgressScreen() {
       {/* Historial visible de entrenos realizados */}
       <RecentWorkoutsCard />
 
+      {/* Forma aeróbica (corredores): eficiencia ritmo/FC y predicción de carrera */}
+      {D.runFitness ? (
+        <SectionCard title="Forma aeróbica" icon="heart" sub="Calculada con tus carreras reales de Strava (ritmo y FC)">
+          <div className="row wrap" style={{ gap: 18 }}>
+            {D.runFitness.efficiency ? (
+              <div>
+                <div className="mb-label">Eficiencia (m/min por ppm)</div>
+                <Stat num={String(D.runFitness.efficiency.recentEf).replace('.', ',')}
+                  label={`${D.runFitness.efficiency.trendPct >= 0 ? '↑ +' : '↓ '}${String(D.runFitness.efficiency.trendPct).replace('.', ',')}% vs tu base (${D.runFitness.efficiency.runsUsed} carreras)`}
+                  color={D.runFitness.efficiency.trendPct >= 0 ? 'var(--glu-good)' : 'var(--glu-mid)'} />
+                <p className="tiny muted" style={{ margin: '6px 0 0', maxWidth: 320, lineHeight: 1.45 }}>Si corres igual de rápido con menos pulso, tu base aeróbica mejora.</p>
+              </div>
+            ) : null}
+            {D.runFitness.prediction ? (
+              <div>
+                <div className="mb-label">Predicción {D.runFitness.prediction.goal}</div>
+                <Stat num={D.runFitness.prediction.time} label={`Basada en tu ${D.runFitness.prediction.basedOn.distanceKm} km del ${D.runFitness.prediction.basedOn.date}`} color="var(--accent)" />
+                <p className="tiny muted" style={{ margin: '6px 0 0', maxWidth: 320, lineHeight: 1.45 }}>Fórmula de Riegel sobre tu mejor esfuerzo reciente; mejora con cada carrera de calidad que registres.</p>
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+      ) : null}
+
       {/* Validación de zonas (corredores con Strava) */}
       {D.runZones && Array.isArray(D.runZones.items) && D.runZones.items.length ? (
         <SectionCard title="Validación de zonas" icon="heart" sub={`Comparo tu FC real con la zona prescrita · FCmáx ~${D.runZones.hrMax} ppm`}>

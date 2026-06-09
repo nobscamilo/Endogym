@@ -27,6 +27,7 @@
 | `GET`, `POST` | `/api/studio-nutrition` | Consultar o generar el plan semanal de comidas del Studio. |
 | `POST` | `/api/studio-availability` | Guardar encuesta de disponibilidad y regenerar plan. |
 | `POST` | `/api/studio-swap` | Cambiar ejercicios o ampliar sesión en el plan guardado. |
+| `GET` | `/api/backup` | Export de Firestore a GCS (solo Vercel Cron con `CRON_SECRET`). |
 | `GET` | `/api/products/barcode?code=...` | Consultar Open Food Facts. |
 | `GET` | `/api/account/export` | Exportar datos JSON. |
 | `DELETE` | `/api/account/delete` | Eliminar datos y cuenta. |
@@ -57,6 +58,7 @@ Las operaciones IA costosas usan ventanas persistentes por usuario en Firestore:
 | `POST /api/weekly-plan` | 4 solicitudes cada 3600 segundos. |
 | `POST /api/coach-chat` | 20 solicitudes cada 3600 segundos. |
 | `POST /api/coach-analysis` | 6 solicitudes cada 3600 segundos. |
+| `POST /api/studio-nutrition` | 12 solicitudes cada 3600 segundos (generación semanal y `swapMeal`). |
 
 Al superar el limite responden HTTP `429`, cabecera `Retry-After` y `details.retryAfterSeconds`.
 
@@ -93,6 +95,15 @@ Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y 
 - `GET /api/coach-analysis` devuelve el informe guardado (`users/{uid}/coachReports/latest`) con `stale:true` si hay entrenos nuevos desde la última generación (firma de entrenos de 28 días), o `{ "empty": true }` si no hay informe.
 - `POST /api/coach-analysis` construye un digest REAL (entrenos manuales + Strava + check-ins de 28 días, comparación de cargas reales vs prescritas, señal de FC y reglas adaptativas del planner) y pide a Gemini un informe JSON (`lastSession`, `history`, `adjustments[]`, `warning`). Si Gemini falla, genera un informe heurístico observable desde las mismas señales (`source:'heuristic'`); el front lo etiqueta honestamente como "Resumen automático (sin IA)". Consume el rate limit `coach-analysis` y guarda el informe con la firma para invalidación.
 - La lógica vive en `src/services/coachAnalysis.js` (testeada en `tests/services/coach-analysis.test.js`).
+
+## Cambio de una comida (swapMeal)
+
+`POST /api/studio-nutrition` con `{ "swapMeal": { "day": "Jue", "slot": "Cena", "request": "más ligera" } }` regenera SOLO esa comida con Gemini (esquema `MEAL_ITEM_SCHEMA`), instruida para cubrir las kcal/proteína restantes del día, reemplaza el slot en el plan guardado de la semana y lo persiste. Responde `{ ok, day, slot, meal, nutrition }`. Sin plan guardado responde `404`. La generación semanal y el swap comparten el rate limit `studio-nutrition` (antes esta ruta NO tenía rate limit).
+
+## Backup de Firestore y alertas
+
+- `GET /api/backup` (Vercel Cron, lunes 03:00 UTC — ver `vercel.json` `crons`): lanza `exportDocuments` de Firestore a `gs://endogym-vtety8-backups-eu/auto/<timestamp>` con el token OAuth del Admin SDK (roles `datastore.importExportAdmin` + `objectAdmin` del bucket). Protegido por `CRON_SECRET` (Vercel lo envía como `Authorization: Bearer`). El bucket tiene lifecycle de borrado a 90 días.
+- **Alertas de errores:** `logError()` envía además un aviso a `ALERT_WEBHOOK_URL` (Discord `{content}` / Slack `{text}`) con dedupe de 5 min por mensaje. Si la env var no existe, no hace nada.
 
 ## Historial de entrenos y análisis por sesión
 

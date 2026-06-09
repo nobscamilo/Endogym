@@ -222,6 +222,7 @@ function NutritionScreen({ layout }) {
     setDayIdx(i);
     if (D.mealWeek && D.mealWeek[i]) {
       D.meals = D.mealWeek[i].meals;
+      D.currentMealDay = D.mealWeek[i].day; // para "Cambiar comida" (swap por día+slot)
       setGen((g) => g + 1);
     }
   }
@@ -239,7 +240,9 @@ function NutritionScreen({ layout }) {
         kcal: d.meals.reduce((a, m) => a + (Number(m.kcal) || 0), 0),
         today: i === tIdx,
       }));
-      D.meals = (week[Math.min(dayIdx, week.length - 1)] || week[0]).meals;
+      const sel = week[Math.min(dayIdx, week.length - 1)] || week[0];
+      D.meals = sel.meals;
+      D.currentMealDay = sel.day;
     } else if (Array.isArray(n.meals) && n.meals.length) {
       // Compatibilidad con la forma antigua (un solo día).
       const single = normMeals(n.meals);
@@ -253,6 +256,8 @@ function NutritionScreen({ layout }) {
     setGen((g) => g + 1);
     return true;
   }
+  // Expuesto para que "Cambiar comida" (MealDetail) pueda refrescar la vista con el plan guardado.
+  window.__applyNutrition = applyNutrition;
 
   // Genera (o regenera) el plan semanal con IA y lo guarda en el servidor (POST).
   async function generate() {
@@ -401,6 +406,26 @@ function NutritionToday({ layout }) {
 
 /* Detalle compartido de una comida */
 function MealDetail({ m }) {
+  const [sw, setSw] = useStateN('idle'); // idle|busy|err
+  // Cambia ESTA comida por otra equivalente (IA): el servidor regenera solo este slot,
+  // mantiene kcal/proteína del día y guarda el plan actualizado.
+  async function swapThisMeal() {
+    setSw('busy');
+    try {
+      const D = window.STUDIO;
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setSw('err'); return; }
+      const day = D.currentMealDay || (D.mealWeek && D.mealWeek[0] && D.mealWeek[0].day) || 'Lun';
+      const r = await fetch('/api/studio-nutrition', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ swapMeal: { day, slot: m.slot } }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok && j.nutrition && window.__applyNutrition) { window.__applyNutrition(j.nutrition); return; }
+      setSw('err');
+    } catch (e) { setSw('err'); }
+  }
   return (
     <div className="meal-body-pad">
       <div>
@@ -421,9 +446,12 @@ function MealDetail({ m }) {
           </div>
         </div>
       </div>
-      <div className="row wrap" style={{ gap: 8 }}>
+      <div className="row wrap ac" style={{ gap: 8 }}>
         <button className="btn soft sm"><Icon name="check" size={15} /> Marcar como hecha</button>
-        <button className="btn ghost sm"><Icon name="sparkles" size={15} /> Cambiar comida</button>
+        <button className="btn ghost sm" onClick={swapThisMeal} disabled={sw === 'busy'}>
+          <Icon name="sparkles" size={15} /> {sw === 'busy' ? 'Buscando alternativa…' : 'Cambiar comida'}
+        </button>
+        {sw === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo cambiar. Reintenta.</span> : null}
       </div>
     </div>
   );

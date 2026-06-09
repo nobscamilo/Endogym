@@ -85,6 +85,64 @@ export function describeWorkout(w) {
   return parts.join(' · ');
 }
 
+// e1RM por Epley: kg × (1 + reps/30). Sin reps fiables, el e1RM ≈ kg (comparación conservadora).
+export function epley1Rm(kg, reps) {
+  const k = Number(kg);
+  const r = Number(reps);
+  if (!Number.isFinite(k) || k <= 0) return null;
+  if (!Number.isFinite(r) || r <= 0 || r > 30) return Math.round(k * 10) / 10;
+  return Math.round(k * (1 + r / 30) * 10) / 10;
+}
+
+// Progresión de cargas por ejercicio a partir de los entrenos registrados (manuales con kg).
+// Devuelve, por ejercicio, los últimos puntos (fecha, kg, reps, e1RM) y un veredicto:
+// 'progressing' (el último e1RM supera el previo), 'stalled' (≥3 sesiones sin superar),
+// 'regressing' (cae >3%) o 'insufficient' (menos de 2 puntos).
+export function buildLiftProgression(workouts, { maxLifts = 6, maxPoints = 5 } = {}) {
+  const byLift = new Map();
+  const done = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => isDoneWorkout(w) && Array.isArray(w.exercises))
+    .sort((a, b) => String(a.performedAt || '').localeCompare(String(b.performedAt || '')));
+  for (const w of done) {
+    for (const e of w.exercises) {
+      const kg = Number(e?.weightKg);
+      if (!e?.name || !Number.isFinite(kg) || kg <= 0) continue;
+      const key = String(e.name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      if (!byLift.has(key)) byLift.set(key, { name: e.name, points: [] });
+      byLift.get(key).points.push({
+        date: String(w.performedAt || '').slice(0, 10),
+        kg,
+        reps: Number(e.reps) > 0 ? Number(e.reps) : null,
+        e1rm: epley1Rm(kg, e.reps),
+      });
+    }
+  }
+  const lifts = [];
+  for (const lift of byLift.values()) {
+    const points = lift.points.slice(-maxPoints);
+    let trend = 'insufficient';
+    if (points.length >= 2) {
+      const last = points[points.length - 1].e1rm;
+      const prevMax = Math.max(...points.slice(0, -1).map((p) => p.e1rm));
+      if (last > prevMax * 1.01) trend = 'progressing';
+      else if (last < prevMax * 0.97) trend = 'regressing';
+      else trend = points.length >= 3 ? 'stalled' : 'flat';
+    }
+    lifts.push({ name: lift.name, points, trend, sessions: lift.points.length });
+  }
+  // Prioriza lo accionable: estancados/en retroceso primero, luego más sesiones.
+  const rank = { regressing: 0, stalled: 1, flat: 2, progressing: 3, insufficient: 4 };
+  lifts.sort((a, b) => (rank[a.trend] - rank[b.trend]) || (b.sessions - a.sessions));
+  return lifts.slice(0, maxLifts);
+}
+
+export function describeLiftProgression(lifts) {
+  const label = { progressing: 'PROGRESANDO', stalled: 'ESTANCADO', regressing: 'EN RETROCESO', flat: 'estable', insufficient: 'datos insuficientes' };
+  return (Array.isArray(lifts) ? lifts : [])
+    .filter((l) => l.trend !== 'insufficient')
+    .map((l) => `${l.name} [${label[l.trend]}]: ${l.points.map((p) => `${p.kg} kg${p.reps ? `×${p.reps}` : ''} (e1RM ${p.e1rm})`).join(' → ')}`);
+}
+
 // Compara las cargas del último entreno de fuerza con lo prescrito en el plan (por id o nombre).
 export function compareLoadsWithPlan(lastStrength, plan) {
   if (!lastStrength || !Array.isArray(lastStrength.exercises)) return [];
@@ -143,6 +201,7 @@ export async function buildCoachAnalysisDigest(uid) {
     last,
     lastStrength,
     loadComparison: compareLoadsWithPlan(lastStrength, plan),
+    liftProgression: buildLiftProgression(workouts),
     progressMemory,
     adaptiveTuning,
     signature: workoutsSignature(workouts),
@@ -161,6 +220,10 @@ export function buildCoachAnalysisPrompt(digest) {
   if (loadComparison.length) lines.push(`Cargas reales vs prescritas (último entreno de fuerza): ${loadComparison.join('; ')}.`);
   const prev = done.slice(1, 12).map(describeWorkout);
   if (prev.length) lines.push(`ENTRENOS PREVIOS (28 días):\n- ${prev.join('\n- ')}`);
+  const progressionLines = describeLiftProgression(digest.liftProgression);
+  if (progressionLines.length) {
+    lines.push(`PROGRESIÓN DE CARGAS por ejercicio (e1RM Epley; señala explícitamente los ESTANCADOS o EN RETROCESO y propone el siguiente paso concreto en kg):\n- ${progressionLines.join('\n- ')}`);
+  }
   const cardio = progressMemory?.cardio || {};
   if (Number.isFinite(Number(cardio.hrDriftBpm))) {
     lines.push(`Señal cardiaca: FC media de carrera reciente ${cardio.recentAvgHr ?? '?'} ppm vs base ${cardio.baselineAvgHr ?? '?'} ppm (deriva ${cardio.hrDriftBpm >= 0 ? '+' : ''}${cardio.hrDriftBpm} ppm, señal "${cardio.hrSignal}").`);
@@ -189,10 +252,15 @@ export function buildHeuristicCoachReport(digest) {
   const adjustments = rules.length
     ? rules.map((r) => `${r.reason || r.id}: ${r.effect || 'ajuste aplicado'}`)
     : ['Señales estables: el plan sigue su progresión normal de cargas dentro del bloque.'];
+  // Ejercicios estancados/en retroceso (e1RM): siempre accionable, también sin IA.
+  for (const l of (digest.liftProgression || [])) {
+    if (l.trend === 'stalled') adjustments.push(`${l.name}: estancado ${l.points.length} sesiones (e1RM ${l.points[l.points.length - 1].e1rm}). Sube ~2,5 kg o añade 1-2 reps si el RPE lo permite.`);
+    if (l.trend === 'regressing') adjustments.push(`${l.name}: e1RM en retroceso. Revisa recuperación/técnica antes de subir carga.`);
+  }
   return {
     lastSession,
     history: histParts.join(' '),
-    adjustments,
+    adjustments: adjustments.slice(0, 5),
     warning: '',
   };
 }
@@ -250,6 +318,7 @@ export async function buildWorkoutAnalysisDigest(uid, workoutId) {
   ]);
 
   const comparables = findComparableSessions(workout, workouts);
+  const liftProgression = buildLiftProgression(workouts);
   const day = String(workout.performedAt || '').slice(0, 10);
   const checkin = (Array.isArray(workouts) ? workouts : []).find(
     (w) => w.source === 'daily_checkin' && Math.abs(new Date(String(w.performedAt).slice(0, 10)) - new Date(day)) <= 24 * 3600 * 1000,
@@ -259,7 +328,7 @@ export async function buildWorkoutAnalysisDigest(uid, workoutId) {
   // honesto para sesiones recientes, aproximado para antiguas — el prompt lo deja claro.
   const loadComparison = isStrengthLike(workout) ? compareLoadsWithPlan(workout, plan) : [];
 
-  return { profile, workout, comparables, checkin, loadComparison };
+  return { profile, workout, comparables, checkin, loadComparison, liftProgression };
 }
 
 export function buildWorkoutAnalysisPrompt(digest) {
@@ -282,6 +351,10 @@ export function buildWorkoutAnalysisPrompt(digest) {
     lines.push(`SESIONES PREVIAS COMPARABLES (analiza la progresión real entre ellas y esta):\n- ${comparables.map(describeWorkout).join('\n- ')}`);
   } else {
     lines.push('No hay sesiones previas comparables: di explícitamente que es la primera de su tipo y qué medir a partir de ahora.');
+  }
+  const progLines = describeLiftProgression(digest.liftProgression);
+  if (progLines.length) {
+    lines.push(`PROGRESIÓN DE CARGAS por ejercicio (e1RM Epley; señala estancamientos y propone el siguiente paso en kg):\n- ${progLines.join('\n- ')}`);
   }
   lines.push('Devuelve SOLO el JSON del esquema: session (análisis de esta sesión), progression (vs comparables, o vacía si no hay), tips (2-3 consejos concretos para la próxima de este tipo), warning (alerta o cadena vacía).');
   return lines.join('\n\n');

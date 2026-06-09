@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { withTrace, logError, logInfo } from '../../../lib/logger.js';
+import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import {
@@ -194,6 +195,21 @@ export async function POST(request) {
     const model = resolveGeminiCoachModel();
     if (!isValidGoogleAiModelName(model)) return errorResponse('Modelo Gemini inválido.', 500);
 
+    // Rate limit persistente (antes esta ruta de IA costosa NO tenía): cubre la generación
+    // semanal completa y los cambios de comida individuales.
+    const rateLimit = await enforceUserRateLimit({
+      userId: user.uid,
+      scope: RATE_LIMIT_SCOPES.STUDIO_NUTRITION,
+    });
+    if (!rateLimit.allowed) {
+      logInfo('rate_limit_exceeded', { traceId, userId: user.uid, scope: RATE_LIMIT_SCOPES.STUDIO_NUTRITION, retryAfterSeconds: rateLimit.retryAfterSeconds });
+      return errorResponse('Demasiadas generaciones de nutrición seguidas. Espera antes de reintentar.', 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, getRateLimitHeaders(rateLimit));
+    }
+
+    // Cuerpo opcional: { swapMeal: { day, slot, request? } } cambia UNA comida del plan guardado.
+    let body = {};
+    try { body = await request.json(); } catch { body = {}; }
+
     const [profile, plan] = await Promise.all([
       getUserProfile(user.uid).catch(() => null),
       getLatestWeeklyPlan(user.uid).catch(() => null),
@@ -256,6 +272,62 @@ Requisitos:
 - shopping: lista de la compra para TODA LA SEMANA (7 días), NO para estos días sueltos. 4-6 categorías (cat, icon emoji, items con name y qty), con cantidades agregadas para 7 días (p. ej. "Pollo 1,4 kg", "Huevos 18 ud", "Arroz 1 kg").
 - batch: 3-4 tareas de batch cooking del fin de semana (title, desc, time, day, emoji).` : ''}
 Devuelve SOLO el JSON del esquema.`;
+    }
+
+    // ---- Cambio de UNA comida del plan guardado (swapMeal) ----
+    const swap = body && body.swapMeal && typeof body.swapMeal === 'object' ? body.swapMeal : null;
+    if (swap) {
+      const day = String(swap.day || '').slice(0, 3);
+      const slot = ['Desayuno', 'Comida', 'Merienda', 'Cena'].includes(swap.slot) ? swap.slot : null;
+      const extra = typeof swap.request === 'string' ? swap.request.trim().slice(0, 200) : '';
+      if (!/^(Lun|Mar|Mié|Jue|Vie|Sáb|Dom)$/.test(day) || !slot) {
+        return errorResponse('swapMeal requiere "day" (Lun..Dom) y "slot" válido.', 400);
+      }
+      const saved = await getStudioNutritionPlan(user.uid, currentWeekKey()).catch(() => null);
+      const dayPlan = saved && Array.isArray(saved.days) ? saved.days.find((d) => d.day === day) : null;
+      const current = dayPlan && Array.isArray(dayPlan.meals) ? dayPlan.meals.find((m) => m.slot === slot) : null;
+      if (!current) return errorResponse('No se encontró esa comida en el plan guardado de esta semana.', 404);
+
+      const others = dayPlan.meals.filter((m) => m.slot !== slot);
+      const c = dayCtx[day] || { kcal: t.kcal, protein: t.protein, title: '', carbLevel: 'medio', timing: '' };
+      const restK = others.reduce((a, m) => a + (Number(m.kcal) || 0), 0);
+      const restP = others.reduce((a, m) => a + (Number(m.p) || 0), 0);
+      const swapPrompt = `${baseRules}
+Cambia UNA comida del día ${day} (sesión: "${c.title}"; carbohidratos ${c.carbLevel}${c.timing ? `; timing: ${c.timing}` : ''}).
+Comida a sustituir (NO la repitas ni propongas algo casi idéntico): ${slot} — "${current.dish}" (${current.kcal} kcal, P ${current.p} g).
+Las otras comidas del día ya suman ${restK} kcal y ${restP} g de proteína; el objetivo del día es ${c.kcal} kcal y ${c.protein} g de proteína → la nueva comida debe aportar ~${Math.max(150, c.kcal - restK)} kcal (±10%) y ~${Math.max(15, c.protein - restP)} g de proteína.${extra ? `
+Petición del usuario para la nueva comida: ${extra}.` : ''}
+Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON del esquema.`;
+
+      try {
+        const { response } = await requestGoogleGenerateContent({
+          model,
+          traceId,
+          timeoutMs: 25000,
+          parts: [{ text: swapPrompt }],
+          generationConfig: {
+            temperature: 0.8,
+            topP: 0.9,
+            maxOutputTokens: 2000,
+            responseMimeType: 'application/json',
+            responseJsonSchema: MEAL_ITEM_SCHEMA,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
+        const meal = JSON.parse(text);
+        if (!meal || !meal.dish || !Number(meal.kcal)) throw new Error('comida inválida');
+        meal.slot = slot;
+        dayPlan.meals = dayPlan.meals.map((m) => (m.slot === slot ? meal : m));
+        await saveStudioNutritionPlan(user.uid, currentWeekKey(), saved);
+        logInfo('studio_nutrition_meal_swap', { traceId, userId: user.uid, day, slot });
+        return jsonResponse({ ok: true, day, slot, meal, nutrition: saved }, 200, getRateLimitHeaders(rateLimit));
+      } catch (error) {
+        logError('studio_nutrition_meal_swap_failed', error, { traceId, userId: user.uid, day, slot });
+        return errorResponse('No se pudo cambiar esa comida ahora mismo.', 502);
+      }
     }
 
     async function genChunk(daysList, withShoppingBatch, styleHint) {

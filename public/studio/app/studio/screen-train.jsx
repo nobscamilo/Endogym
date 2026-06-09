@@ -272,6 +272,7 @@ function TrainSession() {
   const [reason, setReason] = useStateTr('variety');
   const [moreMin, setMoreMin] = useStateTr('');
   const [logKg, setLogKg] = useStateTr({});
+  const [logReps, setLogReps] = useStateTr({});
   const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
   const [logRpe, setLogRpe] = useStateTr(7);
   const [autoStatus, setAutoStatus] = useStateTr('idle'); // idle|analyzing|done|limited|err
@@ -316,7 +317,9 @@ function TrainSession() {
           id: e.id || null,
           name: e.name,
           weightKg: Number(logKg[e.id] ?? e.loadKg) || null,
-          reps: e.reps ?? null,
+          // Reps REALES (input del usuario; fallback a las prescritas): habilitan e1RM y
+          // detección de estancamiento en el análisis del coach.
+          reps: Number(logReps[e.id] ?? e.reps) || null,
           sets: e.sets ?? null,
         }))
         .filter((e) => e.id && e.weightKg);
@@ -472,9 +475,14 @@ function TrainSession() {
               <div className="ex-sets">
                 <span className="ex-scheme">{ex.scheme}</span>
                 {ex.loadKg != null ? (
-                  <input className="text-input" type="number" min="0" step="2.5" style={{ width: 62 }}
-                    title="Carga usada (kg)" placeholder={`${ex.loadKg}`}
-                    value={logKg[ex.id] ?? ''} onChange={(e) => setLogKg((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                  <React.Fragment>
+                    <input className="text-input" type="number" min="0" step="2.5" style={{ width: 62 }}
+                      title="Carga usada (kg)" placeholder={`${ex.loadKg}`}
+                      value={logKg[ex.id] ?? ''} onChange={(e) => setLogKg((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                    <input className="text-input" type="number" min="1" max="30" style={{ width: 48 }}
+                      title="Reps reales por serie" placeholder={ex.reps != null ? `×${ex.reps}` : '×reps'}
+                      value={logReps[ex.id] ?? ''} onChange={(e) => setLogReps((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                  </React.Fragment>
                 ) : null}
                 {ex.id ? (
                   <button className="ex-swap" title="Cambiar ejercicio" disabled={busy === ex.id} onClick={() => swap('one', ex.id)}>

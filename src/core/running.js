@@ -334,3 +334,88 @@ export function pacesSummary(paces) {
     cincoK: formatPace(paces.fiveK),
   };
 }
+
+// ----------------------------------------------------------------------------
+// Fitness aeróbico desde carreras reales (Strava): eficiencia ritmo/FC y
+// predicción de tiempo de carrera con los MEJORES esfuerzos recientes (Riegel).
+// ----------------------------------------------------------------------------
+
+// Factor de eficiencia (EF) de una carrera: metros por minuto ÷ ppm (mayor = mejor).
+// Estándar en entrenamiento por FC: si corres igual de rápido con menos pulso, mejoras.
+export function runEfficiencyFactor({ avgPaceSecPerKm, avgHeartRate }) {
+  const pace = Number(avgPaceSecPerKm);
+  const hr = Number(avgHeartRate);
+  if (!Number.isFinite(pace) || pace <= 0 || !Number.isFinite(hr) || hr <= 0) return null;
+  const metersPerMinute = (1000 / pace) * 60;
+  return Math.round((metersPerMinute / hr) * 100) / 100;
+}
+
+// Tendencia de eficiencia: mediana de las últimas `recentN` carreras vs las anteriores.
+// Devuelve { points, recentEf, baselineEf, trendPct } o null si no hay datos suficientes.
+export function buildEfficiencyTrend(runs, { recentN = 3, minRuns = 4 } = {}) {
+  const points = (Array.isArray(runs) ? runs : [])
+    .map((w) => ({
+      date: String(w.performedAt || '').slice(0, 10),
+      ef: runEfficiencyFactor(w),
+      distanceKm: Number(w.distanceKm) || null,
+    }))
+    .filter((p) => p.ef != null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (points.length < minRuns) return null;
+  const median = (arr) => {
+    const s = [...arr].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const recent = points.slice(-recentN).map((p) => p.ef);
+  const baseline = points.slice(0, -recentN).map((p) => p.ef);
+  if (!baseline.length) return null;
+  const recentEf = Math.round(median(recent) * 100) / 100;
+  const baselineEf = Math.round(median(baseline) * 100) / 100;
+  const trendPct = baselineEf > 0 ? Math.round(((recentEf - baselineEf) / baselineEf) * 1000) / 10 : 0;
+  return { points: points.slice(-10), recentEf, baselineEf, trendPct };
+}
+
+// Predicción de tiempo de carrera (Riegel, exponente 1.06) desde los mejores esfuerzos
+// reales (carreras con distancia ≥ minKm y duración válida). Devuelve la MEJOR predicción
+// (la más rápida) y en qué carrera se basa, o null sin datos.
+export function predictRaceTimeFromRuns({ distanceMeters, runs, minKm = 3 }) {
+  const target = Number(distanceMeters);
+  if (!Number.isFinite(target) || target <= 0) return null;
+  let best = null;
+  for (const w of (Array.isArray(runs) ? runs : [])) {
+    const km = Number(w.distanceKm);
+    const min = Number(w.durationMinutes);
+    if (!Number.isFinite(km) || km < minKm || !Number.isFinite(min) || min <= 0) continue;
+    const t1 = min * 60;
+    const predicted = t1 * ((target / (km * 1000)) ** 1.06);
+    if (!best || predicted < best.seconds) {
+      best = {
+        seconds: Math.round(predicted),
+        basedOn: {
+          date: String(w.performedAt || '').slice(0, 10),
+          title: w.title || 'Carrera',
+          distanceKm: km,
+          minutes: Math.round(min),
+        },
+      };
+    }
+  }
+  return best;
+}
+
+export function formatRaceTime(seconds) {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s <= 0) return null;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.round(s % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+export const RACE_GOAL_METERS = Object.freeze({
+  race_5k: 5000,
+  race_10k: 10000,
+  race_21k: 21097,
+  race_42k: 42195,
+});

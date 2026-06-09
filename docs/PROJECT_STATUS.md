@@ -91,10 +91,24 @@ Las cuatro mejoras propuestas en la auditoría, implementadas y desplegadas:
 
 Verificación: **115 tests verdes** en la Mac, `npm run build` OK, bundle regenerado en la Mac (`npm i --no-save esbuild` + `build:studio` → `8867273a5c`).
 
+### Lote grande de mejoras (10 jun 2026 — bundle `7eccd2eaa9`)
+
+Seis mejoras implementadas a petición del usuario (descartó: emails programados y nada que requiera Vercel Pro):
+
+1. **Reps reales al registrar sesión:** input de reps junto al de kg por ejercicio en Entreno; `POST /api/workouts` recibe reps reales (fallback a prescritas). Base del e1RM.
+2. **e1RM + estancamiento (`coachAnalysis.js`):** `epley1Rm`, `buildLiftProgression` (tendencia por ejercicio: progressing/stalled/regressing/flat, estancados primero) y `describeLiftProgression`. Inyectado en el informe global, en el análisis por sesión y en el heurístico (consejos accionables con kg concretos).
+3. **Forma aeróbica (`running.js`):** `runEfficiencyFactor` (m/min ÷ ppm), `buildEfficiencyTrend` (mediana reciente vs base, %), `predictRaceTimeFromRuns` (Riegel 1.06 sobre el mejor esfuerzo real ≥3 km) y `formatRaceTime`. Nuevo override `runFitness` en `studio-data` + tarjeta "Forma aeróbica" en Progreso + contexto en coach-chat (eficiencia y predicción para su objetivo).
+4. **Cambiar UNA comida (`swapMeal`):** `POST /api/studio-nutrition { swapMeal: { day, slot, request? } }` regenera solo ese slot (instruido para cubrir kcal/proteína restantes del día), persiste y devuelve el plan. El botón "Cambiar comida" de la UI (antes decorativo) quedó cableado; `window.__applyNutrition` refresca la vista. **Además la ruta ganó rate limit `studio-nutrition` (12/h) — antes NO tenía.**
+5. **Backups de Firestore:** bucket `gs://endogym-vtety8-backups-eu` (EU, lifecycle 90 días), SA admin con `datastore.importExportAdmin` + `objectAdmin`. **Primer export manual COMPLETADO** (`manual-20260610/`). Backup semanal: Vercel Cron (lun 03:00 UTC) → `GET /api/backup` (protegido con `CRON_SECRET`, ya configurado en Vercel) que lanza `exportDocuments` con prefijo timestamp.
+6. **Alertas de errores:** `logError()` notifica a `ALERT_WEBHOOK_URL` (Discord/Slack) con dedupe 5 min. **Pendiente del usuario: crear el webhook y añadir la env var en Vercel** (hasta entonces, inerte).
+
+Verificación: **24 archivos / 121 tests verdes** en la Mac (nuevos: `running-fitness.test.js` y tests de e1RM/progresión), `npm run build` OK, bundle `7eccd2eaa9`.
+
 ### Pendiente tras esta sesión
 
-1. Usuario: probar en la app: registrar una sesión con RPE (ver análisis automático), campo FCmáx en Perfil, "Sincronizar ahora" en Strava (re-importa la carrera del 9 jun) y verificar "sync automático".
-2. Futuro: regenerar plan nutricional una semana y comprobar en logs que Vie-Sáb ya no cae -20% (`studio_nutrition_macro_retry.targetedChunks`).
+1. Usuario: probar en la app: registrar sesión con kg+reps+RPE (ver análisis automático), FCmáx en Perfil, "Cambiar comida" en Nutrición, tarjeta "Forma aeróbica" en Progreso.
+2. Usuario: crear webhook (Discord/Slack/Telegram-bridge) y añadir `ALERT_WEBHOOK_URL` en Vercel para activar las alertas.
+3. Comprobar el lunes que el cron de backup corrió (`gsutil ls gs://endogym-vtety8-backups-eu/auto/`).
 
 ### Commit y sync (8 jun 2026)
 

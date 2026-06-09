@@ -12,7 +12,7 @@ import {
   listWorkoutsSince,
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
-import { hrMaxFromAge, hrZone, validateRunZone } from '../../../core/running.js';
+import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
@@ -80,6 +80,40 @@ function mapRecentWorkouts(workouts) {
       };
     });
   return done.length ? done : null;
+}
+
+// Forma aeróbica real (corredores): eficiencia ritmo/FC y predicción de carrera
+// con los mejores esfuerzos de Strava. Solo con datos suficientes; nada inventado.
+function mapRunFitness(workouts, profile) {
+  const modality = profile?.trainingModality || '';
+  const isRunner = modality === 'hybrid_run_gym' || modality === 'running'
+    || (profile?.runRaceGoal && profile.runRaceGoal !== 'health');
+  if (!isRunner) return null;
+  const runs = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')));
+  if (!runs.length) return null;
+  const out = {};
+  const trend = buildEfficiencyTrend(runs);
+  if (trend) {
+    out.efficiency = {
+      recentEf: trend.recentEf,
+      baselineEf: trend.baselineEf,
+      trendPct: trend.trendPct,
+      runsUsed: trend.points.length,
+    };
+  }
+  const targetMeters = RACE_GOAL_METERS[profile?.runRaceGoal] || null;
+  if (targetMeters) {
+    const pred = predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs });
+    if (pred) {
+      out.prediction = {
+        goal: profile.runRaceGoal.replace('race_', '').toUpperCase(),
+        time: formatRaceTime(pred.seconds),
+        basedOn: pred.basedOn,
+      };
+    }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function mapCoachAdjust(plan) {
@@ -565,6 +599,7 @@ export async function GET(request) {
       setIf('coachAdjust', mapCoachAdjust(planForStudio));
       setIf('recentWorkouts', mapRecentWorkouts(workouts));
       setIf('runZones', mapRunZones(workouts, planForStudio, profile));
+      setIf('runFitness', mapRunFitness(workouts, profile));
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

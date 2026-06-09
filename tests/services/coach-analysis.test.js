@@ -11,6 +11,9 @@ import {
   buildWorkoutAnalysisPrompt,
   buildHeuristicWorkoutAnalysis,
   sanitizeWorkoutAnalysis,
+  epley1Rm,
+  buildLiftProgression,
+  describeLiftProgression,
 } from '../../src/services/coachAnalysis.js';
 
 describe('coachAnalysis service', () => {
@@ -134,6 +137,32 @@ describe('coachAnalysis service', () => {
     expect(out.session).toContain('Pierna A');
     expect(out.tips.join(' ')).toContain('RPE');
     expect(out.tips.join(' ')).toContain('Primera sesión');
+  });
+
+  it('epley1Rm: kg×(1+reps/30); sin reps devuelve kg; null sin carga', () => {
+    expect(epley1Rm(100, 5)).toBeCloseTo(116.7, 1);
+    expect(epley1Rm(30, null)).toBe(30);
+    expect(epley1Rm(0, 5)).toBeNull();
+  });
+
+  it('buildLiftProgression: detecta progresión y estancamiento por e1RM', () => {
+    const w = (date, name, kg, reps) => ({
+      source: 'manual', completed: true, performedAt: `${date}T12:00:00.000Z`,
+      exercises: [{ name, weightKg: kg, reps }],
+    });
+    const lifts = buildLiftProgression([
+      w('2026-06-01', 'Press militar', 30, 8), w('2026-06-04', 'Press militar', 30, 8), w('2026-06-08', 'Press militar', 30, 8),
+      w('2026-06-01', 'Remo con barra', 30, 8), w('2026-06-08', 'Remo con barra', 32.5, 8),
+    ]);
+    const press = lifts.find((l) => l.name === 'Press militar');
+    const remo = lifts.find((l) => l.name === 'Remo con barra');
+    expect(press.trend).toBe('stalled');
+    expect(remo.trend).toBe('progressing');
+    // Los estancados van primero (accionables) y la descripción los marca.
+    expect(lifts[0].name).toBe('Press militar');
+    const desc = describeLiftProgression(lifts).join(' | ');
+    expect(desc).toContain('ESTANCADO');
+    expect(desc).toContain('PROGRESANDO');
   });
 
   it('sanitizeWorkoutAnalysis: exige session y tips; recorta el resto', () => {

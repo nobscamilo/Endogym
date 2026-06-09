@@ -33,6 +33,12 @@ vi.mock('../../src/lib/logger.js', () => ({
   logError: mocks.logError,
 }));
 
+vi.mock('../../src/lib/rateLimit.js', () => ({
+  RATE_LIMIT_SCOPES: { STUDIO_NUTRITION: 'studio-nutrition' },
+  enforceUserRateLimit: vi.fn(async () => ({ allowed: true, limit: 12, remaining: 11, retryAfterSeconds: 3600 })),
+  getRateLimitHeaders: vi.fn(() => ({ 'ratelimit-limit': '12' })),
+}));
+
 vi.mock('../../src/services/googleGenAiTransport.js', () => ({
   isValidGoogleAiModelName: vi.fn(() => true),
   requestGoogleGenerateContent: mocks.requestGoogleGenerateContent,
