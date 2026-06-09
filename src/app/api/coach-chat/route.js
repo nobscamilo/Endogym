@@ -9,6 +9,31 @@ import {
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, validateRunZone } from '../../../core/running.js';
+import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
+
+// Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
+// chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
+const CHAT_RAG_CHAR_BUDGET = 7000;
+const CHAT_RAG_TIMEOUT_MS = 4000;
+
+async function buildGuidelinesContext({ profile, plan, traceId }) {
+  if (!profile) return '';
+  try {
+    const raced = await Promise.race([
+      retrieveGuidelinesContext({ profile, weeklyPlan: plan || undefined, traceId }),
+      new Promise((resolve) => { setTimeout(() => resolve(''), CHAT_RAG_TIMEOUT_MS); }),
+    ]);
+    if (!raced) return '';
+    let ctx = String(raced);
+    if (ctx.length > CHAT_RAG_CHAR_BUDGET) {
+      const cut = ctx.lastIndexOf('\n', CHAT_RAG_CHAR_BUDGET);
+      ctx = ctx.slice(0, cut > 1000 ? cut : CHAT_RAG_CHAR_BUDGET);
+    }
+    return `\n\n${ctx}\n\nUsa este contexto científico SOLO si es pertinente a la pregunta; no lo cites textualmente salvo que aporte.`;
+  } catch {
+    return ''; // el chat funciona igual sin RAG
+  }
+}
 
 async function buildUserContext(uid) {
   try {
@@ -18,7 +43,7 @@ async function buildUserContext(uid) {
       getLatestWeeklyPlan(uid).catch(() => null),
       listWorkoutsSince(uid, sinceIso, 60).catch(() => []),
     ]);
-    if (!profile && !plan) return '';
+    if (!profile && !plan) return { text: '', profile, plan };
     const parts = [];
     const name = profile?.firstName || profile?.name || profile?.displayName;
     if (name) parts.push(`Nombre: ${name}.`);
@@ -42,7 +67,12 @@ async function buildUserContext(uid) {
     if (plan?.phaseLabel) {
       parts.push(`Fase de entrenamiento: ${plan.phaseLabel}${Number.isFinite(Number(plan.weeksToRace)) && plan.weeksToRace > 0 ? ` (faltan ${plan.weeksToRace} semanas para la carrera)` : ''}.`);
     }
-    const today = Array.isArray(plan?.days) ? (plan.days.find((d) => d?.today) || plan.days[0]) : null;
+    // BUG corregido (10 jun 2026): los días del plan NO tienen flag `.today` — con bloques de
+    // 21 días, caer a days[0] daba la sesión del PRIMER día del bloque como "hoy" durante 20 días.
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const today = Array.isArray(plan?.days)
+      ? (plan.days.find((d) => d?.date === todayKey) || plan.days[0])
+      : null;
     if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
     if (today?.workout?.runPrescription?.structure) parts.push(`Prescripción de hoy: ${today.workout.runPrescription.structure}`);
     if (today?.nutritionTarget?.carbLevel) parts.push(`Carbohidratos hoy: nivel ${today.nutritionTarget.carbLevel}. ${today.nutritionTarget.carbTiming || ''}`);
@@ -65,9 +95,9 @@ async function buildUserContext(uid) {
       }
       parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en Z2, apretar en los días de calidad) usando SU FCmáx por edad/medida; cada usuario es distinto.');
     }
-    if (!parts.length) return '';
-    return `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`;
-  } catch { return ''; }
+    if (!parts.length) return { text: '', profile, plan };
+    return { text: `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`, profile, plan };
+  } catch { return { text: '', profile: null, plan: null }; }
 }
 
 // Chat "Pregúntale al coach" del rediseño Studio.
@@ -131,14 +161,16 @@ export async function POST(request) {
       return errorResponse('Modelo Gemini inválido.', 500);
     }
 
-    const userContext = await buildUserContext(user.uid);
+    const { text: userContext, profile, plan } = await buildUserContext(user.uid);
+    // RAG médico-deportivo recortado (no bloquea: timeout corto y fallback a vacío).
+    const guidelinesContext = await buildGuidelinesContext({ profile, plan, traceId });
 
     try {
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
         timeoutMs: 12000,
-        parts: [{ text: prompt + userContext }],
+        parts: [{ text: prompt + userContext + guidelinesContext }],
         generationConfig: {
           temperature: 0.6,
           topP: 0.9,

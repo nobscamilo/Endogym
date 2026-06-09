@@ -112,7 +112,7 @@ Reglas importantes:
 - Si cambias el vocabulario, recomputa con `python3 scripts/rekey_guidelines.py` (lee el texto ya guardado, no necesita PDFs) y vuelve a subir con `upload_guidelines.js`.
 - **Embeddings:** modelo `gemini-embedding-001`, 768 dims, L2-normalizados (obligatorio normalizar porque dim≠3072). Función `requestGoogleEmbeddings()` en `googleGenAiTransport.js`. No habilitar Vertex.
 - El **índice vectorial** se crea con `gcloud` (ver `docs/DEPLOYMENT.md`); el service-account del repo no tiene permiso para crearlo.
-- Estado al 6 jun 2026: `guidelines`=226 docs (fallback); `guideline_passages`=7.128 pasajes con vector. Índice vectorial: **pendiente de crear por el usuario**.
+- Estado al 10 jun 2026: `guidelines`=226 docs (fallback); `guideline_passages`=7.128 pasajes con vector. **Índice vectorial CREADO y verificado** (sonda real: `mode:'vector'`, 12 pasajes, ~20k chars). `coach-chat` también inyecta RAG desde el 10 jun (presupuesto 7k chars, timeout 4 s, fallback a vacío).
 
 ## Ignios Studio (LANZADO — app por defecto)
 

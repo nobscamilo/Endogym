@@ -41,6 +41,10 @@ vi.mock('../../src/lib/rateLimit.js', () => ({
   getRateLimitHeaders: mocks.getRateLimitHeaders,
 }));
 
+vi.mock('../../src/services/guidelinesRetriever.js', () => ({
+  retrieveGuidelinesContext: vi.fn(async () => 'CONTEXTO RAG DE PRUEBA'),
+}));
+
 vi.mock('../../src/services/googleGenAiTransport.js', () => ({
   isValidGoogleAiModelName: vi.fn(() => true),
   requestGoogleGenerateContent: mocks.requestGoogleGenerateContent,
@@ -125,6 +129,32 @@ describe('/api/coach-chat route', () => {
       scope: 'coach-chat',
     });
     expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('identifica la sesión de HOY por fecha en bloques de 21 días e inyecta el RAG', async () => {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const days = Array.from({ length: 21 }, (_, i) => {
+      const d = new Date(`${todayKey}T00:00:00.000Z`);
+      d.setUTCDate(d.getUTCDate() + (i - 10)); // hoy queda en el medio del bloque
+      const date = d.toISOString().slice(0, 10);
+      return {
+        date,
+        isTrainingDay: true,
+        workout: { title: date === todayKey ? 'Sesión correcta de HOY' : `Otra sesión ${i}` },
+      };
+    });
+    mocks.getLatestWeeklyPlan.mockResolvedValue({ days });
+
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ prompt: '¿Qué toca hoy?' }),
+    }));
+
+    expect(response.status).toBe(200);
+    const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
+    expect(sentPrompt).toContain('Sesión correcta de HOY');
+    expect(sentPrompt).not.toContain('Otra sesión 0'); // antes caía a days[0]
+    expect(sentPrompt).toContain('CONTEXTO RAG DE PRUEBA');
   });
 
   it('returns 429 and skips Gemini when the coach chat budget is exhausted', async () => {

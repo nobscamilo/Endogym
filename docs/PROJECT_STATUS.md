@@ -61,11 +61,29 @@ El usuario eliminó sus cuentas secundarias de Auth; quedaban residuos en Firest
 - **Estado final consistente:** 5 cuentas reales en Auth (la principal `juancamilo.sarmiento@gmail.com` con 19 workouts + 4 de otras personas) ↔ 6 árboles Firestore (5 reales + dev-user). Ya solo hay UNA conexión Strava (gmail).
 - Pendiente conocido sin cambios: índice `collectionGroup integrations.athleteId` sin crear → el webhook de Strava no puede resolver al dueño (el sync manual funciona; el automático no, hasta crear el índice con gcloud).
 
+### Auditoría del Coach AI + RAG + índices (10 jun 2026, madrugada)
+
+Auditoría solicitada por el usuario ("verifica Coach AI, busca errores, verifica el RAG"). Todo ejecutado desde la Mac/sandbox por el agente:
+
+**Verificado funcionando:**
+- **RAG semántico OPERATIVO:** el índice vectorial de `guideline_passages` YA EXISTE (el doc decía "pendiente" — desactualizado). Sonda real: `mode:'vector'`, 12 pasajes, 20,5k chars de contexto, fuentes correctas para el perfil (Nutrition and Athletic, Sports Nutrition), ~2,2 s. `weekly-plan` lo consume bien (`contextText`).
+- **`npm run e2e:production` PASÓ completo** (10 jun): Google OAuth, Gemini live (`weekly_coach_fallback=false`), firma MIME, ambos rate limits, limpieza de usuario temporal.
+- El chat del Studio SÍ llama a `/api/coach-chat`: `build-studio.mjs` define un shim `window.claude.complete` → fetch al endpoint (el código de `coach.jsx` confunde a primera vista, pero está cableado).
+
+**Bug encontrado y corregido (`coach-chat`):** `plan.days.find(d => d.today)` — ningún día del plan tiene `.today` → con bloques de 21 días siempre caía a `days[0]` y el coach hablaba de la sesión/carbohidratos del PRIMER día del bloque como si fuera "hoy" durante 20 de 21 días. Corregido a búsqueda por `date === hoy(UTC)`. Test nuevo que lo cubre (bloque de 21 días con hoy en el medio).
+
+**Mejora aplicada:** `coach-chat` ahora inyecta **RAG médico-deportivo** (antes el chat NO usaba el RAG; solo weekly-plan): presupuesto recortado a 7k chars, timeout 4 s y fallback silencioso a vacío para no degradar la latencia del chat. Mock en tests.
+
+**Índice `collectionGroup integrations.athleteId` CREADO** (REST API con token gcloud del usuario; la CLI no expone query-scope para índices de campo único). Verificado: la consulta del webhook ya resuelve al dueño (1 conexión: gmail). El sync automático por webhook queda funcional (si la suscripción no está activa, pulsar "Activar sync automático" en Perfil → Strava una vez).
+
+**Notas de datos:** la carrera del 9 jun (Strava 18856015874) solo se había importado a la cuenta icloud eliminada; el cursor de sync de gmail es anterior, así que el próximo "Sincronizar ahora" (o el webhook) la re-importa. El sync server-side desde sandbox no es posible: `STRAVA_CLIENT_ID/SECRET` solo están en Vercel, no en `.env.local` (el refresh devuelve 400).
+
+**Verificación:** 115 tests verdes en la Mac + `npm run build` OK. Sandbox ya NO corre vitest otra vez (el `npm install` de la Mac restauró binarios darwin y quitó los linux — comportamiento de vaivén esperado del node_modules compartido).
+
 ### Pendiente tras esta sesión
 
-1. Usuario: probar en la app (Progreso): "Análisis del coach" (su informe ya está pre-generado) e "Historial de entrenos" → "Analizar esta sesión".
-2. Crear el índice `collectionGroup` de `integrations` por `athleteId` (gcloud) si se quiere sync automático por webhook.
-3. Mejora futura: capturar RPE en "Registrar sesión hecha" para alimentar la "Carga semanal"; opcional: disparar el análisis automáticamente al registrar sesión (hoy es GET cacheado + botón).
+1. Usuario: probar en la app (Progreso): "Análisis del coach" e "Historial de entrenos" → "Analizar esta sesión"; pulsar "Sincronizar ahora" en Strava (re-importa la carrera del 9 jun); verificar/activar "sync automático" una vez.
+2. Mejoras futuras propuestas (no implementadas): capturar RPE en "Registrar sesión hecha"; análisis automático al registrar sesión; campo manual de FCmáx en perfil; revisar kcal bajas del bloque Vie-Sáb en nutrición (-20% conocido).
 
 ### Commit y sync (8 jun 2026)
 
