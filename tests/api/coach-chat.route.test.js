@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   listWorkoutsSince: vi.fn(),
   listMealsSince: vi.fn(),
   listMetricsSince: vi.fn(),
+  getCoachChatMemory: vi.fn(),
+  saveCoachChatMemory: vi.fn(),
   requestGoogleGenerateContent: vi.fn(),
   resolveGeminiCoachModel: vi.fn(),
   enforceUserRateLimit: vi.fn(),
@@ -30,6 +32,8 @@ vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
   listWorkoutsSince: mocks.listWorkoutsSince,
   listMealsSince: mocks.listMealsSince,
   listMetricsSince: mocks.listMetricsSince,
+  getCoachChatMemory: mocks.getCoachChatMemory,
+  saveCoachChatMemory: mocks.saveCoachChatMemory,
 }));
 
 vi.mock('../../src/lib/logger.js', () => ({
@@ -93,6 +97,10 @@ describe('/api/coach-chat route', () => {
     mocks.listMealsSince.mockResolvedValue([]);
     mocks.listMetricsSince.mockReset();
     mocks.listMetricsSince.mockResolvedValue([]);
+    mocks.getCoachChatMemory.mockReset();
+    mocks.getCoachChatMemory.mockResolvedValue([]);
+    mocks.saveCoachChatMemory.mockReset();
+    mocks.saveCoachChatMemory.mockResolvedValue(undefined);
     mocks.resolveGeminiCoachModel.mockReturnValue('gemini-2.5-flash');
     mocks.enforceUserRateLimit.mockResolvedValue({
       allowed: true,
@@ -259,6 +267,38 @@ describe('/api/coach-chat route', () => {
     const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
     expect(sentPrompt).not.toContain('Nutrición últimos');
     expect(sentPrompt).not.toContain('Recuperación últimos');
+  });
+
+  it('FASE 2.1: inyecta la conversación reciente y persiste el intercambio', async () => {
+    const at = new Date().toISOString();
+    mocks.getCoachChatMemory.mockResolvedValue([
+      { role: 'user', text: '¿Subo peso en sentadilla?', at },
+      { role: 'coach', text: 'Sube 2,5 kg si el RPE fue ≤8.', at },
+    ]);
+
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: '¿Y en press banca?' }),
+    }));
+
+    expect(response.status).toBe(200);
+    const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
+    expect(sentPrompt).toContain('Conversación reciente');
+    expect(sentPrompt).toContain('¿Subo peso en sentadilla?');
+    expect(sentPrompt).toContain('Sube 2,5 kg');
+    // persiste el turno nuevo encima de la memoria existente
+    const saved = mocks.saveCoachChatMemory.mock.calls[0][1];
+    expect(saved.map((t) => t.text)).toEqual(expect.arrayContaining(['¿Y en press banca?', 'Respuesta personalizada.']));
+  });
+
+  it('FASE 2.1: sin memoria previa no inyecta el bloque y la respuesta funciona igual', async () => {
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'hola' }),
+    }));
+    expect(response.status).toBe(200);
+    const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
+    expect(sentPrompt).not.toContain('Conversación reciente');
   });
 
   it('red flag: responde texto fijo sin llamar a Gemini, sin gastar rate limit y loguea sin contenido', async () => {

@@ -225,6 +225,39 @@ export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
   return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 }
 
+// FASE 2.1 — Memoria conversacional del chat del coach (últimos turnos, TTL gestionado
+// en lectura por coachChatMemory.trimChatMemory; el doc se sobreescribe ya recortado).
+export async function getCoachChatMemory(userId) {
+  const { db } = await getAdminServices();
+  const snap = await db.collection('users').doc(userId).collection('coachChat').doc('memory').get();
+  if (!snap.exists) return [];
+  const turns = snap.data()?.turns;
+  return Array.isArray(turns) ? turns : [];
+}
+
+export async function saveCoachChatMemory(userId, turns) {
+  const { db } = await getAdminServices();
+  await db.collection('users').doc(userId).collection('coachChat').doc('memory').set({
+    turns: Array.isArray(turns) ? turns : [],
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+// FASE 2.2 — Última recomendación del análisis del coach (cierre del loop).
+export async function saveCoachRecommendation(userId, recommendation) {
+  const { db } = await getAdminServices();
+  await db.collection('users').doc(userId).collection('coachRecommendations').doc('latest').set({
+    ...recommendation,
+    createdAt: recommendation?.createdAt || new Date().toISOString(),
+  });
+}
+
+export async function getCoachRecommendation(userId) {
+  const { db } = await getAdminServices();
+  const snap = await db.collection('users').doc(userId).collection('coachRecommendations').doc('latest').get();
+  return snap.exists ? snap.data() : null;
+}
+
 // FASE 1.3 — Último entreno HECHO sin ventana temporal (para detectar inactividad
 // aunque el parón supere el lookback de las consultas acotadas). Mira los últimos 15
 // registros: suficiente para saltar check-ins "no entrené" y workouts incompletos.

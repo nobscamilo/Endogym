@@ -7,7 +7,8 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
-import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince, listMetricsSince } from '../../../lib/repositories/firestoreRepository.js';
+import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince, listMetricsSince, getCoachChatMemory, saveCoachChatMemory } from '../../../lib/repositories/firestoreRepository.js';
+import { trimChatMemory, appendChatTurns, formatChatMemory } from '../../../services/coachChatMemory.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
@@ -182,6 +183,11 @@ export async function POST(request) {
         userId: user.uid,
         category: redFlag.category,
       });
+      // La memoria también recuerda que se recomendó parar (continuidad del hilo).
+      try {
+        const prev = await getCoachChatMemory(user.uid);
+        await saveCoachChatMemory(user.uid, appendChatTurns(prev, message, RED_FLAG_RESPONSE));
+      } catch { /* la memoria nunca bloquea la respuesta de seguridad */ }
       return jsonResponse({ text: RED_FLAG_RESPONSE, redFlag: true, category: redFlag.category });
     }
 
@@ -218,13 +224,17 @@ export async function POST(request) {
     const { text: userContext, profile, plan } = await buildUserContext(user.uid);
     // RAG médico-deportivo recortado (no bloquea: timeout corto y fallback a vacío).
     const guidelinesContext = await buildGuidelinesContext({ profile, plan, message, traceId });
+    // FASE 2.1 — memoria conversacional (últimos turnos, TTL 7 días, acotada en chars).
+    let memoryTurns = [];
+    try { memoryTurns = trimChatMemory(await getCoachChatMemory(user.uid)); } catch { memoryTurns = []; }
+    const memoryContext = formatChatMemory(memoryTurns);
 
     try {
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
         timeoutMs: 12000,
-        parts: [{ text: buildCoachChatPrompt({ message, userContext, guidelinesContext }) }],
+        parts: [{ text: buildCoachChatPrompt({ message, userContext, guidelinesContext, memoryContext }) }],
         generationConfig: {
           temperature: 0.6,
           topP: 0.9,
@@ -251,6 +261,13 @@ export async function POST(request) {
 
       if (!text) {
         return errorResponse('Respuesta vacía del coach.', 502);
+      }
+
+      // FASE 2.1 — persistir el intercambio (ya recortado) para el siguiente turno.
+      try {
+        await saveCoachChatMemory(user.uid, appendChatTurns(memoryTurns, message, text));
+      } catch (memErr) {
+        logError('coach_chat_memory_save_failed', memErr, { traceId, userId: user.uid });
       }
 
       return jsonResponse({ text }, 200, rateLimitHeaders);
