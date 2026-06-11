@@ -1,6 +1,65 @@
 /* ENDOGYM STUDIO — Pantalla HOY (hub) + variaciones de Inicio */
 const { useState: useStateT } = React;
 
+/* FASE 1.3 — Check-in de reentrada (≥7 días sin entrenar): 1 pregunta + sesión puente.
+   La respuesta alimenta las reglas REENTRY_* del ajuste adaptativo (server-side). */
+function ReentryCard() {
+  const D = window.STUDIO;
+  const re = D.reentry;
+  const [sent, setSent] = useStateT(false);
+  const [reason, setReason] = useStateT(null);
+  const [busy, setBusy] = useStateT(false);
+  if (!re || (!re.needsCheckin && !re.bridgeSession && !re.planStale)) return null;
+  const answer = async (value) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (token) {
+        await fetch('/api/studio-availability', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+          body: JSON.stringify({ reentryReason: value, reentryDaysOut: re.daysSinceLastDone }),
+        });
+      }
+      setReason(value); setSent(true);
+      if (D.reentry) D.reentry.needsCheckin = false;
+    } catch (e) { /* el plan sigue siendo conservador aunque falle el guardado */ }
+    setBusy(false);
+  };
+  const opts = [['vacaciones', 'Vacaciones'], ['enfermedad', 'Enfermedad'], ['motivacion', 'Motivación'], ['otro', 'Otro']];
+  return (
+    <SectionCard title={`Has vuelto tras ${re.daysSinceLastDone} días sin entrenar`} icon="sparkles">
+      {re.needsCheckin && !sent ? (
+        <div>
+          <p className="muted" style={{ margin: '0 0 10px' }}>Para adaptar tu vuelta con seguridad: ¿por qué paraste?</p>
+          <div className="chips">
+            {opts.map(([v, l]) => (
+              <button key={v} className="btn soft sm" disabled={busy} onClick={() => answer(v)}>{l}</button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="muted" style={{ margin: 0 }}>
+          {reason === 'enfermedad'
+            ? 'Como el parón fue por enfermedad, las próximas 2 semanas serán extra suaves. Si fue con fiebre o respiratoria, reevalúa tu cribado en Perfil antes de apretar.'
+            : 'Gracias. El plan se adapta a tu vuelta: progresión suave esta semana.'}
+        </p>
+      )}
+      {re.bridgeSession ? (
+        <p className="tiny muted" style={{ marginTop: 10 }}>
+          Hoy: sesión puente de 20-30 min suaves (técnica y movilidad), sin buscar cargas.
+        </p>
+      ) : null}
+      {re.planStale ? (
+        <p className="tiny" style={{ marginTop: 6 }}>
+          Tu plan quedó desactualizado tras el parón: regenera el plan (Perfil → Regenerar plan con IA) para empezar con una rampa suave de 1-2 semanas.
+        </p>
+      ) : null}
+    </SectionCard>
+  );
+}
+
 function TodayHub({ go, variant }) {
   const D = window.STUDIO;
   const { user, todaySession: s, macroTargets: mt, macroEaten: me, progress } = D;
@@ -20,6 +79,8 @@ function TodayHub({ go, variant }) {
       </div>
 
       {variant === 'resumen' ? <HeroResumen go={go} /> : variant === 'editorial' ? <HeroEditorial go={go} /> : <HeroAnillos go={go} />}
+
+      <ReentryCard />
 
       {/* Coach + sesión */}
       <div className="grid g-2" style={{ gridTemplateColumns: '0.95fr 1.05fr' }}>

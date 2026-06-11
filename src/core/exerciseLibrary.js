@@ -1262,26 +1262,28 @@ function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 
   const bodyWeight = clamp(toNumber(profile?.weightKg, 75), 35, 250);
   const readinessModifier = toNumber(adaptiveTuning?.workout?.rpeShift, 0) * 0.03;
   const prog = clamp(toNumber(loadProgression, 1), 0.8, 1.3);
+  // FASE 1.3 — reentrada tras inactividad: multiplicador de carga (p. ej. 0.9 = −10%).
+  const loadFactor = clamp(toNumber(adaptiveTuning?.workout?.loadFactor, 1), 0.8, 1);
 
   let raw;
   let source;
   const hl = toNumber(historyLoad, null);
   if (hl != null && hl >= 5) {
     // Sobrecarga progresiva REAL: parte de tu última carga registrada y progresa por fase/RPE.
-    raw = hl * prog * (1 + readinessModifier);
+    raw = hl * prog * (1 + readinessModifier) * loadFactor;
     source = historySource || 'history';
   } else {
     // Estimación inicial por peso corporal × ratio del ejercicio (hasta tener historial).
     const ratio = toNumber(exercise.loadRatio, 0.15);
     const volumeFactor = toNumber(adaptiveTuning?.workout?.volumeFactor, 1);
-    raw = bodyWeight * ratio * (1 + readinessModifier) * volumeFactor * prog;
+    raw = bodyWeight * ratio * (1 + readinessModifier) * volumeFactor * prog * loadFactor;
     source = 'estimate';
   }
   const bounded = clamp(raw, 5, bodyWeight * 1.6);
   return { loadKg: roundToStep(bounded, 2.5), source };
 }
 
-function buildExercisePrescription(exercise, { goal, sessionType, profile, adaptiveTuning, loadProgression = 1, liftHistory = null, setScale = 1 }) {
+export function buildExercisePrescription(exercise, { goal, sessionType, profile, adaptiveTuning, loadProgression = 1, liftHistory = null, setScale = 1 }) {
   if (exercise.loadType === 'time') {
     const time = resolveTimePrescription(sessionType);
     const baseMinutes = time.durationMinutes;

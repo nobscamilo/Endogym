@@ -63,6 +63,26 @@ export async function POST(request) {
     if (Number.isFinite(hrMax) && hrMax >= 120 && hrMax <= 230) patch.hrMaxBpm = Math.round(hrMax);
     else if (body?.hrMaxBpm === null) patch.hrMaxBpm = null;
 
+    // FASE 1.3 — Check-in de reentrada (1 pregunta: ¿por qué paraste?). El front lo envía
+    // la primera vez que el usuario vuelve tras ≥7 días sin entrenar. answeredAt/daysOut
+    // se fijan server-side; alimentan las reglas REENTRY_* de buildAdaptiveTuning.
+    const REENTRY_REASONS = new Set(['vacaciones', 'enfermedad', 'motivacion', 'otro']);
+    if (REENTRY_REASONS.has(body?.reentryReason)) {
+      const daysOut = Number(body?.reentryDaysOut);
+      patch.reentry = {
+        reason: body.reentryReason,
+        answeredAt: new Date().toISOString(),
+        daysOut: Number.isFinite(daysOut) ? Math.min(365, Math.max(0, Math.round(daysOut))) : null,
+      };
+      // Si el POST es SOLO el check-in de reentrada (sin encuesta), no marcar
+      // studioAvailability: ese flag cambia cómo el planner honra duración/frecuencia.
+      if (!GOALS.has(body?.goal) && !MODALITIES.has(body?.trainingModality)
+        && body?.sessionMinutes == null && body?.preferredDurationMinutes == null && body?.daysPerWeek == null) {
+        delete patch.studioAvailability;
+        delete patch.lastSurveyAt;
+      }
+    }
+
     try {
       await upsertUserProfile(user.uid, patch);
       return jsonResponse({ ok: true });

@@ -25,6 +25,7 @@ import {
   resolvePhaseParams,
   weeksToRace,
   carbStrategyForDay,
+  stepDownRunFocus,
 } from './running.js';
 
 const ACTIVITY_FACTORS = {
@@ -894,7 +895,13 @@ export function generateWeeklyPlan({
 
     // Prescripción de carrera (ritmo objetivo, estructura, drills) en días aeróbicos.
     if (templateDay.sessionType === 'aerobic') {
-      workout.runPrescription = buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+      // FASE 1.3 — reentrada: intensidad un escalón abajo la primera semana de vuelta.
+      const stepDown = adaptiveTuning?.workout?.runIntensityStepDown === true;
+      const rpFocus = stepDown ? stepDownRunFocus(sessionFocus) : sessionFocus;
+      workout.runPrescription = buildRunPrescription({ sessionFocus: rpFocus, durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+      if (stepDown && rpFocus !== sessionFocus) {
+        workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${workout.runPrescription.note || ''}`.trim();
+      }
     }
 
     return {
@@ -950,7 +957,12 @@ export function generateWeeklyPlan({
         }
         // Recalcula la prescripción de carrera si cambió la duración.
         if (d.sessionType === 'aerobic') {
-          d.workout.runPrescription = buildRunPrescription({ sessionFocus: d.sessionFocus, durationMinutes: d.workout.durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+          const stepDown2 = adaptiveTuning?.workout?.runIntensityStepDown === true;
+          const rpFocus2 = stepDown2 ? stepDownRunFocus(d.sessionFocus) : d.sessionFocus;
+          d.workout.runPrescription = buildRunPrescription({ sessionFocus: rpFocus2, durationMinutes: d.workout.durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+          if (stepDown2 && rpFocus2 !== d.sessionFocus) {
+            d.workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${d.workout.runPrescription.note || ''}`.trim();
+          }
         }
       });
     }

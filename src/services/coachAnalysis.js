@@ -10,6 +10,7 @@ import {
   listMetricsSince,
   listMealsSince,
   getWorkoutById,
+  getLastDoneWorkoutAt,
 } from '../lib/repositories/firestoreRepository.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../core/wellnessDigest.js';
 
@@ -171,19 +172,20 @@ export function compareLoadsWithPlan(lastStrength, plan) {
 export async function buildCoachAnalysisDigest(uid) {
   const sinceIso = new Date(Date.now() - COACH_ANALYSIS_LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
   const mealsSinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const [profile, plan, workouts, metrics, meals] = await Promise.all([
+  const [profile, plan, workouts, metrics, meals, lastDoneAtHint] = await Promise.all([
     getUserProfile(uid).catch(() => null),
     getLatestWeeklyPlan(uid).catch(() => null),
     listWorkoutsSince(uid, sinceIso, 120).catch(() => []),
     listMetricsSince(uid, sinceIso, 100).catch(() => []),
     listMealsSince(uid, mealsSinceIso, 120).catch(() => []),
+    getLastDoneWorkoutAt(uid).catch(() => null),
   ]);
 
   const done = (Array.isArray(workouts) ? workouts : [])
     .filter(isDoneWorkout)
     .sort((a, b) => String(b.performedAt || '').localeCompare(String(a.performedAt || '')));
 
-  const progressMemory = buildProgressMemory({ workouts, metrics, lookbackDays: 21, now: new Date() });
+  const progressMemory = buildProgressMemory({ workouts, metrics, lookbackDays: 21, now: new Date(), lastDoneAtHint });
   let adaptiveTuning = null;
   if (profile) {
     try {

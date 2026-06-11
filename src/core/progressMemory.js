@@ -60,7 +60,15 @@ export function normalizeAdaptiveThresholds(input = {}) {
   };
 }
 
-export function buildProgressMemory({ workouts = [], meals = [], metrics = [], lookbackDays = 21, now = new Date() }) {
+// Mismo criterio que isDoneWorkout en coachAnalysis.js (un check-in cuenta solo si
+// confirmó que entrenó). Duplicado aquí a propósito: core no importa de services.
+function isDoneForInactivity(w) {
+  if (!w) return false;
+  if (w.source === 'daily_checkin') return w.completed === true;
+  return w.completed !== false;
+}
+
+export function buildProgressMemory({ workouts = [], meals = [], metrics = [], lookbackDays = 21, now = new Date(), lastDoneAtHint = null }) {
   const nowDate = normalizeDate(now) || new Date();
   const since = new Date(nowDate);
   since.setUTCDate(since.getUTCDate() - Math.max(3, Number(lookbackDays) || 21));
@@ -150,6 +158,21 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
   const rpeComponent = ((10 - clamp(avgSessionRpe ?? 6.5, 3, 10)) / 7) * 15;
   const readinessScore = Math.round(clamp(completionComponent + adherenceComponent + fatigueComponent + rpeComponent, 0, 100));
 
+  // FASE 1.3 — Inactividad: días desde el último entreno HECHO. Se evalúa sobre toda
+  // la lista recibida (sin ventana) y, si la consulta del caller está acotada en días,
+  // puede complementarse con `lastDoneAtHint` (consulta aparte al último workout hecho).
+  // Si el usuario nunca entrenó, daysSinceLastDone es null (no aplican reglas de reentrada).
+  const doneDates = workouts
+    .filter(isDoneForInactivity)
+    .map((w) => normalizeDate(w.performedAt || w.createdAt))
+    .filter((d) => d && d <= nowDate);
+  const hintDate = lastDoneAtHint ? normalizeDate(lastDoneAtHint) : null; // OJO: new Date(null) es 1970
+  if (hintDate && hintDate <= nowDate) doneDates.push(hintDate);
+  const lastDone = doneDates.length ? new Date(Math.max(...doneDates.map((d) => d.getTime()))) : null;
+  const daysSinceLastDone = lastDone
+    ? Math.max(0, Math.floor((nowDate.getTime() - lastDone.getTime()) / (24 * 3600 * 1000)))
+    : null;
+
   const readinessState = readinessScore >= 78 ? 'high' : readinessScore >= 58 ? 'moderate' : 'low';
   const fatigueState = (avgFatigue ?? 0) >= 7 ? 'high' : (avgFatigue ?? 0) >= 5 ? 'moderate' : 'low';
   const adherenceState =
@@ -198,6 +221,10 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
       hrDriftBpm,
       hrSignal,
     },
+    inactivity: {
+      daysSinceLastDone,
+      lastDoneAt: lastDone ? lastDone.toISOString() : null,
+    },
   };
 }
 
@@ -228,6 +255,11 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
   let carbsFactor = 1;
   let fatFactor = 1;
   let proteinFactor = 1;
+  let loadFactor = 1; // FASE 1.3: multiplicador de cargas de fuerza (reentrada)
+  let runIntensityStepDown = false;
+  let bridgeSession = false;
+  let planStale = false;
+  let suggestRescreening = false;
   const appliedRules = [];
 
   if (hasAlarmSymptoms) {
@@ -413,10 +445,102 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // FASE 1.3 — Reajuste por inactividad (3 niveles) y check-in de reentrada.
+  // 3-6 días: sin regla. 7-14: cargas de fuerza −10% y carrera un escalón abajo la
+  // primera semana (frecuencia intacta). >14: plan vigente inválido → regenerar con
+  // volumen 0.7-0.8 y rampa 1-2 semanas. Enfermedad: regla extra conservadora.
+  // ---------------------------------------------------------------------------
+  const nowRef = normalizeDate(progressMemory?.until) || new Date();
+  const daysSince = toNumber(progressMemory?.inactivity?.daysSinceLastDone, null);
+  const reentry = profile?.reentry && typeof profile.reentry === 'object' ? profile.reentry : null;
+  const reentryAnsweredAt = normalizeDate(reentry?.answeredAt);
+  const reentryAgeDays = reentryAnsweredAt
+    ? Math.floor((nowRef.getTime() - reentryAnsweredAt.getTime()) / (24 * 3600 * 1000))
+    : null;
+  const reentryDaysOut = toNumber(reentry?.daysOut, null);
+
+  if (daysSince != null && daysSince >= 7 && daysSince <= 14) {
+    loadFactor = 0.9;
+    runIntensityStepDown = true;
+    bridgeSession = true;
+    appliedRules.push(
+      createRule(
+        'INACTIVITY_REENTRY',
+        'Vuelta tras 7-14 días sin entrenar.',
+        `daysSinceLastDone=${daysSince}`,
+        'Primera semana de reentrada: cargas de fuerza −10% y carrera un escalón menos de intensidad; frecuencia intacta. Primera sesión de vuelta: sesión puente corta (20-30 min, fácil).'
+      )
+    );
+  } else if (daysSince != null && daysSince > 14) {
+    volumeFactor *= 0.75;
+    loadFactor = 0.85;
+    rpeShift -= 1;
+    planStale = true;
+    bridgeSession = true;
+    appliedRules.push(
+      createRule(
+        'INACTIVITY_RESET',
+        `Más de 14 días sin entrenar (${daysSince}).`,
+        `daysSinceLastDone=${daysSince}`,
+        'El plan vigente queda marcado como NO válido: conviene regenerarlo (volumen 0.7-0.8 y rampa de 1-2 semanas). Primera sesión de vuelta: sesión puente corta (20-30 min, fácil).'
+      )
+    );
+  } else if (reentryAgeDays != null && reentryAgeDays >= 0 && reentryDaysOut != null && reentryDaysOut >= 7) {
+    // Ya volvió a entrenar (daysSince se reinició) pero sigue dentro de la rampa de retorno.
+    if (reentryAgeDays < 7) {
+      const longBreak = reentryDaysOut > 14;
+      loadFactor = longBreak ? 0.85 : 0.9;
+      if (longBreak) volumeFactor *= 0.8;
+      runIntensityStepDown = true;
+      appliedRules.push(
+        createRule(
+          'REENTRY_RAMP',
+          `Primera semana de vuelta tras ${reentryDaysOut} días sin entrenar.`,
+          `reentryAnsweredAt=${reentry.answeredAt}, daysOut=${reentryDaysOut}`,
+          longBreak
+            ? 'Rampa de retorno (semana 1): volumen ×0.8, cargas −15% y carrera suave; normaliza en 1-2 semanas.'
+            : 'Semana de reentrada: cargas −10% y carrera un escalón menos de intensidad.'
+        )
+      );
+    } else if (reentryAgeDays < 14 && reentryDaysOut > 14) {
+      volumeFactor *= 0.9;
+      loadFactor = 0.95;
+      appliedRules.push(
+        createRule(
+          'REENTRY_RAMP_W2',
+          'Segunda semana de rampa tras un parón largo.',
+          `reentryAnsweredAt=${reentry.answeredAt}, daysOut=${reentryDaysOut}`,
+          'Volumen ×0.9 y cargas −5% esta semana; la próxima vuelve la progresión normal.'
+        )
+      );
+    }
+  }
+
+  // Enfermedad como causa del parón (especialmente febril/respiratoria): vuelta extra
+  // conservadora y sugerencia de reevaluar el cribado preparticipación.
+  if (reentry?.reason === 'enfermedad' && reentryAgeDays != null && reentryAgeDays >= 0 && reentryAgeDays < 14) {
+    volumeFactor *= 0.85;
+    rpeShift -= 1;
+    suggestRescreening = true;
+    appliedRules.push(
+      createRule(
+        'REENTRY_ILLNESS',
+        'El parón fue por enfermedad.',
+        `reason=enfermedad, answeredAt=${reentry.answeredAt}`,
+        'Vuelta extra conservadora (sobre todo si fue febril o respiratoria): intensidad capada (RPE ≤6) estas 2 semanas y reevaluar el cribado preparticipación antes de progresar.'
+      )
+    );
+  }
+
   volumeFactor = Number(clamp(volumeFactor, 0.7, 1.15).toFixed(2));
   rpeShift = clamp(rpeShift, -3, 1);
   const maxRpeCap = clamp(
-    Math.min(toNumber(screening?.maxAllowedSessionRpe, 9), hasAlarmSymptoms ? 4 : 9),
+    Math.min(
+      toNumber(screening?.maxAllowedSessionRpe, 9),
+      hasAlarmSymptoms ? 4 : 9,
+      suggestRescreening ? 6 : 9
+    ),
     4,
     9
   );
@@ -440,6 +564,12 @@ export function buildAdaptiveTuning({ profile, progressMemory, screening }) {
       rpeShift,
       maxRpeCap,
       highIntensityBlocked: screening?.highIntensityAllowed === false || hasAlarmSymptoms,
+      // FASE 1.3 — reentrada tras inactividad
+      loadFactor: Number(clamp(loadFactor, 0.8, 1).toFixed(2)),
+      runIntensityStepDown,
+      bridgeSession,
+      planStale,
+      suggestRescreening,
     },
     nutrition: {
       calorieDelta,

@@ -56,6 +56,11 @@ export function buildActiveBlockAdaptiveOverlay({
     volumeFactor: round2(adaptiveTuning?.workout?.volumeFactor),
     rpeShift: round2(adaptiveTuning?.workout?.rpeShift),
     maxRpeCap: round2(adaptiveTuning?.workout?.maxRpeCap),
+    // FASE 1.3 — reentrada tras inactividad
+    loadFactor: round2(adaptiveTuning?.workout?.loadFactor),
+    runIntensityStepDown: adaptiveTuning?.workout?.runIntensityStepDown === true,
+    bridgeSession: adaptiveTuning?.workout?.bridgeSession === true,
+    planStale: adaptiveTuning?.workout?.planStale === true,
     readinessScore: Number.isFinite(Number(progressMemory?.readinessScore))
       ? Number(progressMemory.readinessScore)
       : null,
@@ -79,6 +84,10 @@ export function buildActiveBlockAdaptiveOverlay({
             volumeFactor: overlay.volumeFactor,
             rpeShift: overlay.rpeShift,
             maxRpeCap: overlay.maxRpeCap,
+            bridgeSession: overlay.bridgeSession,
+            bridgeNote: overlay.bridgeSession
+              ? 'Sesión puente de reentrada: hoy 20-30 min suaves (técnica y movilidad), sin buscar cargas.'
+              : null,
           },
         }
         : day.workout,

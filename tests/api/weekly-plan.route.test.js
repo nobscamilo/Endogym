@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   listMealsSince: vi.fn(),
   listMetricsSince: vi.fn(),
   listWorkoutsSince: vi.fn(),
+  getLastDoneWorkoutAt: vi.fn(async () => null),
   upsertUserProfile: vi.fn(),
   isGeminiConfigured: vi.fn(),
   callGeminiExerciseCoach: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
   listMealsSince: mocks.listMealsSince,
   listMetricsSince: mocks.listMetricsSince,
   listWorkoutsSince: mocks.listWorkoutsSince,
+  getLastDoneWorkoutAt: mocks.getLastDoneWorkoutAt,
   upsertUserProfile: mocks.upsertUserProfile,
 }));
 

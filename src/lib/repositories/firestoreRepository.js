@@ -225,6 +225,26 @@ export async function listWorkoutsSince(userId, sinceIso, limit = 200) {
   return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 }
 
+// FASE 1.3 — Último entreno HECHO sin ventana temporal (para detectar inactividad
+// aunque el parón supere el lookback de las consultas acotadas). Mira los últimos 15
+// registros: suficiente para saltar check-ins "no entrené" y workouts incompletos.
+export async function getLastDoneWorkoutAt(userId) {
+  const { db } = await getAdminServices();
+  const snapshot = await db
+    .collection('users')
+    .doc(userId)
+    .collection('workouts')
+    .orderBy('performedAt', 'desc')
+    .limit(15)
+    .get();
+  for (const doc of snapshot.docs) {
+    const w = doc.data();
+    const done = w.source === 'daily_checkin' ? w.completed === true : w.completed !== false;
+    if (done && w.performedAt) return w.performedAt;
+  }
+  return null;
+}
+
 function sanitizeWorkoutId(workoutId) {
   const id = String(workoutId || '').trim();
   return id && id.length <= 80 && !id.includes('/') ? id : null;

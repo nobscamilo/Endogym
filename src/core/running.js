@@ -122,6 +122,13 @@ function intervalScheme(raceGoal) {
 }
 
 // Construye la prescripción de una sesión de carrera.
+// FASE 1.3 — Reentrada tras inactividad: baja la intensidad de carrera UN escalón
+// (series→tempo, tempo→fácil). La tirada larga y los rodajes fáciles no cambian de tipo.
+export function stepDownRunFocus(sessionFocus) {
+  const map = { cardio_intervals: 'cardio_tempo', cardio_tempo: 'cardio_easy' };
+  return map[sessionFocus] || sessionFocus;
+}
+
 export function buildRunPrescription({ sessionFocus, durationMinutes, raceGoal, paces, phase }) {
   const runType = runTypeFromFocus(sessionFocus);
   const goal = resolveRaceGoal(raceGoal);

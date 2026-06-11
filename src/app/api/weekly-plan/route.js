@@ -41,6 +41,7 @@ import {
   listMealsSince,
   listMetricsSince,
   listWorkoutsSince,
+  getLastDoneWorkoutAt,
   listWeeklyPlans,
   updateWeeklyPlanAdaptiveOverlay,
   updateWeeklyPlanCustomizations,
@@ -337,10 +338,11 @@ export async function POST(request) {
       since.setUTCDate(since.getUTCDate() - lookbackDays);
       const sinceIso = since.toISOString();
 
-      const [recentWorkouts, recentMeals, recentMetrics] = await Promise.all([
+      const [recentWorkouts, recentMeals, recentMetrics, lastDoneAtHint] = await Promise.all([
         listWorkoutsSince(user.uid, sinceIso, 200),
         listMealsSince(user.uid, sinceIso, 250),
         listMetricsSince(user.uid, sinceIso, 200),
+        getLastDoneWorkoutAt(user.uid).catch(() => null),
       ]);
 
       const preparticipationScreening = evaluatePreparticipationScreening(profile.preparticipation);
@@ -350,6 +352,7 @@ export async function POST(request) {
         metrics: recentMetrics,
         lookbackDays,
         now,
+        lastDoneAtHint,
       });
       const adaptiveTuning = buildAdaptiveTuning({
         profile,

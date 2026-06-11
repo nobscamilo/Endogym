@@ -10,6 +10,7 @@ import {
   listMealsSince,
   listMetricsSince,
   listWorkoutsSince,
+  getLastDoneWorkoutAt,
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
@@ -84,6 +85,32 @@ function mapRecentWorkouts(workouts) {
 
 // Forma aeróbica real (corredores): eficiencia ritmo/FC y predicción de carrera
 // con los mejores esfuerzos de Strava. Solo con datos suficientes; nada inventado.
+// FASE 1.3 — Estado de reentrada para la UI: días sin entrenar, si toca el check-in
+// de reentrada (1 pregunta: "¿por qué paraste?") y si hoy corresponde sesión puente
+// o regenerar el plan. null para usuarios nuevos (nunca entrenaron) o activos (<7 días).
+function mapReentry({ workouts, profile, lastDoneAtHint, tuning }) {
+  const done = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => (w.source === 'daily_checkin' ? w.completed === true : w.completed !== false))
+    .map((w) => String(w.performedAt || ''))
+    .filter(Boolean)
+    .sort();
+  let lastDoneAt = done.at(-1) || null;
+  if (lastDoneAtHint && (!lastDoneAt || String(lastDoneAtHint) > lastDoneAt)) lastDoneAt = String(lastDoneAtHint);
+  if (!lastDoneAt) return null;
+  const ms = Date.now() - new Date(lastDoneAt).getTime();
+  if (!Number.isFinite(ms)) return null;
+  const days = Math.max(0, Math.floor(ms / 86400000));
+  const tw = tuning?.workout || {};
+  if (days < 7 && tw.bridgeSession !== true && tw.runIntensityStepDown !== true) return null;
+  const answeredThisBreak = Boolean(profile?.reentry?.answeredAt && profile.reentry.answeredAt > lastDoneAt);
+  return {
+    daysSinceLastDone: days,
+    needsCheckin: days >= 7 && !answeredThisBreak,
+    bridgeSession: tw.bridgeSession === true || days >= 7,
+    planStale: tw.planStale === true || days > 14,
+  };
+}
+
 function mapRunFitness(workouts, profile) {
   const modality = profile?.trainingModality || '';
   const isRunner = modality === 'hybrid_run_gym' || modality === 'running'
@@ -562,6 +589,9 @@ export async function GET(request) {
         .filter((meal) => String(meal?.eatenAt || meal?.createdAt || '') >= startOfTodayIso)
         .slice(0, 50);
       let planForStudio = latestPlan;
+      // FASE 1.3 — estado de reentrada (independiente de que haya bloque activo).
+      const lastDoneAtHint = await getLastDoneWorkoutAt(user.uid).catch(() => null);
+      let reentryTuning = null;
       if (profile && isActiveBlockPlan(latestPlan, today)) {
         const progressMemory = buildProgressMemory({
           workouts,
@@ -569,12 +599,14 @@ export async function GET(request) {
           metrics,
           lookbackDays: 21,
           now: new Date(),
+          lastDoneAtHint,
         });
         const adaptiveTuning = buildAdaptiveTuning({
           profile,
           progressMemory,
           screening: evaluatePreparticipationScreening(profile.preparticipation),
         });
+        reentryTuning = adaptiveTuning;
         planForStudio = buildActiveBlockAdaptiveOverlay({
           plan: latestPlan,
           adaptiveTuning,
@@ -600,6 +632,7 @@ export async function GET(request) {
       setIf('recentWorkouts', mapRecentWorkouts(workouts));
       setIf('runZones', mapRunZones(workouts, planForStudio, profile));
       setIf('runFitness', mapRunFitness(workouts, profile));
+      setIf('reentry', mapReentry({ workouts, profile, lastDoneAtHint, tuning: reentryTuning }));
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {
