@@ -5,9 +5,7 @@ import {
   TrainingMode,
 } from '../domain/models.js';
 import {
-  buildCooldownProtocol,
   buildSessionExercises,
-  buildWarmupProtocol,
   getExerciseLibrarySummary,
   isExerciseCompatibleWithSessionFocus,
   resolveSessionFocus,
@@ -27,6 +25,7 @@ import {
   carbStrategyForDay,
   stepDownRunFocus,
 } from './running.js';
+import { buildWarmupProtocol, buildCooldownProtocol } from './warmupCooldown.js';
 
 const ACTIVITY_FACTORS = {
   sedentary: 1.2,
@@ -888,9 +887,9 @@ export function generateWeeklyPlan({
         adaptiveTuning,
         preparticipationScreening
       ),
-      warmup: buildWarmupProtocol({ sessionType: templateDay.sessionType, modality }),
+      warmup: buildWarmupProtocol({ sessionType: templateDay.sessionType, modality, sessionFocus, profile }),
       exercises: sessionExercises,
-      cooldown: buildCooldownProtocol({ sessionType: templateDay.sessionType }),
+      cooldown: buildCooldownProtocol({ sessionType: templateDay.sessionType, profile }),
     };
 
     // Prescripción de carrera (ritmo objetivo, estructura, drills) en días aeróbicos.
@@ -936,9 +935,9 @@ export function generateWeeklyPlan({
           sessionFocus: 'recovery',
           durationMinutes: 30,
           intensityRpe: 'RPE 2-3',
-          warmup: buildWarmupProtocol({ sessionType: 'recovery', modality }),
+          warmup: buildWarmupProtocol({ sessionType: 'recovery', modality, sessionFocus: 'recovery', profile }),
           exercises: [],
-          cooldown: buildCooldownProtocol({ sessionType: 'recovery' }),
+          cooldown: buildCooldownProtocol({ sessionType: 'recovery', profile }),
         };
       });
     }
@@ -1203,9 +1202,9 @@ export function suggestSessionAlternatives({
           sessionFocus,
           durationMinutes: variation.durationMinutes || targetDay.workout?.durationMinutes || 45,
           intensityRpe: targetDay.workout?.intensityRpe || 'RPE moderado',
-          warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality }),
+          warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality, sessionFocus, profile }),
           exercises,
-          cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType }),
+          cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType, profile }),
         },
       };
     });

@@ -1484,47 +1484,6 @@ export function suggestExerciseAlternatives({
   });
 }
 
-export function buildWarmupProtocol({ sessionType, modality }) {
-  const common = [
-    { step: 'Movilidad articular global', durationMinutes: 4, details: 'Tobillos, caderas, columna torácica y hombros.' },
-    { step: 'Activación cardiometabólica progresiva', durationMinutes: 4, details: 'Caminar rápido, bici suave o saltos de bajo impacto.' },
-  ];
-
-  if (sessionType === 'resistance' || sessionType === 'mixed') {
-    common.push({
-      step: 'Series de aproximación',
-      durationMinutes: 5,
-      details: '2-3 series con carga creciente antes del ejercicio principal.',
-    });
-  }
-
-  if (modality === TrainingModality.YOGA || modality === TrainingModality.PILATES) {
-    common.push({
-      step: 'Respiración diafragmática',
-      durationMinutes: 3,
-      details: 'Inhala 4s, exhala 6s para mejorar control neuromotor.',
-    });
-  }
-
-  return common;
-}
-
-export function buildCooldownProtocol({ sessionType }) {
-  const steps = [
-    { step: 'Vuelta a la calma', durationMinutes: 4, details: 'Reducir pulso progresivamente hasta conversación cómoda.' },
-    { step: 'Movilidad y estiramientos', durationMinutes: 6, details: '10-30s por grupo muscular principal.' },
-  ];
-
-  if (sessionType === 'aerobic' || sessionType === 'mixed') {
-    steps.push({
-      step: 'Respiración de recuperación',
-      durationMinutes: 3,
-      details: 'Respiración nasal lenta para acelerar recuperación autonómica.',
-    });
-  }
-  return steps;
-}
-
 export function buildSessionExercises({
   modality,
   sessionType,
