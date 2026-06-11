@@ -18,11 +18,13 @@ import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFla
 const CHAT_RAG_CHAR_BUDGET = 7000;
 const CHAT_RAG_TIMEOUT_MS = 4000;
 
-async function buildGuidelinesContext({ profile, plan, traceId }) {
+async function buildGuidelinesContext({ profile, plan, message, traceId }) {
   if (!profile) return '';
   try {
     const raced = await Promise.race([
-      retrieveGuidelinesContext({ profile, weeklyPlan: plan || undefined, traceId }),
+      // FASE 0.3: la query del RAG es la PREGUNTA del usuario (+ objetivo/modalidad),
+      // no el perfil completo. Ver buildQueryText en guidelinesRetriever.js.
+      retrieveGuidelinesContext({ profile, weeklyPlan: plan || undefined, userQuery: message, traceId }),
       new Promise((resolve) => { setTimeout(() => resolve(''), CHAT_RAG_TIMEOUT_MS); }),
     ]);
     if (!raced) return '';
@@ -197,7 +199,7 @@ export async function POST(request) {
 
     const { text: userContext, profile, plan } = await buildUserContext(user.uid);
     // RAG médico-deportivo recortado (no bloquea: timeout corto y fallback a vacío).
-    const guidelinesContext = await buildGuidelinesContext({ profile, plan, traceId });
+    const guidelinesContext = await buildGuidelinesContext({ profile, plan, message, traceId });
 
     try {
       const { response } = await requestGoogleGenerateContent({

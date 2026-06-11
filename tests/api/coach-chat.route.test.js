@@ -206,6 +206,19 @@ describe('/api/coach-chat route', () => {
     expect(sentPrompt).toContain('CONTEXTO RAG DE PRUEBA');
   });
 
+  it('la query del RAG incluye la pregunta del usuario (FASE 0.3)', async () => {
+    const pregunta = '¿Cuánta creatina debería tomar al día?';
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: pregunta }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.retrieveGuidelinesContext).toHaveBeenCalledWith(expect.objectContaining({
+      userQuery: pregunta,
+    }));
+  });
+
   it('red flag: responde texto fijo sin llamar a Gemini, sin gastar rate limit y loguea sin contenido', async () => {
     const response = await POST(new Request('http://localhost/api/coach-chat', {
       method: 'POST',

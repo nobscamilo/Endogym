@@ -76,6 +76,65 @@ describe('guidelines RAG retriever', () => {
     expect(citations.map((c) => c.fileName)).toContain('Sports Nutrition.pdf');
   });
 
+  it('FASE 0.3: con userQuery la query semántica es la pregunta + objetivo/modalidad, no el perfil clínico', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+
+    const vectorQuery = {
+      get: vi.fn().mockResolvedValue({
+        empty: false,
+        size: 1,
+        docs: [{
+          id: 'p1',
+          data: () => ({ parentId: 'docA', fileName: 'Sports Nutrition.pdf', pageStart: 1, pageEnd: 2, text: 'Creatina 3-5 g/día.', _distance: 0.1 }),
+        }],
+      }),
+    };
+    const findNearest = vi.fn().mockReturnValue(vectorQuery);
+    getAdminServices.mockResolvedValue({ db: { collection: vi.fn().mockReturnValue({ findNearest }) } });
+
+    await retrieveGuidelinesContext({
+      profile: { age: 28, medicalConditions: 'diabetes tipo 2', trainingModality: 'hybrid_run_gym' },
+      weeklyPlan: { goal: 'hypertrophy', preparticipationScreening: { input: { knownCardiometabolicDisease: true } } },
+      userQuery: '¿Cuánta creatina debería tomar al día?',
+      traceId: 'test',
+    });
+
+    const embedded = requestGoogleEmbeddings.mock.calls[0][0].texts[0];
+    expect(embedded).toContain('¿Cuánta creatina debería tomar al día?');
+    expect(embedded).toContain('hypertrophy');
+    expect(embedded).toContain('hybrid_run_gym');
+    // El perfil clínico completo ya no contamina la query del chat.
+    expect(embedded).not.toContain('diabetes');
+    expect(embedded).not.toContain('Edad');
+  });
+
+  it('FASE 0.3: sin userQuery la query sigue siendo la del perfil (weekly-plan intacto)', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    const vectorQuery = { get: vi.fn().mockResolvedValue({ empty: true, size: 0, docs: [] }) };
+    getAdminServices.mockResolvedValue({
+      db: {
+        collection: vi.fn().mockReturnValue({
+          findNearest: vi.fn().mockReturnValue(vectorQuery),
+          select: vi.fn().mockReturnThis(),
+          get: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
+        }),
+        // fallback léxico también usa collection(); devolvemos vacío para terminar.
+      },
+    });
+
+    await retrieveGuidelinesContextWithCitations({
+      profile: { age: 65, medicalConditions: 'osteoporosis' },
+      weeklyPlan: { goal: 'strength', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+
+    const embedded = requestGoogleEmbeddings.mock.calls[0][0].texts[0];
+    expect(embedded).toContain('osteoporosis');
+    expect(embedded).toContain('Edad: 65');
+  });
+
   // --------------------------------------------------------------------------
   // Fallback léxico: cuando el vector no está disponible.
   // --------------------------------------------------------------------------

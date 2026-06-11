@@ -34,7 +34,22 @@ const NUTRITION_TERMS = new Set([
 // ----------------------------------------------------------------------------
 // Construcción de la consulta semántica en lenguaje natural.
 // ----------------------------------------------------------------------------
-function buildQueryText(profile, weeklyPlan) {
+function buildQueryText(profileInput, weeklyPlanInput, userQuery) {
+  const profile = profileInput || {};
+  const weeklyPlan = weeklyPlanInput || {};
+  // FASE 0.3 — Chat del coach: si hay pregunta del usuario, la query semántica se
+  // construye desde la PREGUNTA + (objetivo, modalidad), no desde el perfil clínico
+  // completo. Así los pasajes recuperados responden a lo que el usuario pregunta.
+  const trimmedQuery = typeof userQuery === 'string' ? userQuery.trim() : '';
+  if (trimmedQuery) {
+    const queryParts = [`Pregunta del usuario: ${trimmedQuery}`];
+    const qGoal = weeklyPlan.goal || profile.goal || '';
+    if (qGoal) queryParts.push(`Objetivo de entrenamiento: ${qGoal}.`);
+    const qModality = weeklyPlan.trainingModality || profile.trainingModality || profile.trainingMode || '';
+    if (qModality) queryParts.push(`Modalidad: ${qModality}.`);
+    return queryParts.join(' ');
+  }
+
   const parts = [];
   const goal = weeklyPlan.goal || '';
   if (goal) parts.push(`Objetivo de entrenamiento: ${goal}.`);
@@ -77,12 +92,12 @@ function buildQueryText(profile, weeklyPlan) {
 // ----------------------------------------------------------------------------
 // Modo principal: búsqueda vectorial.
 // ----------------------------------------------------------------------------
-async function retrieveByVector({ db, profile, weeklyPlan, traceId }) {
+async function retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId }) {
   if (!process.env.GEMINI_API_KEY) {
     return null; // sin key no se puede embeber; usar fallback
   }
 
-  const queryText = buildQueryText(profile, weeklyPlan);
+  const queryText = buildQueryText(profile, weeklyPlan, userQuery);
   let queryVector;
   try {
     const [vec] = await requestGoogleEmbeddings({
@@ -420,15 +435,17 @@ ${contextBlocks.join('\n\n')}
  * RAG principal: intenta búsqueda semántica (vector) y degrada a léxica (keywords)
  * si la primera no está disponible. Retorna texto de contexto + citaciones.
  */
-export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, traceId }) {
+export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, userQuery, traceId }) {
   try {
     const { db } = await getAdminServices();
 
-    const vectorResult = await retrieveByVector({ db, profile, weeklyPlan, traceId });
+    const vectorResult = await retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId });
     if (vectorResult && vectorResult.contextText) {
       return vectorResult;
     }
 
+    // Nota (FASE 0.3): el fallback léxico sigue siendo por perfil (keywords clínicas);
+    // la pregunta del usuario solo dirige el modo semántico.
     logInfo('guidelines_vector_fallback_keywords', { traceId });
     return await retrieveByKeywords({ db, profile, weeklyPlan, traceId });
   } catch (error) {
@@ -440,7 +457,7 @@ export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPl
 /**
  * Igual que el anterior pero retorna sólo el texto del contexto.
  */
-export async function retrieveGuidelinesContext({ profile, weeklyPlan, traceId }) {
-  const result = await retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, traceId });
+export async function retrieveGuidelinesContext({ profile, weeklyPlan, userQuery, traceId }) {
+  const result = await retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, userQuery, traceId });
   return result.contextText;
 }
