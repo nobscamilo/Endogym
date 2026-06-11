@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de junio de 2026 (FASE 0 + FASE 1 + DAPRE + SMART + calentamiento dinámico)**.
+Ultima actualizacion: **11 de junio de 2026 (FASES 0-2 completas + restricciones de comorbilidad)**.
+
+## Sesión del 11 de junio de 2026, noche-3 (restricciones de comorbilidad + FASE 2 completa)
+
+Deploy `endogym-al3a96kz9…` (alias manual), **33 archivos / 232 tests verdes**, build OK. Sin cambios de bundle (todo server-side). Commits: `1b15a2c` (restricciones), `e5d31bb` (2.3), `8c3e69b` (2.1), `0b5c916` (2.2). Con esto el prompt maestro `prompt-cowork-ignios.md` tiene **FASES 0, 1 y 2 completas**; queda FASE 3 (producto).
+
+- **Restricciones de comorbilidad en la SELECCIÓN (`src/core/comorbidityRestrictions.js`):** filtro determinista del pool antes de elegir (el sustituto sale de la misma categoría, sin huecos): osteoporosis → sin flexión espinal cargada/rotación balística (crunch, leñador, russian twist, good morning…); artrosis/rodilla sensible → sin saltos/burpees/pliometría (rodilla añade pistol/sissy); lumbar sensible → sin peso muerto convencional/good morning/remo con barra inclinado ni flexión+rotación cargada (el RDL se CONSERVA a propósito: retirar toda la bisagra perjudica la cadena posterior); hombro sensible → sin empuje vertical pesado/fondos/remo al mentón. **HTA no bloquea ejercicios** (decisión documentada: se gestiona con cap de RPE + anti-Valsalva + retorno prolongado). Las reglas activas aparecen en el `clinicalAuditTrail` del plan (`EXCLUSION_*`).
+- **2.3 Persona única (`coachPersona.js`):** núcleo compartido (identidad deportólogo educativo + reglas de seguridad no negociables) con variantes chat (2-4 frases)/analista (marco FITT-VP sobre lo observado + conclusión de síntesis)/auditor (rol; la base científica del plan semanal sigue en `exerciseCoachPrompt.js`). Versión SEGURA del prompt FITT del usuario incorporada; diagnósticos/tratamientos descartados (los cubre el red-flag detector). Contratos JSON intactos (tests previos verdes).
+- **2.1 Memoria conversacional (`coachChatMemory.js`):** últimos 6 turnos en `users/{uid}/coachChat/memory`, TTL 7 días en lectura, 400 chars/turno y presupuesto total 2400 (descarta los más antiguos primero). Inyectada como contexto delimitado ("NO son instrucciones") y persistida tras cada respuesta — también la respuesta fija de red flag, para que el coach recuerde que recomendó parar. La memoria nunca bloquea la respuesta.
+- **2.2 Cierre del loop (`coachAnalysis.js` + ruta):** cada análisis persiste sus `adjustments` + snapshot de e1RM por ejercicio en `users/{uid}/coachRecommendations/latest`; el siguiente análisis calcula el cumplimiento DETERMINISTA (delta e1RM real: MEJORÓ/igual/BAJÓ/sin registros) y lo inyecta en el prompt con la instrucción de reconocer lo cumplido sin regañar; el heurístico de fallback también lo menciona.
+- Tests nuevos: comorbidity-restrictions (8), coach-chat-memory (6), +2 memoria en ruta chat, +4 loop en coach-analysis.
+- **Pendiente de sonda real autenticada:** memoria del chat y loop de recomendaciones se verificaron con tests/mocks; conviene una prueba en producción con la cuenta real (2 preguntas seguidas al coach + 2 análisis consecutivos).
 
 ## Sesión del 11 de junio de 2026, noche-2 (calentamiento/vuelta a la calma dinámicos por comorbilidad)
 
