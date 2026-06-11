@@ -26,6 +26,7 @@ import {
   stepDownRunFocus,
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol } from './warmupCooldown.js';
+import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
 
 const ACTIVITY_FACTORS = {
   sedentary: 1.2,
@@ -599,7 +600,7 @@ function adjustRpeByAdaptive(baseRpeLabel, adaptiveTuning, preparticipationScree
   return formatRpeRange({ low, high });
 }
 
-function buildClinicalAuditTrail({ preparticipationScreening, progressMemory, adaptiveTuning }) {
+function buildClinicalAuditTrail({ preparticipationScreening, progressMemory, adaptiveTuning, profile = null }) {
   const items = [];
 
   if (preparticipationScreening) {
@@ -631,6 +632,16 @@ function buildClinicalAuditTrail({ preparticipationScreening, progressMemory, ad
 
   if (Array.isArray(adaptiveTuning?.appliedRules)) {
     adaptiveTuning.appliedRules.forEach((rule) => items.push(rule));
+  }
+
+  // Restricciones de comorbilidad aplicadas a la selección de ejercicios (transparencia).
+  for (const rule of listActiveRestrictionRules(profile)) {
+    items.push({
+      id: `EXCLUSION_${rule.id}`,
+      reason: `Restricción activa por ${rule.label}.`,
+      evidence: 'Detectada en el perfil (condiciones médicas/lesiones declaradas).',
+      effect: rule.reason,
+    });
   }
 
   return items;
@@ -972,6 +983,7 @@ export function generateWeeklyPlan({
     preparticipationScreening,
     progressMemory,
     adaptiveTuning,
+    profile,
   });
   const nutritionPlan = buildWeeklyNutritionPlan({
     profile,
