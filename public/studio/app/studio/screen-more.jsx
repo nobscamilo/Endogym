@@ -246,6 +246,27 @@ function CoachAnalysisCard() {
   );
 }
 
+/* Objetivo SMART: meta + fecha + predicción determinista (override D.goalProgress) */
+function GoalProgressCard() {
+  const gp = window.STUDIO.goalProgress;
+  if (!gp || gp.targetValue == null) return null;
+  return (
+    <SectionCard title="Tu objetivo" icon="target" sub={gp.label}>
+      <div className="tiles">
+        <div className="tile"><div className="t-num num">{gp.targetValue}</div><div className="t-lbl">Meta ({gp.unit})</div></div>
+        <div className="tile"><div className="t-num num">{gp.currentValue != null ? gp.currentValue : '—'}</div><div className="t-lbl">Actual</div></div>
+        <div className="tile"><div className="t-num num">{gp.trendPerWeek != null ? `${gp.trendPerWeek > 0 ? '+' : ''}${gp.trendPerWeek}` : '—'}</div><div className="t-lbl">{gp.unit}/sem</div></div>
+      </div>
+      <div className="row ac" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {gp.targetDate ? <span className="pill tiny">Fecha: {gp.targetDate}</span> : null}
+        {gp.predictedDate ? <span className="pill tiny">A este ritmo: {gp.predictedDate}</span> : null}
+        {gp.onTrack != null ? <span className={`pill tiny ${gp.onTrack ? 'good' : ''}`}>{gp.onTrack ? 'En camino ✅' : 'Por detrás de tu fecha'}</span> : null}
+      </div>
+      {gp.note ? <p className="tiny muted" style={{ marginTop: 8 }}>{gp.note}</p> : null}
+    </SectionCard>
+  );
+}
+
 function ProgressScreen() {
   const D = window.STUDIO;
   const p = D.progress || {};
@@ -273,6 +294,9 @@ function ProgressScreen() {
       </div>
 
       <CoachBanner screen="progress" ask onAsk={() => setAsk(true)} />
+
+      {/* Objetivo SMART: meta, actual, tendencia y predicción */}
+      <GoalProgressCard />
 
       {/* Análisis del coach: último entreno, tendencia y próximos ajustes */}
       <CoachAnalysisCard />
@@ -411,7 +435,9 @@ function ProgressScreen() {
 }
 
 /* ---- Encuesta de disponibilidad: ajusta plan y comidas ---- */
-const AV_GOALS = [['recomposition', 'Recomposición'], ['weight_loss', 'Bajar peso'], ['hypertrophy', 'Hipertrofia'], ['strength', 'Fuerza'], ['endurance', 'Resistencia'], ['glycemic_control', 'Glucémico']];
+// Objetivos en lenguaje de RESULTADO (los valores internos no cambian: sin migración).
+const AV_GOALS = [['weight_loss', 'Perder grasa'], ['hypertrophy', 'Ganar músculo'], ['strength', 'Más fuerza'], ['recomposition', 'Tonificar'], ['endurance', 'Más resistencia'], ['glycemic_control', 'Controlar glucosa']];
+const GOALS_WITH_TARGET = ['weight_loss', 'recomposition', 'hypertrophy', 'strength'];
 const AV_EQUIP = [['full_gym', 'Gimnasio'], ['hybrid_run_gym', 'Correr + Gym'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
 const RUN_GOALS = [['health', 'Salud'], ['race_5k', '5K'], ['race_10k', '10K'], ['race_21k', '21K'], ['race_42k', '42K']];
 const RUN_REF_DIST = [['', '—'], ['5000', '5K'], ['10000', '10K'], ['21097', '21K'], ['42195', '42K']];
@@ -421,6 +447,9 @@ function AvailabilitySurvey() {
   const D = window.STUDIO;
   const u = D.user || {};
   const [goal, setGoal] = useStateP(u.goalRaw || 'recomposition');
+  // Objetivo SMART: meta numérica + fecha (como el objetivo de carrera).
+  const [goalValue, setGoalValue] = useStateP(u.goalTargetValue != null ? String(u.goalTargetValue) : '');
+  const [goalDate, setGoalDate] = useStateP(u.goalTargetDate || '');
   const [equip, setEquip] = useStateP(u.modalityRaw || 'full_gym');
   const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
   const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
@@ -456,6 +485,9 @@ function AvailabilitySurvey() {
           raceDate: raceDate || null,
           // FCmáx medida (opcional): prevalece sobre la estimación por edad en zonas y coach.
           hrMaxBpm: hrMax ? Number(hrMax) : null,
+          // Objetivo SMART medible (meta + fecha); null borra el objetivo.
+          goalTargetValue: goalValue ? Number(goalValue) : null,
+          goalTargetDate: goalDate || null,
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
@@ -477,8 +509,23 @@ function AvailabilitySurvey() {
     <SectionCard title="Tu perfil y disponibilidad" icon="settings" sub="Tus datos y tu tiempo/equipo. Al guardar, reajustamos tu plan y comidas.">
       <div className="stack" style={{ gap: 14 }}>
         <div>
-          <div className="mb-label">Objetivo</div>
+          <div className="mb-label">¿Qué quieres conseguir?</div>
           <div className="chips">{AV_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${goal === v ? 'accent' : ''}`} onClick={() => setGoal(v)}>{l}</button>)}</div>
+          {GOALS_WITH_TARGET.includes(goal) ? (
+            <div style={{ marginTop: 12 }}>
+              <div className="row ac" style={{ gap: 10 }}>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>{goal === 'strength' ? 'e1RM objetivo (kg) en tu básico' : 'Peso objetivo (kg)'}</label>
+                  <input className="text-input" type="number" min={goal === 'strength' ? 10 : 30} max={goal === 'strength' ? 500 : 300} step="0.5" placeholder="opcional" value={goalValue} onChange={(e) => setGoalValue(e.target.value)} />
+                </div>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Fecha objetivo</label>
+                  <input className="text-input" type="date" value={goalDate} onChange={(e) => setGoalDate(e.target.value)} />
+                </div>
+              </div>
+              <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.5 }}>Con meta y fecha, Progreso te mostrará si vas en camino (igual que la predicción de carrera).</p>
+            </div>
+          ) : null}
         </div>
         <div>
           <div className="mb-label">Equipo disponible</div>

@@ -7,8 +7,9 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
-import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince } from '../../../lib/repositories/firestoreRepository.js';
+import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince, listMetricsSince } from '../../../lib/repositories/firestoreRepository.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
+import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { buildCoachChatPrompt } from '../../../services/coachPersona.js';
@@ -44,17 +45,24 @@ async function buildUserContext(uid) {
   try {
     const sinceIso = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
     const mealsSinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const [profile, plan, workouts, meals] = await Promise.all([
+    const metricsSinceIso = new Date(Date.now() - 42 * 24 * 3600 * 1000).toISOString();
+    const [profile, plan, workouts, meals, metrics] = await Promise.all([
       getUserProfile(uid).catch(() => null),
       getLatestWeeklyPlan(uid).catch(() => null),
       listWorkoutsSince(uid, sinceIso, 60).catch(() => []),
       listMealsSince(uid, mealsSinceIso, 120).catch(() => []),
+      listMetricsSince(uid, metricsSinceIso, 100).catch(() => []),
     ]);
     if (!profile && !plan) return { text: '', profile, plan };
     const parts = [];
     const name = profile?.firstName || profile?.name || profile?.displayName;
     if (name) parts.push(`Nombre: ${name}.`);
     if (profile?.goal) parts.push(`Objetivo: ${profile.goal}.`);
+    // Objetivo SMART medible (meta + fecha + tendencia real). Se omite si no hay meta.
+    try {
+      const goalLine = describeGoalProgress(buildGoalProgress({ profile, metrics, workouts }));
+      if (goalLine) parts.push(goalLine);
+    } catch { /* sin objetivo SMART */ }
     if (profile?.trainingModality || profile?.trainingMode) parts.push(`Modalidad: ${profile.trainingModality || profile.trainingMode}.`);
     if (Number.isFinite(Number(profile?.weightKg))) parts.push(`Peso: ${profile.weightKg} kg.`);
     if (Number.isFinite(Number(profile?.age))) parts.push(`Edad: ${profile.age}.`);

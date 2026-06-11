@@ -63,6 +63,32 @@ export async function POST(request) {
     if (Number.isFinite(hrMax) && hrMax >= 120 && hrMax <= 230) patch.hrMaxBpm = Math.round(hrMax);
     else if (body?.hrMaxBpm === null) patch.hrMaxBpm = null;
 
+    // Objetivo SMART medible: valor numérico + fecha. El "kind" se deriva del goal
+    // server-side (peso corporal para perder grasa/recomposición/ganar músculo; e1RM
+    // para fuerza). El objetivo de carrera ya tiene su propio flujo (runRaceGoal/raceDate).
+    const goalForTarget = GOALS.has(body?.goal) ? body.goal : null;
+    const targetKindByGoal = {
+      weight_loss: 'weightKg', recomposition: 'weightKg', hypertrophy: 'weightKg', strength: 'e1rmKg',
+    };
+    if (body?.goalTargetValue === null) {
+      patch.goalTarget = null;
+    } else if (goalForTarget && targetKindByGoal[goalForTarget]) {
+      const v = Number(body?.goalTargetValue);
+      const kind = targetKindByGoal[goalForTarget];
+      const okRange = kind === 'weightKg' ? (v >= 30 && v <= 300) : (v >= 10 && v <= 500);
+      const date = typeof body?.goalTargetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.goalTargetDate)
+        ? body.goalTargetDate : null;
+      if (Number.isFinite(v) && okRange) {
+        patch.goalTarget = {
+          kind,
+          goal: goalForTarget,
+          value: Math.round(v * 10) / 10,
+          date,
+          setAt: new Date().toISOString(),
+        };
+      }
+    }
+
     // FASE 1.3 — Check-in de reentrada (1 pregunta: ¿por qué paraste?). El front lo envía
     // la primera vez que el usuario vuelve tras ≥7 días sin entrenar. answeredAt/daysOut
     // se fijan server-side; alimentan las reglas REENTRY_* de buildAdaptiveTuning.

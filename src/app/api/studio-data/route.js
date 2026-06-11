@@ -14,6 +14,7 @@ import {
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
+import { buildGoalProgress } from '../../../services/goalProgress.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
@@ -223,6 +224,9 @@ function mapUser(profile, authUser) {
   if (num(p.weightKg) !== undefined) out.weightKg = num(p.weightKg);
   if (num(p.heightCm) !== undefined) out.heightCm = num(p.heightCm);
   if (p.sex) out.sex = p.sex;
+  // Objetivo SMART (prefill del formulario de Perfil)
+  if (num(p.goalTarget?.value) !== undefined) out.goalTargetValue = num(p.goalTarget.value);
+  if (p.goalTarget?.date) out.goalTargetDate = p.goalTarget.date;
   if (num(p.mealsPerDay) !== undefined) out.mealsPerDay = num(p.mealsPerDay);
   if (num(p.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(p.preferredDurationMinutes);
   if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
@@ -633,6 +637,7 @@ export async function GET(request) {
       setIf('runZones', mapRunZones(workouts, planForStudio, profile));
       setIf('runFitness', mapRunFitness(workouts, profile));
       setIf('reentry', mapReentry({ workouts, profile, lastDoneAtHint, tuning: reentryTuning }));
+      setIf('goalProgress', profile ? buildGoalProgress({ profile, metrics, workouts }) : null);
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

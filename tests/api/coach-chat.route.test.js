@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getLatestWeeklyPlan: vi.fn(),
   listWorkoutsSince: vi.fn(),
   listMealsSince: vi.fn(),
+  listMetricsSince: vi.fn(),
   requestGoogleGenerateContent: vi.fn(),
   resolveGeminiCoachModel: vi.fn(),
   enforceUserRateLimit: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
   getLatestWeeklyPlan: mocks.getLatestWeeklyPlan,
   listWorkoutsSince: mocks.listWorkoutsSince,
   listMealsSince: mocks.listMealsSince,
+  listMetricsSince: mocks.listMetricsSince,
 }));
 
 vi.mock('../../src/lib/logger.js', () => ({
@@ -89,6 +91,8 @@ describe('/api/coach-chat route', () => {
     mocks.listWorkoutsSince.mockResolvedValue([]);
     mocks.listMealsSince.mockReset();
     mocks.listMealsSince.mockResolvedValue([]);
+    mocks.listMetricsSince.mockReset();
+    mocks.listMetricsSince.mockResolvedValue([]);
     mocks.resolveGeminiCoachModel.mockReturnValue('gemini-2.5-flash');
     mocks.enforceUserRateLimit.mockResolvedValue({
       allowed: true,

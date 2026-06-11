@@ -1,0 +1,84 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  getAuthenticatedUser: vi.fn(),
+  upsertUserProfile: vi.fn(),
+}));
+
+vi.mock('../../src/lib/auth.js', () => {
+  class AuthenticationError extends Error {}
+  return { AuthenticationError, getAuthenticatedUser: mocks.getAuthenticatedUser };
+});
+
+vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
+  upsertUserProfile: mocks.upsertUserProfile,
+}));
+
+vi.mock('../../src/lib/logger.js', () => ({
+  withTrace: async (_op, handler) => handler({ traceId: 'trace-test' }),
+  logError: vi.fn(),
+}));
+
+const { POST } = await import('../../src/app/api/studio-availability/route.js');
+
+function post(body) {
+  return POST(new Request('http://localhost/api/studio-availability', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }));
+}
+
+describe('/api/studio-availability — objetivo SMART y reentrada', () => {
+  beforeEach(() => {
+    mocks.getAuthenticatedUser.mockReset();
+    mocks.upsertUserProfile.mockReset();
+    mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1' });
+    mocks.upsertUserProfile.mockResolvedValue(undefined);
+  });
+
+  it('persiste goalTarget con kind derivado del goal (fuerza → e1rmKg)', async () => {
+    const res = await post({ goal: 'strength', goalTargetValue: 140, goalTargetDate: '2026-12-01' });
+    expect(res.status).toBe(200);
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.goalTarget).toMatchObject({ kind: 'e1rmKg', goal: 'strength', value: 140, date: '2026-12-01' });
+    expect(patch.goalTarget.setAt).toBeTruthy();
+  });
+
+  it('perder grasa → weightKg; valores fuera de rango se ignoran', async () => {
+    await post({ goal: 'weight_loss', goalTargetValue: 78.55, goalTargetDate: '2026-09-01' });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].goalTarget).toMatchObject({ kind: 'weightKg', value: 78.6 });
+
+    await post({ goal: 'weight_loss', goalTargetValue: 10 }); // <30 kg: absurdo
+    expect(mocks.upsertUserProfile.mock.calls[1][1].goalTarget).toBeUndefined();
+  });
+
+  it('goalTargetValue null borra el objetivo; endurance no genera target numérico', async () => {
+    await post({ goal: 'weight_loss', goalTargetValue: null });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].goalTarget).toBeNull();
+
+    await post({ goal: 'endurance', goalTargetValue: 50 });
+    expect(mocks.upsertUserProfile.mock.calls[1][1].goalTarget).toBeUndefined();
+  });
+
+  it('un POST solo-reentrada persiste profile.reentry SIN marcar studioAvailability', async () => {
+    const res = await post({ reentryReason: 'enfermedad', reentryDaysOut: 12 });
+    expect(res.status).toBe(200);
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.reentry).toMatchObject({ reason: 'enfermedad', daysOut: 12 });
+    expect(patch.reentry.answeredAt).toBeTruthy();
+    expect(patch.studioAvailability).toBeUndefined();
+    expect(patch.lastSurveyAt).toBeUndefined();
+  });
+
+  it('la encuesta completa con reentrada sí marca studioAvailability', async () => {
+    await post({ goal: 'strength', trainingModality: 'full_gym', sessionMinutes: 60, daysPerWeek: 4, reentryReason: 'otro' });
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.studioAvailability).toBe(true);
+    expect(patch.reentry.reason).toBe('otro');
+  });
+
+  it('razón de reentrada inválida se ignora', async () => {
+    await post({ reentryReason: 'hackeo' });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].reentry).toBeUndefined();
+  });
+});
