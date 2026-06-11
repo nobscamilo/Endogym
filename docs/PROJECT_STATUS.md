@@ -1,6 +1,15 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de junio de 2026 (FASE 0 + FASE 1 del plan "Mejoras Ignios")**.
+Ultima actualizacion: **11 de junio de 2026 (FASE 0 + FASE 1 + DAPRE + objetivos SMART)**.
+
+## Sesión del 11 de junio de 2026, noche (DAPRE + objetivos SMART medibles)
+
+Dos mejoras del documento de "prescripción dinámica" del usuario, implementadas deterministas (la IA no decide cargas). Desplegado `endogym-9kp2ihp6u…` (alias manual), bundle `f7c2f6d47e`, **30 archivos / 200 tests verdes**, build OK. Commits `60ac1fb` (DAPRE) y `14652b6` (SMART). FASE 2 del prompt maestro queda pendiente a petición del usuario.
+
+- **Progresión DAPRE (`computeDapreProgression` en `exerciseLibrary.js`):** con reps reales de la última sesión, la carga del siguiente entreno la decide el desempeño — superó el tope del rango con RPE ≤8 → +5% (+10% si ≥3 reps de más); por debajo del mínimo o RPE ≥9.5 → −5/−10%; en rango → misma carga (doble progresión: primero reps, luego kg). Sin reps registradas, fallback INTACTO a la progresión por fase (`phaseParams.loadFactor`) — esto corrige que la P del FITT en fuerza heredara la periodización de carrera. `liftHistory` lleva `rpe` (por ejercicio o `sessionRpe`); `prescription.progression` expone `{ method: 'dapre'|'phase', factor, reason }` y `loadGuidance` explica el porqué al usuario. Convive con el `loadFactor` de reentrada (se multiplican).
+- **Objetivos SMART (`services/goalProgress.js` + UI):** la encuesta pregunta "¿Qué quieres conseguir?" con labels de resultado (Perder grasa / Ganar músculo / Más fuerza / Tonificar / Más resistencia / Controlar glucosa — valores internos `GoalType` intactos, sin migración) y, para los 4 objetivos medibles, meta numérica + fecha opcionales: peso corporal (perder grasa/tonificar/ganar músculo) o e1RM del básico de referencia (fuerza). Persistido como `profile.goalTarget { kind, goal, value, date, setAt }` en `studio-availability` (kind derivado server-side, rangos validados, `goalTargetValue: null` borra). `buildGoalProgress` calcula actual, tendencia lineal/semana, fecha estimada de llegada (solo si la tendencia apunta al objetivo) y `onTrack` vs la fecha; el e1RM usa el ejercicio con más registros (mejor e1RM por sesión). Tarjeta **"Tu objetivo"** en Progreso (override `goalProgress` de studio-data) y línea SMART en el contexto del coach-chat (incluye "NO va en camino" para que el coach sea honesto). Mismo patrón que el objetivo de carrera, extendido al resto.
+- Tests nuevos: `dapre-progression` (11), `goal-progress` (6), `studio-availability.route` (6, incluye el guard de reentrada-sin-encuesta).
+- Nota UX pendiente (no bloqueante): el onboarding por pasos con time-to-value corto sigue siendo FASE 3.5 del prompt maestro; esta mejora cubre la selección y medición de objetivos dentro del Perfil actual.
 
 ## Sesión del 11 de junio de 2026, tarde (FASE 1 — holística: nutrición, recuperación e inactividad)
 
