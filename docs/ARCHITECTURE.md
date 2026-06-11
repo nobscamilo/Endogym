@@ -31,6 +31,7 @@ Construir una app full-stack para nutricion, seguimiento glucemico, entrenamient
 | `src/lib/firebaseAdmin.js` | Inicializacion Firebase Admin. |
 | `src/lib/repositories/firestoreRepository.js` | Persistencia y borrado/exportacion de cuenta. |
 | `src/lib/rateLimit.js` | Ventanas persistentes por usuario para operaciones costosas. |
+| `src/lib/appTime.js` | Fecha civil de la app (`Europe/Madrid` por defecto), límites locales y `weekKey` nutricional. |
 | `src/services/googleGenAiTransport.js` | Transporte exclusivo Gemini Developer API. |
 | `src/services/geminiClient.js` | Analisis multimodal estructurado. |
 | `src/services/exerciseCoachClient.js` | Coach estructurado con reintentos. |
@@ -90,17 +91,20 @@ users/{userId}/rateLimits/{scope}
 ## Flujo Coach chat Studio
 
 1. `POST /api/coach-chat` requiere Firebase ID token.
-2. La ruta valida tamaño del prompt y consume el scope persistente `coach-chat`.
-3. Construye contexto de perfil, plan, fase, carrera y entrenos recientes.
-4. Llama Gemini Developer API y devuelve texto; si el limite se supera responde `429` antes de llamar al proveedor.
+2. La ruta acepta `{ message }`; `{ prompt }` queda como legacy y se trata como mensaje de usuario, nunca como system.
+3. Valida tamaño y evalúa red flags deterministas antes del rate limit; si hay síntoma de alarma responde texto fijo sin Gemini.
+4. En el flujo normal consume el scope persistente `coach-chat`.
+5. Construye contexto de perfil, plan, fase, carrera, digest nutricional/recuperación, memoria acotada y entrenos recientes.
+6. Llama Gemini Developer API y devuelve texto; si el limite se supera responde `429` antes de llamar al proveedor.
 
 ## Flujo nutricion Studio
 
-1. `GET /api/studio-nutrition` consulta el plan semanal cacheado en `studioNutrition/{weekKey}`.
+1. `GET /api/studio-nutrition` consulta el plan semanal cacheado en `studioNutrition/{weekKey}`; `weekKey` es el lunes de la fecha civil de la app (`Europe/Madrid` por defecto), no el lunes UTC.
 2. `POST /api/studio-nutrition` genera 7 dias en trozos paralelos con Gemini.
 3. La ruta calcula drift de kcal/proteina por dia antes de guardar.
 4. Si hay drift reintenta una vez; si persiste drift severo en un plan completo, responde `502` y no guarda.
 5. El cache incluye `meta.planSignature`, calculado desde plan, sesiones, fase, carrera y objetivos nutricionales. Si cambia, `GET` responde `stale:true` y el cliente regenera.
+6. `GET /api/studio-data` agrupa comidas de "hoy" con límites UTC derivados de la fecha local de la app; evita desfases tras medianoche en España.
 
 ## Flujo de check-in diario
 

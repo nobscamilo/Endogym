@@ -1,8 +1,8 @@
 # Deploy de Endogym en Vercel
 
-## RAG semántico: crear el índice vectorial de Firestore (acción requerida, 6 jun 2026)
+## RAG semántico: índice vectorial de Firestore
 
-El RAG semántico (`findNearest` sobre `guideline_passages`) requiere un índice vectorial que **no** puede crear el service-account del repo (sin permiso `indexAdmin`). Créalo una vez con `gcloud` autenticado como un usuario con rol Owner/Editor o `roles/datastore.indexAdmin`:
+Estado al **10 de junio de 2026**: el índice vectorial de `guideline_passages` fue **creado y verificado**. Sonda real: `mode:'vector'`, 12 pasajes y ~20k caracteres de contexto recuperado. El service-account del repo sigue sin permiso `indexAdmin`, así que si el índice se borra o se recrea otro proyecto, hazlo con `gcloud` autenticado como un usuario con rol Owner/Editor o `roles/datastore.indexAdmin`:
 
 ```bash
 gcloud firestore indexes composite create \
@@ -14,13 +14,50 @@ gcloud firestore indexes composite create \
 (Formato exacto sugerido por el propio Firestore en el error `FAILED_PRECONDITION`.)
 
 - Tarda unos minutos en construirse sobre 7.128 pasajes.
-- Mientras no exista, `findNearest` falla y el retriever degrada automáticamente a búsqueda por keywords (sin romper producción).
-- Verificación tras crearlo: en Runtime Logs debe aparecer `guidelines_vector_matches` (modo vector) en vez de `guidelines_vector_fallback_keywords` al generar un plan.
+- Si no existe, `findNearest` falla y el retriever degrada automáticamente a búsqueda por keywords (sin romper producción).
+- Verificación: en Runtime Logs debe aparecer `guidelines_vector_matches` (modo vector) en vez de `guidelines_vector_fallback_keywords` al generar un plan.
 - Para re-generar embeddings de libros nuevos: `node --env-file=.env.local scripts/embed_guidelines.mjs` (resumable).
 
 ## Estado verificado
 
-Deploy manual más reciente del **8 de junio de 2026**:
+Último estado confirmado en docs: **12 de junio de 2026**.
+
+- FASES 0-2 del coach/prescripción completas, Perfil objetivos/equipo rediseñado, chat móvil corregido y calendario/horas de Nutrición corregidos, `235` tests verdes y build OK.
+- Deploy más reciente documentado: `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` (`https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`) con alias manual a `endogym.vercel.app`.
+- Sondas básicas recientes: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401` y `/api/coach-chat` sin token `401`.
+- Último bundle con cambios de UI documentado: `08bbcab4a0` (Nutrición selecciona hoy por calendario local y evita titulares horarios engañosos).
+
+Deploy manual relevante del **12 de junio de 2026**:
+
+- `npx vercel --prod --yes` creó `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq`, estado `Ready`, URL `https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`.
+- La CLI volvió a quedarse en `Running Checks`; el alias canónico no apareció en `inspect`, así que se asignó manualmente:
+
+```bash
+npx vercel alias set https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app endogym.vercel.app
+```
+
+- `https://endogym.vercel.app/studio/app/index.html?verify=08bbcab4a0` sirve `studio.bundle.js?v=08bbcab4a0`; el bundle responde `200`.
+- Verificado: `/` -> `200`, `/api/health` -> `200`, `/api/meals` sin token -> `401`, `POST /api/coach-chat` sin token -> `401`; cabeceras defensivas presentes.
+- Playwright producción contra el asset del Studio: Nutrición muestra `Vie 12` activo el 12 de junio (ya no `Lun 8`) y el hero usa etiqueta contextual (`Próxima comida`/`Plan del ...`) en vez de `Toca ahora` por defecto.
+- Logs Vercel del deployment (`--no-follow --since 1h --level error --limit 20`): sin errores encontrados.
+- `.vercelignore` excluye `scratch/`, `.playwright-cli/` y `output/` para no subir capturas/logs locales.
+- No se ejecutó `npm run e2e:production` para este deploy porque el cambio fue de UI/fecha y las sondas públicas cubrieron el runtime básico.
+
+Deploy manual relevante anterior del **12 de junio de 2026**:
+
+- `npx vercel --prod --yes` creó `dpl_EXhggnVun7yJjDP4pLjAxFKJqR7S`, estado `Ready`, URL `https://endogym-8npkwk39l-juan-camilo-sarmientos-projects.vercel.app`.
+- La CLI volvió a quedarse en `Running Checks`; el alias canónico no apareció en `inspect`, así que se asignó manualmente:
+
+```bash
+npx vercel alias set https://endogym-8npkwk39l-juan-camilo-sarmientos-projects.vercel.app endogym.vercel.app
+```
+
+- `https://endogym.vercel.app/studio/app/index.html?verify=6ff6352714` sirve `studio.bundle.js?v=6ff6352714`; el bundle responde `200` y contiene `Flexible`, `Microciclo`, `Mesociclo` y `__createPortal`.
+- Verificado: `/` -> `200`, `/api/health` -> `200`, `/api/meals` sin token -> `401`, `POST /api/coach-chat` sin token -> `401`; cabeceras defensivas presentes.
+- `.vercelignore` excluye `scratch/` y `.playwright-cli/` para no subir capturas/logs locales.
+- No se ejecutó `npm run e2e:production` para este deploy porque el cambio fue de UI/bundle y las sondas públicas cubrieron el runtime básico.
+
+Deploy manual relevante del **8 de junio de 2026**:
 
 - `npx vercel --prod --yes` creó `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`, estado `Ready`, URL `https://endogym-hody8p1xq-juan-camilo-sarmientos-projects.vercel.app`.
 - La CLI quedó esperando en `Running Checks`; el deployment estaba `Ready` pero `endogym.vercel.app` seguía apuntando al deployment anterior. Se promovió manualmente con:
@@ -90,6 +127,14 @@ COACH_CHAT_RATE_LIMIT_MAX=20
 COACH_CHAT_RATE_LIMIT_WINDOW_SECONDS=3600
 COACH_ANALYSIS_RATE_LIMIT_MAX=6
 COACH_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS=3600
+STUDIO_NUTRITION_RATE_LIMIT_MAX=12
+STUDIO_NUTRITION_RATE_LIMIT_WINDOW_SECONDS=3600
+CRON_SECRET
+BACKUP_BUCKET=endogym-vtety8-backups-eu
+ALERT_WEBHOOK_URL
+STRAVA_CLIENT_ID
+STRAVA_CLIENT_SECRET
+STRAVA_STATE_SECRET
 AUTH_DISABLED=false
 ```
 
@@ -110,8 +155,8 @@ NEXT_PUBLIC_FIREBASE_APP_ID
 ## Pendientes antes de usuarios reales
 
 1. Completar revision legal humana de privacidad, consentimiento y disclaimer medico por mercado.
-2. Mantener alternativa gratuita/manual de observabilidad mientras Vercel Pro no sea viable.
-3. Sincronizar GitHub con el runtime manualmente desplegado: `main` local esta cinco commits por delante de `origin/main` y conserva cambios sin commit.
+2. Configurar `ALERT_WEBHOOK_URL` en Vercel si se quiere entrega automática gratuita de errores a Discord/Slack; hasta entonces las alertas están inertes.
+3. Mantener alternativa gratuita/manual de observabilidad mientras Vercel Pro no sea viable.
 
 ## Deploy
 

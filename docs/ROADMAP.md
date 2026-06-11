@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **8 de junio de 2026 (P1/P2 Coach IA + puente auth móvil Studio)**.
+Ultima actualizacion: **12 de junio de 2026 (Nutricion calendario local desplegada)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -75,6 +75,8 @@ Ultima actualizacion: **8 de junio de 2026 (P1/P2 Coach IA + puente auth móvil 
 - [x] Retirar los 37 IDs de YouTube no resolubles; conservar 14 embeds verificados y fallback SVG para el resto.
 - [x] Sustituir imágenes remotas `lh3.googleusercontent.com/aida-public` por assets versionados propios.
 - [x] Añadir recuperación de contraseña Firebase y favicon propio.
+- [x] Rediseñar cómo se muestran objetivos y equipo disponible en Perfil: separar resultado principal, modalidad/equipo y subobjetivo de carrera; sustituir `Mixto` visible por `Flexible`; mostrar microciclo/mesociclo/revisión/fecha clave. Implementado y verificado localmente el 11 jun 2026; desplegado el 12 jun 2026 con bundle `6ff6352714`.
+- [x] Corregir calendario/horas de Nutrición: rail semanal y selección por `dateISO` local, `studio-data`/`studio-nutrition`/`studio-swap` usando fecha civil de app (`Europe/Madrid` por defecto). Desplegado el 12 jun 2026 con bundle `08bbcab4a0`.
 
 ## P2 - Check-in diario seguro
 
@@ -82,7 +84,7 @@ Ultima actualizacion: **8 de junio de 2026 (P1/P2 Coach IA + puente auth móvil 
 - [x] No registrar valores desconocidos de RPE, fatiga o sueño como cero al omitir la encuesta.
 - [x] Rehidratar check-ins persistidos por fecha y prevenir registros duplicados con upsert `daily-YYYY-MM-DD`.
 - [x] Normalizar `performedAt` al mediodía UTC de la fecha seleccionada, permitir pasado/hoy local y bloquear futuro desde UI.
-- [ ] Sincronizar `origin/main` con los cinco commits locales y los cambios manualmente desplegados.
+- [x] Sincronizar `origin/main` con los commits locales y los cambios manualmente desplegados. Al 11 jun, `main` está alineado con `origin/main`; quedan solo artefactos sin commit en `scratch/`.
 
 ## P2 - RAG: de léxico a semántico (implementado 6 jun 2026)
 
@@ -93,9 +95,9 @@ Mejora a búsqueda semántica respetando "no Vertex". Estado:
 - [x] Generar y almacenar vectores en la colección `guideline_passages` (`FieldValue.vector()`). 7.128 subidos y verificados.
 - [x] Reescribir el retriever a `findNearest` (COSINE) con **fallback automático** a keywords. Verificado end-to-end (degrada limpio sin índice).
 - [x] Actualizar tests (camino vectorial + fallback).
-- [ ] **Crear el índice vectorial de Firestore** (acción del usuario; el SA del repo no tiene `indexAdmin`). Comando en `docs/DEPLOYMENT.md`. Hasta entonces el RAG opera en modo keywords.
-- [ ] Tras crear el índice: verificar modo vector en producción (`npm run e2e:production` / Runtime Logs `guidelines_vector_matches`).
-- [ ] Correr `npm test` y `npm run build` en la Mac (vitest no corre en el sandbox Linux).
+- [x] **Crear el índice vectorial de Firestore**. Verificado el 10 jun: modo vector con 12 pasajes y ~20k caracteres de contexto.
+- [x] Tras crear el índice: verificar modo vector en producción (`guidelines_vector_matches` / sonda real).
+- [x] Correr `npm test` y `npm run build` en la Mac tras las fases recientes. Último estado documentado: `235` tests verdes y build OK.
 
 ## P3 - Producto
 
@@ -105,5 +107,6 @@ Mejora a búsqueda semántica respetando "no Vertex". Estado:
 - [ ] Mejorar recomendaciones pre/post entreno con limites clinicos claros.
 - [ ] Diseñar reevaluación o clearance explícito para levantar el gate diario de síntomas sin depender solo de la ventana reciente.
 - [ ] Revisar y completar la sección de perfil del usuario.
+- [ ] Refinar onboarding corto de Perfil: guiar el primer objetivo en menos pasos y explicar solo lo necesario sin tutorial largo.
 - [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
 - [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.

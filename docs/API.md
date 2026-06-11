@@ -76,11 +76,11 @@ Payload:
 
 ```json
 {
-  "prompt": "¿Subo peso en la sesión de hoy?"
+  "message": "¿Subo peso en la sesión de hoy?"
 }
 ```
 
-`POST /api/coach-chat` requiere auth, valida prompts no vacíos de hasta 4000 caracteres, consume el rate limit `coach-chat` y llama Gemini con contexto real de perfil, plan, fase, carrera y entrenos recientes cuando existen. Responde:
+`POST /api/coach-chat` requiere auth y valida mensajes no vacíos de hasta 4000 caracteres. El cliente debe enviar `{ "message": "..." }`; el campo legacy `{ "prompt": "..." }` se acepta solo por compatibilidad y se trata íntegramente como mensaje de usuario, nunca como system prompt. Antes de consumir rate limit o llamar Gemini, la ruta evalúa red flags deterministas y responde texto fijo de seguridad si detecta síntomas de alarma. En el flujo normal consume el rate limit `coach-chat` y llama Gemini con contexto real de perfil, plan, fase, carrera y entrenos recientes cuando existen. Responde:
 
 ```json
 {
@@ -113,11 +113,12 @@ Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y 
 
 ## Nutrición Studio
 
-- `GET /api/studio-nutrition` devuelve el plan semanal guardado de la semana actual (`cached:true`) o `{ "empty": true }`.
+- `GET /api/studio-nutrition` devuelve el plan semanal guardado de la semana actual (`cached:true`) o `{ "empty": true }`. La semana se calcula con la fecha civil de la app (`Europe/Madrid` por defecto), no con UTC.
 - `POST /api/studio-nutrition` genera con Gemini 7 días (`days[]`), compra semanal y batch cooking. La ruta tiene `maxDuration=60`.
 - Antes de guardar un plan completo, el servidor calcula `macroCheck` por día: kcal reales, proteína real, objetivos, ratios, días fuera de rango y drift severo.
 - Si hay drift diario o proteína global baja, reintenta una vez y conserva el mejor resultado. Si un plan completo conserva drift severo, responde `502` y no guarda.
 - Los planes guardados incluyen `nutrition.meta.planSignature`. Si el plan de entrenamiento actual ya no coincide con esa huella, `GET` responde `{ "empty": true, "stale": true, "reason": "training_plan_changed" }`; el frontend lo trata como cache ausente y regenera.
+- `GET /api/studio-data` suma `macroEaten` y glucemia de "hoy" usando límites UTC de la fecha local de la app. A las 00:21 en Madrid ya cuenta como el nuevo día aunque UTC aún sea el día anterior.
 
 ## Check-in diario de entrenamiento
 

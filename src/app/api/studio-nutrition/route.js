@@ -5,6 +5,7 @@ import { withTrace, logError, logInfo } from '../../../lib/logger.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
+import { currentWeekKey as currentAppWeekKey } from '../../../lib/appTime.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -23,13 +24,9 @@ import {
 // El plan semanal (28 comidas) puede tardar; ampliamos el límite de ejecución en Vercel.
 export const maxDuration = 60;
 
-// Clave de la semana actual: fecha (AAAA-MM-DD) del lunes en curso (UTC).
+// Clave de la semana actual: lunes de la fecha civil de la app (Europe/Madrid por defecto).
 function currentWeekKey() {
-  const d = new Date();
-  const day = d.getUTCDay(); // 0=Dom … 6=Sáb
-  const diff = day === 0 ? -6 : 1 - day; // días hasta el lunes
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diff));
-  return monday.toISOString().slice(0, 10);
+  return currentAppWeekKey();
 }
 
 function stableRound(value) {

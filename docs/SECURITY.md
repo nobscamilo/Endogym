@@ -38,6 +38,8 @@ Las fotos usan `endogym-vtety8-plates-eu`, bucket privado del mismo proyecto Fir
 - `POST /api/analyze-plate`: 10 solicitudes cada 600 segundos por usuario.
 - `POST /api/weekly-plan`: 4 solicitudes cada 3600 segundos por usuario.
 - `POST /api/coach-chat`: 20 solicitudes cada 3600 segundos por usuario.
+- `POST /api/coach-analysis` y generación de `workout-analysis`: 6 solicitudes cada 3600 segundos por usuario; hits de caché por sesión no consumen cuota.
+- `POST /api/studio-nutrition` y `swapMeal`: 12 solicitudes cada 3600 segundos por usuario.
 - Los contadores se guardan en Firestore para que funcionen entre instancias Vercel.
 - HTTP `429` incluye `Retry-After`.
 
@@ -67,7 +69,7 @@ Estas medidas pasaron tests, `next start` local y verificación de cabeceras en 
 - El transporte rechaza nombres de modelo invalidos antes de formar el endpoint.
 - Los logs sustituyen identificadores invalidos por `<invalid-model>` para no persistir valores opacos.
 - El coach limita timeout y reintentos para responder con fallback antes del limite de Vercel.
-- El chat del coach requiere autenticacion, limita el prompt a 4000 caracteres y aplica rate limiting persistente antes de llamar Gemini.
+- El chat del coach requiere autenticacion, acepta `{ message }` como contrato principal, limita el mensaje a 4000 caracteres, trata `{ prompt }` legacy como texto de usuario, evalúa red flags deterministas antes de cuota/IA y aplica rate limiting persistente antes de llamar Gemini.
 
 ## Dependencias
 

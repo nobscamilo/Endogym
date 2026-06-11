@@ -1,2 +1,7 @@
 # Ignore local sport medicine PDF books (only parsed JSON / Firestore is needed)
 docs/guidelines/
+
+# Local verification and operation artifacts
+scratch/
+.playwright-cli/
+output/

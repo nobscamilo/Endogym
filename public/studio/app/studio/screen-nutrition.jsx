@@ -174,6 +174,7 @@ function AddFood({ onAdded }) {
 }
 
 const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const DOW_LONG_LABELS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
 // Normaliza una lista de comidas a los campos que espera el diseño (emoji/hue/done/time…).
 function normMeals(arr) {
@@ -186,30 +187,82 @@ function normMeals(arr) {
   }));
 }
 
-// Números de día (del mes) de la semana ACTUAL, empezando en lunes — calendario real.
-function weekDateNumbers() {
+function pad2(n) { return String(n).padStart(2, '0'); }
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+function localDowIndex(date = new Date()) {
+  const js = date.getDay(); // 0=Dom … 6=Sáb
+  return js === 0 ? 6 : js - 1;
+}
+
+// Fechas de la semana ACTUAL, empezando en lunes — calendario local del navegador.
+function weekDateInfo() {
   const now = new Date();
-  const js = now.getDay(); // 0=Dom … 6=Sáb
-  const toMonday = js === 0 ? -6 : 1 - js;
+  const toMonday = -localDowIndex(now);
   const monday = new Date(now);
   monday.setDate(now.getDate() + toMonday);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return d.getDate();
+    return { date: d.getDate(), dateISO: localDateKey(d), today: localDateKey(d) === localDateKey(now) };
   });
 }
 
 // Índice del día de hoy dentro de la semana (Lun=0 … Dom=6).
 function todayDowIndex(D) {
-  const flagged = (D.nutritionDays || []).findIndex((d) => d.today);
-  if (flagged >= 0) return flagged;
-  const js = new Date().getDay(); // 0=Dom … 6=Sáb
-  return js === 0 ? 6 : js - 1;
+  const todayKey = localDateKey();
+  const byIso = (D.nutritionDays || []).findIndex((d) => d.dateISO === todayKey);
+  if (byIso >= 0) return byIso;
+  const localIdx = localDowIndex();
+  const todayDate = new Date().getDate();
+  const flagged = (D.nutritionDays || []).findIndex((d, i) => d.today && i === localIdx && Number(d.date) === todayDate);
+  return flagged >= 0 ? flagged : localIdx;
+}
+
+function mealTotals(meals) {
+  return (meals || []).reduce((a, m) => ({
+    kcal: a.kcal + Math.round(Number(m.kcal) || 0),
+    protein: a.protein + Math.round(Number(m.p) || 0),
+    carbs: a.carbs + Math.round(Number(m.c) || 0),
+    fat: a.fat + Math.round(Number(m.f) || 0),
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+}
+
+function longDayLabel(shortDay) {
+  const idx = DOW_LABELS.findIndex((d) => d === shortDay);
+  return idx >= 0 ? DOW_LONG_LABELS[idx] : (shortDay || 'día');
+}
+
+function glText(glClass) {
+  return glClass === 'high' ? 'alta' : glClass === 'mid' ? 'media' : 'baja';
+}
+
+function applySelectedNutritionDay(D, index) {
+  const i = Math.max(0, Math.min(index, (D.mealWeek || []).length - 1));
+  const weekDay = D.mealWeek && D.mealWeek[i];
+  if (!weekDay) return i;
+  const dayMeta = D.nutritionDays && D.nutritionDays[i];
+  D.meals = weekDay.meals;
+  D.currentMealDay = weekDay.day;
+  D.currentMealDate = dayMeta?.dateISO || null;
+  D.currentMealIsToday = Boolean(dayMeta?.today);
+  D.currentMealTargets = mealTotals(weekDay.meals);
+  return i;
 }
 
 function NutritionScreen({ layout }) {
   const D = window.STUDIO;
+  if (!D.__nutritionCalendarSynced && Array.isArray(D.nutritionDays)) {
+    const info = weekDateInfo();
+    D.nutritionDays = D.nutritionDays.map((d, i) => ({
+      ...d,
+      date: info[i]?.date || d.date,
+      dateISO: info[i]?.dateISO || d.dateISO || null,
+      today: Boolean(info[i]?.today),
+    }));
+    D.__nutritionCalendarSynced = true;
+  }
   const [tab, setTab] = useStateN('hoy');
   const tIdx = todayDowIndex(D);
   const [dayIdx, setDayIdx] = useStateN(tIdx);
@@ -219,35 +272,39 @@ function NutritionScreen({ layout }) {
 
   // Muestra las comidas del día seleccionado (D.meals se mantiene sincronizado con la selección).
   function showDay(i) {
-    setDayIdx(i);
-    if (D.mealWeek && D.mealWeek[i]) {
-      D.meals = D.mealWeek[i].meals;
-      D.currentMealDay = D.mealWeek[i].day; // para "Cambiar comida" (swap por día+slot)
-      setGen((g) => g + 1);
-    }
+    const nextIdx = applySelectedNutritionDay(D, i);
+    setDayIdx(nextIdx);
+    setGen((g) => g + 1);
   }
 
   // Vuelca un plan (días + compra + batch) en window.STUDIO y refresca la vista.
-  function applyNutrition(n) {
+  function applyNutrition(n, options = {}) {
     if (!n) return false;
     if (Array.isArray(n.days) && n.days.length) {
       const week = n.days.map((d, i) => ({ day: d.day || DOW_LABELS[i] || ('D' + i), meals: normMeals(d.meals) }));
       D.mealWeek = week;
-      const dateNums = weekDateNumbers();
+      const dateInfo = weekDateInfo();
       D.nutritionDays = week.map((d, i) => ({
         day: d.day,
-        date: dateNums[i],
+        date: dateInfo[i]?.date || '',
+        dateISO: dateInfo[i]?.dateISO || null,
         kcal: d.meals.reduce((a, m) => a + (Number(m.kcal) || 0), 0),
-        today: i === tIdx,
+        today: Boolean(dateInfo[i]?.today),
       }));
-      const sel = week[Math.min(dayIdx, week.length - 1)] || week[0];
-      D.meals = sel.meals;
-      D.currentMealDay = sel.day;
+      const nextIdx = options.preserveSelection ? Math.min(dayIdx, week.length - 1) : todayDowIndex(D);
+      setDayIdx(applySelectedNutritionDay(D, nextIdx));
     } else if (Array.isArray(n.meals) && n.meals.length) {
       // Compatibilidad con la forma antigua (un solo día).
       const single = normMeals(n.meals);
       D.mealWeek = [{ day: DOW_LABELS[tIdx], meals: single }];
+      const todayInfo = weekDateInfo()[tIdx];
+      D.nutritionDays = [{ day: DOW_LABELS[tIdx], date: todayInfo.date, dateISO: todayInfo.dateISO, kcal: mealTotals(single).kcal, today: true }];
       D.meals = single;
+      D.currentMealDay = DOW_LABELS[tIdx];
+      D.currentMealDate = todayInfo.dateISO;
+      D.currentMealIsToday = true;
+      D.currentMealTargets = mealTotals(single);
+      setDayIdx(0);
     } else {
       return false;
     }
@@ -257,7 +314,7 @@ function NutritionScreen({ layout }) {
     return true;
   }
   // Expuesto para que "Cambiar comida" (MealDetail) pueda refrescar la vista con el plan guardado.
-  window.__applyNutrition = applyNutrition;
+  window.__applyNutrition = (nutrition) => applyNutrition(nutrition, { preserveSelection: true });
 
   // Genera (o regenera) el plan semanal con IA y lo guarda en el servidor (POST).
   async function generate() {
@@ -340,35 +397,53 @@ function NutritionScreen({ layout }) {
 /* ---------- QUÉ COMER HOY ---------- */
 function NutritionToday({ layout }) {
   const D = window.STUDIO;
-  const { macroTargets: mt, meals } = D;
-  const [me, setMe] = useStateN(D.macroEaten);
-  const onAdded = (t) => setMe((p) => ({
-    kcal: p.kcal + Math.round(Number(t.calories) || 0),
-    protein: p.protein + Math.round(Number(t.proteinGrams) || 0),
-    carbs: p.carbs + Math.round(Number(t.carbsGrams) || 0),
-    fat: p.fat + Math.round(Number(t.fatGrams) || 0),
-  }));
-  // "Toca ahora": la próxima comida según la hora actual (avanza durante el día).
+  const { meals } = D;
+  const isSelectedToday = D.currentMealIsToday !== false;
+  const plannedTargets = D.currentMealTargets || mealTotals(meals);
+  const mt = isSelectedToday ? (D.macroTargets || plannedTargets) : plannedTargets;
+  const initialEaten = isSelectedToday ? (D.macroEaten || { kcal: 0, protein: 0, carbs: 0, fat: 0 }) : { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  const [me, setMe] = useStateN(initialEaten);
+  const onAdded = (t) => {
+    const next = {
+      kcal: (D.macroEaten?.kcal || 0) + Math.round(Number(t.calories) || 0),
+      protein: (D.macroEaten?.protein || 0) + Math.round(Number(t.proteinGrams) || 0),
+      carbs: (D.macroEaten?.carbs || 0) + Math.round(Number(t.carbsGrams) || 0),
+      fat: (D.macroEaten?.fat || 0) + Math.round(Number(t.fatGrams) || 0),
+    };
+    D.macroEaten = next;
+    if (isSelectedToday) setMe(next);
+  };
+  // Próxima comida: solo se llama "Toca ahora" si el día seleccionado es hoy y la hora encaja.
   const nowMin = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
   const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 9999; };
   const next = meals.find((m) => !m.done && toMin(m.time) >= nowMin)
     || meals.find((m) => toMin(m.time) >= nowMin)
     || meals.find((m) => !m.done)
     || meals[meals.length - 1] || meals[0];
+  if (!next) return <div className="empty">No hay comidas para este día.</div>;
+  const deltaMin = toMin(next.time) - nowMin;
+  const heroLabel = !isSelectedToday
+    ? `Plan del ${longDayLabel(D.currentMealDay)}`
+    : deltaMin > 75
+      ? 'Próxima comida'
+      : deltaMin < -75
+        ? 'Última comida del día'
+        : 'Toca ahora';
+  const macroValues = isSelectedToday ? me : mt;
   return (
     <React.Fragment>
-      {/* "Toca ahora" — qué comer de un vistazo */}
+      {/* Qué comer — contextual al día seleccionado */}
       <div className="card lg" style={{ background: 'linear-gradient(145deg, var(--accent-soft), var(--surface))', borderColor: 'transparent' }}>
         <div className="row ac" style={{ gap: 16 }}>
           <div className="meal-thumb" style={{ background: videoGrad(next.hue), color: '#fff', width: 64, height: 64, fontSize: '1.8rem' }}>{next.emoji}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p className="eyebrow">Toca ahora · {next.slot} {next.time}</p>
+            <p className="eyebrow">{heroLabel} · {next.slot} {next.time}</p>
             <h2 style={{ fontSize: '1.4rem', margin: '4px 0 0', lineHeight: 1.1 }}>{next.dish}</h2>
             <div className="row ac wrap" style={{ gap: 8, marginTop: 10 }}>
               <span className="pill tiny num">{next.kcal} kcal</span>
               <span className="pill tiny num">P {next.p} · C {next.c} · G {next.f}</span>
               <span className="pill tiny"><Icon name="clock" size={12} /> {next.mins} min</span>
-              <span className={`pill tiny ${next.glClass}`}><span className="dot" /> Carga baja</span>
+              <span className={`pill tiny ${next.glClass}`}><span className="dot" /> Carga {glText(next.glClass)}</span>
             </div>
           </div>
         </div>
@@ -377,16 +452,16 @@ function NutritionToday({ layout }) {
       {/* Banda de macros */}
       <div className="card lg">
         <div className="macro-band">
-          <Ring value={me.kcal} max={mt.kcal} size={150} stroke={16} color="var(--accent)">
-            <div><div className="rc-num num">{mt.kcal - me.kcal}</div><div className="rc-lbl">kcal restan</div></div>
+          <Ring value={macroValues.kcal} max={mt.kcal || 1} size={150} stroke={16} color="var(--accent)">
+            <div><div className="rc-num num">{isSelectedToday ? Math.max(0, mt.kcal - me.kcal) : mt.kcal}</div><div className="rc-lbl">{isSelectedToday ? 'kcal restan' : 'kcal plan'}</div></div>
           </Ring>
           <div className="macro-bars">
-            <MacroLine label="Proteína" v={me.protein} t={mt.protein} u="g" color="var(--protein)" />
-            <MacroLine label="Carbohidratos" v={me.carbs} t={mt.carbs} u="g" color="var(--carbs)" />
-            <MacroLine label="Grasas" v={me.fat} t={mt.fat} u="g" color="var(--fat)" />
+            <MacroLine label="Proteína" v={macroValues.protein} t={mt.protein || 1} u="g" color="var(--protein)" />
+            <MacroLine label="Carbohidratos" v={macroValues.carbs} t={mt.carbs || 1} u="g" color="var(--carbs)" />
+            <MacroLine label="Grasas" v={macroValues.fat} t={mt.fat || 1} u="g" color="var(--fat)" />
             <div className="row between" style={{ marginTop: 2 }}>
-              <span className="muted tiny num">{me.kcal} de {mt.kcal} kcal consumidas</span>
-              <span className="pill good tiny"><span className="dot" /> Vas bien</span>
+              <span className="muted tiny num">{isSelectedToday ? `${me.kcal} de ${mt.kcal} kcal consumidas` : `${mt.kcal} kcal planificadas para ${longDayLabel(D.currentMealDay)}`}</span>
+              <span className="pill good tiny"><span className="dot" /> {isSelectedToday ? 'Vas bien' : 'Plan del día'}</span>
             </div>
           </div>
         </div>

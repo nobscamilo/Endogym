@@ -68,9 +68,27 @@ function AskCoach({ open, onClose }) {
   const [log, setLog] = useStateC([]); // {role, text}
   const [busy, setBusy] = useStateC(false);
   const scrollRef = useRefC(null);
+  const inputRef = useRefC(null);
 
   useEffectC(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [log, busy]);
   useEffectC(() => { if (!open) { setLog([]); setQ(''); setBusy(false); } }, [open]);
+  useEffectC(() => {
+    if (!open) return undefined;
+    const body = document.body;
+    const main = document.querySelector('.main');
+    const prevBodyOverflow = body.style.overflow;
+    const prevMainOverflow = main ? main.style.overflowY : '';
+    body.style.overflow = 'hidden';
+    if (main) main.style.overflowY = 'hidden';
+    const id = setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus({ preventScroll: true });
+    }, 80);
+    return () => {
+      clearTimeout(id);
+      body.style.overflow = prevBodyOverflow;
+      if (main) main.style.overflowY = prevMainOverflow;
+    };
+  }, [open]);
 
   const send = async (text) => {
     const question = (text || q).trim();
@@ -90,8 +108,10 @@ function AskCoach({ open, onClose }) {
   };
 
   if (!open) return null;
-  return (
-    <div className="ask-scrim" onClick={onClose}>
+  const isMobileSheet = typeof window !== 'undefined'
+    && (window.matchMedia('(max-width: 700px)').matches || Boolean(document.querySelector('.app.mobile')));
+  const modal = (
+    <div className={`ask-scrim${isMobileSheet ? ' mobile' : ''}`} onClick={onClose}>
       <div className="ask-card" onClick={(e) => e.stopPropagation()}>
         <div className="ask-head">
           <span className="cb-av"><Icon name="sparkles" size={18} /><span className="cb-live" /></span>
@@ -113,12 +133,14 @@ function AskCoach({ open, onClose }) {
           {busy ? <div className="ask-msg coach"><span className="cb-av sm"><Icon name="sparkles" size={13} /></span><div className="ask-bubble"><div className="cb-typing"><span /><span /><span /></div></div></div> : null}
         </div>
         <form className="ask-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Escribe tu pregunta…" />
+          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Escribe tu pregunta…" />
           <button type="submit" className="btn icon-only" disabled={busy || !q.trim()}><Icon name="arrowRight" size={18} /></button>
         </form>
       </div>
     </div>
   );
+  const createPortal = typeof window !== 'undefined' ? window.__createPortal : null;
+  return createPortal && document.body ? createPortal(modal, document.body) : modal;
 }
 
 Object.assign(window, { CoachBanner, AskCoach, useTypewriter, COACH_MSGS });

@@ -15,6 +15,7 @@ import {
 } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
+import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
@@ -188,7 +189,7 @@ function mapStrava(connection, workouts) {
 const HUES = [55, 232, 18, 300, 162, 78, 200, 120];
 
 function todayStrUTC() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKeyInTimeZone();
 }
 
 function initialsFrom(name, last) {
@@ -198,7 +199,7 @@ function initialsFrom(name, last) {
 }
 
 const GOAL_LABELS = { weight_loss: 'Pérdida de peso', recomposition: 'Recomposición', hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia', glycemic_control: 'Control glucémico' };
-const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Mixto', hybrid_run_gym: 'Correr + Gym', running: 'Carrera', cycling: 'Ciclismo', yoga: 'Yoga', pilates: 'Pilates' };
+const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Flexible', hybrid_run_gym: 'Correr + Gym', running: 'Carrera', cycling: 'Ciclismo', yoga: 'Yoga', pilates: 'Pilates' };
 
 function mapUser(profile, authUser) {
   // IMPORTANTE: nunca devolvemos null ni dejamos el nombre sin asignar; si lo hiciéramos, el
@@ -576,7 +577,7 @@ export async function GET(request) {
 
     try {
       const today = todayStrUTC();
-      const startOfTodayIso = `${today}T00:00:00.000Z`;
+      const { startIso: startOfTodayIso, endIso: endOfTodayIso } = dateKeyBoundsIso(today);
       const since21dIso = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
       const since6wIso = new Date(Date.now() - 42 * 24 * 3600 * 1000).toISOString();
       const since60dIso = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
@@ -590,7 +591,10 @@ export async function GET(request) {
         getStravaConnection(user.uid).catch(() => null),
       ]);
       const todayMeals = (Array.isArray(recentMeals) ? recentMeals : [])
-        .filter((meal) => String(meal?.eatenAt || meal?.createdAt || '') >= startOfTodayIso)
+        .filter((meal) => {
+          const at = String(meal?.eatenAt || meal?.createdAt || '');
+          return at >= startOfTodayIso && at < endOfTodayIso;
+        })
         .slice(0, 50);
       let planForStudio = latestPlan;
       // FASE 1.3 — estado de reentrada (independiente de que haya bloque activo).

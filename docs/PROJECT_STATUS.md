@@ -1,6 +1,40 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de junio de 2026 (FASES 0-2 completas + restricciones de comorbilidad)**.
+Ultima actualizacion: **12 de junio de 2026 (fix calendario/horas de Nutricion desplegado)**.
+
+## Sesion del 12 de junio de 2026, madrugada-2 (fix calendario y horas de Nutricion)
+
+El bug reportado era real y no era solo estético: el front de Nutrición conservaba el índice del plan/cache anterior (por eso podía quedarse en `Lun 8`) y varias rutas server-side calculaban "hoy" con UTC, de modo que a las 00:21 en Madrid seguían leyendo el día anterior.
+
+- **Tiempo civil de la app:** nuevo helper `src/lib/appTime.js` (`Europe/Madrid` por defecto, sobrescribible con `APP_TIME_ZONE`) para `dateKeyInTimeZone`, límites UTC de un día local y `weekKey` del lunes local.
+- **APIs corregidas:** `studio-data` agrupa `macroEaten`/glucemia por límites locales (`startIso/endIso`) en vez de `YYYY-MM-DDT00:00Z`; `studio-nutrition` cachea la semana por lunes local; `studio-swap` busca la sesión de hoy por fecha local.
+- **UI Nutrición corregida:** `screen-nutrition.jsx` sincroniza el rail de días con la semana local real, selecciona hoy por `dateISO` al cargar/cachear plan, no conserva `dayIdx` obsoleto por defecto y cambia el titular de la comida principal a `Próxima comida`/`Plan del ...` cuando `Toca ahora` no corresponde.
+- **Bundle Studio regenerado:** `studio.bundle.js?v=08bbcab4a0`.
+- **Verificación local:** `npm run build:studio`, `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (34 archivos / 235 tests), `npm run build` OK. Test nuevo `tests/lib/app-time.test.js`; Playwright local en `/studio/app/index.html` mostró `Vie 12` activo.
+- **Deploy producción:** `npx vercel --prod --yes` creó `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq`, URL `https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`, estado `Ready`; la CLI volvió a quedarse en `Running Checks` y el alias se reasignó manualmente a `endogym.vercel.app`.
+- **Sondas públicas post-deploy:** `/` `200`, `/api/health` `200`, `/api/meals` sin token `401`, `POST /api/coach-chat` sin token `401`; `/studio/app/index.html?verify=08bbcab4a0` `200` y referencia `studio.bundle.js?v=08bbcab4a0`; bundle `200`.
+- **Playwright producción:** asset directo sin sesión (401 esperado en `/api/studio-data`) renderiza el Studio demo; Nutrición muestra `Vie 12` activo y ya no `Lun 8`.
+- **Logs Vercel:** `npx vercel logs ... --no-follow --since 1h --level error --limit 20` no encontró errores para el deployment.
+
+## Sesion del 12 de junio de 2026, madrugada (deploy Perfil + chat movil)
+
+Deploy manual desde working tree local con `npx vercel --prod --yes`: **`dpl_EXhggnVun7yJjDP4pLjAxFKJqR7S`**, URL `https://endogym-8npkwk39l-juan-camilo-sarmientos-projects.vercel.app`, alias manual `endogym.vercel.app` asignado con `npx vercel alias set` (la CLI volvio a quedarse esperando en `Running Checks` aunque el deployment estaba `Ready`). Bundle Studio desplegado: **`studio.bundle.js?v=6ff6352714`**.
+
+- **Preflight local antes de deploy:** `npm run build:studio`, `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (33 archivos / 232 tests) y `npm run build` OK.
+- **Sondas publicas post-deploy:** `/` `200`, `/api/health` `200`, `/api/meals` sin token `401`, `POST /api/coach-chat` sin token `401`; `/studio/app/index.html?verify=6ff6352714` `200` y referencia `studio.bundle.js?v=6ff6352714`; el bundle responde `200` y contiene `Flexible`, `Microciclo`, `Mesociclo` y `__createPortal`.
+- **Cabeceras defensivas post-deploy:** CSP, HSTS, `nosniff`, `Referrer-Policy` y `Permissions-Policy` presentes en `/`.
+- **Higiene de deploy:** `.vercelignore` ahora excluye `scratch/` y `.playwright-cli/` para no subir capturas/logs locales a Vercel.
+
+## Sesion del 11 de junio de 2026, noche-4 (Perfil por jerarquia + chat movil usable)
+
+Implementado en codigo y verificado localmente; **desplegado el 12 de junio de 2026** en `dpl_EXhggnVun7yJjDP4pLjAxFKJqR7S`.
+
+- **Perfil redisenado (`screen-more.jsx` + `screens.css`):** la encuesta deja de mostrar objetivo/equipo como chips planos y pasa a una jerarquia de decision: objetivo principal (resultado), meta medible opcional, modalidad/equipo, subobjetivo de carrera solo cuando aplica, datos personales y resumen del bloque. El resumen explicita **microciclo**, **mesociclo/bloque de 21 dias**, revision y fecha clave para que la UX refleje como se periodiza el plan.
+- **"Mixto" visible sustituido por "Flexible":** el valor interno `mixed` se conserva para no migrar datos, pero la UI y el label de `studio-data` muestran "Flexible" con detalle "Gym, casa y TRX".
+- **Guard de datos obsoletos:** al cambiar fuera de `Correr + gym`, la encuesta limpia `raceDate`, marca y ritmos; las metas SMART se guardan solo para objetivos medibles. El refresco post-guardado ahora tambien trae `goalProgress`, `runFitness`, `runZones`, `coachAdjust` y `reentry`.
+- **Coach AI movil (`coach.jsx` + `scripts/build-studio.mjs`):** el modal "Preguntale al coach" se renderiza por portal en `document.body`, bloquea el scroll de fondo, enfoca el input sin desplazar la app y en movil ocupa toda la pantalla. Se desactivo la animacion de entrada en movil para evitar que el input quede temporalmente bajo el viewport/tabbar.
+- **Bundle Studio regenerado:** `studio.bundle.js?v=6ff6352714`.
+- **Verificacion local:** `npm run build:studio`, `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (33 archivos / 232 tests) y `npm run build` OK. Playwright movil 390x844: perfil verificado en `scratch/verification-profile-mobile.png`; chat verificado en `scratch/verification-coach-mobile.png` con input `bottom=831` dentro de viewport `844` y `elementFromPoint` sobre el input.
 
 ## Sesión del 11 de junio de 2026, noche-3 (restricciones de comorbilidad + FASE 2 completa)
 

@@ -27,13 +27,13 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación local: **8 de junio de 2026** (`check:conflicts`, `audit`, `smoke`, `test`, `build`). Último deploy público: **8 de junio de 2026**, `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`, con `/`, `/api/health`, `/api/meals` sin token y puente móvil de auth del Studio verificados. Última sonda integral `e2e:production`: **2 de junio de 2026**.
+Última verificación local documentada: **12 de junio de 2026** (fix calendario/horas de Nutrición, `235` tests y build OK). Último deploy público documentado: **12 de junio de 2026**, `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` con alias manual a `endogym.vercel.app` y bundle `08bbcab4a0`. Última sonda integral `e2e:production`: **10 de junio de 2026**; las sondas básicas más recientes verificaron `/`, `/api/health` y rechazos `401` esperados.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
-- `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente. La suite actual tiene `103` tests.
+- `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente según la última verificación completa registrada. La suite actual documentada tiene `235` tests.
 - `playwright` está instalado como devDependency y Chromium de Playwright está disponible para verificación visual local.
 - `npm audit` devuelve `0` vulnerabilidades tras fijar overrides transitivos seguros para `postcss` y `uuid`.
-- La producción Vercel responde en `/` y `/api/health`; `/api/meals` sin token responde `401`. Producción actual: `dpl_DhMpiLwCJtBgJEYfDGMDqVWY1sSg`.
+- La producción Vercel responde en `/` y `/api/health`; `/api/meals` y `/api/coach-chat` sin token responden `401`. Producción más reciente documentada: `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq`.
 - Firebase Authentication, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se validaron con sondas reales.
 - Firebase Admin y Firestore funcionan localmente y en producción con Firebase ID tokens reales.
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu` del proyecto Firebase/GCP; escritura y borrado fueron verificados.
@@ -41,6 +41,10 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - `POST /api/analyze-plate` fue verificado end-to-end: guarda foto, obtiene inferencia Gemini real, persiste la comida y conserva fallback observable para fallos futuros.
 - `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
 - `POST /api/coach-chat` usa Gemini con contexto real del usuario y rate limiting persistente (`coach-chat`, 20 preguntas/h por defecto).
+- El coach tiene persona única server-side, detector determinista de red flags sin Gemini/rate limit, RAG por pregunta, memoria conversacional acotada, digest nutricional/recuperación 7d y cierre del loop entre recomendaciones y evolución real.
+- La prescripción de entrenamiento usa bloque estable de 21 días con overlay adaptativo, DAPRE por desempeño real, objetivos SMART medibles, calentamiento/vuelta a la calma dinámicos y restricciones de comorbilidad en la selección de ejercicios.
+- Perfil muestra objetivos y disponibilidad como decisiones jerárquicas (objetivo, meta, modalidad/equipo, carrera y resumen microciclo/mesociclo), con `Flexible` en vez de `Mixto`; el chat móvil del coach se monta como modal a pantalla completa con input visible.
+- Nutrición usa calendario local de la app (`Europe/Madrid` por defecto) para seleccionar el día actual, calcular la semana cacheada y agrupar comidas de "hoy"; esto evita que después de medianoche siga mostrando el día UTC anterior.
 - `POST /api/studio-nutrition` genera semana completa con Gemini, cachea por semana, valida kcal/proteína por día antes de guardar planes completos e invalida cache si cambia la huella del plan de entrenamiento.
 - La raíz `/` entrega el Firebase ID token al iframe del Studio por `postMessage` de mismo origen para evitar que móvil/iframe muestre el entreno demo cuando la restauración interna de Firebase Auth se retrasa.
 - Las cargas de ejercicios registradas conservan `exercise.id`, de modo que la progresión por `liftHistory` puede enlazar historial y catálogo por ID estable. Para datos legacy sin ID existe fallback por nombre normalizado.

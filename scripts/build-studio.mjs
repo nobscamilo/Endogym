@@ -56,6 +56,7 @@ const FILES = [
 const PREAMBLE = `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 
@@ -63,6 +64,7 @@ import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 let __auth = null;
 let __parentToken = null;
 let __parentTokenWaiters = [];
+window.__createPortal = createPortal;
 
 function __resolveParentToken(token) {
   if (!token || typeof token !== 'string') return;

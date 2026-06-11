@@ -1,10 +1,10 @@
 # Observabilidad operativa
 
-Ultima actualizacion: **8 de junio de 2026**.
+Ultima actualizacion: **11 de junio de 2026**.
 
 ## Estado real
 
-Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel esta en plan `hobby`; Vercel Pro no es viable por ahora. Se mantiene observabilidad manual con logs de runtime y sondas, sin Alerts Beta ni Drains.
+Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel esta en plan `hobby`; Vercel Pro no es viable por ahora. Se mantiene observabilidad manual con logs de runtime y sondas. Además, `logError()` puede notificar a un webhook gratuito (`ALERT_WEBHOOK_URL`) con dedupe de 5 min, pero está pendiente de configurar por el usuario.
 
 ## Eventos relevantes
 
@@ -17,13 +17,15 @@ Endogym usa logs JSON estructurados en Vercel Runtime Logs. El proyecto Vercel e
 | `plate_analysis_result` | Resultado de plato persistido. | Vigilar `fallbackApplied` y `storageSaved`. |
 | `weekly_plan_coach_result` | Resultado de generacion semanal. | Vigilar `fallbackApplied` y `coachFailureCode`. |
 | `plate_image_rejected` | La firma MIME o el Content-Type de una imagen no es valido. | Investigar picos por cliente defectuoso o abuso. |
-| `rate_limit_exceeded` | Un usuario supero una ventana persistente. | Revisar `scope` (`plate-analysis`, `weekly-plan-generate`, `coach-chat`) antes de ajustar limites. |
+| `rate_limit_exceeded` | Un usuario supero una ventana persistente. | Revisar `scope` (`plate-analysis`, `weekly-plan-generate`, `coach-chat`, `coach-analysis`, `studio-nutrition`) antes de ajustar limites. |
 | `weekly_plan_active_block_overlay` | Un bloque activo fue refrescado con overlay adaptativo sin regenerar el mesociclo. | Vigilar `rules` y `volumeFactor`; confirma que check-ins/FC se reflejan. |
 | `weekly_plan_active_block_overlay_failed` | Fallo al persistir el overlay adaptativo del bloque activo. | La respuesta puede usar overlay en memoria, pero Studio futuro podría quedar stale. |
 | `studio_nutrition_macro_retry` | El plan semanal IA tuvo drift de macros y se reintento una vez. | Vigilar frecuencia; si sube, ajustar prompt o umbrales. |
 | `studio_nutrition_macro_invalid` | El plan completo mantuvo drift severo y no se guardo. | Revisar `severeDriftDays`, proveedor y calidad del prompt. |
 | `coach_chat_failed` | El chat del coach no pudo responder tras llamar Gemini. | Revisar status del proveedor, payload y `traceId`. |
 | `coach_chat_http_error` | Gemini respondio HTTP no OK para el chat. | Revisar status y detalle truncado. |
+| `coach_chat_red_flag` | El detector determinista respondió por síntoma de alarma sin Gemini ni rate limit. | Vigilar volumen y categoría; no contiene el texto del usuario. |
+| `backup_failed` | El export semanal/manual de Firestore falló. | Revisar `CRON_SECRET`, permisos de Admin SDK y bucket `endogym-vtety8-backups-eu`. |
 
 No registres imagenes, tokens, API keys ni datos nutricionales completos en logs.
 
@@ -44,6 +46,8 @@ npx vercel logs --environment production --since 1h --query 'rate_limit_exceeded
 npx vercel logs --environment production --since 1h --query 'studio_nutrition_macro_retry' --no-branch
 npx vercel logs --environment production --since 1h --query 'studio_nutrition_macro_invalid' --no-branch
 npx vercel logs --environment production --since 1h --query 'coach_chat_failed' --no-branch
+npx vercel logs --environment production --since 1h --query 'coach_chat_red_flag' --no-branch
+npx vercel logs --environment production --since 1h --query 'backup_failed' --no-branch
 npx vercel logs --environment production --since 1h --status-code 500 --no-branch
 ```
 
@@ -62,10 +66,12 @@ Cuando se habilite un canal de alertas:
 
 ## Pendiente externo
 
-Para entrega automatica por email, Slack o webhook hay dos rutas, no viables por ahora sin cambio de plan o proveedor:
+Para entrega automatica nativa por email/Slack desde Vercel hay dos rutas, no viables por ahora sin cambio de plan o proveedor:
 
 1. Subir Vercel a Pro o Enterprise con Observability Plus y activar Alerts.
 2. Subir Vercel a Pro o Enterprise y configurar un Drain hacia un proveedor externo.
+
+Ruta gratuita ya implementada: configurar `ALERT_WEBHOOK_URL` (Discord/Slack) en Vercel para recibir avisos de `logError()`.
 
 Referencias oficiales:
 

@@ -5,6 +5,7 @@ import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
 import { suggestExerciseAlternatives } from '../../../core/exerciseLibrary.js';
 import { resolveRaceGoal, estimate5kPaceSecPerKm, deriveRunPaces, buildRunPrescription } from '../../../core/running.js';
+import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 // Swap de ejercicios del Studio (fase 2). Cambia un ejercicio (scope 'one') o toda la sesión
 // de hoy (scope 'all'), eligiendo alternativas con la lógica del coach (suggestExerciseAlternatives)
@@ -16,7 +17,7 @@ function norm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
-function todayStrUTC() { return new Date().toISOString().slice(0, 10); }
+function todayStrUTC() { return dateKeyInTimeZone(); }
 
 export async function POST(request) {
   return withTrace('studio_swap', async ({ traceId }) => {

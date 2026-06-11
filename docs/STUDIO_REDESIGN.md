@@ -1,6 +1,6 @@
 # Rediseño "Ignios" (Studio) — rama `redesign/endogym-studio` (mergeada a `main`)
 
-Última actualización: **8 de junio de 2026 — P1/P2 Coach IA + nutrición alineada + puente auth móvil**.
+Última actualización: **12 de junio de 2026 — Nutrición por calendario local desplegada**.
 
 ## Lanzamiento oficial
 
@@ -18,6 +18,9 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
 - **Añadir/escanear alimento** (Nutrición → "Qué comer hoy" → `AddFood`): por código de barras (input → **`/api/products/barcode`**, OpenFoodFacts; + escaneo con cámara vía `BarcodeDetector` si el navegador lo soporta) o manual. POST a **`/api/meals`** y actualiza en vivo las kcal/macros consumidas. El iframe lleva `allow="camera"`.
 
 - **Plan nutricional semanal con IA** (Nutrición → botón "Generar mi plan con IA"): genera con Gemini 7 días (`days[]`), 4 comidas/día, lista de compra semanal y batch cooking, personalizado al perfil/objetivo/macros y al entrenamiento de cada día. Endpoint **`/api/studio-nutrition`** (`GET` cache semanal, `POST` regeneración, auth, JSON estructurado con `responseJsonSchema`, `maxDuration=60`). El servidor valida kcal/proteína por día, reintenta una vez ante drift y no guarda planes completos con drift severo. El cache lleva `meta.planSignature` y se invalida si cambia el plan de entrenamiento/fase/macros. Requiere sesión; coste/latencia de varias llamadas Gemini pequeñas en paralelo.
+- **Objetivos SMART y prescripción data-driven (11 jun):** Perfil guarda `profile.goalTarget` (peso objetivo o e1RM + fecha) y Progreso muestra "Tu objetivo" con meta, valor actual, tendencia y predicción. La fuerza progresa con DAPRE por reps/RPE reales; calentamiento/vuelta a la calma y selección de ejercicios respetan comorbilidades.
+- **Perfil por jerarquía (11 jun, noche-4):** la encuesta de Perfil separa objetivo principal, meta medible, modalidad/equipo, subobjetivo de carrera y datos personales. La opción visible `Mixto` se sustituyó por **Flexible** (valor interno `mixed` intacto). El resumen del bloque enseña microciclo, mesociclo/bloque de 21 días, revisión y fecha clave para hacer visible la periodización real.
+- **Nutrición por calendario local (12 jun):** el rail de días se sincroniza con la semana civil del navegador y selecciona hoy por `dateISO`; el backend usa `Europe/Madrid` por defecto para "hoy", límites de comidas y `weekKey` del plan nutricional. Esto evita que pasada medianoche en España se siga mostrando el día UTC anterior o un índice obsoleto del cache.
 
 > Estas features se editan en `public/studio/app/studio/{screen-train,screen-nutrition}.jsx` + `screens.css` y requieren **regenerar el bundle** (`npm run build:studio`, mantenedor) y commitearlo.
 
@@ -54,7 +57,7 @@ El diseño es un SPA React. Para máxima fidelidad y aislamiento total del resto
 
 ### Integraciones con el backend real
 
-- **Coach IA ("Pregúntale al coach" + guía contextual):** el bundle define `window.claude.complete` → `POST /api/coach-chat` (`src/app/api/coach-chat/route.js`), que usa el transporte Gemini existente (`gemini-2.5-flash`). Requiere auth y aplica rate limit persistente `coach-chat` (20/h por defecto) antes de llamar al proveedor. Si no hay sesión o falla, `coach.jsx` usa respuesta de respaldo honesta. El banner estático ya no se presenta como IA live ni inventa métricas personales; la IA live es el modal de preguntas.
+- **Coach IA ("Pregúntale al coach" + guía contextual):** el bundle define `window.claude.complete` → `POST /api/coach-chat` (`src/app/api/coach-chat/route.js`) enviando `{ message }`. El servidor mantiene la persona única en `coachPersona.js`, evalúa red flags deterministas antes de Gemini/rate limit y usa el transporte Gemini existente (`gemini-2.5-flash`) en el flujo normal. Requiere auth y aplica rate limit persistente `coach-chat` (20/h por defecto). Si no hay sesión o falla, `coach.jsx` usa respuesta de respaldo honesta. El banner estático ya no se presenta como IA live ni inventa métricas personales; la IA live es el modal de preguntas. En móvil, el modal se monta por portal en `document.body`, bloquea el scroll de fondo y mantiene el input dentro del viewport.
 - **Auth del iframe:** `GET /api/public-config` devuelve la config pública de Firebase; el shim inicializa Firebase web y lee la sesión existente del mismo origen para obtener el ID token. Además, desde el 8 jun 2026 la raíz `/` entrega el token al iframe por `postMessage` same-origin (`IGNIOS_AUTH_TOKEN`) y el iframe lo solicita con `IGNIOS_TOKEN_REQUEST`. Esto evita que Safari/móvil caiga al dataset demo si la restauración interna de Firebase Auth llega tarde. No pasar tokens por URL.
 - **Datos reales (fase 2 implementada):** `GET /api/studio-data` mapea datos reales del backend a la forma `window.STUDIO` y el cargador del bundle los fusiona sobre la muestra ANTES de renderizar (cada sección es defensiva: si faltan datos válidos, se conserva la muestra). Si hay bloque activo, recalcula un overlay adaptativo en lectura para que el Studio muestre fatiga/FC/check-in recientes sin regenerar el mesociclo. Si no hay sesión, todo queda en muestra.
 
@@ -97,3 +100,23 @@ Verificación producción del 8 jun 2026:
 - Playwright móvil contra assets de producción: puente padre→iframe OK (`Authorization: Bearer prod-token-parent` en `/api/studio-data`), sin `pageerror`, sin mostrar el demo de torso cuando hay token.
 
 Para cambios visuales futuros: revisar `/` logueado en desktop/móvil, tema claro/oscuro, modal "Pregúntale al coach", Entreno → ajustes del coach y Nutrición → generación/cache semanal.
+
+Verificación local adicional del 11 jun 2026, noche-4:
+
+- `npm run build:studio` OK; bundle cache-bust `6ff6352714`.
+- `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (33 archivos, 232 tests) y `npm run build` OK.
+- Playwright móvil 390x844 contra `/studio/app/index.html`: Perfil muestra objetivo/modalidad como tarjetas y `Flexible` en lugar de `Mixto`; el modal del coach cubre la app, no muestra la tabbar y el input queda dentro del viewport (`bottom=831` de `844`).
+
+Verificación producción del 12 jun 2026:
+
+- Deploy `dpl_EXhggnVun7yJjDP4pLjAxFKJqR7S`, alias manual `endogym.vercel.app` → `https://endogym-8npkwk39l-juan-camilo-sarmientos-projects.vercel.app`.
+- `https://endogym.vercel.app/studio/app/index.html?verify=6ff6352714` sirve `studio.bundle.js?v=6ff6352714`; el bundle responde `200` y contiene `Flexible`, `Microciclo`, `Mesociclo` y `__createPortal`.
+- Sondas públicas: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401`, `POST /api/coach-chat` sin token `401`.
+
+Verificación local y producción adicional del 12 jun 2026, madrugada-2:
+
+- `npm run build:studio` OK; bundle cache-bust `08bbcab4a0`.
+- `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (34 archivos, 235 tests) y `npm run build` OK.
+- Playwright local contra `/studio/app/index.html`: Nutrición muestra `Vie 12` activo y no conserva `Lun 8` al abrir la pantalla.
+- Deploy `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq`, alias manual `endogym.vercel.app` → `https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`.
+- `https://endogym.vercel.app/studio/app/index.html?verify=08bbcab4a0` sirve `studio.bundle.js?v=08bbcab4a0`; Playwright producción muestra `Vie 12` activo en Nutrición.

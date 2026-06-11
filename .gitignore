@@ -13,3 +13,8 @@ npm-debug.log*
 scripts/ocr_pdf
 docs/guidelines/*_ocr_text.json
 docs/guidelines/*.pdf
+
+# Local verification and operation artifacts
+scratch/
+.playwright-cli/
+output/

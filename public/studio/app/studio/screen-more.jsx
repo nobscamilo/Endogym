@@ -436,11 +436,25 @@ function ProgressScreen() {
 
 /* ---- Encuesta de disponibilidad: ajusta plan y comidas ---- */
 // Objetivos en lenguaje de RESULTADO (los valores internos no cambian: sin migración).
-const AV_GOALS = [['weight_loss', 'Perder grasa'], ['hypertrophy', 'Ganar músculo'], ['strength', 'Más fuerza'], ['recomposition', 'Tonificar'], ['endurance', 'Más resistencia'], ['glycemic_control', 'Controlar glucosa']];
-const GOALS_WITH_TARGET = ['weight_loss', 'recomposition', 'hypertrophy', 'strength'];
-const AV_EQUIP = [['full_gym', 'Gimnasio'], ['hybrid_run_gym', 'Correr + Gym'], ['mixed', 'Mixto'], ['trx', 'TRX'], ['home', 'Casa']];
+const AV_GOALS = [
+  { value: 'weight_loss', title: 'Perder grasa', icon: 'flame', detail: 'Déficit moderado + fuerza', targetLabel: 'Peso objetivo (kg)' },
+  { value: 'hypertrophy', title: 'Ganar músculo', icon: 'dumbbell', detail: 'Volumen + proteína', targetLabel: 'Peso objetivo (kg)' },
+  { value: 'strength', title: 'Más fuerza', icon: 'bolt', detail: 'Básicos, e1RM y DAPRE', targetLabel: 'e1RM objetivo (kg)' },
+  { value: 'recomposition', title: 'Tonificar', icon: 'scale', detail: 'Fuerza + control de grasa', targetLabel: 'Peso objetivo (kg)' },
+  { value: 'endurance', title: 'Más resistencia', icon: 'heart', detail: 'Base aeróbica y ritmos' },
+  { value: 'glycemic_control', title: 'Controlar glucosa', icon: 'drop', detail: 'Timing, fibra y Z2' },
+];
+const GOALS_WITH_TARGET = AV_GOALS.filter((g) => g.targetLabel).map((g) => g.value);
+const AV_EQUIP = [
+  { value: 'full_gym', title: 'Gimnasio', icon: 'dumbbell', detail: 'Máquinas, poleas y básicos' },
+  { value: 'hybrid_run_gym', title: 'Correr + gym', icon: 'heart', detail: 'Fuerza y carrera concurrente' },
+  { value: 'mixed', title: 'Flexible', icon: 'sliders', detail: 'Gym, casa y TRX' },
+  { value: 'trx', title: 'TRX', icon: 'zap', detail: 'Suspensión y peso corporal' },
+  { value: 'home', title: 'Casa', icon: 'profile', detail: 'Mínimo material' },
+];
 const RUN_GOALS = [['health', 'Salud'], ['race_5k', '5K'], ['race_10k', '10K'], ['race_21k', '21K'], ['race_42k', '42K']];
 const RUN_REF_DIST = [['', '—'], ['5000', '5K'], ['10000', '10K'], ['21097', '21K'], ['42195', '42K']];
+function findChoice(list, value) { return list.find((item) => item.value === value) || list[0]; }
 function secsToMMSS(s) { const n = Number(s); if (!Number.isFinite(n) || n <= 0) return ''; const m = Math.floor(n / 60); const r = Math.round(n % 60); return `${m}:${String(r).padStart(2, '0')}`; }
 function mmssToSecs(str) { const m = /^(\d{1,3}):([0-5]?\d)$/.exec(String(str || '').trim()); if (!m) return null; return Number(m[1]) * 60 + Number(m[2]); }
 function AvailabilitySurvey() {
@@ -465,6 +479,12 @@ function AvailabilitySurvey() {
   const [meals, setMeals] = useStateP(u.mealsPerDay != null ? u.mealsPerDay : 4);
   const [weeks, setWeeks] = useStateP(4);
   const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth
+  const selectedGoal = findChoice(AV_GOALS, goal);
+  const selectedModality = findChoice(AV_EQUIP, equip);
+  const targetEnabled = GOALS_WITH_TARGET.includes(goal);
+  const usesRace = equip === 'hybrid_run_gym';
+  const raceLabel = (RUN_GOALS.find(([v]) => v === raceGoal) || [null, 'Salud'])[1];
+  const keyDate = usesRace && raceDate ? raceDate : (targetEnabled && goalDate ? goalDate : null);
 
   async function save() {
     setStatus('saving');
@@ -479,15 +499,15 @@ function AvailabilitySurvey() {
           age: Number(age), weightKg: Number(weight), heightCm: Number(height),
           sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks),
           // Carrera: objetivo + marca de referencia (para ritmos numéricos).
-          runRaceGoal: raceGoal,
-          runRefDistanceMeters: refDist ? Number(refDist) : null,
-          runRefTimeSeconds: mmssToSecs(refTime),
-          raceDate: raceDate || null,
+          runRaceGoal: usesRace ? raceGoal : 'health',
+          runRefDistanceMeters: usesRace && refDist ? Number(refDist) : null,
+          runRefTimeSeconds: usesRace ? mmssToSecs(refTime) : null,
+          raceDate: usesRace ? (raceDate || null) : null,
           // FCmáx medida (opcional): prevalece sobre la estimación por edad en zonas y coach.
           hrMaxBpm: hrMax ? Number(hrMax) : null,
           // Objetivo SMART medible (meta + fecha); null borra el objetivo.
-          goalTargetValue: goalValue ? Number(goalValue) : null,
-          goalTargetDate: goalDate || null,
+          goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
+          goalTargetDate: targetEnabled ? (goalDate || null) : null,
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
@@ -498,7 +518,7 @@ function AvailabilitySurvey() {
         if (d.ok) {
           const j = await d.json();
           const o = j && j.ok ? j.overrides : null;
-          if (o) ['user', 'todaySession', 'week', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+          if (o) ['user', 'todaySession', 'week', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic', 'goalProgress', 'runFitness', 'runZones', 'coachAdjust', 'reentry'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
         }
       } catch (e) { /* noop */ }
       setStatus('ok'); setTimeout(() => setStatus('idle'), 3500);
@@ -506,76 +526,120 @@ function AvailabilitySurvey() {
   }
 
   return (
-    <SectionCard title="Tu perfil y disponibilidad" icon="settings" sub="Tus datos y tu tiempo/equipo. Al guardar, reajustamos tu plan y comidas.">
-      <div className="stack" style={{ gap: 14 }}>
-        <div>
-          <div className="mb-label">¿Qué quieres conseguir?</div>
-          <div className="chips">{AV_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${goal === v ? 'accent' : ''}`} onClick={() => setGoal(v)}>{l}</button>)}</div>
-          {GOALS_WITH_TARGET.includes(goal) ? (
-            <div style={{ marginTop: 12 }}>
-              <div className="row ac" style={{ gap: 10 }}>
-                <div className="field" style={{ flex: 1 }}>
-                  <label>{goal === 'strength' ? 'e1RM objetivo (kg) en tu básico' : 'Peso objetivo (kg)'}</label>
-                  <input className="text-input" type="number" min={goal === 'strength' ? 10 : 30} max={goal === 'strength' ? 500 : 300} step="0.5" placeholder="opcional" value={goalValue} onChange={(e) => setGoalValue(e.target.value)} />
-                </div>
-                <div className="field" style={{ flex: 1 }}>
-                  <label>Fecha objetivo</label>
-                  <input className="text-input" type="date" value={goalDate} onChange={(e) => setGoalDate(e.target.value)} />
-                </div>
+    <SectionCard title="Tu perfil y disponibilidad" icon="settings" sub="Objetivo, modalidad y calendario del bloque. Al guardar, reajustamos tu plan y comidas.">
+      <div className="availability-flow">
+        <section className="profile-step">
+          <div className="profile-step-head">
+            <div>
+              <div className="mb-label">Objetivo principal</div>
+              <h4>{selectedGoal.title}</h4>
+            </div>
+            <span className="pill tiny accent">Resultado</span>
+          </div>
+          <div className="profile-choice-grid goals">
+            {AV_GOALS.map((g) => (
+              <button key={g.value} type="button" className={`choice-tile ${goal === g.value ? 'on' : ''}`} aria-pressed={goal === g.value} onClick={() => setGoal(g.value)}>
+                <span className="choice-head"><span className="choice-icon"><Icon name={g.icon} size={16} /></span><strong>{g.title}</strong></span>
+                <span className="choice-detail">{g.detail}</span>
+              </button>
+            ))}
+          </div>
+          {targetEnabled ? (
+            <div className="profile-target-panel">
+              <div className="field">
+                <label>{selectedGoal.targetLabel}</label>
+                <input className="text-input" type="number" min={goal === 'strength' ? 10 : 30} max={goal === 'strength' ? 500 : 300} step="0.5" placeholder="opcional" value={goalValue} onChange={(e) => setGoalValue(e.target.value)} />
               </div>
-              <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.5 }}>Con meta y fecha, Progreso te mostrará si vas en camino (igual que la predicción de carrera).</p>
+              <div className="field">
+                <label>Fecha meta</label>
+                <input className="text-input" type="date" value={goalDate} onChange={(e) => setGoalDate(e.target.value)} />
+              </div>
+              <p className="tiny muted">La meta alimenta Progreso y el coach; si no hay datos suficientes, no se inventa predicción.</p>
             </div>
           ) : null}
-        </div>
-        <div>
-          <div className="mb-label">Equipo disponible</div>
-          <div className="chips">{AV_EQUIP.map(([v, l]) => <button key={v} type="button" className={`pill ${equip === v ? 'accent' : ''}`} onClick={() => setEquip(v)}>{l}</button>)}</div>
-        </div>
-        <div>
-          <div className="mb-label">Sexo</div>
-          <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
-        </div>
+        </section>
 
-        {equip === 'hybrid_run_gym' ? (
-          <div className="card" style={{ background: 'var(--accent-soft)', borderColor: 'transparent', padding: 14 }}>
-            <div className="mb-label">Objetivo de carrera</div>
-            <div className="chips">{RUN_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${raceGoal === v ? 'accent' : ''}`} onClick={() => setRaceGoal(v)}>{l}</button>)}</div>
-            <div className="field" style={{ marginTop: 12 }}><label>Fecha de carrera (opcional → periodización)</label>
-              <input className="text-input" type="date" value={raceDate} onChange={(e) => setRaceDate(e.target.value)} />
+        <section className="profile-step">
+          <div className="profile-step-head">
+            <div>
+              <div className="mb-label">Dónde y cómo entrenas</div>
+              <h4>{selectedModality.title}</h4>
             </div>
-            <div className="mb-label" style={{ marginTop: 12 }}>Marca reciente (opcional → ritmos numéricos)</div>
-            <div className="row ac" style={{ gap: 10 }}>
-              <div className="field" style={{ flex: 1 }}><label>Distancia</label>
+            <span className="pill tiny">Modalidad</span>
+          </div>
+          <div className="profile-choice-grid modes">
+            {AV_EQUIP.map((m) => (
+              <button key={m.value} type="button" className={`choice-tile ${equip === m.value ? 'on' : ''}`} aria-pressed={equip === m.value} onClick={() => setEquip(m.value)}>
+                <span className="choice-head"><span className="choice-icon"><Icon name={m.icon} size={16} /></span><strong>{m.title}</strong></span>
+                <span className="choice-detail">{m.detail}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {usesRace ? (
+          <section className="runner-panel">
+            <div className="profile-step-head">
+              <div>
+                <div className="mb-label">Carrera</div>
+                <h4>{raceLabel}</h4>
+              </div>
+              <span className="pill tiny accent">Subobjetivo</span>
+            </div>
+            <div className="chips run-goals">{RUN_GOALS.map(([v, l]) => <button key={v} type="button" className={`pill ${raceGoal === v ? 'accent' : ''}`} onClick={() => setRaceGoal(v)}>{l}</button>)}</div>
+            <div className="runner-grid">
+              <div className="field"><label>Fecha de carrera</label>
+                <input className="text-input" type="date" value={raceDate} onChange={(e) => setRaceDate(e.target.value)} />
+              </div>
+              <div className="field"><label>Marca reciente</label>
                 <select className="text-input" value={refDist} onChange={(e) => setRefDist(e.target.value)}>
                   {RUN_REF_DIST.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
-              <div className="field" style={{ flex: 1 }}><label>Tiempo (m:ss)</label>
+              <div className="field"><label>Tiempo (m:ss)</label>
                 <input className="text-input" type="text" inputMode="numeric" placeholder="25:00" value={refTime} onChange={(e) => setRefTime(e.target.value)} />
               </div>
             </div>
-            <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Sin marca, los ritmos se dan por zona (zona 2, umbral, intervalo). Con marca, calculamos tu ritmo objetivo en min/km.</p>
-          </div>
+            <p className="tiny muted">Con fecha se periodiza la carrera; con marca se calculan ritmos. Sin marca, el bloque usa zonas.</p>
+          </section>
         ) : null}
-        <div className="grid g-4" style={{ gap: 10 }}>
-          <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" value={age} onChange={(e) => setAge(e.target.value)} /></div>
-          <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>
-          <div className="field"><label>Altura (cm)</label><input className="text-input" type="number" min="120" max="230" value={height} onChange={(e) => setHeight(e.target.value)} /></div>
-          <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
-        </div>
-        <div className="grid g-4" style={{ gap: 10 }}>
-          <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
-          <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
-          <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
-          <div className="field"><label>FCmáx (ppm, opcional)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
-        </div>
-        <div className="row ac" style={{ gap: 12 }}>
-          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando…' : 'Guardar cambios'}</button>
-          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado ✨</span> : null}
+
+        <section className="plan-summary-band">
+          <div className="plan-summary-main">
+            <div className="mb-label">Bloque resultante</div>
+            <strong>{selectedGoal.title} · {selectedModality.title}</strong>
+          </div>
+          <div className="plan-summary-grid">
+            <span><b>Microciclo</b><em>{days} días/sem · {mins} min</em></span>
+            <span><b>Mesociclo</b><em>Bloque de 21 días</em></span>
+            <span><b>Revisión</b><em>Cada {weeks} sem</em></span>
+            <span><b>Fecha clave</b><em>{keyDate || 'Sin fecha'}</em></span>
+          </div>
+        </section>
+
+        <section className="profile-step compact">
+          <div className="mb-label">Datos personales</div>
+          <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
+          <div className="grid g-4" style={{ gap: 10, marginTop: 12 }}>
+            <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" value={age} onChange={(e) => setAge(e.target.value)} /></div>
+            <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>
+            <div className="field"><label>Altura (cm)</label><input className="text-input" type="number" min="120" max="230" value={height} onChange={(e) => setHeight(e.target.value)} /></div>
+            <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
+          </div>
+          <div className="grid g-4" style={{ gap: 10, marginTop: 10 }}>
+            <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
+            <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
+            <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
+            <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
+          </div>
+        </section>
+
+        <div className="row ac wrap" style={{ gap: 12 }}>
+          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando...' : 'Guardar cambios'}</button>
+          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado.</span> : null}
           {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
           {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
         </div>
-        <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>Al guardar, tus datos se conservan y regeneramos tu plan de entreno y tus macros según tu objetivo, equipo y tiempo.</p>
       </div>
     </SectionCard>
   );
