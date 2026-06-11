@@ -16,7 +16,8 @@ Ejecución de la **FASE 0** del prompt `prompt-cowork-ignios.md` (alcance acorda
 
 - `npx vitest run` → **25 archivos / 154 tests verdes** (121 previos + 33 nuevos: 24 del detector, 7 de la ruta del chat, 2 del retriever), verificado en sandbox Y en la Mac.
 - Bundle regenerado en sandbox (`npm i --no-save esbuild` + `build:studio` → `42d6ca94ad`).
-- `npm run build` (Next 16.2.6) OK en la Mac. Deploy `endogym-511l00tgg…` con **alias asignado manualmente** (la CLI volvió a colgarse en "Running Checks", patrón conocido).
+- `npm run build` (Next 16.2.6) OK en la Mac. Deploy final: **`endogym-hgfeg49y5…`** (incluye el parche de grpc-js; un deploy intermedio `endogym-511l00tgg…` se construyó antes del parche y fue reemplazado). Alias **asignado manualmente** en ambos (la CLI se colgó en "Running Checks", patrón conocido).
+- Bundle de producción verificado: el chat envía `JSON.stringify({message:…})` (ya no viaja system prompt desde el cliente).
 - **Sondas públicas verificadas:** `/` 200, `/api/health` 200, `/api/meals` 401 sin token, `POST /api/coach-chat` 401 sin token, `index.html` referencia `studio.bundle.js?v=42d6ca94ad` y el bundle responde 200.
 - **`npm audit` → 0 vulnerabilidades** tras `npm audit fix` (apareció un high upstream en `@grpc/grpc-js` 1.14.0–1.14.3, GHSA-5375-pq7m-f5r2 / GHSA-99f4-grh7-6pcq; parcheado en commit propio, 154 tests verdes después).
 
