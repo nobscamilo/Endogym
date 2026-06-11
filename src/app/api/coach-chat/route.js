@@ -7,7 +7,8 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
-import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince } from '../../../lib/repositories/firestoreRepository.js';
+import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince } from '../../../lib/repositories/firestoreRepository.js';
+import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { buildCoachChatPrompt } from '../../../services/coachPersona.js';
@@ -42,10 +43,12 @@ async function buildGuidelinesContext({ profile, plan, message, traceId }) {
 async function buildUserContext(uid) {
   try {
     const sinceIso = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
-    const [profile, plan, workouts] = await Promise.all([
+    const mealsSinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const [profile, plan, workouts, meals] = await Promise.all([
       getUserProfile(uid).catch(() => null),
       getLatestWeeklyPlan(uid).catch(() => null),
       listWorkoutsSince(uid, sinceIso, 60).catch(() => []),
+      listMealsSince(uid, mealsSinceIso, 120).catch(() => []),
     ]);
     if (!profile && !plan) return { text: '', profile, plan };
     const parts = [];
@@ -80,6 +83,13 @@ async function buildUserContext(uid) {
     if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
     if (today?.workout?.runPrescription?.structure) parts.push(`Prescripción de hoy: ${today.workout.runPrescription.structure}`);
     if (today?.nutritionTarget?.carbLevel) parts.push(`Carbohidratos hoy: nivel ${today.nutritionTarget.carbLevel}. ${today.nutritionTarget.carbTiming || ''}`);
+
+    // FASE 1.1 — Digest nutricional determinista (7 días). Se omite si no hay registros.
+    const nutritionLine = describeNutritionDigest(buildNutritionDigest({ meals, plan }));
+    if (nutritionLine) parts.push(nutritionLine);
+    // FASE 1.2 — Tendencia de recuperación desde check-ins. Se omite si no hay datos.
+    const recoveryLine = describeRecoveryTrend(buildRecoveryTrend({ workouts }));
+    if (recoveryLine) parts.push(recoveryLine);
 
     // Validación de zonas (personalizada por edad/FCmáx): compara la última carrera con la
     // zona prescrita. Solo para perfiles de carrera.

@@ -8,8 +8,10 @@ import {
   getLatestWeeklyPlan,
   listWorkoutsSince,
   listMetricsSince,
+  listMealsSince,
   getWorkoutById,
 } from '../lib/repositories/firestoreRepository.js';
+import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../core/wellnessDigest.js';
 
 export const COACH_ANALYSIS_LOOKBACK_DAYS = 28;
 
@@ -168,11 +170,13 @@ export function compareLoadsWithPlan(lastStrength, plan) {
 
 export async function buildCoachAnalysisDigest(uid) {
   const sinceIso = new Date(Date.now() - COACH_ANALYSIS_LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
-  const [profile, plan, workouts, metrics] = await Promise.all([
+  const mealsSinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [profile, plan, workouts, metrics, meals] = await Promise.all([
     getUserProfile(uid).catch(() => null),
     getLatestWeeklyPlan(uid).catch(() => null),
     listWorkoutsSince(uid, sinceIso, 120).catch(() => []),
     listMetricsSince(uid, sinceIso, 100).catch(() => []),
+    listMealsSince(uid, mealsSinceIso, 120).catch(() => []),
   ]);
 
   const done = (Array.isArray(workouts) ? workouts : [])
@@ -204,6 +208,9 @@ export async function buildCoachAnalysisDigest(uid) {
     liftProgression: buildLiftProgression(workouts),
     progressMemory,
     adaptiveTuning,
+    // FASE 1.1/1.2 — digests deterministas (null si no hay datos; el prompt los omite).
+    nutrition7d: buildNutritionDigest({ meals, plan }),
+    recovery7d: buildRecoveryTrend({ workouts }),
     signature: workoutsSignature(workouts),
   };
 }
@@ -228,6 +235,11 @@ export function buildCoachAnalysisPrompt(digest) {
   if (Number.isFinite(Number(cardio.hrDriftBpm))) {
     lines.push(`Señal cardiaca: FC media de carrera reciente ${cardio.recentAvgHr ?? '?'} ppm vs base ${cardio.baselineAvgHr ?? '?'} ppm (deriva ${cardio.hrDriftBpm >= 0 ? '+' : ''}${cardio.hrDriftBpm} ppm, señal "${cardio.hrSignal}").`);
   }
+  // FASE 1.1/1.2 — nutrición y recuperación reales (si hay datos).
+  const nutritionLine = describeNutritionDigest(digest.nutrition7d);
+  if (nutritionLine) lines.push(`NUTRICIÓN REAL: ${nutritionLine}`);
+  const recoveryLine = describeRecoveryTrend(digest.recovery7d);
+  if (recoveryLine) lines.push(`RECUPERACIÓN: ${recoveryLine}`);
   if (adaptiveTuning?.appliedRules?.length) {
     lines.push(`AJUSTES QUE EL PLANNER YA APLICÓ (reglas reales, explícalas al usuario): ${adaptiveTuning.appliedRules.map((r) => `${r.id}: ${r.reason || ''} → ${r.effect || ''}`).join(' | ')}. Factor de volumen: ${adaptiveTuning?.workout?.volumeFactor ?? 1}.`);
   } else {

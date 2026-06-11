@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getUserProfile: vi.fn(),
   getLatestWeeklyPlan: vi.fn(),
   listWorkoutsSince: vi.fn(),
+  listMealsSince: vi.fn(),
   requestGoogleGenerateContent: vi.fn(),
   resolveGeminiCoachModel: vi.fn(),
   enforceUserRateLimit: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('../../src/lib/repositories/firestoreRepository.js', () => ({
   getUserProfile: mocks.getUserProfile,
   getLatestWeeklyPlan: mocks.getLatestWeeklyPlan,
   listWorkoutsSince: mocks.listWorkoutsSince,
+  listMealsSince: mocks.listMealsSince,
 }));
 
 vi.mock('../../src/lib/logger.js', () => ({
@@ -85,6 +87,8 @@ describe('/api/coach-chat route', () => {
     mocks.getUserProfile.mockResolvedValue({ goal: 'strength', trainingModality: 'full_gym' });
     mocks.getLatestWeeklyPlan.mockResolvedValue(null);
     mocks.listWorkoutsSince.mockResolvedValue([]);
+    mocks.listMealsSince.mockReset();
+    mocks.listMealsSince.mockResolvedValue([]);
     mocks.resolveGeminiCoachModel.mockReturnValue('gemini-2.5-flash');
     mocks.enforceUserRateLimit.mockResolvedValue({
       allowed: true,
@@ -217,6 +221,40 @@ describe('/api/coach-chat route', () => {
     expect(mocks.retrieveGuidelinesContext).toHaveBeenCalledWith(expect.objectContaining({
       userQuery: pregunta,
     }));
+  });
+
+  it('inyecta digest nutricional y recuperación cuando hay datos (FASE 1.1/1.2)', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    mocks.listMealsSince.mockResolvedValue([
+      { eatenAt: `${today}T13:00:00.000Z`, totals: { calories: 1800, proteinGrams: 90, carbsGrams: 180, fatGrams: 50 } },
+    ]);
+    mocks.listWorkoutsSince.mockResolvedValue([
+      { source: 'daily_checkin', performedAt: `${today}T07:00:00.000Z`, sleepHours: 6, fatigue: 7, completed: true },
+    ]);
+
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: '¿Cómo voy?' }),
+    }));
+
+    expect(response.status).toBe(200);
+    const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
+    expect(sentPrompt).toContain('Nutrición últimos 7 días');
+    expect(sentPrompt).toContain('1800 kcal');
+    expect(sentPrompt).toContain('Recuperación últimos 7 días');
+    expect(sentPrompt).toContain('fatiga media 7/10');
+  });
+
+  it('SIN registros de comida ni check-ins, el contexto omite nutrición y recuperación (no inventa ceros)', async () => {
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: '¿Cómo voy?' }),
+    }));
+
+    expect(response.status).toBe(200);
+    const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
+    expect(sentPrompt).not.toContain('Nutrición últimos');
+    expect(sentPrompt).not.toContain('Recuperación últimos');
   });
 
   it('red flag: responde texto fijo sin llamar a Gemini, sin gastar rate limit y loguea sin contenido', async () => {
