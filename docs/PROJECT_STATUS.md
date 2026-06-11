@@ -1,6 +1,20 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de junio de 2026 (FASE 0 del plan "Mejoras Ignios": seguridad del coach-chat)**.
+Ultima actualizacion: **11 de junio de 2026 (FASE 0 + FASE 1 del plan "Mejoras Ignios")**.
+
+## Sesión del 11 de junio de 2026, tarde (FASE 1 — holística: nutrición, recuperación e inactividad)
+
+Ejecución de la FASE 1 completa de `prompt-cowork-ignios.md`. Desplegado y verificado (deploy `endogym-h88aq3i3r…`, alias manual, bundle `22ab51e837`, sondas `/` 200, `health` 200, 401 sin token; el bundle de producción contiene `reentryReason`). **27 archivos / 177 tests verdes** (Mac) + `npm run build` OK. Commits: `6f9cc62` (1.1+1.2), `9f59e7b` (1.3).
+
+- **1.1 Digest nutricional (7 días) — `src/core/wellnessDigest.js`:** kcal/proteína/carbohidratos reales por día (suma de `meals.totals` agrupada por `eatenAt`) vs el `nutritionTarget` de ESE día del plan (respeta carb cycling), % de días con registro y aviso si <50%. Inyectado en `buildUserContext` (chat) y en `buildCoachAnalysisDigest`/prompt (`nutrition7d`). Sin registros → null y la sección se OMITE (guard `posNum`, jamás ceros inventados).
+- **1.2 Tendencia de recuperación — mismo módulo:** sueño medio 7d (aviso si <6,5 h), fatiga media y tendencia (subiendo/bajando/estable vs los 7 días anteriores, umbral ±0,8) desde check-ins y subjetivos no omitidos. En chat (`buildUserContext`) y análisis (`recovery7d`).
+- **1.3 Reajuste por inactividad (3 niveles) + check-in de reentrada:**
+  - `buildProgressMemory` añade `inactivity.daysSinceLastDone` (último entreno HECHO; nuevo `getLastDoneWorkoutAt(uid)` en el repositorio como hint sin ventana — OJO `new Date(null)`=1970, guardado). Usuario nuevo → null, sin reglas.
+  - `buildAdaptiveTuning`: **3-6 días** sin regla; **7-14** `INACTIVITY_REENTRY` (loadFactor 0.9 → −10% cargas de fuerza vía `prescribeLoadKg`, `runIntensityStepDown` → `stepDownRunFocus` series→tempo→fácil en `runPrescription` con nota, frecuencia/volumen intactos, `bridgeSession`); **>14** `INACTIVITY_RESET` (`planStale` → el plan vigente se marca inválido y la UI sugiere regenerar; volumen 0.75 y rampa); tras volver, `REENTRY_RAMP` (sem 1: vol ×0.8 y cargas −15% si el parón fue >14 días) y `REENTRY_RAMP_W2` (sem 2: vol ×0.9), expiran a los 14 días de responder.
+  - **Enfermedad** (`REENTRY_ILLNESS`): volumen ×0.85, RPE capado a 6 (`maxRpeCap`), `suggestRescreening` y copy que sugiere reevaluar el cribado (febril/respiratoria).
+  - **Check-in de reentrada (UI):** `ReentryCard` en Hoy (screen-today) cuando `studio-data` expone `reentry.needsCheckin` (≥7 días y sin respuesta posterior al último entreno); 1 pregunta (vacaciones/enfermedad/motivación/otro) → `POST /api/studio-availability { reentryReason, reentryDaysOut }` (persiste `profile.reentry` con `answeredAt` server-side; un POST solo-reentrada NO marca `studioAvailability`). Banner de **sesión puente** (20-30 min suave) y aviso de regenerar plan si `planStale`. El overlay del bloque activo expone `loadFactor/bridgeSession/planStale` y `bridgeNote` en el workout de hoy.
+- Tests nuevos: `tests/core/wellness-digest.test.js` (10), `tests/core/inactivity-reentry.test.js` (13), +2 de contexto en coach-chat; mocks de repos actualizados (`listMealsSince`, `getLastDoneWorkoutAt` — recordar SIEMPRE ampliar los `vi.mock` del repositorio al añadir funciones).
+- **Riesgo conocido (documentado):** si el usuario nunca responde el check-in de reentrada, la rampa post-retorno no persiste tras su primer entreno (las reglas 7-14/>14 dejan de disparar al reiniciarse `daysSinceLastDone`); mitigado porque la tarjeta es prominente en Hoy.
 
 ## Sesión del 11 de junio de 2026 (FASE 0 — seguridad y calidad inmediata del coach)
 
