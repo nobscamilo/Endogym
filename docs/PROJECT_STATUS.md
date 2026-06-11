@@ -1,6 +1,30 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **9 de junio de 2026 (Análisis del coach en Progreso + historial de entrenos visible)**.
+Ultima actualizacion: **11 de junio de 2026 (FASE 0 del plan "Mejoras Ignios": seguridad del coach-chat)**.
+
+## Sesión del 11 de junio de 2026 (FASE 0 — seguridad y calidad inmediata del coach)
+
+Ejecución de la **FASE 0** del prompt `prompt-cowork-ignios.md` (alcance acordado con el usuario: solo FASE 0, commits por tarea, build/deploy desde la Mac).
+
+### Implementado
+
+- **0.1 System prompt del chat al servidor.** Nuevo `src/services/coachPersona.js`: definición única de persona/reglas del chat (incluye "PROHIBIDO inventar datos" y resistencia a redefinición de rol); es la base de la persona unificada de FASE 2.3. `/api/coach-chat` ahora acepta `{ message }` (solo el mensaje del usuario) y construye el prompt server-side; el campo legacy `{ prompt }` se acepta por compatibilidad pero se trata ÍNTEGRO como mensaje de usuario, nunca como system. `coach.jsx` y el shim `window.claude.complete` del bundle envían solo la pregunta. Límite 4000 chars y rate limit intactos. Bundle regenerado: `42d6ca94ad`.
+- **0.2 Detector determinista de red flags.** Nuevo `src/services/coachRedFlags.js` (léxico ES, sin IA): dolor torácico, síncope, disnea desproporcionada, palpitaciones con mareo, lesión aguda. Se evalúa ANTES del rate limit y de la comprobación de `GEMINI_API_KEY` (la respuesta de seguridad nunca queda bloqueada por cuota ni depende de la IA). Si dispara: respuesta fija empática (detener ejercicio + valoración médica/urgencias 112), sin Gemini, y log `coach_chat_red_flag` (traceId + categoría, SIN contenido del mensaje). **Decisión de falsos positivos documentada:** dolor de pecho con contexto muscular explícito (agujetas/press banca/pectoral) y sin modificadores de alarma (opresión, mareo, falta de aire, irradiación…) NO dispara; ante la duda ("me duele el pecho" a secas) dispara — conservador.
+- **0.3 RAG del chat por pregunta.** `retrieveGuidelinesContext`/`WithCitations` y `buildQueryText` aceptan `userQuery`: con pregunta presente, la query del embedding es `pregunta + objetivo + modalidad` (el perfil clínico completo ya no contamina la recuperación del chat). `weekly-plan` (sin `userQuery`) queda intacto, verificado con test. El fallback léxico sigue siendo por perfil (decisión anotada en el código). Presupuesto 7000 chars, timeout 4 s y fallback a vacío sin cambios. `buildQueryText` ahora tolera `weeklyPlan` undefined (antes un usuario sin plan rompía la query y el RAG del chat caía silenciosamente a vacío).
+
+### Verificación (11 jun 2026, sandbox Linux)
+
+- `npx vitest run` → **25 archivos / 154 tests verdes** (121 previos + 33 nuevos: 24 del detector, 7 de la ruta del chat, 2 del retriever), verificado en sandbox Y en la Mac.
+- Bundle regenerado en sandbox (`npm i --no-save esbuild` + `build:studio` → `42d6ca94ad`).
+- `npm run build` (Next 16.2.6) OK en la Mac. Deploy `endogym-511l00tgg…` con **alias asignado manualmente** (la CLI volvió a colgarse en "Running Checks", patrón conocido).
+- **Sondas públicas verificadas:** `/` 200, `/api/health` 200, `/api/meals` 401 sin token, `POST /api/coach-chat` 401 sin token, `index.html` referencia `studio.bundle.js?v=42d6ca94ad` y el bundle responde 200.
+- **`npm audit` → 0 vulnerabilidades** tras `npm audit fix` (apareció un high upstream en `@grpc/grpc-js` 1.14.0–1.14.3, GHSA-5375-pq7m-f5r2 / GHSA-99f4-grh7-6pcq; parcheado en commit propio, 154 tests verdes después).
+
+### Incidencia operativa documentada (para futuros agentes)
+
+- El sandbox Linux **no puede hacer unlink en el FS montado**: ni borrar `.git/index.lock` del IDE ni los `HEAD.lock`/`main.lock` que deja cada operación de ref. Workaround usado: commit 0.1 con `GIT_INDEX_FILE` alternativo; árboles 0.2/0.3 preparados con `git write-tree` y commiteados después desde la Mac con `commit-tree` + `update-ref`.
+- **OJO con `osascript` + `nohup … &`:** dos llamadas de `do shell script` que devolvieron "error" en realidad SÍ ejecutaron el script en background → el script de finalización corrió 3 veces en paralelo y dejó la historia con commits **triplicados**. Se reparó reescribiendo `main` (4fb92b1 → 0.2 `69a646f` → 0.3 `b8c9ad7` → deps `73dd57b` → docs) y un único `push --force-with-lease`. Lección: lanzar scripts en la Mac con un guard de lock (o `pgrep`) y tratar el "error" de osascript como resultado AMBIGUO, no como fallo.
+- Scripts de la operación en `scratch/` (`fase0-finalize-mac.sh`, `fase0-fix-history.sh`, logs) — sin commitear; se pueden borrar.
 
 ## Sesión del 9 de junio de 2026 (Análisis del coach + historial visible en Progreso)
 
