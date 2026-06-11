@@ -408,7 +408,13 @@ export async function POST(request) {
         for (const e of (Array.isArray(w.exercises) ? w.exercises : [])) {
           const wk = Number(e?.weightKg);
           if (!Number.isFinite(wk) || wk <= 0) continue;
-          const entry = { weightKg: wk, reps: Number(e.reps) || null, name: e.name || null };
+          // rpe por ejercicio si existe; si no, el RPE de sesión (señal DAPRE de esfuerzo).
+          const entry = {
+            weightKg: wk,
+            reps: Number(e.reps) || null,
+            rpe: Number(e.rpe) || Number(w.sessionRpe) || null,
+            name: e.name || null,
+          };
           if (e?.id && !liftHistory[e.id]) {
             liftHistory[e.id] = { ...entry, source: 'id' };
           }

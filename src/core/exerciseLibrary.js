@@ -1242,16 +1242,42 @@ export function normalizeExerciseHistoryKey(value) {
 }
 
 function resolveHistoryLoad(exercise, liftHistory) {
-  if (!liftHistory || !exercise) return { weightKg: null, source: null };
+  if (!liftHistory || !exercise) return { weightKg: null, reps: null, rpe: null, source: null };
   if (exercise.id && liftHistory[exercise.id]) {
-    return { weightKg: liftHistory[exercise.id].weightKg, source: 'history' };
+    const h = liftHistory[exercise.id];
+    return { weightKg: h.weightKg, reps: h.reps ?? null, rpe: h.rpe ?? null, source: 'history' };
   }
   const nameKey = normalizeExerciseHistoryKey(exercise.name);
   const byName = nameKey ? liftHistory.__byName?.[nameKey] : null;
   if (byName) {
-    return { weightKg: byName.weightKg, source: 'history_name' };
+    return { weightKg: byName.weightKg, reps: byName.reps ?? null, rpe: byName.rpe ?? null, source: 'history_name' };
   }
-  return { weightKg: null, source: null };
+  return { weightKg: null, reps: null, rpe: null, source: null };
+}
+
+// ---------------------------------------------------------------------------
+// Progresión DAPRE (autorregulación por desempeño REAL, idea del doc del usuario):
+// con reps reales registradas, la progresión de carga la decide el desempeño de la
+// última sesión y NO la fase de carrera (que solo aplica como fallback sin datos):
+//  - superó el tope del rango con RPE holgado (≤8 o sin RPE) → +5% (+10% si lo superó
+//    por ≥3 reps);
+//  - no llegó al mínimo del rango, o RPE ≥9.5 → −5% (−10% si quedó ≥3 reps por debajo);
+//  - dentro del rango → MISMA carga (doble progresión: primero reps, luego kg).
+// ---------------------------------------------------------------------------
+export function computeDapreProgression({ lastReps, repsRange, rpe }) {
+  const m = String(repsRange || '').match(/(\d+)\s*-\s*(\d+)/);
+  const reps = Number(lastReps);
+  if (!m || !Number.isFinite(reps) || reps <= 0) return { factor: null, reason: 'no_data' };
+  const low = Number(m[1]);
+  const high = Number(m[2]);
+  const effort = Number.isFinite(Number(rpe)) && Number(rpe) > 0 ? Number(rpe) : null;
+  if (reps >= high && (effort == null || effort <= 8)) {
+    return { factor: reps >= high + 3 ? 1.1 : 1.05, reason: 'beat_target' };
+  }
+  if (reps < low || (effort != null && effort >= 9.5)) {
+    return { factor: reps <= Math.max(1, low - 3) ? 0.9 : 0.95, reason: 'below_target' };
+  }
+  return { factor: 1, reason: 'in_range' };
 }
 
 function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 1, historyLoad = null, historySource = null } = {}) {
@@ -1303,12 +1329,22 @@ export function buildExercisePrescription(exercise, { goal, sessionType, profile
   const setFactor = sessionType === 'mixed' ? 0.9 : 1;
   const sets = Math.max(2, Math.round(repRange.sets * toNumber(adaptiveTuning?.workout?.volumeFactor, 1) * setFactor * clamp(toNumber(setScale, 1), 0.6, 1)));
   const historyEntry = resolveHistoryLoad(exercise, liftHistory);
+  // DAPRE: con reps reales de la última sesión, el desempeño manda sobre la fase.
+  const dapre = computeDapreProgression({ lastReps: historyEntry.reps, repsRange: repRange.reps, rpe: historyEntry.rpe });
+  const effectiveProgression = (historyEntry.weightKg != null && dapre.factor != null) ? dapre.factor : loadProgression;
   const { loadKg, source } = prescribeLoadKg(exercise, profile, adaptiveTuning, {
-    loadProgression,
+    loadProgression: effectiveProgression,
     historyLoad: historyEntry.weightKg,
     historySource: historyEntry.source,
   });
 
+  const isHistory = source === 'history' || source === 'history_name';
+  const dapreApplied = isHistory && dapre.factor != null;
+  const dapreGuidance = {
+    beat_target: `Subimos la carga ${Math.round((dapre.factor - 1) * 100)}% porque superaste las repeticiones objetivo con esfuerzo controlado. Mantén 1-3 reps en reserva.`,
+    below_target: 'Bajamos un poco la carga: la última sesión quedaste por debajo del rango (o el esfuerzo fue máximo). Consolida técnica y reps.',
+    in_range: 'Misma carga que tu último registro: añade 1-2 repeticiones antes de subir kg (doble progresión).',
+  };
   return {
     format: 'reps',
     sets,
@@ -1316,11 +1352,17 @@ export function buildExercisePrescription(exercise, { goal, sessionType, profile
     restSeconds: goal === GoalType.STRENGTH ? 120 : 75,
     loadKg,
     loadSource: source, // 'history'/'history_name' (desde registro) | 'estimate' (estimación inicial)
+    // Transparencia del método: 'dapre' (desempeño real) o 'phase' (fallback sin reps).
+    progression: dapreApplied
+      ? { method: 'dapre', factor: dapre.factor, reason: dapre.reason }
+      : { method: 'phase', factor: clamp(toNumber(loadProgression, 1), 0.8, 1.3) },
     loadGuidance:
       loadKg != null
-        ? (source === 'history' || source === 'history_name'
-          ? 'Progresa desde tu última carga registrada; termina cada serie con 1-3 reps en reserva (RIR).'
-          : 'Estimación inicial: ajusta para terminar con 1-3 reps en reserva (RIR) y se afinará con tu registro.')
+        ? (dapreApplied
+          ? dapreGuidance[dapre.reason]
+          : (isHistory
+            ? 'Progresa desde tu última carga registrada; termina cada serie con 1-3 reps en reserva (RIR).'
+            : 'Estimación inicial: ajusta para terminar con 1-3 reps en reserva (RIR) y se afinará con tu registro.'))
         : 'Usa progresión de dificultad (ángulo, palanca o tempo) para mantener RPE objetivo.',
   };
 }
