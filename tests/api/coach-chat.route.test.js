@@ -206,6 +206,54 @@ describe('/api/coach-chat route', () => {
     expect(sentPrompt).toContain('CONTEXTO RAG DE PRUEBA');
   });
 
+  it('red flag: responde texto fijo sin llamar a Gemini, sin gastar rate limit y loguea sin contenido', async () => {
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Siento opresión en el pecho y mareo mientras corro, ¿paro?' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.redFlag).toBe(true);
+    expect(json.category).toBe('dolor_toracico');
+    expect(json.text).toMatch(/urgencias|112/i);
+    expect(mocks.requestGoogleGenerateContent).not.toHaveBeenCalled();
+    expect(mocks.enforceUserRateLimit).not.toHaveBeenCalled();
+    expect(mocks.logInfo).toHaveBeenCalledWith('coach_chat_red_flag', expect.objectContaining({
+      traceId: 'trace-test',
+      userId: 'user-1',
+      category: 'dolor_toracico',
+    }));
+    // El log NO debe incluir el contenido del mensaje.
+    const logPayload = mocks.logInfo.mock.calls.find((c) => c[0] === 'coach_chat_red_flag')[1];
+    expect(JSON.stringify(logPayload)).not.toContain('opresión');
+  });
+
+  it('red flag funciona incluso sin GEMINI_API_KEY configurada (degradación elegante)', async () => {
+    delete process.env.GEMINI_API_KEY;
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Me desmayé al acabar las series de hoy' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.redFlag).toBe(true);
+    expect(json.category).toBe('sincope');
+  });
+
+  it('mensajes normales (agujetas de press banca) NO disparan red flag y van a Gemini', async () => {
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Me duele el pecho de las agujetas de press banca, ¿entreno hoy?' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.redFlag).toBeUndefined();
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 429 and skips Gemini when the coach chat budget is exhausted', async () => {
     mocks.enforceUserRateLimit.mockResolvedValue({
       allowed: false,

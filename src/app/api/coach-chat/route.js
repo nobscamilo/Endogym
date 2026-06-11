@@ -11,6 +11,7 @@ import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince } from '../../..
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { buildCoachChatPrompt } from '../../../services/coachPersona.js';
+import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFlags.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
 // chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
@@ -149,6 +150,19 @@ export async function POST(request) {
     }
     if (message.length > 4000) {
       return errorResponse('Mensaje demasiado largo.', 413);
+    }
+
+    // FASE 0.2 — Red flags deterministas ANTES de Gemini, del rate limit y de la
+    // comprobación de API key: la respuesta de seguridad nunca debe quedar bloqueada
+    // por cuota ni depender de que la IA esté configurada. Log sin contenido del mensaje.
+    const redFlag = detectRedFlags(message);
+    if (redFlag.flagged) {
+      logInfo('coach_chat_red_flag', {
+        traceId,
+        userId: user.uid,
+        category: redFlag.category,
+      });
+      return jsonResponse({ text: RED_FLAG_RESPONSE, redFlag: true, category: redFlag.category });
     }
 
     if (!process.env.GEMINI_API_KEY) {
