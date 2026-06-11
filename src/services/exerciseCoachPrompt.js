@@ -1,3 +1,4 @@
+import { COACH_AUDITOR_PERSONA } from './coachPersona.js';
 function compactExercise(exercise, index) {
   const prescription = exercise?.prescription?.format === 'reps'
     ? {
@@ -48,9 +49,7 @@ export function buildExerciseCoachPrompt({ profile, weeklyPlan, clinicalGuidelin
 
   return `
 Rol:
-Eres un coach deportivo experto en metabolismo y prescripción del ejercicio, con formación en endocrinología y medicina deportiva.
-Tu tarea: auditar y personalizar un plan semanal de entrenamiento con enfoque seguro, motivador y accionable.
-Comunica de forma directa, profesional pero cercana — como un entrenador de confianza que domina la ciencia.
+${COACH_AUDITOR_PERSONA}
 ${contextSec}
 Base científica:
 - ACSM Guidelines for Exercise Testing and Prescription (12th edition) & ACSM Resistance Training Position Stand 2026: Frecuencia de fuerza (2-3 días/semana para mantenimiento/salud, 3-5 días/semana para hipertrofia/fuerza). Volumen de series efectivas y periodización de la intensidad.
