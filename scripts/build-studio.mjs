@@ -134,12 +134,13 @@ window.__signOut = async function () {
 };
 
 window.claude = {
-  complete: async function (prompt) {
+  // FASE 0.1: se envía SOLO el mensaje del usuario; la persona del coach vive en el servidor.
+  complete: async function (message) {
     let token = null;
     try { token = await __getIdToken(); } catch (e) { token = null; }
     const headers = { 'content-type': 'application/json' };
     if (token) headers['authorization'] = 'Bearer ' + token;
-    const res = await fetch('/api/coach-chat', { method: 'POST', headers, body: JSON.stringify({ prompt }) });
+    const res = await fetch('/api/coach-chat', { method: 'POST', headers, body: JSON.stringify({ message }) });
     if (!res.ok) throw new Error('coach-chat HTTP ' + res.status);
     const data = await res.json();
     return data && typeof data.text === 'string' ? data.text : '';

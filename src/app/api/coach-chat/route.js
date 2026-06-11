@@ -10,6 +10,7 @@ import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.j
 import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
+import { buildCoachChatPrompt } from '../../../services/coachPersona.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
 // chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
@@ -115,8 +116,11 @@ async function buildUserContext(uid) {
 }
 
 // Chat "Pregúntale al coach" del rediseño Studio.
-// Recibe { prompt } (el frontend ya incluye el system + contexto del usuario) y
-// devuelve { text } con la respuesta del Coach IA usando la Gemini Developer API.
+// Recibe { message } (SOLO el mensaje del usuario; la persona y el contexto se
+// construyen server-side en coachPersona.js — FASE 0.1) y devuelve { text } con la
+// respuesta del Coach IA usando la Gemini Developer API.
+// Compatibilidad: si un bundle antiguo envía { prompt }, se trata ÍNTEGRO como mensaje
+// de usuario (nunca como system prompt).
 // Requiere autenticación para evitar abuso/coste de un endpoint de IA abierto.
 export async function POST(request) {
   return withTrace('coach_chat', async ({ traceId }) => {
@@ -137,12 +141,14 @@ export async function POST(request) {
       return errorResponse('Cuerpo JSON inválido.', 400);
     }
 
-    const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
-    if (!prompt) {
-      return errorResponse('Falta "prompt".', 400);
+    const message = typeof body?.message === 'string' && body.message.trim()
+      ? body.message.trim()
+      : (typeof body?.prompt === 'string' ? body.prompt.trim() : '');
+    if (!message) {
+      return errorResponse('Falta "message".', 400);
     }
-    if (prompt.length > 4000) {
-      return errorResponse('Prompt demasiado largo.', 413);
+    if (message.length > 4000) {
+      return errorResponse('Mensaje demasiado largo.', 413);
     }
 
     if (!process.env.GEMINI_API_KEY) {
@@ -184,7 +190,7 @@ export async function POST(request) {
         model,
         traceId,
         timeoutMs: 12000,
-        parts: [{ text: prompt + userContext + guidelinesContext }],
+        parts: [{ text: buildCoachChatPrompt({ message, userContext, guidelinesContext }) }],
         generationConfig: {
           temperature: 0.6,
           topP: 0.9,
