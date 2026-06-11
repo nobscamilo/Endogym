@@ -1,6 +1,19 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de junio de 2026 (FASE 0 + FASE 1 + DAPRE + objetivos SMART)**.
+Ultima actualizacion: **11 de junio de 2026 (FASE 0 + FASE 1 + DAPRE + SMART + calentamiento dinámico)**.
+
+## Sesión del 11 de junio de 2026, noche-2 (calentamiento/vuelta a la calma dinámicos por comorbilidad)
+
+Petición del usuario: el calentamiento y enfriamiento no pueden ser estáticos ni opcionales — se ensamblan cruzando el tipo de sesión del día con las comorbilidades. Commit `d5def32`, deploy `endogym-1ypgxhzvn…` (alias manual), **31 archivos / 212 tests verdes**, build OK. No requirió bundle (la UI ya pintaba warmup/cooldown; el shape `{step, durationMinutes, details}` se mantuvo).
+
+- **Nuevo `src/core/warmupCooldown.js`** (sustituye los protocolos ESTÁTICOS de exerciseLibrary):
+  - `detectComorbidities(profile)`: parser léxico determinista (ES) de `medicalConditions`/`physicalInjuries` + cribado + edad → hipertensión, artrosis, diabetes (incluye goal glucémico), osteoporosis, cardiometabólica, lesiones por zona (lumbar/rodilla/hombro/tobillo/cadera/cervical/muñeca), ≥60 años. Conservador: solo marca lo explícito.
+  - **Calentamiento general (termorregulación):** 4 min base → 8 min muy graduales con HTA/cardiometabólica; sin impacto con artrosis; ≥6 min con ≥60 años.
+  - **Calentamiento específico (movilidad + activación biomecánica)** según `sessionFocus` del día (push/pull/lower/full/carrera: fácil-larga-tempo-series con drills y progresivos); artrosis → movilidad más larga, lenta, sin rebotes; osteoporosis → columna neutra, sin flexiones/rotaciones bruscas; **lesiones previas → paso de activación dirigida de la zona antes de cargar**; fuerza con HTA → aviso anti-Valsalva en las series de aproximación.
+  - **Vuelta a la calma (fase de retorno):** retorno gradual 4 min → 7 min con HTA con "NUNCA pares en seco" (hipotensión post-esfuerzo) y estiramientos sin cabeza bajo el corazón; diabetes → recordatorio educativo de pies + hipoglucemia tardía.
+- Planner: los 3 call sites (día normal, descanso activo, alternativas de swap) pasan ahora `profile` y `sessionFocus`.
+- **IMPORTANTE (usuario):** los protocolos viajan en el plan GUARDADO → pulsar "Regenerar plan con IA" una vez para que el bloque activo incorpore los nuevos calentamientos.
+- Tests: `tests/core/warmup-cooldown.test.js` (12) — detección, HTA, artrosis, osteoporosis, lesión, drills de carrera, retorno prolongado, diabetes.
 
 ## Sesión del 11 de junio de 2026, noche (DAPRE + objetivos SMART medibles)
 
