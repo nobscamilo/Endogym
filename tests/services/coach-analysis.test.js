@@ -14,6 +14,8 @@ import {
   epley1Rm,
   buildLiftProgression,
   describeLiftProgression,
+  buildLiftSnapshot,
+  buildRecommendationCompliance,
 } from '../../src/services/coachAnalysis.js';
 
 describe('coachAnalysis service', () => {
@@ -186,5 +188,50 @@ describe('coachAnalysis service', () => {
     expect(rep.lastSession).toBe('análisis');
     expect(rep.adjustments).toEqual(['a', 'b', 'c', 'd', 'e']);
     expect(rep.warning).toBe('w');
+  });
+});
+
+describe('FASE 2.2 — cierre del loop de recomendaciones', () => {
+  const liftProgression = [
+    { name: 'Sentadilla', trend: 'progressing', sessions: 4, points: [{ date: '2026-06-01', kg: 100, reps: 8, e1rm: 126.7 }, { date: '2026-06-10', kg: 105, reps: 8, e1rm: 133 }] },
+    { name: 'Press banca', trend: 'stalled', sessions: 3, points: [{ date: '2026-06-10', kg: 80, reps: 6, e1rm: 96 }] },
+  ];
+
+  it('buildLiftSnapshot captura el último e1RM por ejercicio', () => {
+    expect(buildLiftSnapshot(liftProgression)).toEqual({ Sentadilla: 133, 'Press banca': 96 });
+  });
+
+  it('buildRecommendationCompliance compara con el snapshot previo (mejoró/igual/bajó/sin registros)', () => {
+    const prev = { liftSnapshot: { Sentadilla: 126.7, 'Press banca': 96, Remo: 70 } };
+    const lines = buildRecommendationCompliance(prev, liftProgression);
+    expect(lines.find((l) => l.startsWith('Sentadilla'))).toMatch(/MEJOR/);
+    expect(lines.find((l) => l.startsWith('Press banca'))).toMatch(/igual/);
+    expect(lines.find((l) => l.startsWith('Remo'))).toMatch(/sin registros/i);
+  });
+
+  it('sin recomendación previa: cumplimiento vacío y el prompt no lo menciona', () => {
+    expect(buildRecommendationCompliance(null, liftProgression)).toEqual([]);
+    const digest = {
+      profile: null, plan: null, done: [], last: null, loadComparison: [],
+      liftProgression: [], progressMemory: null, adaptiveTuning: null,
+      nutrition7d: null, recovery7d: null, previousRecommendation: null, recommendationCompliance: [],
+    };
+    expect(buildCoachAnalysisPrompt(digest)).not.toContain('RECOMENDACIONES PREVIAS');
+  });
+
+  it('con recomendación previa: prompt y heurístico la mencionan con su cumplimiento', () => {
+    const digest = {
+      profile: null, plan: null, done: [], last: null, loadComparison: [],
+      liftProgression, progressMemory: null, adaptiveTuning: null,
+      nutrition7d: null, recovery7d: null,
+      previousRecommendation: { adjustments: ['Sube sentadilla a 105 kg'], createdAt: '2026-06-04T10:00:00.000Z', liftSnapshot: { Sentadilla: 126.7 } },
+      recommendationCompliance: ['Sentadilla: e1RM 126.7 → 133 kg (MEJORÓ)'],
+    };
+    const prompt = buildCoachAnalysisPrompt(digest);
+    expect(prompt).toContain('RECOMENDACIONES PREVIAS DEL COACH (2026-06-04)');
+    expect(prompt).toContain('Sube sentadilla a 105 kg');
+    expect(prompt).toContain('CUMPLIMIENTO');
+    const heuristic = buildHeuristicCoachReport(digest);
+    expect(heuristic.history).toContain('Desde la última recomendación');
   });
 });

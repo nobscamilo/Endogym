@@ -20,6 +20,7 @@ import {
   listWorkoutsSince,
   saveCoachAnalysis,
   getCoachAnalysis,
+  saveCoachRecommendation,
 } from '../../../lib/repositories/firestoreRepository.js';
 
 // Análisis del coach (Progreso): analiza el ÚLTIMO entreno realizado, lo compara con los
@@ -116,6 +117,19 @@ export async function POST(request) {
       }
 
       const record = await saveCoachAnalysis(user.uid, { report, source, signature: digest.signature });
+      // FASE 2.2 — persistir las recomendaciones emitidas + snapshot de e1RM para
+      // comparar su cumplimiento de forma determinista en el siguiente análisis.
+      try {
+        const { buildLiftSnapshot } = await import('../../../services/coachAnalysis.js');
+        await saveCoachRecommendation(user.uid, {
+          adjustments: Array.isArray(report?.adjustments) ? report.adjustments.slice(0, 6) : [],
+          signature: digest.signature,
+          liftSnapshot: buildLiftSnapshot(digest.liftProgression),
+          source,
+        });
+      } catch (recErr) {
+        logError('coach_recommendation_save_failed', recErr, { traceId, userId: user.uid });
+      }
       logInfo('coach_analysis_result', { traceId, userId: user.uid, source, workouts: digest.done.length });
       return jsonResponse({ ok: true, report, source, generatedAt: record?.updatedAt || null, stale: false }, 200, rateLimitHeaders);
     } catch (error) {

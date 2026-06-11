@@ -11,8 +11,10 @@ import {
   listMealsSince,
   getWorkoutById,
   getLastDoneWorkoutAt,
+  getCoachRecommendation,
 } from '../lib/repositories/firestoreRepository.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../core/wellnessDigest.js';
+import { COACH_ANALYST_PERSONA } from './coachPersona.js';
 
 export const COACH_ANALYSIS_LOOKBACK_DAYS = 28;
 
@@ -146,6 +148,35 @@ export function describeLiftProgression(lifts) {
     .map((l) => `${l.name} [${label[l.trend]}]: ${l.points.map((p) => `${p.kg} kg${p.reps ? `×${p.reps}` : ''} (e1RM ${p.e1rm})`).join(' → ')}`);
 }
 
+/* ===== FASE 2.2 — Cierre del loop de recomendaciones ===== */
+
+// Instantánea de e1RM por ejercicio en el momento de emitir recomendaciones.
+export function buildLiftSnapshot(liftProgression) {
+  const snap = {};
+  for (const l of Array.isArray(liftProgression) ? liftProgression : []) {
+    const last = l.points?.[l.points.length - 1];
+    if (l.name && last?.e1rm != null) snap[l.name] = last.e1rm;
+  }
+  return snap;
+}
+
+// Cumplimiento determinista: compara el e1RM actual de cada ejercicio con el snapshot
+// guardado junto a las recomendaciones previas. Sin juicios inventados: solo deltas.
+export function buildRecommendationCompliance(previousRecommendation, liftProgression) {
+  const prevSnap = previousRecommendation?.liftSnapshot;
+  if (!prevSnap || typeof prevSnap !== 'object') return [];
+  const current = buildLiftSnapshot(liftProgression);
+  const lines = [];
+  for (const [name, prevE1rm] of Object.entries(prevSnap)) {
+    const now = current[name];
+    if (now == null) { lines.push(`${name}: sin registros nuevos desde la recomendación`); continue; }
+    const delta = Math.round((now - prevE1rm) * 10) / 10;
+    const label = delta > 0.5 ? 'MEJORÓ' : delta < -0.5 ? 'BAJÓ' : 'igual';
+    lines.push(`${name}: e1RM ${prevE1rm} → ${now} kg (${label})`);
+  }
+  return lines.slice(0, 6);
+}
+
 // Compara las cargas del último entreno de fuerza con lo prescrito en el plan (por id o nombre).
 export function compareLoadsWithPlan(lastStrength, plan) {
   if (!lastStrength || !Array.isArray(lastStrength.exercises)) return [];
@@ -172,13 +203,14 @@ export function compareLoadsWithPlan(lastStrength, plan) {
 export async function buildCoachAnalysisDigest(uid) {
   const sinceIso = new Date(Date.now() - COACH_ANALYSIS_LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
   const mealsSinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const [profile, plan, workouts, metrics, meals, lastDoneAtHint] = await Promise.all([
+  const [profile, plan, workouts, metrics, meals, lastDoneAtHint, previousRecommendation] = await Promise.all([
     getUserProfile(uid).catch(() => null),
     getLatestWeeklyPlan(uid).catch(() => null),
     listWorkoutsSince(uid, sinceIso, 120).catch(() => []),
     listMetricsSince(uid, sinceIso, 100).catch(() => []),
     listMealsSince(uid, mealsSinceIso, 120).catch(() => []),
     getLastDoneWorkoutAt(uid).catch(() => null),
+    getCoachRecommendation(uid).catch(() => null),
   ]);
 
   const done = (Array.isArray(workouts) ? workouts : [])
@@ -213,6 +245,9 @@ export async function buildCoachAnalysisDigest(uid) {
     // FASE 1.1/1.2 — digests deterministas (null si no hay datos; el prompt los omite).
     nutrition7d: buildNutritionDigest({ meals, plan }),
     recovery7d: buildRecoveryTrend({ workouts }),
+    // FASE 2.2 — recomendaciones previas y su cumplimiento determinista
+    previousRecommendation: previousRecommendation || null,
+    recommendationCompliance: buildRecommendationCompliance(previousRecommendation, buildLiftProgression(workouts)),
     signature: workoutsSignature(workouts),
   };
 }
@@ -220,7 +255,8 @@ export async function buildCoachAnalysisDigest(uid) {
 export function buildCoachAnalysisPrompt(digest) {
   const { profile, plan, done, last, loadComparison, progressMemory, adaptiveTuning } = digest;
   const lines = [];
-  lines.push('Eres un deportólogo de élite y coach del usuario en la app Ignios. Analiza SUS DATOS REALES y responde en español, directo y concreto, citando números reales (kg, ppm, RPE, minutos). PROHIBIDO inventar datos que no estén abajo. Tono cercano pero crítico: señala lo que está bien Y lo que hay que corregir.');
+  // FASE 2.3 — persona única: el analista comparte núcleo con chat y auditor.
+  lines.push(COACH_ANALYST_PERSONA);
   if (profile) {
     lines.push(`Perfil: ${profile.sex === 'female' ? 'mujer' : 'hombre'}, ${profile.age ?? '?'} años, ${profile.weightKg ?? '?'} kg. Objetivo: ${profile.goal || '?'}. Modalidad: ${profile.trainingModality || '?'}.${profile.runRaceGoal ? ` Objetivo de carrera: ${profile.runRaceGoal}.` : ''}`);
   }
@@ -237,6 +273,15 @@ export function buildCoachAnalysisPrompt(digest) {
   if (Number.isFinite(Number(cardio.hrDriftBpm))) {
     lines.push(`Señal cardiaca: FC media de carrera reciente ${cardio.recentAvgHr ?? '?'} ppm vs base ${cardio.baselineAvgHr ?? '?'} ppm (deriva ${cardio.hrDriftBpm >= 0 ? '+' : ''}${cardio.hrDriftBpm} ppm, señal "${cardio.hrSignal}").`);
   }
+  // FASE 2.2 — cierre del loop: qué se recomendó la última vez y qué pasó después.
+  if (digest.previousRecommendation?.adjustments?.length) {
+    const prevDate = String(digest.previousRecommendation.createdAt || '').slice(0, 10);
+    lines.push(`RECOMENDACIONES PREVIAS DEL COACH (${prevDate}): ${digest.previousRecommendation.adjustments.slice(0, 4).join(' | ')}`);
+    if (digest.recommendationCompliance?.length) {
+      lines.push(`CUMPLIMIENTO desde entonces (e1RM real, determinista): ${digest.recommendationCompliance.join('; ')}. Referencia esto: reconoce lo cumplido y ajusta lo que no se aplicó (sin regañar).`);
+    }
+  }
+
   // FASE 1.1/1.2 — nutrición y recuperación reales (si hay datos).
   const nutritionLine = describeNutritionDigest(digest.nutrition7d);
   if (nutritionLine) lines.push(`NUTRICIÓN REAL: ${nutritionLine}`);
@@ -261,6 +306,9 @@ export function buildHeuristicCoachReport(digest) {
   const histParts = [`En 28 días registraste ${done.length} sesiones (app + Strava + check-ins).`];
   if (Number.isFinite(Number(cardio.hrDriftBpm))) {
     histParts.push(`FC media de carrera reciente ${cardio.recentAvgHr} ppm vs base ${cardio.baselineAvgHr} ppm (${cardio.hrDriftBpm >= 0 ? '+' : ''}${cardio.hrDriftBpm} ppm).`);
+  }
+  if (digest.previousRecommendation?.adjustments?.length && digest.recommendationCompliance?.length) {
+    histParts.push(`Desde la última recomendación: ${digest.recommendationCompliance.slice(0, 3).join('; ')}.`);
   }
   const rules = adaptiveTuning?.appliedRules || [];
   const adjustments = rules.length
