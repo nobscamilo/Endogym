@@ -24,6 +24,7 @@ function applyCoachAdjustments(days, adjustments) {
   return applied;
 }
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
+import { recordAiMetric } from '../../../lib/aiMetrics.js';
 import { evaluatePreparticipationScreening } from '../../../core/screening.js';
 import { normalizeExerciseHistoryKey, resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import {
@@ -592,6 +593,7 @@ export async function POST(request) {
         coachFailureCode: coachMeta.failureCode || null,
         fallbackApplied: Boolean(coachMeta.fallbackApplied),
       });
+      await recordAiMetric('weekly-plan', { calls: 1, fallbacks: coachMeta?.fallbackApplied ? 1 : 0 }).catch(() => {});
 
       if (profile.onboardingCompleted !== true && profile.preparticipationUpdatedAt) {
         await upsertUserProfile(user.uid, {

@@ -63,6 +63,12 @@ vi.mock('../../src/services/exerciseCoachClient.js', () => ({
   resolveGeminiCoachModel: mocks.resolveGeminiCoachModel,
 }));
 
+// FASE 3.6 — las métricas son best-effort; en tests se anulan para no tocar Firestore.
+vi.mock('../../src/lib/aiMetrics.js', () => ({
+  recordAiMetric: vi.fn(async () => {}),
+  tokensFromGeminiResponse: () => ({ tokensIn: 0, tokensOut: 0 }),
+}));
+
 const { POST } = await import('../../src/app/api/coach-chat/route.js');
 
 async function readJson(response) {

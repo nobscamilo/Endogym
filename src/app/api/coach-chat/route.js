@@ -9,6 +9,7 @@ import {
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince, listMetricsSince, getCoachChatMemory, saveCoachChatMemory } from '../../../lib/repositories/firestoreRepository.js';
 import { trimChatMemory, appendChatTurns, formatChatMemory } from '../../../services/coachChatMemory.js';
+import { recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
@@ -188,6 +189,7 @@ export async function POST(request) {
         const prev = await getCoachChatMemory(user.uid);
         await saveCoachChatMemory(user.uid, appendChatTurns(prev, message, RED_FLAG_RESPONSE));
       } catch { /* la memoria nunca bloquea la respuesta de seguridad */ }
+      await recordAiMetric('coach-chat', { redFlags: 1 });
       return jsonResponse({ text: RED_FLAG_RESPONSE, redFlag: true, category: redFlag.category });
     }
 
@@ -250,10 +252,13 @@ export async function POST(request) {
           userId: user.uid,
           detail: detail.slice(0, 300),
         });
+        await recordAiMetric('coach-chat', { errors: 1 });
         return errorResponse('El coach no pudo responder ahora mismo.', 502);
       }
 
       const data = await response.json();
+      // FASE 3.6 — contador de llamadas + tokens (si la API los devuelve). Sin PII.
+      await recordAiMetric('coach-chat', { calls: 1, ...tokensFromGeminiResponse(data) });
       const text = (data?.candidates?.[0]?.content?.parts || [])
         .map((p) => (typeof p?.text === 'string' ? p.text : ''))
         .join('')
@@ -273,6 +278,7 @@ export async function POST(request) {
       return jsonResponse({ text }, 200, rateLimitHeaders);
     } catch (error) {
       logError('coach_chat_failed', error, { traceId, userId: user.uid });
+      await recordAiMetric('coach-chat', { errors: 1 });
       return errorResponse('El coach no pudo responder ahora mismo.', 502);
     }
   });

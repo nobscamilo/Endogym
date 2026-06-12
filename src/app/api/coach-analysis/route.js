@@ -7,6 +7,7 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
+import { recordAiMetric } from '../../../lib/aiMetrics.js';
 import {
   COACH_ANALYSIS_LOOKBACK_DAYS,
   COACH_ANALYSIS_REPORT_SCHEMA,
@@ -116,6 +117,8 @@ export async function POST(request) {
         source = 'heuristic';
       }
 
+      // FASE 3.6 — métricas: llamada + fallback heurístico si aplica.
+      await recordAiMetric('coach-analysis', { calls: 1, fallbacks: source === 'heuristic' ? 1 : 0 });
       const record = await saveCoachAnalysis(user.uid, { report, source, signature: digest.signature });
       // FASE 2.2 — persistir las recomendaciones emitidas + snapshot de e1RM para
       // comparar su cumplimiento de forma determinista en el siguiente análisis.
@@ -134,6 +137,7 @@ export async function POST(request) {
       return jsonResponse({ ok: true, report, source, generatedAt: record?.updatedAt || null, stale: false }, 200, rateLimitHeaders);
     } catch (error) {
       logError('coach_analysis_failed', error, { traceId, userId: user.uid });
+      await recordAiMetric('coach-analysis', { errors: 1 });
       return errorResponse('No se pudo generar el análisis ahora mismo.', 502, undefined, rateLimitHeaders);
     }
   });
