@@ -68,6 +68,12 @@ vi.mock('../../src/services/exerciseCoachClient.js', () => ({
   resolveGeminiCoachModel: mocks.resolveGeminiCoachModel,
 }));
 
+// FASE 3.6 — métricas best-effort anuladas en tests.
+vi.mock('../../src/lib/aiMetrics.js', () => ({
+  recordAiMetric: vi.fn(async () => {}),
+  tokensFromGeminiResponse: () => ({ tokensIn: 0, tokensOut: 0 }),
+}));
+
 const { GET, POST, PATCH } = await import('../../src/app/api/weekly-plan/route.js');
 
 async function readJson(response) {
@@ -282,9 +288,11 @@ describe('/api/weekly-plan route', () => {
       },
     });
     mocks.getLatestWeeklyPlan.mockResolvedValue(activeBlock);
+    // OJO: 00:00Z y no 12:00Z — si la suite corre antes del mediodía UTC, un check-in a
+    // las 12:00Z queda "en el futuro" y progressMemory lo excluye (test flaky por hora).
     mocks.listWorkoutsSince.mockResolvedValue([{
       source: 'daily_checkin',
-      performedAt: `${today}T12:00:00.000Z`,
+      performedAt: `${today}T00:00:00.000Z`,
       completed: true,
       sessionRpe: 9,
       fatigue: 9,
