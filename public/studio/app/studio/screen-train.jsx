@@ -435,12 +435,8 @@ function TrainSession() {
                 <span className="pill tiny muted">Ritmo por sensación ({rp.zoneLabel}). Añade una marca en Perfil para ritmos en min/km.</span>
               )}
               <p style={{ margin: 0, lineHeight: 1.5, fontWeight: 600 }}>{rp.structure}</p>
-              {Array.isArray(rp.drills) && rp.drills.length ? (
-                <div>
-                  <div className="mb-label">Calentamiento técnico</div>
-                  <ul className="step-list">{rp.drills.map((d, i) => <li key={i}>{d}</li>)}</ul>
-                </div>
-              ) : null}
+              {/* El calentamiento técnico vive en la tarjeta única "Calentamiento y movilidad"
+                  (protocolo dinámico por comorbilidades); aquí ya no se duplica. */}
               {rp.note ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>{rp.note}</p> : null}
             </div>
           </SectionCard>

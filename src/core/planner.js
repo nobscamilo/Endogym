@@ -237,6 +237,16 @@ function getTemplateWeekdayIndex(date) {
   return (date.getUTCDay() + 6) % 7;
 }
 
+// Fuente ÚNICA de calentamiento: los drills concretos de la prescripción de carrera
+// (A-skip, rectas con metros y series) sustituyen al texto genérico del paso de
+// activación del protocolo dinámico. La UI solo pinta el protocolo (sin duplicados).
+export function mergeRunDrillsIntoWarmup(workout) {
+  const drills = workout?.runPrescription?.drills;
+  if (!Array.isArray(drills) || !drills.length || !Array.isArray(workout?.warmup)) return;
+  const activation = workout.warmup.find((step) => step.step === 'Activación biomecánica');
+  if (activation) activation.details = drills.join(' · ');
+}
+
 function rotateTemplateToDate(template, startDate) {
   const startIndex = getTemplateWeekdayIndex(startDate);
   return template.map((_, index) => template[(startIndex + index) % template.length]);
@@ -912,6 +922,7 @@ export function generateWeeklyPlan({
       if (stepDown && rpFocus !== sessionFocus) {
         workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${workout.runPrescription.note || ''}`.trim();
       }
+      mergeRunDrillsIntoWarmup(workout);
     }
 
     return {
@@ -973,6 +984,7 @@ export function generateWeeklyPlan({
           if (stepDown2 && rpFocus2 !== d.sessionFocus) {
             d.workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${d.workout.runPrescription.note || ''}`.trim();
           }
+          mergeRunDrillsIntoWarmup(d.workout);
         }
       });
     }

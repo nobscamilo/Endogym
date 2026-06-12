@@ -114,3 +114,28 @@ describe('buildCooldownProtocol — fase de retorno', () => {
     expect(cd.map((s) => s.step)).toContain('Estiramientos suaves');
   });
 });
+
+describe('fusión del calentamiento técnico de carrera (fuente única)', () => {
+  it('los drills concretos de runPrescription sustituyen al texto genérico de activación', async () => {
+    const { mergeRunDrillsIntoWarmup } = await import('../../src/core/planner.js');
+    const workout = {
+      warmup: buildWarmupProtocol({ sessionType: 'aerobic', sessionFocus: 'cardio_intervals', profile: {} }),
+      runPrescription: { drills: ['Movilidad de tobillo y cadera (3 min)', 'A-skip y skipping bajo (2×20 m)', '4-6 rectas progresivas (strides) de 60-80 m'] },
+    };
+    mergeRunDrillsIntoWarmup(workout);
+    const act = workout.warmup.find((s) => s.step === 'Activación biomecánica');
+    expect(act.details).toContain('A-skip y skipping bajo (2×20 m)');
+    expect(act.details).toContain('rectas progresivas');
+  });
+
+  it('sin drills (rodaje fácil) el protocolo queda intacto', async () => {
+    const { mergeRunDrillsIntoWarmup } = await import('../../src/core/planner.js');
+    const workout = {
+      warmup: buildWarmupProtocol({ sessionType: 'aerobic', sessionFocus: 'cardio_easy', profile: {} }),
+      runPrescription: { drills: [] },
+    };
+    const before = workout.warmup.find((s) => s.step === 'Activación biomecánica').details;
+    mergeRunDrillsIntoWarmup(workout);
+    expect(workout.warmup.find((s) => s.step === 'Activación biomecánica').details).toBe(before);
+  });
+});
