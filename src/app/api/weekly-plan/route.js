@@ -50,6 +50,7 @@ import {
 } from '../../../lib/repositories/firestoreRepository.js';
 import { errorResponse, jsonResponse } from '../../../lib/http.js';
 import { logError, logInfo, withTrace } from '../../../lib/logger.js';
+import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 
 function parseLimit(searchParams) {
@@ -364,7 +365,8 @@ export async function POST(request) {
       // Plan estable por BLOQUE (≥15 días). Si ya hay un bloque activo (hoy ≤ fin del bloque)
       // y no se pide rebuild explícito, NO se regenera: el usuario ve siempre el mismo bloque.
       const currentPlan = await getLatestWeeklyPlan(user.uid);
-      const todayStr = new Date().toISOString().slice(0, 10);
+      // Fecha CIVIL de la app (Europe/Madrid): coherente con Nutrición/studio-data.
+      const todayStr = dateKeyInTimeZone();
       const rebuild = payload.rebuild === true;
       const activeBlock = isActiveBlockPlan(currentPlan, todayStr);
       if (activeBlock && !rebuild) {
@@ -373,6 +375,7 @@ export async function POST(request) {
           adaptiveTuning,
           progressMemory,
           now,
+          today: todayStr,
         });
         const overlayPlan = overlayResult.plan || currentPlan;
         const persistedPlan = await updateWeeklyPlanAdaptiveOverlay(user.uid, currentPlan.id, {
@@ -429,7 +432,8 @@ export async function POST(request) {
 
       const generated = generateBlockPlan({
         profile,
-        startDate: payload.startDate,
+        // Sin startDate explícito: HOY civil (a las 00:30 de Madrid, UTC aún es ayer).
+        startDate: payload.startDate || dateKeyInTimeZone(),
         userId: user.uid,
         liftHistory,
         preparticipationScreening,

@@ -69,6 +69,7 @@ vi.mock('../../src/lib/aiMetrics.js', () => ({
   tokensFromGeminiResponse: () => ({ tokensIn: 0, tokensOut: 0 }),
 }));
 
+const { dateKeyInTimeZone } = await import('../../src/lib/appTime.js');
 const { POST } = await import('../../src/app/api/coach-chat/route.js');
 
 async function readJson(response) {
@@ -203,7 +204,7 @@ describe('/api/coach-chat route', () => {
   });
 
   it('identifica la sesión de HOY por fecha en bloques de 21 días e inyecta el RAG', async () => {
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = dateKeyInTimeZone(); // misma fecha civil que usa la ruta
     const days = Array.from({ length: 21 }, (_, i) => {
       const d = new Date(`${todayKey}T00:00:00.000Z`);
       d.setUTCDate(d.getUTCDate() + (i - 10)); // hoy queda en el medio del bloque

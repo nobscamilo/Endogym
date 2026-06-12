@@ -10,6 +10,7 @@ import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.j
 import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince, listMetricsSince, getCoachChatMemory, saveCoachChatMemory } from '../../../lib/repositories/firestoreRepository.js';
 import { trimChatMemory, appendChatTurns, formatChatMemory } from '../../../services/coachChatMemory.js';
 import { recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
+import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
@@ -86,7 +87,7 @@ async function buildUserContext(uid) {
     }
     // BUG corregido (10 jun 2026): los días del plan NO tienen flag `.today` — con bloques de
     // 21 días, caer a days[0] daba la sesión del PRIMER día del bloque como "hoy" durante 20 días.
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = dateKeyInTimeZone(); // fecha CIVIL de la app, no UTC
     const today = Array.isArray(plan?.days)
       ? (plan.days.find((d) => d?.date === todayKey) || plan.days[0])
       : null;

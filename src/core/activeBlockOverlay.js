@@ -30,9 +30,12 @@ export function buildActiveBlockAdaptiveOverlay({
   adaptiveTuning,
   progressMemory,
   now = new Date(),
+  today: todayOverride = null,
 }) {
   const date = validDate(now);
-  const today = todayKey(date);
+  // Los callers (weekly-plan, studio-data) pasan la fecha CIVIL (appTime); el
+  // fallback UTC se mantiene solo por compatibilidad.
+  const today = todayOverride || todayKey(date);
   if (!isActiveBlockPlan(plan, today)) {
     return { plan, overlay: null };
   }

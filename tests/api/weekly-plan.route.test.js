@@ -248,7 +248,8 @@ describe('/api/weekly-plan route', () => {
   });
 
   it('POST refreshes adaptive overlay for an active block without rebuilding it', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const { dateKeyInTimeZone } = await import('../../src/lib/appTime.js');
+    const today = dateKeyInTimeZone(); // fecha CIVIL, igual que la ruta
     const days = Array.from({ length: 14 }, (_, index) => ({
       date: index === 0 ? today : `2099-01-${String(index + 1).padStart(2, '0')}`,
       dayName: index === 0 ? 'lunes' : 'martes',
