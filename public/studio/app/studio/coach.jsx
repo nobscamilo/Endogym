@@ -63,6 +63,37 @@ const COACH_FALLBACK = {
   default: 'Ahora no puedo consultar el motor IA. Usa el plan como referencia, prioriza técnica y seguridad, y registra la sesión para que el próximo ajuste tenga mejores datos.',
 };
 
+/* FASE 3.4 — Feedback 👍👎 por respuesta del coach (chat y análisis). Solo guarda
+   endpoint + rating + hash corto del texto (nunca el contenido). */
+function coachFeedbackHash(text) {
+  let h = 5381; const str = String(text || '');
+  for (let i = 0; i < str.length; i += 1) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16);
+}
+function CoachFeedback({ endpoint, text }) {
+  const [sent, setSent] = useStateC(null);
+  const vote = async (rating) => {
+    if (sent) return;
+    setSent(rating);
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) return;
+      await fetch('/api/coach-feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ endpoint, rating, contextHash: coachFeedbackHash(text) }),
+      });
+    } catch (e) { /* el feedback nunca molesta */ }
+  };
+  return (
+    <span className="row ac" style={{ gap: 4, marginTop: 6 }}>
+      <button type="button" className="icon-btn" style={{ width: 26, height: 26, fontSize: '0.78rem', opacity: sent && sent !== 'up' ? 0.25 : 1 }} disabled={!!sent} onClick={() => vote('up')} title="Respuesta útil">👍</button>
+      <button type="button" className="icon-btn" style={{ width: 26, height: 26, fontSize: '0.78rem', opacity: sent && sent !== 'down' ? 0.25 : 1 }} disabled={!!sent} onClick={() => vote('down')} title="Respuesta poco útil">👎</button>
+      {sent ? <span className="tiny muted">Gracias por el feedback</span> : null}
+    </span>
+  );
+}
+
 function AskCoach({ open, onClose }) {
   const [q, setQ] = useStateC('');
   const [log, setLog] = useStateC([]); // {role, text}
@@ -127,7 +158,7 @@ function AskCoach({ open, onClose }) {
           ) : log.map((m, i) => (
             <div key={i} className={`ask-msg ${m.role}`}>
               {m.role === 'coach' ? <span className="cb-av sm"><Icon name="sparkles" size={13} /></span> : null}
-              <div className="ask-bubble">{m.text}</div>
+              <div className="ask-bubble">{m.text}{m.role === 'coach' ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}</div>
             </div>
           ))}
           {busy ? <div className="ask-msg coach"><span className="cb-av sm"><Icon name="sparkles" size={13} /></span><div className="ask-bubble"><div className="cb-typing"><span /><span /><span /></div></div></div> : null}
@@ -143,4 +174,4 @@ function AskCoach({ open, onClose }) {
   return createPortal && document.body ? createPortal(modal, document.body) : modal;
 }
 
-Object.assign(window, { CoachBanner, AskCoach, useTypewriter, COACH_MSGS });
+Object.assign(window, { CoachBanner, AskCoach, useTypewriter, COACH_MSGS, CoachFeedback });

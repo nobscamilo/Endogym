@@ -238,7 +238,11 @@ function CoachAnalysisCard() {
           ) : null}
           <div className="row ac wrap between" style={{ gap: 10 }}>
             <span className="tiny muted">{state.generatedAt ? `Generado: ${String(state.generatedAt).slice(0, 16).replace('T', ' ')}` : ''}</span>
-            {!state.stale ? <button className="btn ghost sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Re-analizar'}</button> : null}
+            <span className="row ac" style={{ gap: 8 }}>
+              {/* FASE 3.4 — feedback del análisis (clave por contenido del informe) */}
+              <CoachFeedback key={state.generatedAt || 'fb'} endpoint="coach-analysis" text={`${rep.lastSession || ''}|${rep.history || ''}`} />
+              {!state.stale ? <button className="btn ghost sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Re-analizar'}</button> : null}
+            </span>
           </div>
         </div>
       ) : null}

@@ -397,8 +397,20 @@ function TrainSession() {
             <h2 style={{ fontSize: '1.7rem', margin: '6px 0 0' }}>{s.title}</h2>
             <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{s.focus} · {s.durationMin} min · {s.intensity}</p>
           </div>
-          <button className="btn" style={{ background: '#fff', color: 'var(--accent-deep)', boxShadow: 'none', whiteSpace: 'nowrap' }}
-            onClick={() => open(s.list[0], null)}><Icon name="play" size={17} /> Iniciar guiada</button>
+          <div className="row ac wrap" style={{ gap: 8 }}>
+            <button className="btn" style={{ background: '#fff', color: 'var(--accent-deep)', boxShadow: 'none', whiteSpace: 'nowrap' }}
+              onClick={() => open(s.list[0], null)}><Icon name="play" size={17} /> Iniciar guiada</button>
+            {/* FASE 3.1 — registro con UN TAP: crea el workout con los valores PRESCRITOS
+                (kg/reps/duración del plan vigente); abajo solo se editan desviaciones. */}
+            {s.sessionType !== 'aerobic' && Array.isArray(s.list) && s.list.some((e) => e.loadKg != null) ? (
+              <button className="btn" disabled={logStatus === 'saving'}
+                style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: '1px solid rgba(255,255,255,0.45)', boxShadow: 'none', whiteSpace: 'nowrap' }}
+                title="Registra la sesión tal y como estaba prescrita (kg, reps y duración del plan). Si cambiaste algo, edítalo abajo antes de pulsar."
+                onClick={logSession}>
+                <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : logStatus === 'ok' ? 'Registrada ✓' : 'Hecho según plan'}
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="row ac between" style={{ marginTop: 22, marginBottom: 10 }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>{done}/{list.length} completados</span>
