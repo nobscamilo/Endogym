@@ -77,6 +77,15 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     expect(patch.reentry.reason).toBe('otro');
   });
 
+  it('persiste comorbilidades estructuradas validando zonas', async () => {
+    await post({ conditions: { hypertension: true, diabetes: false, osteoarthritis: true, osteoporosis: false, injuryZones: ['rodilla', 'inventada', 'lumbar'] } });
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.conditions).toEqual({
+      hypertension: true, diabetes: false, osteoarthritis: true, osteoporosis: false,
+      injuryZones: ['rodilla', 'lumbar'],
+    });
+  });
+
   it('razón de reentrada inválida se ignora', async () => {
     await post({ reentryReason: 'hackeo' });
     expect(mocks.upsertUserProfile.mock.calls[0][1].reentry).toBeUndefined();

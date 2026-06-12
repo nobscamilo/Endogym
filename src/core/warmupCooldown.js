@@ -24,23 +24,35 @@ const INJURY_ZONES = [
   ['muñeca', /(muneca|carpiano|tendinitis de muneca)/],
 ];
 
+export const INJURY_ZONE_KEYS = INJURY_ZONES.map(([zone]) => zone);
+
 /**
- * Detección léxica determinista de comorbilidades sobre el perfil (texto libre ES
- * de medicalConditions/physicalInjuries + cribado + edad). Conservadora: solo marca
- * lo que aparece explícito.
+ * Detección determinista de comorbilidades. Fuente PRINCIPAL: los checkboxes
+ * estructurados del perfil (`profile.conditions`, encuesta de Perfil). Fuente
+ * COMPLEMENTARIA (OR): léxico ES sobre el texto libre de medicalConditions/
+ * physicalInjuries (cubre perfiles antiguos y matices escritos a mano).
+ * Conservadora: solo marca lo explícito.
  */
 export function detectComorbidities(profile = {}) {
   const text = norm(`${profile.medicalConditions || ''} ${profile.physicalInjuries || ''}`);
   const screening = profile.preparticipation || {};
+  const structured = profile.conditions && typeof profile.conditions === 'object' ? profile.conditions : {};
   const age = Number(profile.age);
-  const injuries = INJURY_ZONES.filter(([, re]) => re.test(text)).map(([zone]) => zone);
+  const lexicalInjuries = INJURY_ZONES.filter(([, re]) => re.test(text)).map(([zone]) => zone);
+  const structuredInjuries = (Array.isArray(structured.injuryZones) ? structured.injuryZones : [])
+    .filter((zone) => INJURY_ZONE_KEYS.includes(zone));
   return {
-    hypertension: /(hipertension|presion (arterial )?alta|\bhta\b|hipertenso)/.test(text),
-    osteoarthritis: /(artrosis|osteoartritis|artritis)/.test(text),
-    diabetes: /(diabetes|diabetic|glucemia alta|\bdm2?\b)/.test(text) || profile.goal === 'glycemic_control',
-    osteoporosis: /(osteoporosis|osteopenia)/.test(text),
+    hypertension: structured.hypertension === true
+      || /(hipertension|presion (arterial )?alta|tension alta|\bhta\b|hipertenso)/.test(text),
+    osteoarthritis: structured.osteoarthritis === true
+      || /(artrosis|osteoartritis|artritis)/.test(text),
+    diabetes: structured.diabetes === true
+      || /(diabetes|diabetic|glucemia alta|azucar alta|\bdm2?\b)/.test(text)
+      || profile.goal === 'glycemic_control',
+    osteoporosis: structured.osteoporosis === true
+      || /(osteoporosis|osteopenia)/.test(text),
     cardiometabolic: screening.knownCardiometabolicDisease === true,
-    injuries,
+    injuries: [...new Set([...structuredInjuries, ...lexicalInjuries])],
     older: Number.isFinite(age) && age >= 60,
   };
 }

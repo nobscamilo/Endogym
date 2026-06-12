@@ -465,6 +465,11 @@ function AvailabilitySurvey() {
   const D = window.STUDIO;
   const u = D.user || {};
   const [goal, setGoal] = useStateP(u.goalRaw || 'recomposition');
+  // Comorbilidades estructuradas (checkboxes): adaptan calentamiento, retorno,
+  // selección de ejercicios y avisos del coach. Complementan al texto libre.
+  const [conds, setConds] = useStateP(u.conditions || { hypertension: false, diabetes: false, osteoarthritis: false, osteoporosis: false, injuryZones: [] });
+  const toggleCond = (k) => setConds((c) => ({ ...c, [k]: !c[k] }));
+  const toggleZone = (z) => setConds((c) => ({ ...c, injuryZones: (c.injuryZones || []).includes(z) ? c.injuryZones.filter((x) => x !== z) : [...(c.injuryZones || []), z] }));
   // Objetivo SMART: meta numérica + fecha (como el objetivo de carrera).
   const [goalValue, setGoalValue] = useStateP(u.goalTargetValue != null ? String(u.goalTargetValue) : '');
   const [goalDate, setGoalDate] = useStateP(u.goalTargetDate || '');
@@ -509,6 +514,8 @@ function AvailabilitySurvey() {
           raceDate: usesRace ? (raceDate || null) : null,
           // FCmáx medida (opcional): prevalece sobre la estimación por edad en zonas y coach.
           hrMaxBpm: hrMax ? Number(hrMax) : null,
+          // Comorbilidades estructuradas (checkboxes de salud).
+          conditions: conds,
           // Objetivo SMART medible (meta + fecha); null borra el objetivo.
           goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
           goalTargetDate: targetEnabled ? (goalDate || null) : null,
@@ -624,6 +631,23 @@ function AvailabilitySurvey() {
         <section className="profile-step compact">
           <div className="mb-label">Datos personales</div>
           <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
+
+          <div style={{ marginTop: 14 }}>
+            <div className="mb-label">Salud (opcional — adapta tu plan con seguridad)</div>
+          <div className="chips">
+            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis']].map(([k, l]) => (
+              <button key={k} type="button" className={`pill ${conds[k] ? 'accent' : ''}`} onClick={() => toggleCond(k)}>{l}</button>
+            ))}
+          </div>
+          <div className="mb-label" style={{ marginTop: 10 }}>Zonas sensibles o con lesión previa</div>
+          <div className="chips">
+            {['lumbar', 'rodilla', 'hombro', 'tobillo', 'cadera', 'cervical', 'muñeca'].map((z) => (
+              <button key={z} type="button" className={`pill ${((conds.injuryZones || []).includes(z)) ? 'accent' : ''}`} onClick={() => toggleZone(z)} style={{ textTransform: 'capitalize' }}>{z}</button>
+            ))}
+          </div>
+          <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis). Es educativo, no diagnóstico.</p>
+          </div>
+
           <div className="grid g-4" style={{ gap: 10, marginTop: 12 }}>
             <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" value={age} onChange={(e) => setAge(e.target.value)} /></div>
             <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>

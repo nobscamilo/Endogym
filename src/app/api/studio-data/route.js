@@ -225,6 +225,8 @@ function mapUser(profile, authUser) {
   if (num(p.weightKg) !== undefined) out.weightKg = num(p.weightKg);
   if (num(p.heightCm) !== undefined) out.heightCm = num(p.heightCm);
   if (p.sex) out.sex = p.sex;
+  // Comorbilidades estructuradas (prefill de los checkboxes de Perfil)
+  if (p.conditions && typeof p.conditions === 'object') out.conditions = p.conditions;
   // Objetivo SMART (prefill del formulario de Perfil)
   if (num(p.goalTarget?.value) !== undefined) out.goalTargetValue = num(p.goalTarget.value);
   if (p.goalTarget?.date) out.goalTargetDate = p.goalTarget.date;
@@ -620,6 +622,7 @@ export async function GET(request) {
           adaptiveTuning,
           progressMemory,
           now: new Date(),
+          today,
         }).plan;
       }
 

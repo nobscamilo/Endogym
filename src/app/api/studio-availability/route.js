@@ -63,6 +63,20 @@ export async function POST(request) {
     if (Number.isFinite(hrMax) && hrMax >= 120 && hrMax <= 230) patch.hrMaxBpm = Math.round(hrMax);
     else if (body?.hrMaxBpm === null) patch.hrMaxBpm = null;
 
+    // Comorbilidades ESTRUCTURADAS (checkboxes de Perfil): fuente principal de
+    // detectComorbidities (calentamiento/retorno, restricciones de selección).
+    if (body?.conditions && typeof body.conditions === 'object') {
+      const VALID_ZONES = new Set(['lumbar', 'rodilla', 'hombro', 'tobillo', 'cadera', 'cervical', 'muñeca']);
+      patch.conditions = {
+        hypertension: body.conditions.hypertension === true,
+        diabetes: body.conditions.diabetes === true,
+        osteoarthritis: body.conditions.osteoarthritis === true,
+        osteoporosis: body.conditions.osteoporosis === true,
+        injuryZones: (Array.isArray(body.conditions.injuryZones) ? body.conditions.injuryZones : [])
+          .filter((z) => VALID_ZONES.has(z)).slice(0, 7),
+      };
+    }
+
     // Objetivo SMART medible: valor numérico + fecha. El "kind" se deriva del goal
     // server-side (peso corporal para perder grasa/recomposición/ganar músculo; e1RM
     // para fuerza). El objetivo de carrera ya tiene su propio flujo (runRaceGoal/raceDate).

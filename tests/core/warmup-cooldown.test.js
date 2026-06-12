@@ -23,6 +23,21 @@ describe('detectComorbidities (léxico determinista)', () => {
     expect(c.older).toBe(false);
   });
 
+  it('checkboxes estructurados mandan aunque el texto libre esté vacío (y se unen al léxico)', () => {
+    const c = detectComorbidities({
+      conditions: { hypertension: true, osteoporosis: true, injuryZones: ['rodilla'] },
+      physicalInjuries: 'molestia de hombro',
+    });
+    expect(c.hypertension).toBe(true);
+    expect(c.osteoporosis).toBe(true);
+    expect(c.diabetes).toBe(false);
+    expect(c.injuries).toEqual(expect.arrayContaining(['rodilla', 'hombro']));
+  });
+
+  it('texto coloquial "tensión alta" ahora también detecta hipertensión (léxico ampliado)', () => {
+    expect(detectComorbidities({ medicalConditions: 'tengo la tensión alta' }).hypertension).toBe(true);
+  });
+
   it('objetivo glucémico cuenta como señal de diabetes; el cribado como cardiometabólica', () => {
     expect(detectComorbidities({ goal: 'glycemic_control' }).diabetes).toBe(true);
     expect(detectComorbidities({ preparticipation: { knownCardiometabolicDisease: true } }).cardiometabolic).toBe(true);
