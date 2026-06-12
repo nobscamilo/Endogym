@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **12 de junio de 2026 (fix calendario/horas de Nutricion desplegado)**.
+Ultima actualizacion: **12 de junio de 2026 (FASE 3 parcial: registro 1-tap, feedback 👍👎 y observabilidad de IA)**.
+
+## Sesión del 12 de junio de 2026, mañana (FASE 3: 3.1 + 3.4 + 3.6)
+
+Deploy `endogym-jmnr7wkk6…` (alias manual), **35 archivos / 239 tests verdes**, build OK, bundle `bec6d9a891`. Commits: `9f21709` (fix test flaky), `5bfed8f` (3.4 backend), `9b5aba7` (3.6), `9003608` (3.1+3.4 UI).
+
+- **3.1 Registro con un tap:** botón **"Hecho según plan"** en el banner de la sesión de fuerza (Entreno): crea el workout con los valores PRESCRITOS (kg/reps/duración del plan vigente, `logSession` con sus fallbacks) en un tap; los inputs por ejercicio quedan solo para editar desviaciones. Dispara el análisis automático existente. Es la palanca de calidad de datos de e1RM/DAPRE.
+- **3.4 Feedback 👍👎:** `POST /api/coach-feedback { endpoint: coach-chat|coach-analysis|workout-analysis, rating: up|down, contextHash }` → `users/{uid}/coachFeedback` (hash corto del texto, NUNCA el contenido). UI: componente `CoachFeedback` compartido (coach.jsx) en cada burbuja del chat y en el pie del Análisis del coach.
+- **3.6 Observabilidad de IA (`src/lib/aiMetrics.js`):** contadores diarios por endpoint en la colección raíz `aiMetrics/{YYYY-MM-DD}` (sin PII, `FieldValue.increment` + merge, SIEMPRE best-effort). Instrumentado: coach-chat (calls/errors/redFlags/tokens de `usageMetadata`), coach-analysis (calls/fallbacks/errors), weekly-plan (calls/fallbacks), coach-feedback (feedbackUp/Down). Consulta rápida: doc del día en Firestore.
+- **Fix de test flaky por hora:** el check-in mockeado a `12:00Z` en weekly-plan quedaba "en el futuro" si la suite corría antes del mediodía UTC → `HIGH_FATIGUE` no disparaba. Ahora `00:00Z`. (Detectado al correr la suite de madrugada tras el merge del fix de calendario.)
+- **Revisión cruzada del commit `9f057cb` (otro agente):** correcto y verificado — `appTime.js` arregla la fecha civil; el chat conserva el contrato `{ message }` de FASE 0.1. **Inconsistencia pendiente detectada:** `appTime` solo se aplica a studio-data/nutrition/swap; `weekly-plan`, `coach-chat` y `coach-analysis` siguen calculando "hoy" en UTC (de madrugada pueden hablar de días distintos). Mejora recomendada #1.
+- **FASE 3 restante (decisión de alcance, comunicada al usuario):** 3.2 push (requiere FCM/VAPID configurados por el usuario + service worker — sesión propia), 3.3 offline (rediseño del flujo de datos del Studio — sesión propia), 3.5 onboarding corto (mejor con decisión de diseño del usuario).
 
 ## Sesion del 12 de junio de 2026, madrugada-2 (fix calendario y horas de Nutricion)
 
