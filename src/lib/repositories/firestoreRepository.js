@@ -243,6 +243,17 @@ export async function saveCoachChatMemory(userId, turns) {
   });
 }
 
+// FASE 3.4 — Feedback 👍👎 sobre respuestas del coach (sin contenido, solo hash corto).
+export async function saveCoachFeedback(userId, { endpoint, rating, contextHash = null }) {
+  const { db } = await getAdminServices();
+  await db.collection('users').doc(userId).collection('coachFeedback').add({
+    endpoint: String(endpoint).slice(0, 40),
+    rating: rating === 'up' ? 'up' : 'down',
+    contextHash: typeof contextHash === 'string' ? contextHash.slice(0, 64) : null,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 // FASE 2.2 — Última recomendación del análisis del coach (cierre del loop).
 export async function saveCoachRecommendation(userId, recommendation) {
   const { db } = await getAdminServices();
