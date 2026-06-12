@@ -101,6 +101,7 @@ Mejora a búsqueda semántica respetando "no Vertex". Estado:
 
 ## P3 - Producto
 
+- [ ] **Animaciones SVG de calentamiento (sesión dedicada — idea aprobada por el usuario el 12 jun 2026).** Ejemplo de referencia ya creado y validado: `public/warmups/a-skip.svg` (figura animada CSS-en-SVG, paleta azul-magenta, respeta `prefers-reduced-motion`, ~3 KB). Plan acordado: (1) elegir 5-6 movimientos prioritarios del calentamiento dinámico (A-skip, skipping bajo, monster walk, puente de glúteo, gato-vaca, rotación torácica); (2) animarlos uno a uno CON revisión técnica del usuario (deportólogo) por patrón; (3) cablearlos como nivel intermedio de la cascada de fallback: vídeo verificado > animación SVG > SVG estático (`EXERCISE_VIDEO_MAP` / modal de detalle de ejercicio). Hacerlo en sesión limpia: cada animación es coreografía artesanal de keyframes (no plantilla) y consume muchos tokens.
 - [ ] Mejorar correccion manual de alimentos y porciones.
 - [ ] Calibrar confianza por tipo de plato.
 - [ ] Ampliar historial y progresion.
