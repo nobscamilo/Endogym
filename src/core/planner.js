@@ -333,6 +333,53 @@ function focusChangeBlockReason({ targetFocus, targetType, previousDay, nextDay 
   return null;
 }
 
+const STRENGTH_FAMILY_LABELS = { upper: 'torso', lower: 'pierna', full: 'full body' };
+
+// Cuenta las familias de fuerza (torso/pierna/full) entrenadas en la semana,
+// excluyendo el día que se está cambiando. Un día full body suma a su propio
+// cubo Y aporta carga a torso y pierna (entrena ambos).
+function countWeeklyStrengthFamilies(days, excludeIndex) {
+  const counts = { upper: 0, lower: 0, full: 0 };
+  (Array.isArray(days) ? days : []).forEach((day, idx) => {
+    if (idx === excludeIndex || !day) return;
+    if (!['resistance', 'mixed'].includes(day.sessionType)) return;
+    const focus = day.sessionFocus || day.workout?.sessionFocus || '';
+    const family = resolveSessionFocusFamily(focus, day.sessionType);
+    if (!['upper', 'lower', 'full'].includes(family)) return;
+    counts[family] += 1;
+  });
+  return counts;
+}
+
+// Guardarraíl de volumen SEMANAL: la comprobación de adyacencia no impide que
+// swaps repetidos en días no contiguos saturen una familia (p. ej. torso lun/mié/vie)
+// y desequilibren el microciclo. Aquí proyectamos el cambio sobre la semana y
+// bloqueamos si una familia pasaría a ocupar >60% de las sesiones de fuerza
+// (con ≥3 sesiones de fuerza), repartiendo el aporte de los full body a torso y pierna.
+function weeklyFocusOverloadReason(targetFocus, targetType, days, dayIndex) {
+  const targetFamily = resolveSessionFocusFamily(targetFocus, targetType);
+  if (!['upper', 'lower', 'full'].includes(targetFamily)) return null;
+
+  const counts = countWeeklyStrengthFamilies(days, dayIndex);
+  const projected = { ...counts, [targetFamily]: counts[targetFamily] + 1 };
+  const totalStrength = projected.upper + projected.lower + projected.full;
+  if (totalStrength < 3) return null;
+
+  // Carga efectiva por cadena: los full body aportan a torso y a pierna.
+  const effective = {
+    upper: projected.upper + projected.full,
+    lower: projected.lower + projected.full,
+    full: projected.full,
+  };
+  const cap = Math.ceil(totalStrength * 0.6);
+  const targetEffective = effective[targetFamily];
+  if (targetEffective > cap) {
+    return `Sobrecargaría ${STRENGTH_FAMILY_LABELS[targetFamily]} esta semana `
+      + `(${targetEffective} de ${totalStrength} sesiones de fuerza); desequilibra el microciclo.`;
+  }
+  return null;
+}
+
 function getSessionVariationCatalog(modality) {
   const template = MODALITY_TEMPLATES[modality] || MODALITY_TEMPLATES[TrainingModality.MIXED];
   const baseVariations = template.map((day) => ({
@@ -1387,12 +1434,12 @@ export function listSessionFocusChangeOptions({
     const current = meta.id === currentFocus;
     const blockReason = current
       ? 'Foco actual.'
-      : focusChangeBlockReason({
+      : (focusChangeBlockReason({
         targetFocus: meta.id,
         targetType: targetDay.sessionType,
         previousDay,
         nextDay,
-      });
+      }) || weeklyFocusOverloadReason(meta.id, targetDay.sessionType, days, dayIndex));
 
     return {
       id: meta.id,

@@ -108,6 +108,34 @@ describe('/api/studio-swap route', () => {
     expect(mocks.updatePlan).not.toHaveBeenCalled();
   });
 
+  it('rejects a non-adjacent change that would overload a strength family for the week', async () => {
+    const aerobicDay = (date) => ({
+      date,
+      dayName: 'Cardio',
+      isTrainingDay: true,
+      sessionType: 'aerobic',
+      sessionFocus: 'cardio_easy',
+      workout: { title: 'Rodaje suave', durationMinutes: 40, exercises: [] },
+    });
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-13', 'upper', 'Torso lunes'),
+      aerobicDay('2026-06-14'),
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+      aerobicDay('2026-06-16'),
+      trainingDay('2026-06-17', 'upper', 'Torso viernes'),
+    ]));
+
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper' }),
+    }));
+    const json = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(json.error).toContain('Sobrecargaría');
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
+
   it('persists a safe muscle-group change for today', async () => {
     mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
       trainingDay('2026-06-15', 'lower', 'Pierna actual'),
