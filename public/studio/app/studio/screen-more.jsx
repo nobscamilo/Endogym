@@ -456,6 +456,11 @@ const AV_EQUIP = [
   { value: 'trx', title: 'TRX', icon: 'zap', detail: 'Suspensión y peso corporal' },
   { value: 'home', title: 'Casa', icon: 'profile', detail: 'Mínimo material' },
 ];
+const TRAINING_LEVELS = [
+  { value: 'novice', title: 'Base', icon: 'leaf', detail: 'Inicio o retorno progresivo' },
+  { value: 'intermediate', title: 'Intermedio', icon: 'progress', detail: 'Entrenas con regularidad' },
+  { value: 'advanced', title: 'Avanzado', icon: 'bolt', detail: 'Toleras más volumen' },
+];
 const RUN_GOALS = [['health', 'Salud'], ['race_5k', '5K'], ['race_10k', '10K'], ['race_21k', '21K'], ['race_42k', '42K']];
 const RUN_REF_DIST = [['', '—'], ['5000', '5K'], ['10000', '10K'], ['21097', '21K'], ['42195', '42K']];
 function findChoice(list, value) { return list.find((item) => item.value === value) || list[0]; }
@@ -474,6 +479,7 @@ function AvailabilitySurvey() {
   const [goalValue, setGoalValue] = useStateP(u.goalTargetValue != null ? String(u.goalTargetValue) : '');
   const [goalDate, setGoalDate] = useStateP(u.goalTargetDate || '');
   const [equip, setEquip] = useStateP(u.modalityRaw || 'full_gym');
+  const [trainingExperience, setTrainingExperience] = useStateP(u.trainingExperience || 'intermediate');
   const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
   const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
   const [refTime, setRefTime] = useStateP(secsToMMSS(u.runRefTimeSeconds));
@@ -505,6 +511,7 @@ function AvailabilitySurvey() {
         method: 'POST', headers,
         body: JSON.stringify({
           goal, trainingModality: equip, sex,
+          trainingExperience,
           age: Number(age), weightKg: Number(weight), heightCm: Number(height),
           sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks),
           // Carrera: objetivo + marca de referencia (para ritmos numéricos).
@@ -583,6 +590,24 @@ function AvailabilitySurvey() {
               <button key={m.value} type="button" className={`choice-tile ${equip === m.value ? 'on' : ''}`} aria-pressed={equip === m.value} onClick={() => setEquip(m.value)}>
                 <span className="choice-head"><span className="choice-icon"><Icon name={m.icon} size={16} /></span><strong>{m.title}</strong></span>
                 <span className="choice-detail">{m.detail}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="profile-step">
+          <div className="profile-step-head">
+            <div>
+              <div className="mb-label">Nivel actual</div>
+              <h4>{(TRAINING_LEVELS.find((x) => x.value === trainingExperience) || TRAINING_LEVELS[1]).title}</h4>
+            </div>
+            <span className="pill tiny">Volumen</span>
+          </div>
+          <div className="profile-choice-grid experience">
+            {TRAINING_LEVELS.map((lvl) => (
+              <button key={lvl.value} type="button" className={`choice-tile ${trainingExperience === lvl.value ? 'on' : ''}`} aria-pressed={trainingExperience === lvl.value} onClick={() => setTrainingExperience(lvl.value)}>
+                <span className="choice-head"><span className="choice-icon"><Icon name={lvl.icon} size={16} /></span><strong>{lvl.title}</strong></span>
+                <span className="choice-detail">{lvl.detail}</span>
               </button>
             ))}
           </div>

@@ -26,7 +26,7 @@
 | `POST` | `/api/workout-analysis` | Analizar UNA sesión del historial (caché permanente por workout). |
 | `GET`, `POST` | `/api/studio-nutrition` | Consultar o generar el plan semanal de comidas del Studio. |
 | `POST` | `/api/studio-availability` | Guardar encuesta de disponibilidad y regenerar plan. |
-| `POST` | `/api/studio-swap` | Cambiar ejercicios o ampliar sesión en el plan guardado. |
+| `POST` | `/api/studio-swap` | Cambiar ejercicios, ampliar sesión o cambiar foco muscular en el plan guardado. |
 | `GET` | `/api/backup` | Export de Firestore a GCS (solo Vercel Cron con `CRON_SECRET`). |
 | `GET` | `/api/products/barcode?code=...` | Consultar Open Food Facts. |
 | `GET` | `/api/account/export` | Exportar datos JSON. |
@@ -119,6 +119,28 @@ Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y 
 - Si hay drift diario o proteína global baja, reintenta una vez y conserva el mejor resultado. Si un plan completo conserva drift severo, responde `502` y no guarda.
 - Los planes guardados incluyen `nutrition.meta.planSignature`. Si el plan de entrenamiento actual ya no coincide con esa huella, `GET` responde `{ "empty": true, "stale": true, "reason": "training_plan_changed" }`; el frontend lo trata como cache ausente y regenera.
 - `GET /api/studio-data` suma `macroEaten` y glucemia de "hoy" usando límites UTC de la fecha local de la app. A las 00:21 en Madrid ya cuenta como el nuevo día aunque UTC aún sea el día anterior.
+
+## Disponibilidad Studio
+
+`POST /api/studio-availability` hace merge parcial del perfil. Además de objetivo, modalidad, minutos, días/semana, comidas, carrera, salud estructurada y reentrada, acepta:
+
+```json
+{
+  "trainingExperience": "novice | intermediate | advanced"
+}
+```
+
+Ese campo se rehidrata por `GET /api/studio-data` y afecta la prescripción determinista de fuerza: volumen/series/descanso se ajustan por nivel. Cuando `daysPerWeek` reduce una plantilla, el planner conserva sesiones prioritarias por objetivo/modalidad en lugar de quedarse con los primeros días del calendario.
+
+## Cambios de sesión en Studio
+
+`POST /api/studio-swap` requiere Firebase ID token y opera sobre la sesión de entrenamiento de la fecha civil de la app.
+
+- Ejercicio individual: `{ "scope": "one", "exerciseId": "gym-bench-press", "reason": "variety" }`.
+- Sesión completa por variedad/tiempo/equipo: `{ "scope": "all", "reason": "time" }`, `{ "reason": "more_time", "targetMinutes": 75 }`.
+- Grupo muscular de hoy: `{ "scope": "focus", "sessionFocus": "upper" }`, donde `sessionFocus` puede ser `upper`, `push`, `pull`, `lower` o `full_body`.
+
+El cambio de grupo solo aplica a sesiones `resistance`/`mixed`. El servidor reconstruye ejercicios, calentamiento y enfriamiento con la prescripción determinista vigente, conserva fase/interferencia del bloque y rechaza (`409`) focos que choquen con la sesión anterior o siguiente para evitar repetir familias musculares en días consecutivos.
 
 ## Check-in diario de entrenamiento
 

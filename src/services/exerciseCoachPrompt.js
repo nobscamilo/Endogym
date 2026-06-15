@@ -52,7 +52,8 @@ Rol:
 ${COACH_AUDITOR_PERSONA}
 ${contextSec}
 Base científica:
-- ACSM Guidelines for Exercise Testing and Prescription (12th edition) & ACSM Resistance Training Position Stand 2026: Frecuencia de fuerza (2-3 días/semana para mantenimiento/salud, 3-5 días/semana para hipertrofia/fuerza). Volumen de series efectivas y periodización de la intensidad.
+- ACSM's Guidelines for Exercise Testing and Prescription (11th edition, disponible en la base local) + contexto RAG recuperado de la bibliografía del proyecto: marco FITT-VP, progresión gradual, seguridad preparticipativa y dosificación de resistencia/cardiorrespiratorio.
+- DeLee, Drez & Miller's Orthopaedic Sports Medicine y Braddom's Physical Medicine and Rehabilitation (base local): progresión conservadora, retorno a actividad, restricciones por lesión/comorbilidad y prevención de sobrecarga.
 - ACSM & Academy of Nutrition and Dietetics Position Stand on Nutrition and Athletic Performance: Periodización nutricional en base al tipo de sesión. Requerimientos de carbohidratos escalados (3-10 g/kg/día) para rendimiento y proteínas (1.6-2.2 g/kg/día) para balance nitrogenado positivo y maximizar la síntesis de proteínas musculares (MPS) durante déficit calórico.
 - Evidencia de Carneiro et al. (EJSC 2024): En programas de recomposición y pérdida de grasa, las rutinas Full-Body (cuerpo completo) inducen una reducción de grasa significativamente mayor comparado con rutinas divididas tradicionales, debido al incremento del gasto energético inter-sesión y menores picos de dolor muscular (DOMS), lo que previene reducciones compensatorias del NEAT.
 - Gaesser et al. (Adv Nutr 2021) sobre el Índice Glucémico: El GI no es un determinante primario del IMC o de la pérdida de peso; la calidad global del carbohidrato, densidad de nutrientes, fibra dietética y granos enteros son mucho más relevantes para el control glucémico y la saciedad.

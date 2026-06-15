@@ -4,6 +4,7 @@ import { withTrace, logError } from '../../../lib/logger.js';
 import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
 import { suggestExerciseAlternatives } from '../../../core/exerciseLibrary.js';
+import { buildSessionFocusChange } from '../../../core/planner.js';
 import { resolveRaceGoal, estimate5kPaceSecPerKm, deriveRunPaces, buildRunPrescription } from '../../../core/running.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 
@@ -31,8 +32,14 @@ export async function POST(request) {
 
     let body;
     try { body = await request.json(); } catch { return errorResponse('JSON inválido.', 400); }
-    const reason = ['time', 'equipment', 'variety', 'more_time'].includes(body?.reason) ? body.reason : 'variety';
-    const scope = (body?.scope === 'all' || reason === 'more_time') ? 'all' : 'one';
+    const requestedFocus = typeof body?.sessionFocus === 'string'
+      ? body.sessionFocus
+      : (typeof body?.targetFocus === 'string' ? body.targetFocus : '');
+    const isFocusSwap = body?.scope === 'focus' || body?.reason === 'focus' || Boolean(requestedFocus);
+    const reason = isFocusSwap
+      ? 'focus'
+      : (['time', 'equipment', 'variety', 'more_time'].includes(body?.reason) ? body.reason : 'variety');
+    const scope = isFocusSwap ? 'focus' : ((body?.scope === 'all' || reason === 'more_time') ? 'all' : 'one');
     const exerciseId = typeof body?.exerciseId === 'string' ? body.exerciseId : null;
     if (scope === 'one' && !exerciseId) return errorResponse('Falta exerciseId.', 400);
 
@@ -51,6 +58,35 @@ export async function POST(request) {
       if (idx < 0) return errorResponse('No hay sesión de entreno hoy.', 409);
       const day = plan.days[idx];
       const exercises = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
+
+      if (scope === 'focus') {
+        const profileForPlan = {
+          ...(profile || {}),
+          goal: plan.goal || profile?.goal,
+          trainingMode: plan.trainingMode || profile?.trainingMode,
+          trainingModality: plan.trainingModality || profile?.trainingModality,
+        };
+        const change = buildSessionFocusChange({
+          days: plan.days,
+          dayIndex: idx,
+          targetFocus: requestedFocus,
+          profile: profileForPlan,
+          adaptiveTuning: plan.adaptiveTuning || null,
+          trainingMode: plan.trainingMode,
+          trainingModality: plan.trainingModality,
+          goal: plan.goal,
+          phase: plan.phase,
+        });
+        if (!change.ok) {
+          return errorResponse(change.error, change.status || 400, change.details);
+        }
+        plan.days[idx] = change.day;
+        const { db } = await getAdminServices();
+        await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
+          .update({ days: plan.days, updatedAt: new Date().toISOString() });
+        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options });
+      }
+
       if (!exercises.length) return errorResponse('La sesión no tiene ejercicios.', 409);
 
       const modality = reason === 'equipment' ? (body?.modality || plan.trainingModality) : plan.trainingModality;

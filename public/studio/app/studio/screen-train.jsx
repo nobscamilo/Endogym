@@ -262,6 +262,35 @@ function SegTabs({ tabs, value, onChange }) {
   );
 }
 
+const SESSION_FOCUS_CHOICES = [
+  { id: 'upper', label: 'Torso' },
+  { id: 'push', label: 'Empuje' },
+  { id: 'pull', label: 'Tracción' },
+  { id: 'lower', label: 'Pierna' },
+  { id: 'full_body', label: 'Full body' },
+];
+const SESSION_FOCUS_LABELS = {
+  upper: 'Torso',
+  push: 'Empuje',
+  pull: 'Tracción',
+  lower: 'Pierna',
+  lower_conditioning: 'Pierna',
+  full_body: 'Full body',
+  general_resistance: 'Fuerza',
+  general_mixed: 'Mixto',
+  cardio: 'Cardio',
+  cardio_easy: 'Zona 2',
+  cardio_long: 'Tirada larga',
+  cardio_tempo: 'Tempo',
+  cardio_intervals: 'Series',
+  cardio_drills: 'Técnica',
+  mindbody: 'Movilidad',
+  recovery: 'Recuperación',
+};
+function sessionFocusLabel(value) {
+  return SESSION_FOCUS_LABELS[value] || value || 'Sesión';
+}
+
 /* ---------- SESIÓN ---------- */
 function TrainSession() {
   const D = window.STUDIO;
@@ -271,6 +300,9 @@ function TrainSession() {
   const [busy, setBusy] = useStateTr(null); // 'all' | exerciseId | null
   const [reason, setReason] = useStateTr('variety');
   const [moreMin, setMoreMin] = useStateTr('');
+  const [focusTarget, setFocusTarget] = useStateTr('');
+  const [focusStatus, setFocusStatus] = useStateTr('idle'); // idle|saving|ok|err
+  const [focusError, setFocusError] = useStateTr('');
   const [logKg, setLogKg] = useStateTr({});
   const [logReps, setLogReps] = useStateTr({});
   const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
@@ -291,6 +323,36 @@ function TrainSession() {
       if (o && o.todaySession) { D.todaySession = o.todaySession; setList(o.todaySession.list); }
       if (o) ['week', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
     } catch (e) { /* noop */ }
+  }
+  async function changeFocus() {
+    if (!focusTarget) return;
+    setBusy('focus');
+    setFocusStatus('saving');
+    setFocusError('');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setFocusStatus('err'); setFocusError('Inicia sesión para cambiar el grupo.'); return; }
+      const r = await fetch('/api/studio-swap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ scope: 'focus', sessionFocus: focusTarget }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        await refreshSession();
+        setFocusTarget('');
+        setFocusStatus('ok');
+        setTimeout(() => setFocusStatus('idle'), 2600);
+      } else {
+        setFocusStatus('err');
+        setFocusError(j.error || 'No se pudo cambiar el grupo.');
+      }
+    } catch (e) {
+      setFocusStatus('err');
+      setFocusError('No se pudo cambiar el grupo.');
+    } finally {
+      setBusy(null);
+    }
   }
   async function swap(scope, exerciseId) {
     setBusy(scope === 'all' ? 'all' : exerciseId);
@@ -375,6 +437,8 @@ function TrainSession() {
   const adjust = D.coachAdjust;
   const adjustVisible = adjust && Array.isArray(adjust.rules) && adjust.rules.length
     && (adjust.volumeFactor == null || adjust.volumeFactor !== 1);
+  const canChangeSessionFocus = ['resistance', 'mixed'].includes(s.sessionType)
+    || (!s.sessionType && !s.runPrescription && Array.isArray(s.list) && s.list.length);
   return (
     <React.Fragment>
       {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
@@ -395,7 +459,7 @@ function TrainSession() {
           <div>
             <p className="eyebrow" style={{ color: 'rgba(255,255,255,0.85)' }}>Sesión de hoy</p>
             <h2 style={{ fontSize: '1.7rem', margin: '6px 0 0' }}>{s.title}</h2>
-            <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{s.focus} · {s.durationMin} min · {s.intensity}</p>
+            <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{sessionFocusLabel(s.focus)} · {s.durationMin} min · {s.intensity}</p>
           </div>
           <div className="row ac wrap" style={{ gap: 8 }}>
             <button className="btn" style={{ background: '#fff', color: 'var(--accent-deep)', boxShadow: 'none', whiteSpace: 'nowrap' }}
@@ -418,6 +482,33 @@ function TrainSession() {
         </div>
         <div className="bar" style={{ background: 'rgba(255,255,255,0.25)' }}><i style={{ width: pct + '%', background: '#fff' }} /></div>
       </div>
+
+      {canChangeSessionFocus ? (
+        <div className="card focus-switch-card">
+          <div className="focus-switch-copy">
+            <span className="ico"><Icon name="target" size={18} /></span>
+            <div>
+              <strong>Grupo muscular</strong>
+              <span>{sessionFocusLabel(s.focus)}</span>
+            </div>
+          </div>
+          <div className="focus-switch-actions">
+            <select className="reason-select focus-select" value={focusTarget} onChange={(e) => setFocusTarget(e.target.value)} title="Grupo muscular">
+              <option value="">Elegir grupo</option>
+              {SESSION_FOCUS_CHOICES.map((option) => (
+                <option key={option.id} value={option.id} disabled={option.id === s.focus}>
+                  {option.label}{option.id === s.focus ? ' actual' : ''}
+                </option>
+              ))}
+            </select>
+            <button className="btn ghost sm" disabled={!focusTarget || busy === 'focus'} onClick={changeFocus}>
+              <Icon name="target" size={14} /> {busy === 'focus' ? 'Cambiando…' : 'Cambiar grupo'}
+            </button>
+          </div>
+          {focusStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Sesión ajustada.</span> : null}
+          {focusStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{focusError}</span> : null}
+        </div>
+      ) : null}
 
       {/* Prescripción de carrera (solo días de carrera) */}
       {s.runPrescription ? (() => {

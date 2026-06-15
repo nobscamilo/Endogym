@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { GoalType, TrainingModality } from '../../src/domain/models.js';
 import {
+  buildSessionFocusChange,
   generateWeeklyPlan,
+  listSessionFocusChangeOptions,
   normalizeWeeklyPlanSessionFocus,
   suggestSessionAlternatives,
 } from '../../src/core/planner.js';
@@ -323,6 +325,89 @@ describe('exercise muscle metadata', () => {
         })
       ))
     ).toBe(true);
+  });
+
+  it('blocks muscle-group focus changes that would repeat an adjacent strength family', () => {
+    const days = [
+      {
+        date: '2026-04-06',
+        sessionType: 'resistance',
+        sessionFocus: 'lower',
+        workout: { title: 'Pierna', durationMinutes: 60, exercises: [] },
+      },
+      {
+        date: '2026-04-07',
+        sessionType: 'resistance',
+        sessionFocus: 'lower',
+        workout: { title: 'Pierna actual', durationMinutes: 60, exercises: [] },
+      },
+      {
+        date: '2026-04-08',
+        sessionType: 'resistance',
+        sessionFocus: 'upper',
+        workout: { title: 'Torso mañana', durationMinutes: 60, exercises: [] },
+      },
+    ];
+
+    const options = listSessionFocusChangeOptions({ days, dayIndex: 1 });
+    const upper = options.find((option) => option.id === 'upper');
+
+    expect(upper.available).toBe(false);
+    expect(upper.reason).toContain('siguiente');
+  });
+
+  it('builds a safe muscle-group focus change with compatible exercises and dynamic warmup', () => {
+    const days = [
+      {
+        date: '2026-04-06',
+        sessionType: 'aerobic',
+        sessionFocus: 'cardio_easy',
+        workout: { title: 'Rodaje suave', durationMinutes: 40, exercises: [] },
+      },
+      {
+        date: '2026-04-07',
+        sessionType: 'resistance',
+        sessionFocus: 'lower',
+        workout: {
+          title: 'Pierna actual',
+          durationMinutes: 60,
+          intensityRpe: 'RPE 7-8',
+          exercises: [],
+        },
+      },
+      {
+        date: '2026-04-08',
+        sessionType: 'aerobic',
+        sessionFocus: 'cardio_easy',
+        workout: { title: 'Rodaje suave', durationMinutes: 40, exercises: [] },
+      },
+    ];
+
+    const change = buildSessionFocusChange({
+      days,
+      dayIndex: 1,
+      targetFocus: 'upper',
+      profile: {
+        goal: GoalType.HYPERTROPHY,
+        trainingMode: 'gym',
+        trainingModality: TrainingModality.FULL_GYM,
+        weightKg: 84,
+      },
+      trainingModality: TrainingModality.FULL_GYM,
+      goal: GoalType.HYPERTROPHY,
+    });
+
+    expect(change.ok).toBe(true);
+    expect(change.day.sessionFocus).toBe('upper');
+    expect(change.day.workout.title).toContain('Torso');
+    expect(change.day.workout.warmup.length).toBeGreaterThan(0);
+    expect(change.day.workout.exercises.length).toBeGreaterThan(0);
+    expect(change.day.workout.exercises.every((exercise) =>
+      isExerciseCompatibleWithSessionFocus(exercise, {
+        sessionType: 'resistance',
+        sessionFocus: 'upper',
+      })
+    )).toBe(true);
   });
 
   it('repairs old persisted torso days that contain lower-body exercises', () => {

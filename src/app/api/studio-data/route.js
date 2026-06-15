@@ -233,6 +233,7 @@ function mapUser(profile, authUser) {
   if (num(p.mealsPerDay) !== undefined) out.mealsPerDay = num(p.mealsPerDay);
   if (num(p.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(p.preferredDurationMinutes);
   if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
+  if (['novice', 'intermediate', 'advanced'].includes(p.trainingExperience)) out.trainingExperience = p.trainingExperience;
   // Carrera (para prefijar la encuesta).
   if (p.runRaceGoal) out.runRaceGoal = p.runRaceGoal;
   if (num(p.runRefDistanceMeters) !== undefined) out.runRefDistanceMeters = num(p.runRefDistanceMeters);

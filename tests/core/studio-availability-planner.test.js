@@ -37,4 +37,28 @@ describe('studio availability honored in planner', () => {
     // Sigue habiendo 7 días en total (los sobrantes pasan a descanso activo).
     expect(plan.days.length).toBe(7);
   });
+
+  it('preserves key hybrid-run sessions instead of keeping only the first calendar days', () => {
+    const plan = generateWeeklyPlan({
+      profile: {
+        ...baseProfile,
+        goal: 'endurance',
+        trainingModality: 'hybrid_run_gym',
+        runRaceGoal: 'race_21k',
+        raceDate: '2026-11-08',
+        studioAvailability: true,
+        daysPerWeek: 3,
+        preferredDurationMinutes: 45,
+      },
+      startDate,
+    });
+
+    const training = plan.days.filter((d) => d.isTrainingDay);
+    const focuses = training.map((d) => d.sessionFocus);
+
+    expect(training.length).toBe(3);
+    expect(focuses).toContain('cardio_long');
+    expect(focuses.some((focus) => focus === 'cardio_intervals' || focus === 'cardio_tempo')).toBe(true);
+    expect(training.some((d) => d.sessionType === 'resistance')).toBe(true);
+  });
 });

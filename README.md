@@ -27,7 +27,7 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación local documentada: **12 de junio de 2026** (fix calendario/horas de Nutrición, `235` tests y build OK). Último deploy público documentado: **12 de junio de 2026**, `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` con alias manual a `endogym.vercel.app` y bundle `08bbcab4a0`. Última sonda integral `e2e:production`: **10 de junio de 2026**; las sondas básicas más recientes verificaron `/`, `/api/health` y rechazos `401` esperados.
+Última verificación local documentada: **15 de junio de 2026** (prescripción desde Perfil + cambio de grupo muscular en Entreno, `251` tests y build OK). Último deploy público documentado: **12 de junio de 2026**, `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` con alias manual a `endogym.vercel.app` y bundle `08bbcab4a0`. Última sonda integral `e2e:production`: **10 de junio de 2026**; las sondas básicas más recientes verificaron `/`, `/api/health` y rechazos `401` esperados.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
 - `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente según la última verificación completa registrada. La suite actual documentada tiene `235` tests.
@@ -44,6 +44,8 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - El coach tiene persona única server-side, detector determinista de red flags sin Gemini/rate limit, RAG por pregunta, memoria conversacional acotada, digest nutricional/recuperación 7d y cierre del loop entre recomendaciones y evolución real.
 - La prescripción de entrenamiento usa bloque estable de 21 días con overlay adaptativo, DAPRE por desempeño real, objetivos SMART medibles, calentamiento/vuelta a la calma dinámicos y restricciones de comorbilidad en la selección de ejercicios.
 - Perfil muestra objetivos y disponibilidad como decisiones jerárquicas (objetivo, meta, modalidad/equipo, carrera y resumen microciclo/mesociclo), con `Flexible` en vez de `Mixto`; el chat móvil del coach se monta como modal a pantalla completa con input visible.
+- La prescripción desde Perfil ahora guarda `trainingExperience` (`novice`/`intermediate`/`advanced`), modula volumen/series/descanso de fuerza y, al reducir `daysPerWeek`, preserva sesiones clave del microciclo (por ejemplo tirada larga + calidad + fuerza en `Correr + gym` con carrera) en vez de conservar simplemente los primeros días del calendario.
+- Entreno permite cambiar el grupo muscular de la sesión de fuerza/mixta del día (`upper`/`push`/`pull`/`lower`/`full_body`) sin regenerar el bloque: el servidor reconstruye la sesión y bloquea cambios que repitan la familia muscular de días adyacentes.
 - Nutrición usa calendario local de la app (`Europe/Madrid` por defecto) para seleccionar el día actual, calcular la semana cacheada y agrupar comidas de "hoy"; esto evita que después de medianoche siga mostrando el día UTC anterior.
 - `POST /api/studio-nutrition` genera semana completa con Gemini, cachea por semana, valida kcal/proteína por día antes de guardar planes completos e invalida cache si cambia la huella del plan de entrenamiento.
 - La raíz `/` entrega el Firebase ID token al iframe del Studio por `postMessage` de mismo origen para evitar que móvil/iframe muestre el entreno demo cuando la restauración interna de Firebase Auth se retrasa.

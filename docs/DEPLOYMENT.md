@@ -20,12 +20,12 @@ gcloud firestore indexes composite create \
 
 ## Estado verificado
 
-Último estado confirmado en docs: **12 de junio de 2026**.
+Último estado confirmado en docs: **15 de junio de 2026** para verificación local; producción pública sigue en el deploy del **12 de junio de 2026**.
 
-- FASES 0-2 del coach/prescripción completas, Perfil objetivos/equipo rediseñado, chat móvil corregido y calendario/horas de Nutrición corregidos, `235` tests verdes y build OK.
+- FASES 0-2 del coach/prescripción completas, Perfil objetivos/equipo rediseñado, chat móvil corregido y calendario/horas de Nutrición corregidos. El 15 de junio se reforzó localmente la prescripción desde Perfil (`trainingExperience`, recorte inteligente de `daysPerWeek`, claims de bibliografía corregidos): `247` tests verdes y build OK.
 - Deploy más reciente documentado: `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` (`https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`) con alias manual a `endogym.vercel.app`.
 - Sondas básicas recientes: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401` y `/api/coach-chat` sin token `401`.
-- Último bundle con cambios de UI documentado: `08bbcab4a0` (Nutrición selecciona hoy por calendario local y evita titulares horarios engañosos).
+- Último bundle con cambios de UI desplegado en producción: `08bbcab4a0` (Nutrición selecciona hoy por calendario local y evita titulares horarios engañosos). Bundle local pendiente de deploy tras la mejora de Perfil: `e102303dd5`.
 
 Deploy manual relevante del **12 de junio de 2026**:
 

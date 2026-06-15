@@ -86,6 +86,14 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     });
   });
 
+  it('persiste el nivel de entrenamiento cuando es válido', async () => {
+    await post({ trainingExperience: 'novice' });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].trainingExperience).toBe('novice');
+
+    await post({ trainingExperience: 'élite' });
+    expect(mocks.upsertUserProfile.mock.calls[1][1].trainingExperience).toBeUndefined();
+  });
+
   it('razón de reentrada inválida se ignora', async () => {
     await post({ reentryReason: 'hackeo' });
     expect(mocks.upsertUserProfile.mock.calls[0][1].reentry).toBeUndefined();

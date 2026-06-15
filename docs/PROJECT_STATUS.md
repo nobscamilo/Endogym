@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **12 de junio de 2026 (sesión de consolidación: fecha civil unificada, comorbilidades estructuradas, sondas reales)**.
+Ultima actualizacion: **15 de junio de 2026 (prescripción Perfil/FITT-VP + cambio de grupo muscular, verificación local)**.
+
+## Sesión del 15 de junio de 2026 (prescripción desde Perfil + cambio de grupo muscular)
+
+Implementado en código y **verificado localmente**; **no desplegado en producción** en esta sesión. Bundle Studio regenerado: `studio.bundle.js?v=a0e5d9dc07`.
+
+- **Crítica corregida:** en `Correr + gym`, si el usuario reducía `daysPerWeek`, el planner conservaba los primeros días de la plantilla y podía eliminar la tirada larga de un objetivo 21K. Ahora `generateWeeklyPlan` selecciona qué días conservar por prioridad de objetivo/modalidad: con carrera específica preserva tirada larga, sesión de calidad y al menos una fuerza; para salud prioriza Z2 + fuerza. En `full_gym` con pocos días conserva un equilibrio torso/pierna antes que cardio accesorio.
+- **Nivel de entrenamiento en Perfil:** la UI guarda `trainingExperience` (`novice`/`intermediate`/`advanced`) vía `POST /api/studio-availability`, `studio-data` lo rehidrata, y `exerciseLibrary` lo usa para modular dosis: principiantes reducen volumen efectivo, avanzados toleran más series, y fuerza usa descansos más acordes al objetivo/nivel.
+- **Bibliografía/claims:** `buildAcsmPrescription.source` y `exerciseCoachPrompt` dejaron de afirmar ACSM 12th/position stand 2026 no trazado en el repo. Ahora referencian ACSM 11th + DeLee/Braddom y el contexto RAG local recuperable desde `guideline_passages`.
+- **Cambio de grupo muscular desde Entreno:** la pantalla de sesión muestra un control "Grupo muscular" para fuerza/mixto. `POST /api/studio-swap` acepta `scope:'focus'` + `sessionFocus` (`upper`/`push`/`pull`/`lower`/`full_body`) y reconstruye solo la sesión de hoy con `buildSessionExercises`, calentamiento/enfriamiento dinámicos, restricciones por comorbilidad, factor de fase e interferencia concurrente. El servidor bloquea cambios que pisen la sesión anterior/siguiente según la familia de foco (`upper`/`lower`/`full`) para no romper la recuperación del microciclo.
+- **Mejoras sugeridas pendientes:** quedaron añadidas al roadmap como backlog de prescripción: previsualizar opciones bloqueadas, sugerir reordenar sesiones cuando haya conflicto, check-in por grupo muscular, inventario real de equipo/preferencias, registro por serie, explicación/citas de la prescripción y revisión mensual del mesociclo.
+- **Seguridad de dependencia:** `npm audit fix` actualizó transitivos (`form-data`, `protobufjs`, `vite`/`rolldown`) y dejó `npm audit` en 0 vulnerabilidades; `package.json` no cambió.
+- **Verificación local:** `npm run build:studio`, `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (36 archivos / 251 tests) y `npm run build` OK. Playwright local contra `/studio/app/index.html` verificó Perfil desktop/móvil y Entreno desktop/móvil; el control "Grupo muscular" aparece sin overflow (capturas en `output/playwright/focus-switch-{desktop,mobile}.png`).
 
 ## Sesión del 12 de junio de 2026, mañana-2 (CONSOLIDACIÓN)
 

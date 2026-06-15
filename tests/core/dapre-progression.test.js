@@ -71,4 +71,27 @@ describe('buildExercisePrescription con DAPRE', () => {
     });
     expect(p.loadKg).toBe(95); // 100 × 1.05 × 0.9 = 94.5 → 95 (paso 2.5)
   });
+
+  it('modula series y descanso por nivel de entrenamiento', () => {
+    const novice = buildExercisePrescription(exercise, {
+      ...base,
+      goal: 'strength',
+      profile: { weightKg: 80, trainingExperience: 'novice' },
+    });
+    const advanced = buildExercisePrescription(exercise, {
+      ...base,
+      goal: 'strength',
+      profile: { weightKg: 80, trainingExperience: 'advanced' },
+    });
+    const intermediate = buildExercisePrescription(exercise, {
+      ...base,
+      goal: 'strength',
+      profile: { weightKg: 80, trainingExperience: 'intermediate' },
+    });
+
+    expect(novice.sets).toBeLessThan(advanced.sets);
+    expect(advanced.sets).toBeGreaterThan(intermediate.sets);
+    expect(novice.restSeconds).toBe(120);
+    expect(advanced.restSeconds).toBe(180);
+  });
 });

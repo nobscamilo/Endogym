@@ -1,6 +1,6 @@
 # Rediseño "Ignios" (Studio) — rama `redesign/endogym-studio` (mergeada a `main`)
 
-Última actualización: **12 de junio de 2026 — Nutrición por calendario local desplegada**.
+Última actualización: **15 de junio de 2026 — prescripción desde Perfil + cambio de grupo muscular verificados localmente**.
 
 ## Lanzamiento oficial
 
@@ -21,6 +21,8 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
 - **Objetivos SMART y prescripción data-driven (11 jun):** Perfil guarda `profile.goalTarget` (peso objetivo o e1RM + fecha) y Progreso muestra "Tu objetivo" con meta, valor actual, tendencia y predicción. La fuerza progresa con DAPRE por reps/RPE reales; calentamiento/vuelta a la calma y selección de ejercicios respetan comorbilidades.
 - **Perfil por jerarquía (11 jun, noche-4):** la encuesta de Perfil separa objetivo principal, meta medible, modalidad/equipo, subobjetivo de carrera y datos personales. La opción visible `Mixto` se sustituyó por **Flexible** (valor interno `mixed` intacto). El resumen del bloque enseña microciclo, mesociclo/bloque de 21 días, revisión y fecha clave para hacer visible la periodización real.
 - **Nutrición por calendario local (12 jun):** el rail de días se sincroniza con la semana civil del navegador y selecciona hoy por `dateISO`; el backend usa `Europe/Madrid` por defecto para "hoy", límites de comidas y `weekKey` del plan nutricional. Esto evita que pasada medianoche en España se siga mostrando el día UTC anterior o un índice obsoleto del cache.
+- **Prescripción desde Perfil (15 jun, local):** Perfil añade `trainingExperience` (Base/Intermedio/Avanzado). El backend lo persiste y lo usa para modular volumen/series/descanso. Si `daysPerWeek` recorta el microciclo, el planner conserva sesiones prioritarias por objetivo/modalidad (p. ej. tirada larga + calidad + fuerza para `Correr + gym` con carrera) en lugar de guardar los primeros días del calendario.
+- **Cambio de grupo muscular (15 jun, local):** Entreno muestra "Grupo muscular" en sesiones de fuerza/mixtas. Al elegir Torso/Empuje/Tracción/Pierna/Full body, `POST /api/studio-swap` reconstruye solo la sesión de hoy y bloquea focos que repitan la familia muscular de días adyacentes.
 
 > Estas features se editan en `public/studio/app/studio/{screen-train,screen-nutrition}.jsx` + `screens.css` y requieren **regenerar el bundle** (`npm run build:studio`, mantenedor) y commitearlo.
 
@@ -28,8 +30,9 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
 
 - **Fase 1 — Encuesta de disponibilidad (hecha):** en Perfil (`AvailabilitySurvey`): objetivo, equipo (→`trainingModality`), min/sesión (`preferredDurationMinutes`), días/semana (`daysPerWeek`), comidas/día, y cada cuántas semanas re-preguntar (`resurveyWeeks`). Endpoint **`/api/studio-availability`** (merge PARCIAL del perfil con `upsertUserProfile`, no resetea; marca `studioAvailability:true`). Al guardar, regenera el plan (`/api/weekly-plan`) y refresca datos. El planner honra `preferredDurationMinutes` **solo si `studioAvailability===true`** (no altera defaults ni tests).
   - **Objetivo, equipo, tiempo, comidas y días/semana re-ajustan el plan/macros de verdad** (el planner ya los usa, gated por `studioAvailability`).
-- **Fase 2 — Swap de ejercicios (hecho):** endpoint **`/api/studio-swap`** (POST) cambia un ejercicio (`scope:'one'` + `exerciseId`) o toda la sesión de hoy (`scope:'all'`) con alternativas de `suggestExerciseAlternatives()` y **lógica no-repeat** (evita ejercicios de otros días del plan). `reason`: `variety` | `time` (recorta nº de ejercicios) | `equipment`. Aplica en servidor (persiste el plan) y el cliente refresca `/api/studio-data`. UI en Entreno: botón "Cambiar" por ejercicio (necesita `id`, ya expuesto en `studio-data`) y "Cambiar sesión" con selector de motivo.
+- **Fase 2 — Swap de ejercicios y foco muscular (hecho):** endpoint **`/api/studio-swap`** (POST) cambia un ejercicio (`scope:'one'` + `exerciseId`) o toda la sesión de hoy (`scope:'all'`) con alternativas de `suggestExerciseAlternatives()` y **lógica no-repeat** (evita ejercicios de otros días del plan). `reason`: `variety` | `time` (recorta nº de ejercicios) | `equipment`. También acepta `scope:'focus'` + `sessionFocus` (`upper`/`push`/`pull`/`lower`/`full_body`) para cambiar el grupo muscular de fuerza/mixto sin regenerar el bloque; el servidor bloquea conflictos con días adyacentes. Aplica en servidor (persiste el plan) y el cliente refresca `/api/studio-data`. UI en Entreno: botón "Cambiar" por ejercicio (necesita `id`, ya expuesto en `studio-data`), "Cambiar sesión" con selector de motivo y control "Grupo muscular".
   - **Honor de `daysPerWeek` (hecho):** el planner convierte los días de entreno sobrantes en descanso activo cuando `daysPerWeek` es menor (gated por `studioAvailability`).
+  - **Mejoras sugeridas pendientes:** previsualizar opciones de grupo disponibles/bloqueadas antes del POST; si un foco choca, proponer reordenar la semana o cambiar la sesión vecina; recoger dolor/agujetas por grupo muscular antes del cambio; usar inventario real de equipo y ejercicios excluidos/favoritos; registrar por serie para afinar DAPRE; mostrar una explicación breve de la prescripción con citas RAG cuando existan.
 
 ## Marca Ignios (logo oficial)
 
@@ -120,3 +123,9 @@ Verificación local y producción adicional del 12 jun 2026, madrugada-2:
 - Playwright local contra `/studio/app/index.html`: Nutrición muestra `Vie 12` activo y no conserva `Lun 8` al abrir la pantalla.
 - Deploy `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq`, alias manual `endogym.vercel.app` → `https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`.
 - `https://endogym.vercel.app/studio/app/index.html?verify=08bbcab4a0` sirve `studio.bundle.js?v=08bbcab4a0`; Playwright producción muestra `Vie 12` activo en Nutrición.
+
+Verificación local adicional del 15 jun 2026:
+
+- `npm run build:studio` OK; bundle cache-bust `a0e5d9dc07`.
+- `npm run check:conflicts`, `npm run audit` (0 vulnerabilidades), `npm run smoke`, `npm test` (36 archivos, 251 tests) y `npm run build` OK.
+- Playwright local contra `/studio/app/index.html`: Perfil desktop/móvil muestra el bloque "Nivel actual" sin overflow y Entreno desktop/móvil muestra el control "Grupo muscular" sin overflow.

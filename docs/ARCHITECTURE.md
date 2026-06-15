@@ -87,6 +87,9 @@ users/{userId}/rateLimits/{scope}
 - En ese caso recalcula `progressMemory`/`adaptiveTuning` con datos recientes y guarda un `adaptiveOverlay` en el plan activo, sin crear un plan nuevo.
 - `studio-data` calcula el mismo overlay en lectura para que el Studio muestre ajustes recientes aunque el usuario no haya pulsado regenerar.
 - El overlay es metadata de ajuste; no reescribe el mesociclo ni compone deloads acumulativos sobre las prescripciones base.
+- Si Perfil define `daysPerWeek`, el planner no conserva simplemente los primeros días: selecciona días por prioridad FITT-VP según objetivo/modalidad. En `hybrid_run_gym` con carrera específica conserva tirada larga, calidad y fuerza; en `full_gym` con pocos días preserva balance torso/pierna.
+- Perfil puede guardar `trainingExperience` (`novice`/`intermediate`/`advanced`); la prescripción de fuerza lo usa para ajustar volumen efectivo, series y descansos sin depender de IA.
+- `studio-swap` puede cambiar el foco muscular de la sesión de hoy (`scope:'focus'`) sin regenerar el bloque. La lógica vive en `planner.js` (`buildSessionFocusChange`/`listSessionFocusChangeOptions`) y bloquea conflictos con días adyacentes antes de persistir el plan.
 
 ## Flujo Coach chat Studio
 

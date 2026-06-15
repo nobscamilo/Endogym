@@ -1232,6 +1232,25 @@ function resolveTimePrescription(sessionType) {
   return { durationMinutes: 6, workRatio: 'intervalado' };
 }
 
+function resolveTrainingExperience(profile) {
+  const value = String(profile?.trainingExperience || '').toLowerCase();
+  if (value === 'novice' || value === 'advanced') return value;
+  return 'intermediate';
+}
+
+function experienceSetFactor(experience) {
+  if (experience === 'novice') return 0.75;
+  if (experience === 'advanced') return 1.25;
+  return 1;
+}
+
+function resolveRestSeconds(goal, experience) {
+  if (goal === GoalType.STRENGTH) return experience === 'novice' ? 120 : 180;
+  if (goal === GoalType.HYPERTROPHY || goal === GoalType.RECOMPOSITION) return 90;
+  if (goal === GoalType.ENDURANCE || goal === GoalType.WEIGHT_LOSS || goal === GoalType.GLYCEMIC_CONTROL) return 60;
+  return 75;
+}
+
 export function normalizeExerciseHistoryKey(value) {
   return String(value || '')
     .toLowerCase()
@@ -1327,8 +1346,15 @@ export function buildExercisePrescription(exercise, { goal, sessionType, profile
   }
 
   const repRange = resolveRepRange(goal);
+  const experience = resolveTrainingExperience(profile);
   const setFactor = sessionType === 'mixed' ? 0.9 : 1;
-  const sets = Math.max(2, Math.round(repRange.sets * toNumber(adaptiveTuning?.workout?.volumeFactor, 1) * setFactor * clamp(toNumber(setScale, 1), 0.6, 1)));
+  const sets = Math.max(2, Math.round(
+    repRange.sets
+      * toNumber(adaptiveTuning?.workout?.volumeFactor, 1)
+      * setFactor
+      * experienceSetFactor(experience)
+      * clamp(toNumber(setScale, 1), 0.6, 1)
+  ));
   const historyEntry = resolveHistoryLoad(exercise, liftHistory);
   // DAPRE: con reps reales de la última sesión, el desempeño manda sobre la fase.
   const dapre = computeDapreProgression({ lastReps: historyEntry.reps, repsRange: repRange.reps, rpe: historyEntry.rpe });
@@ -1350,7 +1376,7 @@ export function buildExercisePrescription(exercise, { goal, sessionType, profile
     format: 'reps',
     sets,
     reps: repRange.reps,
-    restSeconds: goal === GoalType.STRENGTH ? 120 : 75,
+    restSeconds: resolveRestSeconds(goal, experience),
     loadKg,
     loadSource: source, // 'history'/'history_name' (desde registro) | 'estimate' (estimación inicial)
     // Transparencia del método: 'dapre' (desempeño real) o 'phase' (fallback sin reps).
@@ -1514,6 +1540,7 @@ export function buildSessionExercises({
 
   const intensity = profile?.preparticipation?.desiredIntensity || 'moderate';
   const resolvedGoal = goal || profile?.goal || 'recomposition';
+  const experience = resolveTrainingExperience(profile);
 
   const highVolumeGoals = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'cut', 'bulk']);
   const screening = profile?.preparticipation ? evaluatePreparticipationScreening(profile.preparticipation) : null;
@@ -1547,6 +1574,12 @@ export function buildSessionExercises({
   // alta carga de carrera para no comprometer la recuperación ni el rendimiento de carrera.
   if ((sessionType === 'resistance' || sessionType === 'mixed') && interferenceScale < 1) {
     desiredCount = Math.max(3, Math.round(desiredCount * interferenceScale));
+  }
+
+  // ACSM/rehabilitación: en personas que empiezan o vuelven tras mucho tiempo, la primera
+  // palanca de seguridad es menor volumen efectivo, no ejercicios más complejos.
+  if ((sessionType === 'resistance' || sessionType === 'mixed') && experience === 'novice') {
+    desiredCount = Math.max(3, desiredCount - 1);
   }
 
   const selectedPool = selectExercisesFromPool(pool, {

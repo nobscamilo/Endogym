@@ -11,6 +11,7 @@ import { upsertUserProfile } from '../../../lib/repositories/firestoreRepository
 const GOALS = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'endurance', 'glycemic_control']);
 const MODALITIES = new Set(['full_gym', 'home', 'trx', 'mixed', 'hybrid_run_gym']);
 const RACE_GOALS = new Set(['health', 'race_5k', 'race_10k', 'race_21k', 'race_42k']);
+const TRAINING_EXPERIENCE = new Set(['novice', 'intermediate', 'advanced']);
 
 export async function POST(request) {
   return withTrace('studio_availability', async ({ traceId }) => {
@@ -39,6 +40,7 @@ export async function POST(request) {
     if (Number.isFinite(days)) patch.daysPerWeek = Math.min(7, Math.max(1, Math.round(days)));
     const weeks = Number(body?.resurveyWeeks);
     if (Number.isFinite(weeks)) patch.resurveyWeeks = Math.min(26, Math.max(1, Math.round(weeks)));
+    if (TRAINING_EXPERIENCE.has(body?.trainingExperience)) patch.trainingExperience = body.trainingExperience;
     // Datos personales (también merge parcial, no resetean el resto del perfil).
     const age = Number(body?.age);
     if (Number.isFinite(age)) patch.age = Math.min(100, Math.max(12, Math.round(age)));

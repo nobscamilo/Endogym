@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **12 de junio de 2026 (Nutricion calendario local desplegada)**.
+Ultima actualizacion: **15 de junio de 2026 (prescripción desde Perfil + cambio de grupo muscular verificados localmente)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -77,6 +77,18 @@ Ultima actualizacion: **12 de junio de 2026 (Nutricion calendario local desplega
 - [x] Añadir recuperación de contraseña Firebase y favicon propio.
 - [x] Rediseñar cómo se muestran objetivos y equipo disponible en Perfil: separar resultado principal, modalidad/equipo y subobjetivo de carrera; sustituir `Mixto` visible por `Flexible`; mostrar microciclo/mesociclo/revisión/fecha clave. Implementado y verificado localmente el 11 jun 2026; desplegado el 12 jun 2026 con bundle `6ff6352714`.
 - [x] Corregir calendario/horas de Nutrición: rail semanal y selección por `dateISO` local, `studio-data`/`studio-nutrition`/`studio-swap` usando fecha civil de app (`Europe/Madrid` por defecto). Desplegado el 12 jun 2026 con bundle `08bbcab4a0`.
+- [x] Mejorar prescripción desde Perfil: añadir nivel de entrenamiento, modular volumen/series/descanso y seleccionar días prioritarios por FITT-VP cuando `daysPerWeek` recorta el microciclo. Verificado localmente el 15 jun 2026; pendiente deploy.
+- [x] Permitir cambiar grupo muscular en Entreno sin regenerar el bloque: `studio-swap` acepta `scope:'focus'`, reconstruye la sesión de hoy y bloquea repeticiones de familia muscular en días adyacentes. Verificado localmente el 15 jun 2026; pendiente deploy.
+
+## P2 - Prescripción de ejercicio: mejoras sugeridas pendientes
+
+- [ ] Mostrar opciones de grupo muscular disponibles/bloqueadas antes de enviar el cambio: el backend ya puede razonar conflictos; falta exponer esa matriz a la UI para deshabilitar, por ejemplo, `Torso` si mañana ya toca torso, con motivo visible.
+- [ ] Ofrecer alternativa cuando un grupo muscular queda bloqueado: en vez de solo rechazar, sugerir "mover la sesión vecina", "hacer recuperación activa" o "elegir grupo compatible", preservando `daysPerWeek`, carga semanal y fase.
+- [ ] Añadir check-in rápido por grupo muscular antes de cambiar foco: agujetas/dolor local (pierna, torso, hombro, lumbar) para modular volumen, evitar patrones dolorosos y no depender únicamente del calendario.
+- [ ] Mejorar inventario de equipo y preferencias: permitir marcar ejercicios excluidos/favoritos, material disponible real (poleas, barra, mancuernas, bandas, máquinas) y limitaciones temporales; usarlo en `buildSessionExercises` y swaps.
+- [ ] Registrar ejecución por serie, no solo valores agregados: kg/reps/RIR o RPE por set y dolor/técnica opcional. Esto haría DAPRE y detección de estancamiento mucho más fiables, pero aumenta fricción; debe diseñarse con modo rápido.
+- [ ] Mostrar el "por qué" de la prescripción de fuerza: volumen, intensidad, descanso y selección de ejercicios explicados con datos del perfil, historial y bibliografía RAG recuperada; evitar claims si no hay pasajes/citas disponibles.
+- [ ] Revisión mensual del mesociclo desde datos reales: detectar si el usuario cambia mucho de grupo/sesión, si se saltan patrones o si hay fatiga localizada repetida, y proponer regenerar el bloque en lugar de acumular parches.
 
 ## P2 - Check-in diario seguro
 
@@ -107,7 +119,7 @@ Mejora a búsqueda semántica respetando "no Vertex". Estado:
 - [ ] Ampliar historial y progresion.
 - [ ] Mejorar recomendaciones pre/post entreno con limites clinicos claros.
 - [ ] Diseñar reevaluación o clearance explícito para levantar el gate diario de síntomas sin depender solo de la ventana reciente.
-- [ ] Revisar y completar la sección de perfil del usuario.
+- [ ] Revisar y completar la sección de perfil del usuario (queda onboarding/UX más guiado; la dosis de prescripción Perfil se reforzó el 15 jun 2026).
 - [ ] Refinar onboarding corto de Perfil: guiar el primer objetivo en menos pasos y explicar solo lo necesario sin tutorial largo.
 - [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
 - [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.

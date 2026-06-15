@@ -299,6 +299,40 @@ function sessionFocusesConflict(leftFocus, rightFocus, leftType = '', rightType 
   return leftFamily === rightFamily;
 }
 
+const STRENGTH_FOCUS_CHANGE_OPTIONS = [
+  { id: 'upper', label: 'Torso', title: 'Torso' },
+  { id: 'push', label: 'Empuje', title: 'Empuje' },
+  { id: 'pull', label: 'Tracción', title: 'Tracción' },
+  { id: 'lower', label: 'Pierna', title: 'Pierna' },
+  { id: 'full_body', label: 'Full body', title: 'Full body' },
+];
+
+function focusChangeMeta(sessionFocus) {
+  return STRENGTH_FOCUS_CHANGE_OPTIONS.find((option) => option.id === sessionFocus) || null;
+}
+
+function focusChangeTitle(modality, sessionFocus) {
+  const meta = focusChangeMeta(sessionFocus);
+  const label = meta?.title || 'Fuerza';
+  if (modality === TrainingModality.HYBRID_RUN_GYM || modality === TrainingModality.FULL_GYM) return `Gym · ${label}`;
+  if (modality === TrainingModality.HOME) return `Casa · ${label}`;
+  if (modality === TrainingModality.TRX) return `TRX · ${label}`;
+  if (modality === TrainingModality.CALISTHENICS) return `Calistenia · ${label}`;
+  return label;
+}
+
+function focusChangeBlockReason({ targetFocus, targetType, previousDay, nextDay }) {
+  const previousFocus = previousDay?.sessionFocus || previousDay?.workout?.sessionFocus || null;
+  const nextFocus = nextDay?.sessionFocus || nextDay?.workout?.sessionFocus || null;
+  if (sessionFocusesConflict(targetFocus, previousFocus, targetType, previousDay?.sessionType)) {
+    return `Choca con la sesión anterior (${previousDay?.workout?.title || previousFocus}).`;
+  }
+  if (sessionFocusesConflict(targetFocus, nextFocus, targetType, nextDay?.sessionType)) {
+    return `Choca con la siguiente sesión (${nextDay?.workout?.title || nextFocus}).`;
+  }
+  return null;
+}
+
 function getSessionVariationCatalog(modality) {
   const template = MODALITY_TEMPLATES[modality] || MODALITY_TEMPLATES[TrainingModality.MIXED];
   const baseVariations = template.map((day) => ({
@@ -690,7 +724,7 @@ function buildAcsmPrescription(goal, modality) {
 
   return {
     source:
-      'ACSM Guidelines for Exercise Testing and Prescription, 12th edition + ACSM Resistance Training Position Stand (2026).',
+      "ACSM's Guidelines for Exercise Testing and Prescription, 11th ed.; DeLee, Drez & Miller's Orthopaedic Sports Medicine; bibliografía local recuperable vía RAG.",
     fitt: {
       aerobic: aerobicByGoal[goal],
       resistance: resistanceByGoal[goal],
@@ -811,6 +845,104 @@ function hashToInt(value) {
 // según la fase de carrera. En fases de alta carga (pico/taper) se baja más para priorizar
 // la recuperación y el rendimiento en carrera.
 const INTERFERENCE_BY_PHASE = { base: 1.0, build: 0.9, peak: 0.82, taper: 0.8, deload: 0.85 };
+
+function isQualityRunFocus(sessionFocus) {
+  return sessionFocus === 'cardio_intervals' || sessionFocus === 'cardio_tempo';
+}
+
+function addBestTrainingDay(keep, candidates, predicate) {
+  const best = candidates
+    .filter((candidate) => !keep.has(candidate.index) && predicate(candidate.day))
+    .sort((a, b) => b.priority - a.priority || a.index - b.index)[0];
+  if (best) keep.add(best.index);
+}
+
+function trainingDayPriority(day, { modality, raceGoal, goal }) {
+  const focus = day?.sessionFocus || day?.workout?.sessionFocus || '';
+  const type = day?.sessionType;
+  const raceSpecific = raceGoal && raceGoal !== 'health';
+  let priority = 0;
+
+  if (type === 'aerobic') {
+    if (focus === 'cardio_long') priority = raceSpecific ? 110 : 86;
+    else if (isQualityRunFocus(focus)) priority = raceSpecific ? 98 : 72;
+    else if (focus === 'cardio_easy' || focus === 'cardio') priority = raceSpecific ? 88 : 96;
+    else priority = 72;
+    if (goal === GoalType.ENDURANCE) priority += 8;
+    if (goal === GoalType.GLYCEMIC_CONTROL || goal === GoalType.WEIGHT_LOSS) priority += 5;
+  } else if (type === 'resistance' || type === 'mixed') {
+    const isLower = focus === 'lower';
+    const isUpper = focus === 'upper' || focus === 'push' || focus === 'pull';
+    if (modality === TrainingModality.HYBRID_RUN_GYM) {
+      priority = isLower ? 84 : isUpper ? 80 : 76;
+      if (!raceSpecific) priority += 10;
+    } else if (goal === GoalType.STRENGTH || goal === GoalType.HYPERTROPHY) {
+      priority = type === 'mixed' ? 92 : 102;
+    } else if (goal === GoalType.RECOMPOSITION || goal === GoalType.WEIGHT_LOSS || goal === GoalType.GLYCEMIC_CONTROL) {
+      priority = type === 'mixed' ? 98 : 94;
+    } else {
+      priority = type === 'mixed' ? 82 : 86;
+    }
+    if (isLower) priority += 2;
+  } else if (type === 'mindbody') {
+    priority = 60;
+  }
+
+  return priority;
+}
+
+function selectTrainingDayIndexesForAvailability(days, targetDays, context) {
+  const training = days
+    .map((day, index) => ({
+      day,
+      index,
+      priority: trainingDayPriority(day, context),
+    }))
+    .filter((item) => item.day?.isTrainingDay);
+
+  if (!Number.isFinite(targetDays) || targetDays >= training.length) {
+    return new Set(training.map((item) => item.index));
+  }
+
+  const target = Math.max(1, Math.min(training.length, Math.round(targetDays)));
+  const keep = new Set();
+  const raceSpecific = context.raceGoal && context.raceGoal !== 'health';
+
+  if (context.modality === TrainingModality.HYBRID_RUN_GYM) {
+    if (raceSpecific) {
+      addBestTrainingDay(keep, training, (day) => day.sessionFocus === 'cardio_long');
+      if (target >= 2) addBestTrainingDay(keep, training, (day) => isQualityRunFocus(day.sessionFocus));
+      if (target >= 3) addBestTrainingDay(keep, training, (day) => day.sessionType === 'resistance' || day.sessionType === 'mixed');
+      if (target >= 4) {
+        addBestTrainingDay(keep, training, (day) =>
+          day.sessionType === 'aerobic' && day.sessionFocus !== 'cardio_long'
+        );
+      }
+      if (target >= 5) addBestTrainingDay(keep, training, (day) => day.sessionType === 'resistance' || day.sessionType === 'mixed');
+    } else {
+      addBestTrainingDay(keep, training, (day) => day.sessionFocus === 'cardio_easy');
+      if (target >= 2) addBestTrainingDay(keep, training, (day) => day.sessionType === 'resistance' || day.sessionType === 'mixed');
+      if (target >= 3) addBestTrainingDay(keep, training, (day) => day.sessionFocus === 'cardio_long');
+      if (target >= 4) addBestTrainingDay(keep, training, (day) => isQualityRunFocus(day.sessionFocus));
+      if (target >= 5) addBestTrainingDay(keep, training, (day) => day.sessionType === 'resistance' || day.sessionType === 'mixed');
+    }
+  } else if (context.modality === TrainingModality.FULL_GYM && target >= 2) {
+    addBestTrainingDay(keep, training, (day) =>
+      day.sessionType === 'resistance' && ['upper', 'push', 'pull'].includes(day.sessionFocus)
+    );
+    addBestTrainingDay(keep, training, (day) =>
+      day.sessionType === 'resistance' && day.sessionFocus === 'lower'
+    );
+  }
+
+  const ranked = [...training].sort((a, b) => b.priority - a.priority || a.index - b.index);
+  for (const item of ranked) {
+    if (keep.size >= target) break;
+    keep.add(item.index);
+  }
+
+  return keep;
+}
 
 function computeUserSeed(profile, goal, userId) {
   const identity = userId
@@ -941,14 +1073,18 @@ export function generateWeeklyPlan({
   // duración de los días de entreno. Gated por `studioAvailability` para no alterar el
   // comportamiento por defecto ni los tests existentes.
   if (profile.studioAvailability === true) {
-    // Frecuencia: si el usuario indicó menos días/semana que el plan, convierte los días de
-    // entreno sobrantes en descanso activo (conservando los primeros del orden semanal).
+    // Frecuencia: si el usuario indicó menos días/semana que el plan, convierte en descanso
+    // activo los días menos prioritarios para el objetivo/modalidad (no simplemente los últimos).
     const dpw = Math.round(Number(profile.daysPerWeek));
     if (Number.isFinite(dpw) && dpw >= 1 && dpw <= 7) {
-      let kept = 0;
-      days.forEach((d) => {
+      const keepTrainingIndexes = selectTrainingDayIndexesForAvailability(days, dpw, {
+        modality,
+        raceGoal,
+        goal,
+      });
+      days.forEach((d, index) => {
         if (!d.isTrainingDay) return;
-        if (kept < dpw) { kept += 1; return; }
+        if (keepTrainingIndexes.has(index)) return;
         d.isTrainingDay = false;
         d.sessionType = 'recovery';
         d.sessionFocus = 'recovery';
@@ -1229,7 +1365,155 @@ export function suggestSessionAlternatives({
           warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality, sessionFocus, profile }),
           exercises,
           cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType, profile }),
-        },
-      };
-    });
+      },
+    };
+  });
+}
+
+export function listSessionFocusChangeOptions({
+  days = [],
+  dayIndex = -1,
+} = {}) {
+  const targetDay = Array.isArray(days) ? days[dayIndex] : null;
+  if (!targetDay?.workout || !['resistance', 'mixed'].includes(targetDay.sessionType)) {
+    return [];
+  }
+
+  const currentFocus = targetDay.sessionFocus || targetDay.workout?.sessionFocus || null;
+  const previousDay = dayIndex > 0 ? days[dayIndex - 1] : null;
+  const nextDay = dayIndex < days.length - 1 ? days[dayIndex + 1] : null;
+
+  return STRENGTH_FOCUS_CHANGE_OPTIONS.map((meta) => {
+    const current = meta.id === currentFocus;
+    const blockReason = current
+      ? 'Foco actual.'
+      : focusChangeBlockReason({
+        targetFocus: meta.id,
+        targetType: targetDay.sessionType,
+        previousDay,
+        nextDay,
+      });
+
+    return {
+      id: meta.id,
+      label: meta.label,
+      current,
+      available: !blockReason,
+      reason: blockReason,
+      compatibilityNote: blockReason || buildSessionCompatibilityNote(meta.id, previousDay, nextDay),
+    };
+  });
+}
+
+export function buildSessionFocusChange({
+  days = [],
+  dayIndex = -1,
+  targetFocus = '',
+  profile = {},
+  adaptiveTuning = null,
+  trainingModality = null,
+  trainingMode = null,
+  goal: planGoal = null,
+  phase = null,
+} = {}) {
+  const targetDay = Array.isArray(days) ? days[dayIndex] : null;
+  if (!targetDay?.workout) {
+    return { ok: false, status: 404, error: 'No se encontró la sesión a ajustar.' };
+  }
+  if (!['resistance', 'mixed'].includes(targetDay.sessionType)) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'El cambio de grupo muscular solo aplica a sesiones de fuerza o mixtas.',
+      details: { options: [] },
+    };
+  }
+
+  const normalizedFocus = String(targetFocus || '').trim();
+  const meta = focusChangeMeta(normalizedFocus);
+  const options = listSessionFocusChangeOptions({ days, dayIndex });
+  if (!meta) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Grupo muscular no válido.',
+      details: { options },
+    };
+  }
+
+  const currentFocus = targetDay.sessionFocus || targetDay.workout?.sessionFocus || null;
+  if (normalizedFocus === currentFocus) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Ese ya es el foco de la sesión de hoy.',
+      details: { options },
+    };
+  }
+
+  const option = options.find((entry) => entry.id === normalizedFocus);
+  if (!option?.available) {
+    return {
+      ok: false,
+      status: 409,
+      error: option?.reason || 'Ese foco rompería la secuencia de recuperación semanal.',
+      details: { options },
+    };
+  }
+
+  const modality = resolveTrainingModality(
+    trainingModality || targetDay.trainingModality || profile.trainingModality,
+    trainingMode || targetDay.trainingMode || profile.trainingMode
+  );
+  const goal = resolveGoal(planGoal || targetDay.goal || profile.goal);
+  const phaseParams = phase ? resolvePhaseParams(phase) : { loadFactor: 1 };
+  const interferenceScale = ((modality === TrainingModality.HYBRID_RUN_GYM || modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING)
+    && (targetDay.sessionType === 'resistance' || targetDay.sessionType === 'mixed'))
+    ? (INTERFERENCE_BY_PHASE[phase] ?? 1) : 1;
+  const durationMinutes = targetDay.workout?.durationMinutes || 45;
+  const title = focusChangeTitle(modality, normalizedFocus);
+  const exercises = buildSessionExercises({
+    modality,
+    sessionType: targetDay.sessionType,
+    sessionTitle: title,
+    sessionFocus: normalizedFocus,
+    goal,
+    profile,
+    adaptiveTuning,
+    daySeed: dayIndex + 101 + computeUserSeed(profile, goal),
+    sessionMinutes: durationMinutes,
+    loadProgression: phaseParams.loadFactor || 1,
+    interferenceScale,
+  });
+
+  if (!exercises.length) {
+    return {
+      ok: false,
+      status: 422,
+      error: 'No se encontraron ejercicios compatibles para ese grupo con tu equipo y restricciones.',
+      details: { options },
+    };
+  }
+
+  const workout = {
+    ...targetDay.workout,
+    title,
+    sessionFocus: normalizedFocus,
+    durationMinutes,
+    warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality, sessionFocus: normalizedFocus, profile }),
+    exercises,
+    cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType, profile }),
+    focusChangeApplied: true,
+  };
+  delete workout.runPrescription;
+
+  return {
+    ok: true,
+    day: {
+      ...targetDay,
+      sessionFocus: normalizedFocus,
+      workout,
+    },
+    options,
+  };
 }
