@@ -309,6 +309,17 @@ function TrainSession() {
   const [logRpe, setLogRpe] = useStateTr(7);
   const [autoStatus, setAutoStatus] = useStateTr('idle'); // idle|analyzing|done|limited|err
   const [autoAnalysis, setAutoAnalysis] = useStateTr(null); // { analysis, source }
+  // Check-in UNIFICADO de la sesión (sustituye a la antigua tarjeta CheckinCard + el bloque
+  // de RPE duplicado): completada + cargas + RPE + fatiga + sueño + síntomas en un solo guardado.
+  const [completedSession, setCompletedSession] = useStateTr(true);
+  const [fatigue, setFatigue] = useStateTr(4);
+  const [sleepHours, setSleepHours] = useStateTr(7.5);
+  const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
+  const toggleSym = (k) => setSymptoms((p) => ({ ...p, [k]: !p[k] }));
+  // Rehidratación: si HOY ya hay sesión registrada, mostramos el resumen en vez del formulario.
+  const [loggedLocal, setLoggedLocal] = useStateTr(Boolean(s.logged));
+  const [loggedSummary, setLoggedSummary] = useStateTr(s.loggedSummary || null);
+  const [editingLog, setEditingLog] = useStateTr(false);
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -367,12 +378,15 @@ function TrainSession() {
       if (r.ok) await refreshSession();
     } catch (e) { /* noop */ } finally { setBusy(null); }
   }
-  async function logSession() {
+  // withCheckin=false → un-tap "Hecho según plan" (solo cargas prescritas).
+  // withCheckin=true  → guardado unificado: cargas + RPE + fatiga + sueño + síntomas.
+  async function logSession(withCheckin = false) {
     setLogStatus('saving');
     try {
       const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
       if (!token) { setLogStatus('err'); return; }
       const today = new Date().toISOString().slice(0, 10);
+      const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
       const exercises = list
         .filter((e) => e.loadKg != null)
         .map((e) => ({
@@ -385,38 +399,66 @@ function TrainSession() {
           sets: e.sets ?? null,
         }))
         .filter((e) => e.id && e.weightKg);
-      if (!exercises.length) { setLogStatus('err'); return; }
-      const r = await fetch('/api/workouts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-        body: JSON.stringify({
-          source: 'manual', performedAt: `${today}T12:00:00.000Z`, title: (s.title || 'Sesión'),
-          mode: 'studio', completed: true, exercises,
-          // RPE de la sesión: alimenta la "Carga semanal" de Progreso y el ajuste adaptativo.
-          sessionRpe: Number(logRpe) || null,
-          durationMinutes: s.durationMin || null,
-        }),
-      });
-      setLogStatus(r.ok ? 'ok' : 'err');
-      if (r.ok) {
-        setTimeout(() => setLogStatus('idle'), 3000);
+      const hasLoads = exercises.length > 0;
+      // El un-tap exige cargas; el check-in unificado también vale para días sin cargas (carrera).
+      if (!withCheckin && !hasLoads) { setLogStatus('err'); return; }
+
+      let manualOk = true;
+      let wid = null;
+      // 1) Registro de cargas (e1RM/DAPRE + análisis del coach): solo si completada y con cargas.
+      if (hasLoads && (!withCheckin || completedSession)) {
+        const r = await fetch('/api/workouts', {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            source: 'manual', performedAt: `${today}T12:00:00.000Z`, title: (s.title || 'Sesión'),
+            mode: 'studio', completed: true, exercises,
+            sessionRpe: Number(logRpe) || null,
+            durationMinutes: s.durationMin || null,
+          }),
+        });
+        manualOk = r.ok;
+        if (r.ok) { const j = await r.json().catch(() => ({})); wid = j && j.workout && j.workout.id; }
+      }
+
+      // 2) Check-in del día (solo en el guardado unificado): registra la sesión y el gate clínico.
+      //    La fusión por día del backend colapsa este doc + el manual en UNA sola sesión.
+      let checkinOk = true;
+      if (withCheckin) {
+        const base = { source: 'daily_checkin', dailyCheckinDate: today, performedAt: `${today}T12:00:00.000Z`, symptoms, title: (s.title || 'Sesión'), mode: 'studio' };
+        const body = completedSession
+          ? { ...base, completed: true, checkinSkipped: false, sessionRpe: Number(logRpe) || null, fatigue: Number(fatigue) || null, sleepHours: Number(sleepHours) || null }
+          : { ...base, completed: false, checkinSkipped: true, sessionRpe: null, fatigue: null, sleepHours: null };
+        const rc = await fetch('/api/workouts', { method: 'POST', headers, body: JSON.stringify(body) });
+        checkinOk = rc.ok;
+      }
+
+      const ok = manualOk && checkinOk;
+      setLogStatus(ok ? 'ok' : 'err');
+      if (ok) {
+        // Rehidratación local inmediata: la sesión queda como "registrada" sin recargar.
+        setLoggedLocal(true);
+        setEditingLog(false);
+        setLoggedSummary({
+          sources: [hasLoads && (!withCheckin || completedSession) ? 'manual' : null, withCheckin ? 'daily_checkin' : null].filter(Boolean),
+          completed: withCheckin ? completedSession : true,
+          sessionRpe: (!withCheckin || completedSession) ? (Number(logRpe) || null) : null,
+          fatigue: (withCheckin && completedSession) ? (Number(fatigue) || null) : null,
+          sleepHours: (withCheckin && completedSession) ? (Number(sleepHours) || null) : null,
+          hasAlarmSymptoms: withCheckin ? Object.values(symptoms).some(Boolean) : false,
+          lifts: exercises.map((e) => ({ name: e.name, kg: e.weightKg, reps: e.reps, sets: e.sets })),
+        });
+        if (!withCheckin) setTimeout(() => setLogStatus('idle'), 3000);
         // Análisis automático del coach (no bloquea el registro; cacheado en servidor).
-        try {
-          const j = await r.json();
-          const wid = j && j.workout && j.workout.id;
-          if (wid) {
+        if (wid) {
+          try {
             setAutoStatus('analyzing');
-            const ra = await fetch('/api/workout-analysis', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-              body: JSON.stringify({ workoutId: wid }),
-            });
+            const ra = await fetch('/api/workout-analysis', { method: 'POST', headers, body: JSON.stringify({ workoutId: wid }) });
             const ja = await ra.json().catch(() => ({}));
             if (ra.ok && ja.analysis) { setAutoAnalysis({ analysis: ja.analysis, source: ja.source }); setAutoStatus('done'); }
             else if (ra.status === 429) setAutoStatus('limited');
             else setAutoStatus('err');
-          }
-        } catch (e2) { setAutoStatus('err'); }
+          } catch (e2) { setAutoStatus('err'); }
+        }
       }
     } catch (e) { setLogStatus('err'); }
   }
@@ -470,8 +512,8 @@ function TrainSession() {
               <button className="btn" disabled={logStatus === 'saving'}
                 style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: '1px solid rgba(255,255,255,0.45)', boxShadow: 'none', whiteSpace: 'nowrap' }}
                 title="Registra la sesión tal y como estaba prescrita (kg, reps y duración del plan). Si cambiaste algo, edítalo abajo antes de pulsar."
-                onClick={logSession}>
-                <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : logStatus === 'ok' ? 'Registrada ✓' : 'Hecho según plan'}
+                onClick={() => logSession(false)}>
+                <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : (logStatus === 'ok' || loggedLocal) ? 'Registrada ✓' : 'Hecho según plan'}
               </button>
             ) : null}
           </div>
@@ -575,12 +617,18 @@ function TrainSession() {
                 <span className="ex-scheme">{ex.scheme}</span>
                 {ex.loadKg != null ? (
                   <React.Fragment>
-                    <input className="text-input" type="number" min="0" step="2.5" style={{ width: 62 }}
-                      title="Carga usada (kg)" placeholder={`${ex.loadKg}`}
-                      value={logKg[ex.id] ?? ''} onChange={(e) => setLogKg((p) => ({ ...p, [ex.id]: e.target.value }))} />
-                    <input className="text-input" type="number" min="1" max="30" style={{ width: 48 }}
-                      title="Reps reales por serie" placeholder={ex.reps != null ? `×${ex.reps}` : '×reps'}
-                      value={logReps[ex.id] ?? ''} onChange={(e) => setLogReps((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title="Carga usada (kg)">
+                      <span className="tiny muted" style={{ fontSize: 10, lineHeight: 1 }}>kg</span>
+                      <input className="text-input" type="number" min="0" step="2.5" style={{ width: 62 }}
+                        placeholder={`${ex.loadKg}`}
+                        value={logKg[ex.id] ?? ''} onChange={(e) => setLogKg((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title="Reps reales por serie">
+                      <span className="tiny muted" style={{ fontSize: 10, lineHeight: 1 }}>reps</span>
+                      <input className="text-input" type="number" min="1" max="30" style={{ width: 52 }}
+                        placeholder={ex.reps != null ? `${ex.reps}` : 'reps'}
+                        value={logReps[ex.id] ?? ''} onChange={(e) => setLogReps((p) => ({ ...p, [ex.id]: e.target.value }))} />
+                    </label>
                   </React.Fragment>
                 ) : null}
                 {ex.id ? (
@@ -593,30 +641,7 @@ function TrainSession() {
             </div>
           ))}
         </div>
-        {list.some((e) => e.loadKg != null) ? (
-          <div className="stack" style={{ gap: 12, marginTop: 14 }}>
-            <div>
-              <div className="mb-label">Esfuerzo de la sesión (RPE) · {logRpe}/10 — alimenta tu carga semanal y al coach</div>
-              <Scale10 value={logRpe} onChange={setLogRpe} />
-            </div>
-            <div className="row ac wrap" style={{ gap: 12 }}>
-              <button className="btn" onClick={logSession} disabled={logStatus === 'saving'}>
-                <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Registrando…' : 'Registrar sesión hecha'}
-              </button>
-              {logStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Registrado · tus cargas afinarán la progresión ✨</span> : null}
-              {logStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo registrar.</span> : null}
-              <span className="tiny muted">Anota la carga real de cada ejercicio para que el coach progrese desde tus datos.</span>
-            </div>
-            {autoStatus === 'analyzing' ? (
-              <div className="row ac" style={{ gap: 8 }}>
-                <span className="cb-av sm"><Icon name="sparkles" size={13} /></span>
-                <span className="tiny muted">El coach está analizando tu sesión…</span>
-              </div>
-            ) : null}
-            {autoStatus === 'limited' ? <span className="tiny muted">Sesión registrada. El análisis del coach estará disponible en Progreso en un rato (límite temporal alcanzado).</span> : null}
-            {autoAnalysis ? <WorkoutAnalysisBlock analysis={autoAnalysis.analysis} source={autoAnalysis.source} /> : null}
-          </div>
-        ) : null}
+        <p className="tiny muted" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>Anota la carga real (kg) y las repeticiones de cada ejercicio; abajo, en el check-in, las guardas todas de una vez.</p>
       </SectionCard>
 
       {/* Calentamiento y enfriamiento */}
@@ -670,8 +695,85 @@ function TrainSession() {
         </div>
       </SectionCard>
 
-      {/* Check-in de la sesión (datos para el RAG del coach) */}
-      <CheckinCard />
+      {/* Check-in UNIFICADO de la sesión: 1 solo check-in (sustituye a la antigua CheckinCard
+          + el bloque de RPE duplicado). Si hoy ya está registrada, muestra el resumen. */}
+      {loggedLocal && !editingLog ? (
+        <SectionCard title="Sesión registrada" icon="check" sub="Hoy ya quedó guardada — el coach la usará para ajustar tu plan">
+          <div className="stack" style={{ gap: 12 }}>
+            <div className="chips">
+              {loggedSummary?.completed === false ? <span className="pill">No completada</span> : <span className="pill accent">Completada</span>}
+              {loggedSummary?.sessionRpe != null ? <span className="pill">RPE {loggedSummary.sessionRpe}</span> : null}
+              {loggedSummary?.fatigue != null ? <span className="pill">Fatiga {loggedSummary.fatigue}</span> : null}
+              {loggedSummary?.sleepHours != null ? <span className="pill">{loggedSummary.sleepHours} h sueño</span> : null}
+            </div>
+            {Array.isArray(loggedSummary?.lifts) && loggedSummary.lifts.length ? (
+              <div className="stack" style={{ gap: 6 }}>
+                {loggedSummary.lifts.map((lf, i) => (
+                  <div key={i} className="row ac between">
+                    <strong style={{ fontSize: '0.9rem' }}>{lf.name}</strong>
+                    <span className="tiny muted">{lf.kg != null ? `${lf.kg} kg` : 'peso corporal'}{lf.reps != null ? ` × ${lf.reps} reps` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {loggedSummary?.hasAlarmSymptoms ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: 0 }}>Marcaste síntomas de alarma: el coach priorizará seguridad.</p> : null}
+            <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditingLog(true)}>
+              <Icon name="edit" size={14} /> Editar registro
+            </button>
+            {autoStatus === 'analyzing' ? <span className="tiny muted">El coach está analizando tu sesión…</span> : null}
+            {autoAnalysis ? <WorkoutAnalysisBlock analysis={autoAnalysis.analysis} source={autoAnalysis.source} /> : null}
+          </div>
+        </SectionCard>
+      ) : (
+        <SectionCard title="¿Cómo fue tu sesión?" icon="bolt" sub="Un solo check-in — guarda cargas y cómo te sentiste">
+          <div className="stack" style={{ gap: 16 }}>
+            <div>
+              <div className="mb-label">¿Completaste la sesión?</div>
+              <div className="segc" style={{ alignSelf: 'flex-start', maxWidth: 240 }}>
+                <div className="segc-thumb" style={{ left: `calc(4px + ${completedSession ? 0 : 1} * (100% - 8px) / 2)`, width: 'calc((100% - 8px) / 2)' }} />
+                <button className={completedSession ? 'on' : ''} onClick={() => setCompletedSession(true)}>Sí</button>
+                <button className={!completedSession ? 'on' : ''} onClick={() => setCompletedSession(false)}>No</button>
+              </div>
+            </div>
+            {completedSession && (
+              <React.Fragment>
+                {list.some((e) => e.loadKg != null) ? (
+                  <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Las cargas (kg) y repeticiones que anotaste arriba en cada ejercicio se guardan con este check-in.</p>
+                ) : null}
+                <div><div className="mb-label">Esfuerzo percibido (RPE) · {logRpe}/10</div><Scale10 value={logRpe} onChange={setLogRpe} /></div>
+                <div><div className="mb-label">Fatiga · {fatigue}/10</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
+                <div className="row ac" style={{ gap: 12 }}>
+                  <div className="mb-label" style={{ margin: 0 }}>Horas de sueño</div>
+                  <input type="number" min="0" max="24" step="0.5" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="num-input" />
+                </div>
+              </React.Fragment>
+            )}
+            <div>
+              <div className="mb-label">¿Algún síntoma? (seguridad)</div>
+              <div className="chips">
+                {CHECKIN_SYMPTOMS.map((sy) => (
+                  <button key={sy.key} type="button" className={`pill ${symptoms[sy.key] ? 'accent' : ''}`} onClick={() => toggleSym(sy.key)}>{sy.label}</button>
+                ))}
+              </div>
+              {Object.values(symptoms).some(Boolean) ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0' }}>El coach limitará la intensidad y recomendará valoración médica.</p> : null}
+            </div>
+            <div className="row ac wrap" style={{ gap: 12 }}>
+              <button className="btn" onClick={() => logSession(true)} disabled={logStatus === 'saving'}>
+                <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Guardando…' : 'Guardar sesión'}
+              </button>
+              {logStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
+            </div>
+            {autoStatus === 'analyzing' ? (
+              <div className="row ac" style={{ gap: 8 }}>
+                <span className="cb-av sm"><Icon name="sparkles" size={13} /></span>
+                <span className="tiny muted">El coach está analizando tu sesión…</span>
+              </div>
+            ) : null}
+            {autoStatus === 'limited' ? <span className="tiny muted">Sesión registrada. El análisis del coach estará disponible en Progreso en un rato (límite temporal alcanzado).</span> : null}
+            {autoAnalysis ? <WorkoutAnalysisBlock analysis={autoAnalysis.analysis} source={autoAnalysis.source} /> : null}
+          </div>
+        </SectionCard>
+      )}
     </React.Fragment>
   );
 }
