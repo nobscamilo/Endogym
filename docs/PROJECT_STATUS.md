@@ -1,6 +1,27 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **15 de junio de 2026, tarde (DESPLIEGUE del trabajo del 15 jun + guardarraíl de volumen semanal)**.
+Ultima actualizacion: **15 de junio de 2026, noche (fusión de sesiones por día: fin del doble/triple conteo)**.
+
+## Sesión del 15 de junio de 2026, noche (verificación de bugs de registro + fusión de sesiones por día)
+
+El usuario reportó 4 cosas sobre el registro de sesiones. Verificadas TODAS en código antes de tocar nada:
+
+- **(Q1) Strava + check-in = sesiones distintas: CONFIRMADO, y peor de lo reportado.** `createWorkout` guarda por fuente (`daily-{fecha}`, `strava-{id}`, id automático del manual) y `mapProgress` contaba 1 documento = 1 sesión. Un día con check-in + registro manual ya contaba 2; con Strava, 3 → adherencia inflada.
+- **(Q2) La sesión "finalizada" no persiste al volver: matiz — los datos SÍ se guardan, la UI no los rehidrata.** `logSession` escribe bien en Firestore; `logStatus`/`status` arrancan en `idle` sin leer del servidor y `studio-data` no exponía "hoy ya registrado".
+- **(Q3) Historial: YA existe en Perfil** ("Historial de entrenos" → `/api/workout-history`, con ejercicios/kg/series, RPE y análisis del coach). Límites: descartaba ejercicios sin peso (peso corporal) y, por Q1, mostraba el mismo día 2-3 veces.
+- **(Q4) Dos check-ins en Entreno: CONFIRMADO.** Conviven el bloque "Registrar sesión hecha" (cargas/RPE) y la tarjeta "Check-in de hoy" (completada/RPE/fatiga/sueño/síntomas). Redundan en "completada" y RPE.
+
+**Decisiones del usuario (15 jun):** conteo → **1 sesión por día, fusionar registros** (Strava que coincide no suma); check-ins → **mostrar solo 1, el más completo**.
+
+**Implementado y DESPLEGADO (backend, solo servidor, sin cambio de bundle):** commit `f29d9ae`, deployment `endogym-dpe6m40ef…`, alias OK (root 200, health 200, workout-history 401 sin token). **37 archivos / 257 tests, build OK.**
+
+- Nuevo `src/core/sessionHistory.js`: `collapseWorkoutsByDay` (1 sesión/día, se queda con el registro más rico y fusiona bienestar del check-in + métricas de Strava + cargas del manual), `countDoneSessions`, `findDaySession`. +5 tests.
+- Cableado en `studio-data` (`mapProgress` cuenta días no documentos; `mapRecentWorkouts` sin duplicados e incluye ejercicios sin peso) y en `workout-history` (fusiona la página por día; incluye peso corporal).
+- `studio-data` ahora expone `todaySession.logged` + `loggedSummary` (fuentes, RPE, fatiga, sueño, lifts) para que Entreno rehidrate "Registrada ✓".
+
+**PENDIENTE de esta tanda (UI, requiere rebuild de bundle + Playwright — siguiente paso):** fusionar visualmente los 2 check-ins en 1 (Q4), mostrar la sesión ya registrada al volver (Q2 visible) y el **#3 check-in por grupo muscular antes de cambiar foco**. Después, el **#1** (matriz de opciones bloqueadas en la UI).
+
+## Sesión del 15 de junio de 2026, tarde (deploy + guardarraíl de volumen semanal)
 
 ## Sesión del 15 de junio de 2026, tarde (deploy + guardarraíl de volumen semanal)
 

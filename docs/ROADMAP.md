@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **15 de junio de 2026, tarde (trabajo del 15 jun DESPLEGADO + guardarraíl de volumen semanal)**.
+Ultima actualizacion: **15 de junio de 2026, noche (fusión de sesiones por día desplegada; pendiente UI de check-ins)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -92,6 +92,14 @@ Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada í
 - [ ] **#5 Registrar ejecución por serie.** DECISIÓN: **completo con modo rápido** — kg/reps/RIR o RPE por set en todos los ejercicios, con un modo rápido opcional; dolor/técnica opcional. Reconciliar con el un-tap "Hecho según plan" (FASE 3.1): el modo rápido es el puente. Alimenta DAPRE y detección de estancamiento.
 - [ ] **#6 Mostrar el "por qué" de la prescripción de fuerza:** volumen, intensidad, descanso y selección de ejercicios explicados con datos de perfil/historial y bibliografía RAG recuperada. CUIDADO: sin pasaje/cita recuperable, NO mostrar claim (misma disciplina que el retiro de los claims ACSM 12th del 15 jun).
 - [ ] **#7 Revisión mensual del mesociclo desde datos reales:** detectar si el usuario cambia mucho de grupo/sesión, si se saltan patrones o si hay fatiga localizada repetida, y proponer regenerar el bloque en lugar de acumular parches.
+
+## P2 - Registro de sesiones e historial (bugs reportados 15 jun 2026)
+
+- [x] **Fusión de sesiones por día (fin del doble/triple conteo).** `src/core/sessionHistory.js`: check-in + manual + Strava del mismo día = 1 sesión (registro más rico). Cableado en conteo/adherencia, recientes e historial; incluye ejercicios sin peso. **Desplegado** (commit `f29d9ae`, deployment `endogym-dpe6m40ef…`, 257 tests).
+- [x] **`studio-data` expone `todaySession.logged` + `loggedSummary`** para rehidratar Entreno. **Desplegado** (`f29d9ae`).
+- [ ] **(UI) Fusionar los 2 check-ins de Entreno en 1, el más completo** (Q4). Requiere refactor de `screen-train.jsx` + rebuild del bundle + Playwright. Un solo guardado escribe sesión + gate clínico; dedup ya colapsa.
+- [ ] **(UI) Mostrar la sesión ya registrada al volver a Entreno** (Q2 visible): consumir `todaySession.logged`/`loggedSummary` y pintar "Registrada ✓" + resumen en vez de pedir registro otra vez.
+- [ ] **#3 Check-in por grupo muscular antes de cambiar foco** (agujetas/dolor local pierna/torso/hombro/lumbar) — se hace junto con la fusión de check-ins.
 
 ## P2 - Check-in diario seguro
 
