@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **16 de junio de 2026, madrugada-2 (#2 reprograma por intercambio desplegado)**.
+Ultima actualizacion: **16 de junio de 2026, madrugada-3 (#5 registro por serie desplegado)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -89,7 +89,7 @@ Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada í
 - [x] **#2 Reprograma validado por intercambio.** Cuando el grupo elegido está bloqueado por adyacencia con un día vecino de la misma familia, `proposeFocusReschedule` valida que intercambiar el foco (hoy = grupo elegido; vecino = foco actual de hoy) no rompe la recuperación con los OTROS vecinos ni deja sobrecarga semanal (el intercambio preserva `daysPerWeek` y el recuento de familias). `buildSessionFocusReschedule` reconstruye ambos días; `studio-swap` con `action:'reschedule'` los persiste. La matriz expone `canReschedule`/`rescheduleWith` y la UI ofrece "Reprogramar (intercambiar con …)" en los grupos bloqueados-pero-reprogramables. **Desplegado** (commit `437ab5d`, bundle `v=f41d4e0945`, +2 tests). Límite conocido: solo intercambia con un vecino directo; no mueve sesiones a días no contiguos ni reordena la tirada larga (eso sería un scheduler completo).
 - [ ] **#3 Check-in rápido por grupo muscular antes de cambiar foco:** agujetas/dolor local (pierna, torso, hombro, lumbar) para modular volumen, evitar patrones dolorosos y no depender solo del calendario.
 - [ ] **#4 Inventario de equipo y preferencias:** marcar ejercicios excluidos/favoritos, material disponible real (poleas, barra, mancuernas, bandas, máquinas) y limitaciones temporales; usarlo en `buildSessionExercises` y swaps.
-- [ ] **#5 Registrar ejecución por serie.** DECISIÓN: **completo con modo rápido** — kg/reps/RIR o RPE por set en todos los ejercicios, con un modo rápido opcional; dolor/técnica opcional. Reconciliar con el un-tap "Hecho según plan" (FASE 3.1): el modo rápido es el puente. Alimenta DAPRE y detección de estancamiento.
+- [x] **#5 Registrar ejecución por serie.** Modo detallado opcional por ejercicio (toca el icono de lista): kg·reps·**RIR** por set, con "Añadir serie". El **modo rápido** (1 valor/ejercicio) sigue por defecto y es el puente con el un-tap. Al guardar, la serie más pesada queda como serie principal (weightKg/reps) y el **RPE del ejercicio se deriva del RIR** (10−RIR) → alimenta DAPRE/e1RM. `sanitizeExercise` persiste `rir`+`setLogs`; `workout-history` y el historial de Perfil los muestran por set (y se arregló el peso corporal con `kg` null). **Desplegado** (commit `7e9e1cd`, bundle `v=ebbdbc99ff`, +1 test). Pendiente futuro: dolor/técnica por serie y usar el mejor e1RM por set (no solo el top por carga).
 - [ ] **#6 Mostrar el "por qué" de la prescripción de fuerza:** volumen, intensidad, descanso y selección de ejercicios explicados con datos de perfil/historial y bibliografía RAG recuperada. CUIDADO: sin pasaje/cita recuperable, NO mostrar claim (misma disciplina que el retiro de los claims ACSM 12th del 15 jun).
 - [ ] **#7 Revisión mensual del mesociclo desde datos reales:** detectar si el usuario cambia mucho de grupo/sesión, si se saltan patrones o si hay fatiga localizada repetida, y proponer regenerar el bloque en lugar de acumular parches.
 

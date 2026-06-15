@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, madrugada-2 (#2 reprograma validado por intercambio, desplegado)**.
+Ultima actualizacion: **16 de junio de 2026, madrugada-3 (#5 registro por serie con modo rápido, desplegado)**.
+
+## Sesión del 16 de junio de 2026, madrugada-3 (#5 registro por serie)
+
+**Desplegado y verificado:** commit `7e9e1cd`, deployment `endogym-educ5ahk2…`, bundle `v=ebbdbc99ff` (root/health 200; el bundle contiene "Por serie"). Build OK; único rojo = el flaky por hora de `weekly-plan`. +1 test (262 en total).
+
+- **Datos (`firestoreRepository`):** `sanitizeExercise` acepta `rir` (por ejercicio) y `setLogs` (array `{weightKg,reps,rir}`, máx 20, saneado con `numOrNull` para no colar `0` falsos). Compatible hacia atrás (weightKg/reps siguen siendo la "serie principal").
+- **UI (`screen-train.jsx`):** modo rápido por defecto (1 kg/reps por ejercicio). Icono de lista por ejercicio → modo detallado: filas por serie con kg·reps·**RIR** + "Añadir serie". Al guardar, la serie más pesada → weightKg/reps; **RPE del ejercicio = 10 − RIR del top set** (alimenta DAPRE/e1RM con señal real por ejercicio, antes solo había RPE de sesión).
+- **Historial (`workout-history` + `screen-more`):** muestra el desglose por serie cuando existe; arreglado el peso corporal (kg null ya no imprime "null kg").
+- **Pendiente futuro:** dolor/técnica por serie; e1RM por mejor set (no solo top por carga).
+- **Backlog restante del roadmap:** #4 (inventario de equipo), #6 (el "por qué" con citas RAG), #7 (revisión mensual del mesociclo), #8 (onboarding), y la limpieza de `CheckinCard` sin uso.
+
+## Sesión del 16 de junio de 2026, madrugada-2 (#2 reprograma por intercambio)
 
 ## Sesión del 16 de junio de 2026, madrugada-2 (#2 reprograma por intercambio)
 
