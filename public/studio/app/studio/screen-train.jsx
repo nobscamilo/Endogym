@@ -493,6 +493,12 @@ function TrainSession() {
     && (adjust.volumeFactor == null || adjust.volumeFactor !== 1);
   const canChangeSessionFocus = ['resistance', 'mixed'].includes(s.sessionType)
     || (!s.sessionType && !s.runPrescription && Array.isArray(s.list) && s.list.length);
+  // #1 — matriz de grupos disponibles/bloqueados (con motivo). Si el backend no la trae (datos
+  // antiguos), caemos a las opciones simples marcando solo el foco actual.
+  const focusOpts = (Array.isArray(s.focusOptions) && s.focusOptions.length)
+    ? s.focusOptions
+    : SESSION_FOCUS_CHOICES.map((c) => ({ id: c.id, label: c.label, current: c.id === s.focus, available: c.id !== s.focus, reason: c.id === s.focus ? 'Foco actual.' : null }));
+  const focusBlocked = focusOpts.filter((o) => !o.current && o.available === false);
   return (
     <React.Fragment>
       {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
@@ -554,19 +560,34 @@ function TrainSession() {
               ))}
             </div>
           </div>
+          <div className="focus-groups" style={{ flexBasis: '100%', width: '100%' }}>
+            <div className="mb-label" style={{ marginBottom: 6 }}>Elegir grupo</div>
+            <div className="chips">
+              {focusOpts.map((opt) => {
+                const blocked = !opt.current && opt.available === false;
+                return (
+                  <button key={opt.id} type="button"
+                    className={`pill ${focusTarget === opt.id ? 'accent' : ''}`}
+                    disabled={opt.current || blocked}
+                    style={blocked || opt.current ? { opacity: 0.5, cursor: 'not-allowed' } : null}
+                    title={opt.reason || opt.compatibilityNote || ''}
+                    onClick={() => setFocusTarget(opt.id)}>
+                    {opt.label}{opt.current ? ' · actual' : (blocked ? ' 🔒' : '')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="focus-switch-actions">
-            <select className="reason-select focus-select" value={focusTarget} onChange={(e) => setFocusTarget(e.target.value)} title="Grupo muscular">
-              <option value="">Elegir grupo</option>
-              {SESSION_FOCUS_CHOICES.map((option) => (
-                <option key={option.id} value={option.id} disabled={option.id === s.focus}>
-                  {option.label}{option.id === s.focus ? ' actual' : ''}
-                </option>
-              ))}
-            </select>
             <button className="btn ghost sm" disabled={!focusTarget || busy === 'focus'} onClick={changeFocus}>
               <Icon name="target" size={14} /> {busy === 'focus' ? 'Cambiando…' : 'Cambiar grupo'}
             </button>
           </div>
+          {focusBlocked.length ? (
+            <div className="stack" style={{ gap: 2, marginTop: 2, flexBasis: '100%' }}>
+              {focusBlocked.map((o) => <span key={o.id} className="tiny muted">🔒 {o.label}: {o.reason || 'no disponible esta semana'}</span>)}
+            </div>
+          ) : null}
           {focusStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Sesión ajustada.</span> : null}
           {focusStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{focusError}</span> : null}
           {soreNote ? <span className="tiny" style={{ color: 'var(--accent)', flexBasis: '100%' }}>{soreNote}</span> : null}

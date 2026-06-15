@@ -16,6 +16,7 @@ import {
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../../core/sessionHistory.js';
+import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
@@ -348,6 +349,13 @@ function mapTodaySession(plan, today, workouts = []) {
   if (cooldown.length) out.cooldown = cooldown;
   if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;
   out.sessionType = day.sessionType || '';
+  // #1 — matriz de opciones de grupo muscular disponibles/bloqueadas (con motivo), para que la
+  // UI pueda deshabilitar p. ej. "Torso" si mañana ya toca torso, sin esperar a enviar el cambio.
+  if (['resistance', 'mixed'].includes(day.sessionType)) {
+    const dayIndex = days.indexOf(day);
+    const focusOptions = listSessionFocusChangeOptions({ days, dayIndex });
+    if (focusOptions.length) out.focusOptions = focusOptions;
+  }
   // Rehidratación de Entreno: si HOY ya hay una sesión registrada (check-in/manual/Strava),
   // la UI muestra "Registrada ✓" y el resumen en vez de pedir registro de nuevo.
   const loggedToday = findDaySession(workouts, today);
