@@ -321,6 +321,49 @@ function evaluateSoreModulation(soreAreas, targetFocus, targetType) {
   };
 }
 
+function focusOfDay(day) {
+  return day?.sessionFocus || day?.workout?.sessionFocus || null;
+}
+
+// #2 — Reprograma validado por INTERCAMBIO: si cambiar HOY al grupo X choca con un día vecino
+// que ya es de la familia X, propone mover ese vecino al foco actual de hoy (Y), de modo que
+// hoy queda X y el vecino queda Y. Solo si Y es de OTRA familia (si no, seguirían chocando) y si
+// el intercambio no crea nuevos choques con los otros vecinos ni deja a X en sobrecarga semanal.
+function proposeFocusReschedule({ days, dayIndex, targetFocus, targetType }) {
+  if (!Array.isArray(days)) return null;
+  const targetFamily = resolveSessionFocusFamily(targetFocus, targetType);
+  if (!['upper', 'lower', 'full'].includes(targetFamily)) return null;
+  // El intercambio no cambia el recuento semanal de familias → si X ya está en sobrecarga, no ayuda.
+  if (weeklyFocusOverloadReason(targetFocus, targetType, days, dayIndex)) return null;
+
+  const today = days[dayIndex];
+  const todayCurrentFocus = focusOfDay(today);
+  const todayFamily = resolveSessionFocusFamily(todayCurrentFocus, today?.sessionType);
+  // Si hoy ya es de la familia X, intercambiar no separa las familias adyacentes.
+  if (todayFamily === targetFamily) return null;
+
+  for (const ni of [dayIndex - 1, dayIndex + 1]) {
+    if (ni < 0 || ni >= days.length) continue;
+    const nb = days[ni];
+    if (!nb?.workout || !['resistance', 'mixed'].includes(nb.sessionType)) continue;
+    if (resolveSessionFocusFamily(focusOfDay(nb), nb.sessionType) !== targetFamily) continue;
+
+    // Tras el intercambio: hoy = targetFocus (X), vecino = todayCurrentFocus (Y).
+    const otherOfTodayIdx = ni === dayIndex - 1 ? dayIndex + 1 : dayIndex - 1;
+    const otherOfToday = (otherOfTodayIdx >= 0 && otherOfTodayIdx < days.length) ? days[otherOfTodayIdx] : null;
+    const todayOk = !sessionFocusesConflict(targetFocus, focusOfDay(otherOfToday), targetType, otherOfToday?.sessionType);
+
+    const otherOfNbIdx = ni === dayIndex - 1 ? ni - 1 : ni + 1;
+    const otherOfNb = (otherOfNbIdx >= 0 && otherOfNbIdx < days.length) ? days[otherOfNbIdx] : null;
+    const nbOk = !sessionFocusesConflict(todayCurrentFocus, focusOfDay(otherOfNb), nb.sessionType, otherOfNb?.sessionType);
+
+    if (todayOk && nbOk) {
+      return { neighborIndex: ni, neighborDate: nb.date || null, neighborName: nb.dayName || null };
+    }
+  }
+  return null;
+}
+
 const STRENGTH_FOCUS_CHANGE_OPTIONS = [
   { id: 'upper', label: 'Torso', title: 'Torso' },
   { id: 'push', label: 'Empuje', title: 'Empuje' },
@@ -1463,6 +1506,12 @@ export function listSessionFocusChangeOptions({
         nextDay,
       }) || weeklyFocusOverloadReason(meta.id, targetDay.sessionType, days, dayIndex));
 
+    // #2 — si está bloqueado por adyacencia y el intercambio con el vecino lo resuelve,
+    // la UI puede ofrecer "reprogramar" en vez de solo rechazar.
+    const reschedule = (!current && blockReason)
+      ? proposeFocusReschedule({ days, dayIndex, targetFocus: meta.id, targetType: targetDay.sessionType })
+      : null;
+
     return {
       id: meta.id,
       label: meta.label,
@@ -1470,8 +1519,60 @@ export function listSessionFocusChangeOptions({
       available: !blockReason,
       reason: blockReason,
       compatibilityNote: blockReason || buildSessionCompatibilityNote(meta.id, previousDay, nextDay),
+      canReschedule: Boolean(reschedule),
+      rescheduleWith: reschedule ? (reschedule.neighborName || reschedule.neighborDate || 'la sesión vecina') : null,
     };
   });
+}
+
+// Arma el workout de un día para un foco dado (núcleo compartido por el cambio de grupo y la
+// reprogramación por intercambio). Aplica la modulación por molestias (#3).
+function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTuning = null, trainingModality = null, trainingMode = null, goal: planGoal = null, phase = null, soreAreas = [] }) {
+  const modality = resolveTrainingModality(
+    trainingModality || day.trainingModality || profile.trainingModality,
+    trainingMode || day.trainingMode || profile.trainingMode
+  );
+  const goal = resolveGoal(planGoal || day.goal || profile.goal);
+  const phaseParams = phase ? resolvePhaseParams(phase) : { loadFactor: 1 };
+  const interferenceScale = ((modality === TrainingModality.HYBRID_RUN_GYM || modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING)
+    && (day.sessionType === 'resistance' || day.sessionType === 'mixed'))
+    ? (INTERFERENCE_BY_PHASE[phase] ?? 1) : 1;
+  const durationMinutes = day.workout?.durationMinutes || 45;
+  const title = focusChangeTitle(modality, focus);
+  const sore = evaluateSoreModulation(soreAreas, focus, day.sessionType);
+  let effectiveAdaptive = adaptiveTuning;
+  if (sore.matched) {
+    const baseVf = Number(adaptiveTuning?.workout?.volumeFactor);
+    const vf = Number.isFinite(baseVf) && baseVf > 0 ? baseVf : 1;
+    const reducedVf = Math.max(0.6, Math.round(vf * 0.85 * 100) / 100);
+    effectiveAdaptive = { ...(adaptiveTuning || {}), workout: { ...((adaptiveTuning && adaptiveTuning.workout) || {}), volumeFactor: reducedVf } };
+  }
+  const exercises = buildSessionExercises({
+    modality,
+    sessionType: day.sessionType,
+    sessionTitle: title,
+    sessionFocus: focus,
+    goal,
+    profile,
+    adaptiveTuning: effectiveAdaptive,
+    daySeed: dayIndex + 101 + computeUserSeed(profile, goal),
+    sessionMinutes: durationMinutes,
+    loadProgression: phaseParams.loadFactor || 1,
+    interferenceScale,
+  });
+  if (!exercises.length) return { ok: false };
+  const workout = {
+    ...day.workout,
+    title,
+    sessionFocus: focus,
+    durationMinutes,
+    warmup: buildWarmupProtocol({ sessionType: day.sessionType, modality, sessionFocus: focus, profile }),
+    exercises,
+    cooldown: buildCooldownProtocol({ sessionType: day.sessionType, profile }),
+    focusChangeApplied: true,
+  };
+  delete workout.runPrescription;
+  return { ok: true, workout, soreMatched: sore.matched, soreNote: sore.note };
 }
 
 export function buildSessionFocusChange({
@@ -1531,42 +1632,11 @@ export function buildSessionFocusChange({
     };
   }
 
-  const modality = resolveTrainingModality(
-    trainingModality || targetDay.trainingModality || profile.trainingModality,
-    trainingMode || targetDay.trainingMode || profile.trainingMode
-  );
-  const goal = resolveGoal(planGoal || targetDay.goal || profile.goal);
-  const phaseParams = phase ? resolvePhaseParams(phase) : { loadFactor: 1 };
-  const interferenceScale = ((modality === TrainingModality.HYBRID_RUN_GYM || modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING)
-    && (targetDay.sessionType === 'resistance' || targetDay.sessionType === 'mixed'))
-    ? (INTERFERENCE_BY_PHASE[phase] ?? 1) : 1;
-  const durationMinutes = targetDay.workout?.durationMinutes || 45;
-  const title = focusChangeTitle(modality, normalizedFocus);
-  // #3 — modulación por molestias: si la zona dolorida carga el grupo elegido, reduce el
-  // volumeFactor (que en buildSessionExercises baja series Y carga) ~15%.
-  const sore = evaluateSoreModulation(soreAreas, normalizedFocus, targetDay.sessionType);
-  let effectiveAdaptive = adaptiveTuning;
-  if (sore.matched) {
-    const baseVf = Number(adaptiveTuning?.workout?.volumeFactor);
-    const vf = Number.isFinite(baseVf) && baseVf > 0 ? baseVf : 1;
-    const reducedVf = Math.max(0.6, Math.round(vf * 0.85 * 100) / 100);
-    effectiveAdaptive = { ...(adaptiveTuning || {}), workout: { ...((adaptiveTuning && adaptiveTuning.workout) || {}), volumeFactor: reducedVf } };
-  }
-  const exercises = buildSessionExercises({
-    modality,
-    sessionType: targetDay.sessionType,
-    sessionTitle: title,
-    sessionFocus: normalizedFocus,
-    goal,
-    profile,
-    adaptiveTuning: effectiveAdaptive,
-    daySeed: dayIndex + 101 + computeUserSeed(profile, goal),
-    sessionMinutes: durationMinutes,
-    loadProgression: phaseParams.loadFactor || 1,
-    interferenceScale,
+  const composed = composeFocusWorkout({
+    day: targetDay, dayIndex, focus: normalizedFocus,
+    profile, adaptiveTuning, trainingModality, trainingMode, goal: planGoal, phase, soreAreas,
   });
-
-  if (!exercises.length) {
+  if (!composed.ok) {
     return {
       ok: false,
       status: 422,
@@ -1575,27 +1645,71 @@ export function buildSessionFocusChange({
     };
   }
 
-  const workout = {
-    ...targetDay.workout,
-    title,
-    sessionFocus: normalizedFocus,
-    durationMinutes,
-    warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality, sessionFocus: normalizedFocus, profile }),
-    exercises,
-    cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType, profile }),
-    focusChangeApplied: true,
-  };
-  delete workout.runPrescription;
-
   return {
     ok: true,
     day: {
       ...targetDay,
       sessionFocus: normalizedFocus,
-      workout,
+      workout: composed.workout,
     },
     options,
-    soreApplied: sore.matched,
-    soreNote: sore.note,
+    soreApplied: composed.soreMatched,
+    soreNote: composed.soreNote,
+  };
+}
+
+// #2 — Reprograma validado por intercambio. Cuando el grupo elegido está bloqueado por adyacencia
+// con un día vecino de la misma familia, intercambia los focos (hoy = grupo elegido; vecino = foco
+// actual de hoy) tras validar que no rompe la recuperación en ningún lado (lo valida
+// proposeFocusReschedule). Devuelve los DOS días reconstruidos para persistir.
+export function buildSessionFocusReschedule({
+  days = [],
+  dayIndex = -1,
+  targetFocus = '',
+  profile = {},
+  adaptiveTuning = null,
+  trainingModality = null,
+  trainingMode = null,
+  goal: planGoal = null,
+  phase = null,
+  soreAreas = [],
+} = {}) {
+  const targetDay = Array.isArray(days) ? days[dayIndex] : null;
+  if (!targetDay?.workout || !['resistance', 'mixed'].includes(targetDay.sessionType)) {
+    return { ok: false, status: 409, error: 'La reprogramación solo aplica a sesiones de fuerza o mixtas.' };
+  }
+  const normalizedFocus = String(targetFocus || '').trim();
+  if (!focusChangeMeta(normalizedFocus)) {
+    return { ok: false, status: 400, error: 'Grupo muscular no válido.' };
+  }
+  const proposal = proposeFocusReschedule({ days, dayIndex, targetFocus: normalizedFocus, targetType: targetDay.sessionType });
+  if (!proposal) {
+    return { ok: false, status: 409, error: 'No se puede reprogramar sin romper la recuperación de la semana.' };
+  }
+  const neighbor = days[proposal.neighborIndex];
+  const todayCurrentFocus = focusOfDay(targetDay);
+
+  const todayComposed = composeFocusWorkout({
+    day: targetDay, dayIndex, focus: normalizedFocus,
+    profile, adaptiveTuning, trainingModality, trainingMode, goal: planGoal, phase, soreAreas,
+  });
+  const neighborComposed = composeFocusWorkout({
+    day: neighbor, dayIndex: proposal.neighborIndex, focus: todayCurrentFocus,
+    profile, adaptiveTuning, trainingModality, trainingMode, goal: planGoal, phase, soreAreas: [],
+  });
+  if (!todayComposed.ok || !neighborComposed.ok) {
+    return { ok: false, status: 422, error: 'No se encontraron ejercicios compatibles para reprogramar.' };
+  }
+
+  const neighborLabel = neighbor.dayName || neighbor.date || 'la sesión vecina';
+  const todayLabel = focusChangeMeta(normalizedFocus)?.label || normalizedFocus;
+  const neighborNewLabel = focusChangeMeta(todayCurrentFocus)?.label || todayCurrentFocus;
+  return {
+    ok: true,
+    today: { index: dayIndex, day: { ...targetDay, sessionFocus: normalizedFocus, workout: todayComposed.workout } },
+    neighbor: { index: proposal.neighborIndex, day: { ...neighbor, sessionFocus: todayCurrentFocus, workout: neighborComposed.workout } },
+    note: `Reprogramé: hoy queda ${todayLabel} y ${neighborLabel} pasa a ${neighborNewLabel} (intercambio para respetar tu recuperación).`,
+    soreApplied: todayComposed.soreMatched,
+    soreNote: todayComposed.soreNote,
   };
 }

@@ -377,6 +377,39 @@ function TrainSession() {
       setBusy(null);
     }
   }
+  // #2 — reprograma por intercambio: para un grupo bloqueado por adyacencia que el backend marca
+  // como reprogramable, intercambia el foco con el día vecino (validado server-side).
+  async function rescheduleFocus() {
+    if (!focusTarget) return;
+    setBusy('focus');
+    setFocusStatus('saving');
+    setFocusError('');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setFocusStatus('err'); setFocusError('Inicia sesión para reprogramar.'); return; }
+      const r = await fetch('/api/studio-swap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ scope: 'focus', action: 'reschedule', sessionFocus: focusTarget, soreAreas }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        await refreshSession();
+        setFocusTarget('');
+        setSoreNote([j.note, j.soreNote].filter(Boolean).join(' '));
+        setFocusStatus('ok');
+        setTimeout(() => setFocusStatus('idle'), 3500);
+      } else {
+        setFocusStatus('err');
+        setFocusError(j.error || 'No se pudo reprogramar.');
+      }
+    } catch (e) {
+      setFocusStatus('err');
+      setFocusError('No se pudo reprogramar.');
+    } finally {
+      setBusy(null);
+    }
+  }
   async function swap(scope, exerciseId) {
     setBusy(scope === 'all' ? 'all' : exerciseId);
     try {
@@ -499,6 +532,8 @@ function TrainSession() {
     ? s.focusOptions
     : SESSION_FOCUS_CHOICES.map((c) => ({ id: c.id, label: c.label, current: c.id === s.focus, available: c.id !== s.focus, reason: c.id === s.focus ? 'Foco actual.' : null }));
   const focusBlocked = focusOpts.filter((o) => !o.current && o.available === false);
+  const selectedFocusOpt = focusOpts.find((o) => o.id === focusTarget) || null;
+  const selectedReschedule = Boolean(selectedFocusOpt && !selectedFocusOpt.current && selectedFocusOpt.available === false && selectedFocusOpt.canReschedule);
   return (
     <React.Fragment>
       {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
@@ -565,27 +600,39 @@ function TrainSession() {
             <div className="chips">
               {focusOpts.map((opt) => {
                 const blocked = !opt.current && opt.available === false;
+                const reschedulable = blocked && opt.canReschedule;
+                const disabled = opt.current || (blocked && !reschedulable);
                 return (
                   <button key={opt.id} type="button"
                     className={`pill ${focusTarget === opt.id ? 'accent' : ''}`}
-                    disabled={opt.current || blocked}
-                    style={blocked || opt.current ? { opacity: 0.5, cursor: 'not-allowed' } : null}
+                    disabled={disabled}
+                    style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : null}
                     title={opt.reason || opt.compatibilityNote || ''}
                     onClick={() => setFocusTarget(opt.id)}>
-                    {opt.label}{opt.current ? ' · actual' : (blocked ? ' 🔒' : '')}
+                    {opt.label}{opt.current ? ' · actual' : (reschedulable ? ' 🔁' : (blocked ? ' 🔒' : ''))}
                   </button>
                 );
               })}
             </div>
           </div>
           <div className="focus-switch-actions">
-            <button className="btn ghost sm" disabled={!focusTarget || busy === 'focus'} onClick={changeFocus}>
-              <Icon name="target" size={14} /> {busy === 'focus' ? 'Cambiando…' : 'Cambiar grupo'}
-            </button>
+            {selectedReschedule ? (
+              <button className="btn ghost sm" disabled={busy === 'focus'} onClick={rescheduleFocus}>
+                <Icon name="sparkles" size={14} /> {busy === 'focus' ? 'Reprogramando…' : `Reprogramar (intercambiar con ${selectedFocusOpt.rescheduleWith || 'la sesión vecina'})`}
+              </button>
+            ) : (
+              <button className="btn ghost sm" disabled={!focusTarget || busy === 'focus' || (selectedFocusOpt && selectedFocusOpt.available === false)} onClick={changeFocus}>
+                <Icon name="target" size={14} /> {busy === 'focus' ? 'Cambiando…' : 'Cambiar grupo'}
+              </button>
+            )}
           </div>
           {focusBlocked.length ? (
             <div className="stack" style={{ gap: 2, marginTop: 2, flexBasis: '100%' }}>
-              {focusBlocked.map((o) => <span key={o.id} className="tiny muted">🔒 {o.label}: {o.reason || 'no disponible esta semana'}</span>)}
+              {focusBlocked.map((o) => (
+                <span key={o.id} className="tiny muted">
+                  {o.canReschedule ? '🔁' : '🔒'} {o.label}: {o.reason || 'no disponible esta semana'}{o.canReschedule ? ` — puedes reprogramar con ${o.rescheduleWith || 'la vecina'}` : ''}
+                </span>
+              ))}
             </div>
           ) : null}
           {focusStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Sesión ajustada.</span> : null}

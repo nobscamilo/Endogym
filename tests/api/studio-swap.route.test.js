@@ -202,4 +202,43 @@ describe('/api/studio-swap route', () => {
     expect(json.soreApplied).toBe(false);
     expect(json.soreNote).toBeNull();
   });
+
+  it('#2 reprograma por intercambio cuando el grupo elegido choca con el vecino', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+      trainingDay('2026-06-16', 'upper', 'Torso mañana'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', action: 'reschedule' }),
+    }));
+    const json = await response.json();
+    const patch = mocks.updatePlan.mock.calls[0]?.[0];
+    expect(response.status).toBe(200);
+    expect(json.rescheduled).toBe(true);
+    expect(json.note).toMatch(/reprogram/i);
+    expect(patch.days[0].sessionFocus).toBe('upper');
+    expect(patch.days[1].sessionFocus).toBe('lower');
+  });
+
+  it('#2 no reprograma si el bloqueo es por volumen semanal (no por adyacencia)', async () => {
+    const aerobicDay = (date) => ({
+      date, dayName: 'Cardio', isTrainingDay: true,
+      sessionType: 'aerobic', sessionFocus: 'cardio_easy',
+      workout: { title: 'Rodaje suave', durationMinutes: 40, exercises: [] },
+    });
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-13', 'upper', 'Torso lunes'),
+      aerobicDay('2026-06-14'),
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+      aerobicDay('2026-06-16'),
+      trainingDay('2026-06-17', 'upper', 'Torso viernes'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', action: 'reschedule' }),
+    }));
+    expect(response.status).toBe(409);
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
 });

@@ -4,7 +4,7 @@ import { withTrace, logError } from '../../../lib/logger.js';
 import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
 import { suggestExerciseAlternatives } from '../../../core/exerciseLibrary.js';
-import { buildSessionFocusChange } from '../../../core/planner.js';
+import { buildSessionFocusChange, buildSessionFocusReschedule } from '../../../core/planner.js';
 import { resolveRaceGoal, estimate5kPaceSecPerKm, deriveRunPaces, buildRunPrescription } from '../../../core/running.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 
@@ -71,6 +71,35 @@ export async function POST(request) {
           trainingMode: plan.trainingMode || profile?.trainingMode,
           trainingModality: plan.trainingModality || profile?.trainingModality,
         };
+        // #2 — reprograma validado por intercambio (cuando el grupo elegido choca con un vecino).
+        if (body?.action === 'reschedule') {
+          const resched = buildSessionFocusReschedule({
+            days: plan.days,
+            dayIndex: idx,
+            targetFocus: requestedFocus,
+            profile: profileForPlan,
+            adaptiveTuning: plan.adaptiveTuning || null,
+            trainingMode: plan.trainingMode,
+            trainingModality: plan.trainingModality,
+            goal: plan.goal,
+            phase: plan.phase,
+            soreAreas,
+          });
+          if (!resched.ok) return errorResponse(resched.error, resched.status || 400, resched.details);
+          plan.days[resched.today.index] = resched.today.day;
+          plan.days[resched.neighbor.index] = resched.neighbor.day;
+          const { db } = await getAdminServices();
+          await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
+            .update({ days: plan.days, updatedAt: new Date().toISOString() });
+          return jsonResponse({
+            ok: true,
+            sessionFocus: resched.today.day.sessionFocus,
+            rescheduled: true,
+            note: resched.note,
+            soreNote: resched.soreNote || null,
+            soreApplied: Boolean(resched.soreApplied),
+          });
+        }
         const change = buildSessionFocusChange({
           days: plan.days,
           dayIndex: idx,
