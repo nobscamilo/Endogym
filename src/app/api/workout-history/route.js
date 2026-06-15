@@ -21,9 +21,19 @@ function pos(v) {
 
 function mapItem(w, analysis) {
   // Incluye ejercicios sin peso (peso corporal): kg null en vez de filtrarlos.
+  // #5 — si hay registro por serie, lo adjunta (kg·reps·RIR por set).
   const lifts = (Array.isArray(w.exercises) ? w.exercises : [])
     .filter((e) => e?.name)
-    .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, reps: e.reps ?? null, sets: e.sets ?? null }));
+    .map((e) => ({
+      name: e.name,
+      kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null,
+      reps: e.reps ?? null,
+      sets: e.sets ?? null,
+      rir: e.rir ?? null,
+      setLogs: Array.isArray(e.setLogs) && e.setLogs.length
+        ? e.setLogs.slice(0, 20).map((sx) => ({ kg: Number(sx.weightKg) > 0 ? Number(sx.weightKg) : null, reps: sx.reps ?? null, rir: sx.rir ?? null }))
+        : null,
+    }));
   return {
     workoutId: w.id || null,
     performedAt: w.performedAt || null,

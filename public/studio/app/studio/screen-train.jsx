@@ -316,6 +316,20 @@ function TrainSession() {
   const toggleSore = (a) => setSoreAreas((p) => p.includes(a) ? p.filter((x) => x !== a) : [...p, a]);
   const [logKg, setLogKg] = useStateTr({});
   const [logReps, setLogReps] = useStateTr({});
+  // #5 — registro por serie (modo detallado opcional; el modo rápido por defecto = 1 valor/ejercicio).
+  const [setMode, setSetMode] = useStateTr({}); // exId -> bool (detallado)
+  const [setLogs, setSetLogs] = useStateTr({}); // exId -> [{ kg, reps, rir }]
+  const toggleSetMode = (ex) => {
+    const id = ex.id;
+    if (!id) return;
+    setSetLogs((sl) => (sl[id] ? sl : { ...sl, [id]: Array.from({ length: Math.max(1, Number(ex.sets) || 3) }, () => ({ kg: ex.loadKg != null ? String(ex.loadKg) : '', reps: ex.reps != null ? String(ex.reps) : '', rir: '' })) }));
+    setSetMode((p) => ({ ...p, [id]: !p[id] }));
+  };
+  const updateSet = (id, i, field, val) => setSetLogs((sl) => {
+    const arr = (sl[id] || []).slice();
+    arr[i] = { ...(arr[i] || {}), [field]: val };
+    return { ...sl, [id]: arr };
+  });
   const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
   const [logRpe, setLogRpe] = useStateTr(7);
   const [autoStatus, setAutoStatus] = useStateTr('idle'); // idle|analyzing|done|limited|err
@@ -433,16 +447,33 @@ function TrainSession() {
       const today = new Date().toISOString().slice(0, 10);
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
       const exercises = list
-        .filter((e) => e.loadKg != null)
-        .map((e) => ({
-          id: e.id || null,
-          name: e.name,
-          weightKg: Number(logKg[e.id] ?? e.loadKg) || null,
-          // Reps REALES (input del usuario; fallback a las prescritas): habilitan e1RM y
-          // detección de estancamiento en el análisis del coach.
-          reps: Number(logReps[e.id] ?? e.reps) || null,
-          sets: e.sets ?? null,
-        }))
+        .filter((e) => e.loadKg != null && e.id)
+        .map((e) => {
+          // #5 — modo por serie: kg/reps/RIR por set → serie principal (top set) + setLogs + RPE
+          // derivado del RIR (alimenta DAPRE/e1RM y detección de estancamiento).
+          const detailed = setMode[e.id] && Array.isArray(setLogs[e.id]);
+          if (detailed) {
+            const logs = setLogs[e.id]
+              .map((sx) => ({ weightKg: Number(sx.kg) || null, reps: Number(sx.reps) || null, rir: sx.rir === '' || sx.rir == null ? null : Number(sx.rir) }))
+              .filter((sx) => sx.weightKg || sx.reps);
+            if (logs.length) {
+              const top = logs.reduce((a, b) => ((b.weightKg || 0) > (a.weightKg || 0) ? b : a), logs[0]);
+              return {
+                id: e.id, name: e.name,
+                weightKg: top.weightKg, reps: top.reps, sets: logs.length,
+                setLogs: logs, rir: top.rir,
+                rpe: top.rir != null ? Math.max(1, Math.min(10, 10 - top.rir)) : (Number(logRpe) || null),
+              };
+            }
+          }
+          return {
+            id: e.id, name: e.name,
+            // Reps REALES (input del usuario; fallback a las prescritas).
+            weightKg: Number(logKg[e.id] ?? e.loadKg) || null,
+            reps: Number(logReps[e.id] ?? e.reps) || null,
+            sets: e.sets ?? null,
+          };
+        })
         .filter((e) => e.id && e.weightKg);
       const hasLoads = exercises.length > 0;
       // El un-tap exige cargas; el check-in unificado también vale para días sin cargas (carrera).
@@ -692,8 +723,11 @@ function TrainSession() {
           </div>
         )}>
         <div className="ex-list">
-          {list.map((ex, i) => (
-            <div key={i} className={`ex-row ${ex.done ? 'done' : ''}`}>
+          {list.map((ex, i) => {
+            const detailed = ex.id && setMode[ex.id];
+            return (
+            <React.Fragment key={i}>
+            <div className={`ex-row ${ex.done ? 'done' : ''}`}>
               <button className="ex-thumb" style={{ background: thumbBg(ex) }} onClick={(e) => { e.stopPropagation(); open(ex, e.currentTarget); }}>
                 <span className="vid-play sm"><Icon name="play" size={14} /></span>
                 <span className="vid-len">{ex.dur}</span>
@@ -704,7 +738,7 @@ function TrainSession() {
               </div>
               <div className="ex-sets">
                 <span className="ex-scheme">{ex.scheme}</span>
-                {ex.loadKg != null ? (
+                {ex.loadKg != null && !detailed ? (
                   <React.Fragment>
                     <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title="Carga usada (kg)">
                       <span className="tiny muted" style={{ fontSize: 10, lineHeight: 1 }}>kg</span>
@@ -720,6 +754,12 @@ function TrainSession() {
                     </label>
                   </React.Fragment>
                 ) : null}
+                {ex.loadKg != null && ex.id ? (
+                  <button className="ex-swap" title={detailed ? 'Volver a modo rápido' : 'Registrar por serie (kg · reps · RIR)'}
+                    style={detailed ? { color: 'var(--accent)' } : null} onClick={() => toggleSetMode(ex)}>
+                    <Icon name="list" size={15} />
+                  </button>
+                ) : null}
                 {ex.id ? (
                   <button className="ex-swap" title="Cambiar ejercicio" disabled={busy === ex.id} onClick={() => swap('one', ex.id)}>
                     <Icon name={busy === ex.id ? 'clock' : 'sparkles'} size={15} />
@@ -728,9 +768,29 @@ function TrainSession() {
                 <button className="ex-check" onClick={() => toggle(i)}><Icon name="check" size={16} /></button>
               </div>
             </div>
-          ))}
+            {detailed && Array.isArray(setLogs[ex.id]) ? (
+              <div style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 10, margin: '0 0 8px' }}>
+                <div className="row ac between" style={{ marginBottom: 6 }}>
+                  <span className="tiny muted">Por serie · kg · reps · RIR (reps en reserva)</span>
+                </div>
+                {setLogs[ex.id].map((st, si) => (
+                  <div key={si} className="row ac" style={{ gap: 8, marginBottom: 6 }}>
+                    <span className="tiny muted" style={{ width: 54 }}>Serie {si + 1}</span>
+                    <input className="text-input" type="number" min="0" step="2.5" style={{ width: 64 }} placeholder="kg" title="kg" value={st.kg} onChange={(e) => updateSet(ex.id, si, 'kg', e.target.value)} />
+                    <input className="text-input" type="number" min="0" max="50" style={{ width: 52 }} placeholder="reps" title="reps" value={st.reps} onChange={(e) => updateSet(ex.id, si, 'reps', e.target.value)} />
+                    <input className="text-input" type="number" min="0" max="10" style={{ width: 52 }} placeholder="RIR" title="Reps en reserva (RIR)" value={st.rir} onChange={(e) => updateSet(ex.id, si, 'rir', e.target.value)} />
+                  </div>
+                ))}
+                <button className="btn ghost sm" onClick={() => setSetLogs((sl) => ({ ...sl, [ex.id]: [...(sl[ex.id] || []), { kg: '', reps: '', rir: '' }] }))}>
+                  <Icon name="plus" size={12} /> Añadir serie
+                </button>
+              </div>
+            ) : null}
+            </React.Fragment>
+            );
+          })}
         </div>
-        <p className="tiny muted" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>Anota la carga real (kg) y las repeticiones de cada ejercicio; abajo, en el check-in, las guardas todas de una vez.</p>
+        <p className="tiny muted" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>Anota la carga real (kg) y las reps de cada ejercicio. Toca <Icon name="list" size={12} /> para registrar <strong>por serie</strong> (kg · reps · RIR) y afinar la progresión; abajo, en el check-in, lo guardas todo de una vez.</p>
       </SectionCard>
 
       {/* Calentamiento y enfriamiento */}

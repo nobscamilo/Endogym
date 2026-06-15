@@ -71,8 +71,16 @@ function HistoryItem({ w, onAnalyzed }) {
       {open ? (
         <div style={{ marginTop: 6 }}>
           {Array.isArray(w.lifts) && w.lifts.length ? (
-            <div className="tiny muted" style={{ lineHeight: 1.6 }}>
-              {w.lifts.map((l) => `${l.name} ${l.kg} kg${l.sets ? ` ×${l.sets}` : ''}`).join(' · ')}
+            <div className="stack" style={{ gap: 4 }}>
+              {w.lifts.map((l, i) => (
+                <div key={i} className="tiny muted" style={{ lineHeight: 1.5 }}>
+                  <strong>{l.name}</strong>{' '}
+                  {l.kg != null ? `${l.kg} kg` : 'peso corporal'}{l.reps != null ? ` × ${l.reps}` : ''}{(l.sets && !(Array.isArray(l.setLogs) && l.setLogs.length)) ? ` · ${l.sets} series` : ''}
+                  {Array.isArray(l.setLogs) && l.setLogs.length ? (
+                    <span> · {l.setLogs.map((st) => `${st.kg != null ? st.kg + 'kg' : ''}${st.reps != null ? '×' + st.reps : ''}${st.rir != null ? ' RIR' + st.rir : ''}`.trim()).join(' | ')}</span>
+                  ) : null}
+                </div>
+              ))}
             </div>
           ) : null}
           {(w.fatigue != null || w.sleepHours != null) ? (

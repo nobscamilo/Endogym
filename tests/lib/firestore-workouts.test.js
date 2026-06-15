@@ -125,4 +125,33 @@ describe('Firestore workout persistence', () => {
       weightKg: 80,
     });
   });
+
+  it('#5 persiste el registro por serie (setLogs) y RIR del ejercicio', async () => {
+    const manual = await createWorkout('user-1', {
+      title: 'Pierna por serie',
+      mode: 'studio',
+      source: 'manual',
+      performedAt: '2026-06-01T18:00:00.000Z',
+      exercises: [
+        {
+          id: 'gym-back-squat',
+          name: 'Sentadilla',
+          sets: 3,
+          reps: 5,
+          weightKg: 100,
+          rir: 2,
+          setLogs: [
+            { weightKg: 100, reps: 5, rir: 3 },
+            { weightKg: 100, reps: 5, rir: 2 },
+            { weightKg: 102.5, reps: 4, rir: 1 },
+            { weightKg: 'x', reps: null, rir: null }, // inválida → descartada
+          ],
+        },
+      ],
+    });
+
+    expect(manual.exercises[0].rir).toBe(2);
+    expect(manual.exercises[0].setLogs).toHaveLength(3);
+    expect(manual.exercises[0].setLogs[2]).toEqual({ weightKg: 102.5, reps: 4, rir: 1 });
+  });
 });

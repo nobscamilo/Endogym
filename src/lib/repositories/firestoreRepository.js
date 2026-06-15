@@ -79,8 +79,29 @@ export async function listMealsSince(userId, sinceIso, limit = 200) {
   return snapshot.docs.map((doc) => doc.data());
 }
 
+function numOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function sanitizeSetLog(set) {
+  if (!set || typeof set !== 'object') return null;
+  const out = {
+    weightKg: numOrNull(set.weightKg),
+    reps: numOrNull(set.reps),
+    rir: numOrNull(set.rir),
+  };
+  return (out.weightKg != null || out.reps != null || out.rir != null) ? out : null;
+}
+
 function sanitizeExercise(exercise) {
   if (!exercise || typeof exercise !== 'object') return null;
+  // #5 — registro por serie (opcional): kg/reps/RIR por set. weightKg/reps quedan como
+  // "serie principal" (top set) para mantener DAPRE/e1RM y compatibilidad.
+  const setLogs = Array.isArray(exercise.setLogs)
+    ? exercise.setLogs.slice(0, 20).map(sanitizeSetLog).filter(Boolean)
+    : null;
   return {
     id: typeof exercise.id === 'string' && exercise.id.trim()
       ? exercise.id.trim().slice(0, 120)
@@ -91,6 +112,8 @@ function sanitizeExercise(exercise) {
     weightKg: Number.isFinite(Number(exercise.weightKg)) ? Number(exercise.weightKg) : null,
     durationSeconds: Number.isFinite(Number(exercise.durationSeconds)) ? Number(exercise.durationSeconds) : null,
     rpe: Number.isFinite(Number(exercise.rpe)) ? Number(exercise.rpe) : null,
+    rir: Number.isFinite(Number(exercise.rir)) ? Number(exercise.rir) : null,
+    setLogs: setLogs && setLogs.length ? setLogs : null,
     completed: typeof exercise.completed === 'boolean' ? exercise.completed : true,
     notes: typeof exercise.notes === 'string' ? exercise.notes.slice(0, 500) : null,
   };
