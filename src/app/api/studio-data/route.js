@@ -15,6 +15,7 @@ import {
 } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
+import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../../core/sessionHistory.js';
 import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
@@ -61,14 +62,13 @@ function mapRunZones(workouts, plan, profile) {
 // Antes este dato existía en Firestore pero NO se mostraba en ninguna pantalla: el usuario
 // registraba sesiones y "desaparecían". Alimenta la sección de Progreso.
 function mapRecentWorkouts(workouts) {
-  const done = (Array.isArray(workouts) ? workouts : [])
-    .filter((w) => (w.source === 'daily_checkin' ? w.completed === true : w.completed !== false))
-    .sort((a, b) => String(b.performedAt || '').localeCompare(String(a.performedAt || '')))
+  // Una sesión por día (fusiona check-in + manual + Strava); evita duplicados en el historial.
+  const done = collapseWorkoutsByDay(workouts)
     .slice(0, 10)
     .map((w) => {
       const lifts = (Array.isArray(w.exercises) ? w.exercises : [])
-        .filter((e) => e?.name && Number(e.weightKg) > 0)
-        .map((e) => ({ name: e.name, kg: Number(e.weightKg), sets: e.sets ?? null }));
+        .filter((e) => e?.name)
+        .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, sets: e.sets ?? null, reps: e.reps ?? null }));
       // Number(null) === 0 (finito): descarta null/'' antes de convertir para no mostrar 0 falsos.
       const pos = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
       return {
@@ -301,7 +301,7 @@ function dayNumber(dateStr) {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapTodaySession(plan, today) {
+function mapTodaySession(plan, today, workouts = []) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
   const day = days.find((d) => d.date === today && d.isTrainingDay)
@@ -348,6 +348,26 @@ function mapTodaySession(plan, today) {
   if (cooldown.length) out.cooldown = cooldown;
   if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;
   out.sessionType = day.sessionType || '';
+  // Rehidratación de Entreno: si HOY ya hay una sesión registrada (check-in/manual/Strava),
+  // la UI muestra "Registrada ✓" y el resumen en vez de pedir registro de nuevo.
+  const loggedToday = findDaySession(workouts, today);
+  if (loggedToday) {
+    out.logged = true;
+    out.loggedSummary = {
+      sources: loggedToday.sources || [],
+      sessionRpe: loggedToday.sessionRpe ?? null,
+      fatigue: loggedToday.fatigue ?? null,
+      sleepHours: loggedToday.sleepHours ?? null,
+      completed: loggedToday.completed !== false,
+      hasAlarmSymptoms: Boolean(loggedToday.hasAlarmSymptoms),
+      lifts: (Array.isArray(loggedToday.exercises) ? loggedToday.exercises : [])
+        .filter((e) => e?.name)
+        .slice(0, 12)
+        .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, reps: e.reps ?? null, sets: e.sets ?? null })),
+    };
+  } else {
+    out.logged = false;
+  }
   return out;
 }
 
@@ -513,7 +533,8 @@ function mapProgress(metrics, workouts, plan) {
   const planDays = Array.isArray(plan?.days) ? plan.days : [];
   const sessionsPlan = planDays.filter((d) => d.isTrainingDay).length;
   if (sessionsPlan) out.sessionsPlan = sessionsPlan;
-  const done = wlist.filter((w) => w.completed !== false && w.source !== 'daily_checkin' || (w.source === 'daily_checkin' && w.completed === true)).length;
+  // 1 sesión por día: fusiona check-in + manual + Strava para no inflar adherencia.
+  const done = countDoneSessions(wlist);
   out.sessionsDone = done;
   if (sessionsPlan) out.adherence = Math.min(100, Math.round((done / sessionsPlan) * 100));
   const planVolMin = planDays.reduce((a, d) => a + (d.isTrainingDay ? Number(d.workout?.durationMinutes) || 0 : 0), 0);
@@ -632,7 +653,7 @@ export async function GET(request) {
 
       setIf('user', mapUser(profile, user));
       setIf('runPaces', planForStudio?.runPaces || null);
-      setIf('todaySession', mapTodaySession(planForStudio, today));
+      setIf('todaySession', mapTodaySession(planForStudio, today, workouts));
       setIf('week', mapWeek(planForStudio, today));
       setIf('library', mapLibrary(planForStudio));
       setIf('macroTargets', mapMacroTargets(planForStudio, today));

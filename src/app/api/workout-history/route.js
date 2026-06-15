@@ -5,6 +5,7 @@ import {
   listWorkouts,
   getWorkoutAnalysesByIds,
 } from '../../../lib/repositories/firestoreRepository.js';
+import { collapseWorkoutsByDay } from '../../../core/sessionHistory.js';
 
 // Historial consultable de entrenos para el Studio (Progreso): paginado por cursor
 // `before` (performedAt ISO) y con el análisis del coach cacheado inline cuando existe.
@@ -19,15 +20,17 @@ function pos(v) {
 }
 
 function mapItem(w, analysis) {
+  // Incluye ejercicios sin peso (peso corporal): kg null en vez de filtrarlos.
   const lifts = (Array.isArray(w.exercises) ? w.exercises : [])
-    .filter((e) => e?.name && Number(e.weightKg) > 0)
-    .map((e) => ({ name: e.name, kg: Number(e.weightKg), sets: e.sets ?? null }));
+    .filter((e) => e?.name)
+    .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, reps: e.reps ?? null, sets: e.sets ?? null }));
   return {
     workoutId: w.id || null,
     performedAt: w.performedAt || null,
     date: String(w.performedAt || '').slice(0, 10),
     title: w.title || w.sportType || 'Sesión',
     source: w.source === 'strava' ? 'strava' : w.source === 'daily_checkin' ? 'checkin' : 'app',
+    sources: Array.isArray(w.sources) ? w.sources : [w.source || 'manual'],
     durationMin: pos(w.durationMinutes) ? Math.round(Number(w.durationMinutes)) : null,
     distanceKm: pos(w.distanceKm),
     avgHr: pos(w.avgHeartRate),
@@ -66,10 +69,11 @@ export async function GET(request) {
       // Pedimos limit+1 para saber si hay más páginas sin otra consulta.
       const rows = await listWorkouts(user.uid, limit + 1, { before: before || null });
       const hasMore = rows.length > limit;
-      const page = rows.slice(0, limit)
-        .filter((w) => (w.source === 'daily_checkin' ? w.completed === true : w.completed !== false));
-      const analyses = await getWorkoutAnalysesByIds(user.uid, page.map((w) => w.id)).catch(() => ({}));
-      const items = page.map((w) => mapItem(w, analyses[w.id]));
+      // Fusiona los registros del mismo día (check-in + manual + Strava) en UNA sesión,
+      // para que el historial no muestre la misma sesión 2-3 veces.
+      const sessions = collapseWorkoutsByDay(rows.slice(0, limit));
+      const analyses = await getWorkoutAnalysesByIds(user.uid, sessions.map((w) => w.id)).catch(() => ({}));
+      const items = sessions.map((w) => mapItem(w, analyses[w.id]));
       const nextBefore = hasMore && rows[limit - 1]?.performedAt ? rows[limit - 1].performedAt : null;
       return jsonResponse({ ok: true, items, hasMore, nextBefore });
     } catch (error) {
