@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, madrugada (#1 matriz de grupos disponibles/bloqueados en UI, desplegado)**.
+Ultima actualizacion: **16 de junio de 2026, madrugada-2 (#2 reprograma validado por intercambio, desplegado)**.
+
+## Sesión del 16 de junio de 2026, madrugada-2 (#2 reprograma por intercambio)
+
+**Desplegado y verificado:** commit `437ab5d`, deployment `endogym-4mu1my0io…`, bundle `v=f41d4e0945` (root/health 200; el bundle contiene "Reprogramar"). Build OK; único rojo = el flaky por hora de `weekly-plan`. +2 tests (261 en total).
+
+- **Backend (`planner.js`):** `proposeFocusReschedule` decide si un bloqueo por adyacencia se resuelve intercambiando el foco de hoy con el del vecino de la misma familia (hoy→grupo elegido, vecino→foco actual de hoy), validando: la familia de hoy ≠ familia objetivo, sin choque con los OTROS vecinos, y sin sobrecarga semanal (el intercambio no cambia el recuento de familias). `composeFocusWorkout` (factorizado de `buildSessionFocusChange`, sin cambiar su comportamiento) arma cada workout; `buildSessionFocusReschedule` reconstruye ambos días. `listSessionFocusChangeOptions` ahora añade `canReschedule`/`rescheduleWith` por opción.
+- **Ruta (`studio-swap`):** `action:'reschedule'` valida, persiste los DOS días y devuelve `note`.
+- **UI (`screen-train.jsx`):** los grupos bloqueados-pero-reprogramables salen con 🔁 y son seleccionables; al elegirlos aparece "Reprogramar (intercambiar con {día})" en vez de "Cambiar grupo"; la nota del intercambio se muestra al terminar.
+- **Límite conocido (anotado):** solo intercambia con un vecino directo; no mueve a días no contiguos ni reordena la tirada larga (eso sería un scheduler completo).
+- **Backlog restante del roadmap:** #4 (inventario de equipo), #5 (registro por serie, completo con modo rápido), #6 (el "por qué" con citas RAG), #7 (revisión mensual del mesociclo), #8 (onboarding), y la limpieza de `CheckinCard` sin uso.
+
+## Sesión del 16 de junio de 2026, madrugada (#1 matriz de grupos en la UI)
 
 ## Sesión del 16 de junio de 2026, madrugada (#1 matriz de grupos en la UI)
 
