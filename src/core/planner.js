@@ -299,6 +299,28 @@ function sessionFocusesConflict(leftFocus, rightFocus, leftType = '', rightType 
   return leftFamily === rightFamily;
 }
 
+// #3 — Check-in por grupo muscular antes de cambiar foco: si la zona con molestias/agujetas
+// coincide con el grupo al que se cambia, modulamos la sesión (menos volumen y carga) en vez
+// de mandarla a tope. Mapa zona→familias de fuerza que la cargan.
+const SORE_AREA_FAMILIES = { leg: ['lower'], torso: ['upper'], shoulder: ['upper'], lumbar: ['lower'] };
+const SORE_AREA_LABELS = { leg: 'pierna', torso: 'torso', shoulder: 'hombro', lumbar: 'zona lumbar' };
+
+function evaluateSoreModulation(soreAreas, targetFocus, targetType) {
+  const areas = (Array.isArray(soreAreas) ? soreAreas : [])
+    .map((a) => String(a || '').toLowerCase().trim())
+    .filter((a) => SORE_AREA_FAMILIES[a]);
+  if (!areas.length) return { matched: false, note: null };
+  const targetFamily = resolveSessionFocusFamily(targetFocus, targetType);
+  // Un full body entrena todo → cualquier zona dolorida aplica.
+  const matched = areas.filter((a) => targetFamily === 'full' || SORE_AREA_FAMILIES[a].includes(targetFamily));
+  if (!matched.length) return { matched: false, note: null };
+  const labels = matched.map((a) => SORE_AREA_LABELS[a]);
+  return {
+    matched: true,
+    note: `Marcaste molestias en ${labels.join(' y ')}: bajé volumen y carga de la sesión ~15% y conviene no forzar el rango doloroso.`,
+  };
+}
+
 const STRENGTH_FOCUS_CHANGE_OPTIONS = [
   { id: 'upper', label: 'Torso', title: 'Torso' },
   { id: 'push', label: 'Empuje', title: 'Empuje' },
@@ -1462,6 +1484,7 @@ export function buildSessionFocusChange({
   trainingMode = null,
   goal: planGoal = null,
   phase = null,
+  soreAreas = [],
 } = {}) {
   const targetDay = Array.isArray(days) ? days[dayIndex] : null;
   if (!targetDay?.workout) {
@@ -1519,6 +1542,16 @@ export function buildSessionFocusChange({
     ? (INTERFERENCE_BY_PHASE[phase] ?? 1) : 1;
   const durationMinutes = targetDay.workout?.durationMinutes || 45;
   const title = focusChangeTitle(modality, normalizedFocus);
+  // #3 — modulación por molestias: si la zona dolorida carga el grupo elegido, reduce el
+  // volumeFactor (que en buildSessionExercises baja series Y carga) ~15%.
+  const sore = evaluateSoreModulation(soreAreas, normalizedFocus, targetDay.sessionType);
+  let effectiveAdaptive = adaptiveTuning;
+  if (sore.matched) {
+    const baseVf = Number(adaptiveTuning?.workout?.volumeFactor);
+    const vf = Number.isFinite(baseVf) && baseVf > 0 ? baseVf : 1;
+    const reducedVf = Math.max(0.6, Math.round(vf * 0.85 * 100) / 100);
+    effectiveAdaptive = { ...(adaptiveTuning || {}), workout: { ...((adaptiveTuning && adaptiveTuning.workout) || {}), volumeFactor: reducedVf } };
+  }
   const exercises = buildSessionExercises({
     modality,
     sessionType: targetDay.sessionType,
@@ -1526,7 +1559,7 @@ export function buildSessionFocusChange({
     sessionFocus: normalizedFocus,
     goal,
     profile,
-    adaptiveTuning,
+    adaptiveTuning: effectiveAdaptive,
     daySeed: dayIndex + 101 + computeUserSeed(profile, goal),
     sessionMinutes: durationMinutes,
     loadProgression: phaseParams.loadFactor || 1,
@@ -1562,5 +1595,7 @@ export function buildSessionFocusChange({
       workout,
     },
     options,
+    soreApplied: sore.matched,
+    soreNote: sore.note,
   };
 }

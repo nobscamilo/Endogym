@@ -42,6 +42,11 @@ export async function POST(request) {
     const scope = isFocusSwap ? 'focus' : ((body?.scope === 'all' || reason === 'more_time') ? 'all' : 'one');
     const exerciseId = typeof body?.exerciseId === 'string' ? body.exerciseId : null;
     if (scope === 'one' && !exerciseId) return errorResponse('Falta exerciseId.', 400);
+    // #3 — zonas con molestias/agujetas marcadas antes de cambiar de grupo.
+    const SORE_AREA_KEYS = ['leg', 'torso', 'shoulder', 'lumbar'];
+    const soreAreas = Array.isArray(body?.soreAreas)
+      ? Array.from(new Set(body.soreAreas.filter((a) => SORE_AREA_KEYS.includes(a)))).slice(0, 4)
+      : [];
 
     try {
       const [profile, plan] = await Promise.all([
@@ -76,6 +81,7 @@ export async function POST(request) {
           trainingModality: plan.trainingModality,
           goal: plan.goal,
           phase: plan.phase,
+          soreAreas,
         });
         if (!change.ok) {
           return errorResponse(change.error, change.status || 400, change.details);
@@ -84,7 +90,7 @@ export async function POST(request) {
         const { db } = await getAdminServices();
         await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
           .update({ days: plan.days, updatedAt: new Date().toISOString() });
-        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options });
+        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options, soreNote: change.soreNote || null, soreApplied: Boolean(change.soreApplied) });
       }
 
       if (!exercises.length) return errorResponse('La sesión no tiene ejercicios.', 409);

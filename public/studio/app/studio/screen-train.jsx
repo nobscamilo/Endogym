@@ -269,6 +269,13 @@ const SESSION_FOCUS_CHOICES = [
   { id: 'lower', label: 'Pierna' },
   { id: 'full_body', label: 'Full body' },
 ];
+// #3 — zonas de molestias/agujetas para el check-in previo al cambio de grupo.
+const SORE_AREA_CHOICES = [
+  { id: 'leg', label: 'Pierna' },
+  { id: 'torso', label: 'Torso' },
+  { id: 'shoulder', label: 'Hombro' },
+  { id: 'lumbar', label: 'Lumbar' },
+];
 const SESSION_FOCUS_LABELS = {
   upper: 'Torso',
   push: 'Empuje',
@@ -303,6 +310,10 @@ function TrainSession() {
   const [focusTarget, setFocusTarget] = useStateTr('');
   const [focusStatus, setFocusStatus] = useStateTr('idle'); // idle|saving|ok|err
   const [focusError, setFocusError] = useStateTr('');
+  // #3 — molestias/agujetas por zona antes de cambiar de grupo (modula la sesión nueva).
+  const [soreAreas, setSoreAreas] = useStateTr([]);
+  const [soreNote, setSoreNote] = useStateTr('');
+  const toggleSore = (a) => setSoreAreas((p) => p.includes(a) ? p.filter((x) => x !== a) : [...p, a]);
   const [logKg, setLogKg] = useStateTr({});
   const [logReps, setLogReps] = useStateTr({});
   const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
@@ -346,12 +357,13 @@ function TrainSession() {
       const r = await fetch('/api/studio-swap', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-        body: JSON.stringify({ scope: 'focus', sessionFocus: focusTarget }),
+        body: JSON.stringify({ scope: 'focus', sessionFocus: focusTarget, soreAreas }),
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
         await refreshSession();
         setFocusTarget('');
+        setSoreNote(j.soreNote || '');
         setFocusStatus('ok');
         setTimeout(() => setFocusStatus('idle'), 2600);
       } else {
@@ -534,6 +546,14 @@ function TrainSession() {
               <span>{sessionFocusLabel(s.focus)}</span>
             </div>
           </div>
+          <div className="focus-sore" style={{ flexBasis: '100%', width: '100%', marginTop: 4 }}>
+            <div className="mb-label" style={{ marginBottom: 6 }}>¿Molestias o agujetas hoy? <span className="tiny muted">(ajusta la sesión nueva)</span></div>
+            <div className="chips">
+              {SORE_AREA_CHOICES.map((a) => (
+                <button key={a.id} type="button" className={`pill ${soreAreas.includes(a.id) ? 'accent' : ''}`} onClick={() => toggleSore(a.id)}>{a.label}</button>
+              ))}
+            </div>
+          </div>
           <div className="focus-switch-actions">
             <select className="reason-select focus-select" value={focusTarget} onChange={(e) => setFocusTarget(e.target.value)} title="Grupo muscular">
               <option value="">Elegir grupo</option>
@@ -549,6 +569,7 @@ function TrainSession() {
           </div>
           {focusStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Sesión ajustada.</span> : null}
           {focusStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{focusError}</span> : null}
+          {soreNote ? <span className="tiny" style={{ color: 'var(--accent)', flexBasis: '100%' }}>{soreNote}</span> : null}
         </div>
       ) : null}
 

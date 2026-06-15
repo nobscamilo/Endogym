@@ -169,4 +169,37 @@ describe('/api/studio-swap route', () => {
       })
     )).toBe(true);
   });
+
+  const planForSore = () => planWith([
+    trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+    {
+      date: '2026-06-16', dayName: 'Martes', isTrainingDay: true,
+      sessionType: 'aerobic', sessionFocus: 'cardio_easy',
+      workout: { title: 'Rodaje suave', durationMinutes: 40, exercises: [] },
+    },
+  ]);
+
+  it('#3 modula la sesión cuando la zona dolorida carga el grupo elegido', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planForSore());
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', soreAreas: ['torso'] }),
+    }));
+    const json = await response.json();
+    expect(response.status).toBe(200);
+    expect(json.soreApplied).toBe(true);
+    expect(json.soreNote).toMatch(/molestias/i);
+  });
+
+  it('#3 no modula si la zona dolorida no carga el grupo elegido', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planForSore());
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', soreAreas: ['leg'] }),
+    }));
+    const json = await response.json();
+    expect(response.status).toBe(200);
+    expect(json.soreApplied).toBe(false);
+    expect(json.soreNote).toBeNull();
+  });
 });
