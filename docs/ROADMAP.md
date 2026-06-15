@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **15 de junio de 2026, noche-3 (#3 check-in por grupo muscular desplegado; siguiente: #1)**.
+Ultima actualizacion: **16 de junio de 2026, madrugada (#1 matriz de grupos en UI desplegada)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -85,7 +85,7 @@ Ultima actualizacion: **15 de junio de 2026, noche-3 (#3 check-in por grupo musc
 
 Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada ítem).
 
-- [ ] **#1 Mostrar opciones de grupo muscular disponibles/bloqueadas antes de enviar el cambio** (UI). El backend YA devuelve la matriz: `listSessionFocusChangeOptions` (`{ id, label, current, available, reason, compatibilityNote }`) y `studio-swap` la incluye en `options`. Falta: exponerla en `studio-data` (o GET) y pintar chips deshabilitados con motivo en `screen-train`.
+- [x] **#1 Mostrar opciones de grupo muscular disponibles/bloqueadas antes de enviar el cambio** (UI). `studio-data` expone `todaySession.focusOptions` (vía `listSessionFocusChangeOptions`). `screen-train` pinta chips de grupo: el actual y los bloqueados quedan deshabilitados con candado 🔒 y una lista de motivos visibles (adyacencia/volumen semanal). **Desplegado** (commit `780ec52`, bundle `v=1c4ad57905`).
 - [ ] **#2 Ofrecer alternativa cuando un grupo queda bloqueado.** DECISIÓN: **reprogramar la sesión vecina con validación de recuperación** (no solo "recuperación activa"). Requiere un scheduler real que respete espaciado de recuperación, interferencia concurrente y posición de la tirada larga; preservar `daysPerWeek`, carga semanal y fase. Es la tarea más compleja del lote.
 - [ ] **#3 Check-in rápido por grupo muscular antes de cambiar foco:** agujetas/dolor local (pierna, torso, hombro, lumbar) para modular volumen, evitar patrones dolorosos y no depender solo del calendario.
 - [ ] **#4 Inventario de equipo y preferencias:** marcar ejercicios excluidos/favoritos, material disponible real (poleas, barra, mancuernas, bandas, máquinas) y limitaciones temporales; usarlo en `buildSessionExercises` y swaps.

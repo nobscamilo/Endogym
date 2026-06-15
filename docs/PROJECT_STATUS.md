@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **15 de junio de 2026, noche-3 (#3 check-in por grupo muscular con modulación real, desplegado)**.
+Ultima actualizacion: **16 de junio de 2026, madrugada (#1 matriz de grupos disponibles/bloqueados en UI, desplegado)**.
+
+## Sesión del 16 de junio de 2026, madrugada (#1 matriz de grupos en la UI)
+
+**Desplegado y verificado:** commit `780ec52`, deployment `endogym-q7sn259uu…`, bundle `v=1c4ad57905` (root/health 200; el bundle contiene "Elegir grupo"). Build OK; único rojo = el flaky por hora de `weekly-plan` (UTC 22:3x). Sin tests nuevos: la lógica (`listSessionFocusChangeOptions`) ya estaba cubierta a nivel core.
+
+- **Backend (`studio-data`):** `mapTodaySession` expone `todaySession.focusOptions` para días de fuerza/mixtos, llamando a `listSessionFocusChangeOptions({ days, dayIndex })`.
+- **UI (`screen-train.jsx`):** el `<select>` de grupo se reemplazó por **chips**. El grupo actual y los **bloqueados** salen deshabilitados con candado 🔒, y debajo aparece una **lista de motivos visibles** (choca con sesión vecina / sobrecargaría la familia esa semana). Fallback a opciones simples si el backend no trae la matriz.
+- Con esto queda cerrado todo lo pedido en esta tanda: 4 bugs de registro + #3 + #1. Backlog restante del roadmap: #2 (reprogramar vecina), #4, #5 (completo con modo rápido), #6, #7, #8, y la limpieza de `CheckinCard`.
+
+## Sesión del 15 de junio de 2026, noche-3 (#3 check-in por grupo muscular antes de cambiar foco)
 
 ## Sesión del 15 de junio de 2026, noche-3 (#3 check-in por grupo muscular antes de cambiar foco)
 
