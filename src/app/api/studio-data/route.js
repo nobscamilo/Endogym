@@ -235,6 +235,10 @@ function mapUser(profile, authUser) {
   if (num(p.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(p.preferredDurationMinutes);
   if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
   if (['novice', 'intermediate', 'advanced'].includes(p.trainingExperience)) out.trainingExperience = p.trainingExperience;
+  // #4 — inventario de equipo y preferencias (prefill).
+  if (Array.isArray(p.equipment)) out.equipment = p.equipment;
+  if (Array.isArray(p.excludedExercises)) out.excludedExercises = p.excludedExercises;
+  if (Array.isArray(p.favoriteExercises)) out.favoriteExercises = p.favoriteExercises;
   // Carrera (para prefijar la encuesta).
   if (p.runRaceGoal) out.runRaceGoal = p.runRaceGoal;
   if (num(p.runRefDistanceMeters) !== undefined) out.runRefDistanceMeters = num(p.runRefDistanceMeters);

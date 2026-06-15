@@ -2,6 +2,7 @@ import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { withTrace, logError } from '../../../lib/logger.js';
 import { upsertUserProfile } from '../../../lib/repositories/firestoreRepository.js';
+import { sanitizeEquipmentList } from '../../../core/equipmentPreferences.js';
 
 // Encuesta de disponibilidad del Studio. Hace un MERGE PARCIAL del perfil (upsertUserProfile,
 // no resetea otros campos como el PUT de /api/profile) con: objetivo, equipo (→ modalidad),
@@ -41,6 +42,14 @@ export async function POST(request) {
     const weeks = Number(body?.resurveyWeeks);
     if (Number.isFinite(weeks)) patch.resurveyWeeks = Math.min(26, Math.max(1, Math.round(weeks)));
     if (TRAINING_EXPERIENCE.has(body?.trainingExperience)) patch.trainingExperience = body.trainingExperience;
+    // #4 — inventario de equipo y preferencias (merge parcial; vacío = sin restricción).
+    if (Array.isArray(body?.equipment)) patch.equipment = sanitizeEquipmentList(body.equipment);
+    if (Array.isArray(body?.excludedExercises)) {
+      patch.excludedExercises = Array.from(new Set(body.excludedExercises.filter((x) => typeof x === 'string' && x.trim()))).slice(0, 200).map((x) => x.trim().slice(0, 120));
+    }
+    if (Array.isArray(body?.favoriteExercises)) {
+      patch.favoriteExercises = Array.from(new Set(body.favoriteExercises.filter((x) => typeof x === 'string' && x.trim()))).slice(0, 200).map((x) => x.trim().slice(0, 120));
+    }
     // Datos personales (también merge parcial, no resetean el resto del perfil).
     const age = Number(body?.age);
     if (Number.isFinite(age)) patch.age = Math.min(100, Math.max(12, Math.round(age)));

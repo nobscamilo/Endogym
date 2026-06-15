@@ -1,6 +1,7 @@
 import { GoalType, TrainingModality } from '../domain/models.js';
 import { evaluatePreparticipationScreening } from './screening.js';
 import { filterRestrictedExercises } from './comorbidityRestrictions.js';
+import { filterByEquipmentAndPreferences } from './equipmentPreferences.js';
 import {
   EXERCISE_AUDIT_SCHEMA,
   buildExerciseCatalog,
@@ -1469,10 +1470,13 @@ export function suggestExerciseAlternatives({
   const resolvedSessionFocus = sessionFocus || resolveSessionFocus({ modality, sessionType, sessionTitle });
   // Restricciones de comorbilidad: filtra el pool ANTES de seleccionar para que el
   // sustituto salga de la misma categoría (osteoporosis, artrosis, lesiones declaradas).
-  const pool = filterRestrictedExercises(
-    listBaseSessionExercises(modality, sessionType, resolvedSessionFocus),
+  const pool = filterByEquipmentAndPreferences(
+    filterRestrictedExercises(
+      listBaseSessionExercises(modality, sessionType, resolvedSessionFocus),
+      profile
+    ).allowed,
     profile
-  ).allowed;
+  );
   if (!pool.length) return [];
 
   const targetExercise = getExerciseById(currentExerciseId)
@@ -1533,10 +1537,13 @@ export function buildSessionExercises({
   const resolvedSessionFocus = sessionFocus || resolveSessionFocus({ modality, sessionType, sessionTitle });
   // Restricciones de comorbilidad: filtra el pool ANTES de seleccionar para que el
   // sustituto salga de la misma categoría (osteoporosis, artrosis, lesiones declaradas).
-  const pool = filterRestrictedExercises(
-    listBaseSessionExercises(modality, sessionType, resolvedSessionFocus),
+  const pool = filterByEquipmentAndPreferences(
+    filterRestrictedExercises(
+      listBaseSessionExercises(modality, sessionType, resolvedSessionFocus),
+      profile
+    ).allowed,
     profile
-  ).allowed;
+  );
 
   const intensity = profile?.preparticipation?.desiredIntensity || 'moderate';
   const resolvedGoal = goal || profile?.goal || 'recomposition';

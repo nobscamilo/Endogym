@@ -464,6 +464,20 @@ const AV_EQUIP = [
   { value: 'trx', title: 'TRX', icon: 'zap', detail: 'Suspensión y peso corporal' },
   { value: 'home', title: 'Casa', icon: 'profile', detail: 'Mínimo material' },
 ];
+// #4 — opciones de equipo disponible (deben coincidir con EQUIPMENT_OPTIONS de equipmentPreferences.js).
+const GEAR_OPTIONS = [
+  { id: 'barbell', label: 'Barra' },
+  { id: 'dumbbells', label: 'Mancuernas' },
+  { id: 'cable', label: 'Poleas' },
+  { id: 'machine', label: 'Máquinas' },
+  { id: 'band', label: 'Bandas' },
+  { id: 'kettlebell', label: 'Kettlebell' },
+  { id: 'bench', label: 'Banco' },
+  { id: 'rack', label: 'Rack' },
+  { id: 'pullup', label: 'Barra de dominadas' },
+  { id: 'trx', label: 'TRX' },
+  { id: 'bike', label: 'Bicicleta' },
+];
 const TRAINING_LEVELS = [
   { value: 'novice', title: 'Base', icon: 'leaf', detail: 'Inicio o retorno progresivo' },
   { value: 'intermediate', title: 'Intermedio', icon: 'progress', detail: 'Entrenas con regularidad' },
@@ -487,6 +501,9 @@ function AvailabilitySurvey() {
   const [goalValue, setGoalValue] = useStateP(u.goalTargetValue != null ? String(u.goalTargetValue) : '');
   const [goalDate, setGoalDate] = useStateP(u.goalTargetDate || '');
   const [equip, setEquip] = useStateP(u.modalityRaw || 'full_gym');
+  // #4 — inventario de equipo disponible (vacío = sin restricción).
+  const [gear, setGear] = useStateP(Array.isArray(u.equipment) ? u.equipment : []);
+  const toggleGear = (id) => setGear((g) => g.includes(id) ? g.filter((x) => x !== id) : [...g, id]);
   const [trainingExperience, setTrainingExperience] = useStateP(u.trainingExperience || 'intermediate');
   const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
   const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
@@ -531,6 +548,8 @@ function AvailabilitySurvey() {
           hrMaxBpm: hrMax ? Number(hrMax) : null,
           // Comorbilidades estructuradas (checkboxes de salud).
           conditions: conds,
+          // #4 — equipo disponible (vacío = sin restricción).
+          equipment: gear,
           // Objetivo SMART medible (meta + fecha); null borra el objetivo.
           goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
           goalTargetDate: targetEnabled ? (goalDate || null) : null,
@@ -601,6 +620,13 @@ function AvailabilitySurvey() {
               </button>
             ))}
           </div>
+          <div className="mb-label" style={{ marginTop: 14 }}>Material disponible <span className="tiny muted">(opcional — si marcas, solo elegimos ejercicios que puedas hacer)</span></div>
+          <div className="chips">
+            {GEAR_OPTIONS.map((g) => (
+              <button key={g.id} type="button" className={`pill ${gear.includes(g.id) ? 'accent' : ''}`} aria-pressed={gear.includes(g.id)} onClick={() => toggleGear(g.id)}>{g.label}</button>
+            ))}
+          </div>
+          {gear.length ? <p className="tiny muted" style={{ margin: '8px 0 0' }}>Si un ejercicio necesita algo que no marcaste, lo sustituimos por uno equivalente que sí puedas hacer.</p> : null}
         </section>
 
         <section className="profile-step">
