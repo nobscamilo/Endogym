@@ -1,6 +1,14 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **15 de junio de 2026 (prescripción Perfil/FITT-VP + cambio de grupo muscular, verificación local)**.
+Ultima actualizacion: **15 de junio de 2026, tarde (DESPLIEGUE del trabajo del 15 jun + guardarraíl de volumen semanal)**.
+
+## Sesión del 15 de junio de 2026, tarde (deploy + guardarraíl de volumen semanal)
+
+Se desplegó a producción el trabajo del 15 jun (que estaba solo verificado en local) y se cerró el gap de seguridad detectado en la revisión.
+
+- **Deploy del trabajo del 15 jun:** commit `8b0b464`, deployment `endogym-56a9wwgy9…`, alias `endogym.vercel.app` reasignado manualmente (la CLI volvió a colgarse en "Running Checks"). Preflight en la Mac: `check:conflicts` OK, **36 archivos / 251 tests**, `npm run build` OK. Sondas: `/` 200, `/api/health` 200, `/api/meals` 401 sin token, `POST /api/coach-chat` 401, bundle `studio.bundle.js?v=a0e5d9dc07` 200 y contiene el control "Grupo muscular". Push a `origin/main` OK.
+- **Guardarraíl de volumen semanal por familia muscular (gap de seguridad detectado en la revisión):** la comprobación de adyacencia NO impedía que swaps de grupo repetidos en días NO contiguos (p. ej. torso lun/mié/vie) saturaran una cadena y desequilibraran el microciclo. Nuevo `weeklyFocusOverloadReason` + `countWeeklyStrengthFamilies` en `planner.js`, integrado en `listSessionFocusChangeOptions` (aplica tanto a la matriz que verá la UI como al swap real de `buildSessionFocusChange`). Bloquea si una cadena pasaría a ocupar >60% de las sesiones de fuerza de la semana (con ≥3 sesiones de fuerza); los full body reparten carga a torso y pierna. Commit `a738ac0`, deployment `endogym-e27br2nrj…`, alias OK (root 200, health 200, chat 401). +1 test en `studio-swap.route` (**252 tests verdes**), build OK.
+- **Decisiones de diseño del usuario para el backlog de prescripción (15 jun):** #5 registro por serie → **completo con modo rápido**; #2 grupo bloqueado → **reprogramar la sesión vecina con validación de recuperación** (requiere scheduler real); guardarraíl de volumen semanal → **SÍ** (ya implementado arriba). Estas alimentan las tareas pendientes del ROADMAP.
 
 ## Sesión del 15 de junio de 2026 (prescripción desde Perfil + cambio de grupo muscular)
 
