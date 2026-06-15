@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **15 de junio de 2026, noche (fusión de sesiones por día: fin del doble/triple conteo)**.
+Ultima actualizacion: **15 de junio de 2026, noche-2 (check-in ÚNICO en Entreno + rehidratación, desplegado)**.
+
+## Sesión del 15 de junio de 2026, noche-2 (UI: check-in único + rehidratación)
+
+Aprobado por el usuario vía mockup (Visualize). **Desplegado y verificado:** commit `531f7a7`, deployment `endogym-eay348mhk…`, bundle `studio.bundle.js?v=8688935aeb` (root/health 200; el bundle de producción contiene "Guardar sesión" y "Editar registro"). El único test rojo del run fue el flaky por hora de `weekly-plan` (UTC 22:15 del 15 pero Madrid ya 16 → el check-in mockeado a `T00:00Z` queda "en el futuro"); NO relacionado con el cambio. `build:studio` (esbuild) y los tests de `session-history`/`studio-swap` verdes.
+
+- **Check-in ÚNICO (Q4):** se fusionaron los 2 check-ins de Entreno en uno (`screen-train.jsx`). El nuevo "¿Cómo fue tu sesión?" captura completada + cargas/reps por ejercicio + RPE + fatiga + sueño + síntomas con UN solo guardado. `logSession(withCheckin)` ahora hace doble escritura idempotente: workout `manual` (cargas → e1RM/DAPRE + análisis) **y** `daily_checkin` (bienestar → gate clínico); la fusión por día del backend los colapsa en 1 sesión. El un-tap "Hecho según plan" del banner sigue siendo registro rápido (solo cargas, `withCheckin=false`).
+- **Rehidratación (Q2 visible):** si `todaySession.logged`, Entreno muestra la tarjeta "Sesión registrada" con resumen (RPE/fatiga/sueño + lifts) y "Editar registro", en vez del formulario. Estado local inmediato tras guardar (sin recargar).
+- **Etiquetas kg/reps:** cada ejercicio muestra ahora etiqueta explícita "kg" y "reps" sobre sus inputs (petición del usuario).
+- **Nota:** la antigua `CheckinCard` queda definida pero SIN usar en `screen-train.jsx` (se puede retirar en una limpieza posterior).
+- **PENDIENTE de la tanda:** **#3 check-in por grupo muscular antes de cambiar foco** (pills de molestias por zona + modulación real en backend) — siguiente paso. Después, el **#1** (matriz de opciones bloqueadas en la UI).
+
+## Sesión del 15 de junio de 2026, noche (verificación de bugs de registro + fusión de sesiones por día)
 
 ## Sesión del 15 de junio de 2026, noche (verificación de bugs de registro + fusión de sesiones por día)
 

@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **15 de junio de 2026, noche (fusión de sesiones por día desplegada; pendiente UI de check-ins)**.
+Ultima actualizacion: **15 de junio de 2026, noche-2 (check-in único en Entreno desplegado; pendiente #3)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -97,9 +97,11 @@ Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada í
 
 - [x] **Fusión de sesiones por día (fin del doble/triple conteo).** `src/core/sessionHistory.js`: check-in + manual + Strava del mismo día = 1 sesión (registro más rico). Cableado en conteo/adherencia, recientes e historial; incluye ejercicios sin peso. **Desplegado** (commit `f29d9ae`, deployment `endogym-dpe6m40ef…`, 257 tests).
 - [x] **`studio-data` expone `todaySession.logged` + `loggedSummary`** para rehidratar Entreno. **Desplegado** (`f29d9ae`).
-- [ ] **(UI) Fusionar los 2 check-ins de Entreno en 1, el más completo** (Q4). Requiere refactor de `screen-train.jsx` + rebuild del bundle + Playwright. Un solo guardado escribe sesión + gate clínico; dedup ya colapsa.
-- [ ] **(UI) Mostrar la sesión ya registrada al volver a Entreno** (Q2 visible): consumir `todaySession.logged`/`loggedSummary` y pintar "Registrada ✓" + resumen en vez de pedir registro otra vez.
-- [ ] **#3 Check-in por grupo muscular antes de cambiar foco** (agujetas/dolor local pierna/torso/hombro/lumbar) — se hace junto con la fusión de check-ins.
+- [x] **(UI) Fusionar los 2 check-ins de Entreno en 1, el más completo** (Q4). `screen-train.jsx`: "¿Cómo fue tu sesión?" con completada + cargas/reps + RPE + fatiga + sueño + síntomas en un guardado; doble escritura idempotente (manual + daily_checkin) que la fusión por día colapsa. **Desplegado** (commit `531f7a7`, bundle `v=8688935aeb`).
+- [x] **(UI) Mostrar la sesión ya registrada al volver a Entreno** (Q2 visible): consume `todaySession.logged`/`loggedSummary` → tarjeta "Sesión registrada" + "Editar registro". **Desplegado** (`531f7a7`).
+- [x] **(UI) Etiquetas kg/reps explícitas por ejercicio.** **Desplegado** (`531f7a7`).
+- [ ] **#3 Check-in por grupo muscular antes de cambiar foco** (agujetas/dolor local pierna/torso/hombro/lumbar). DISEÑO: pills en la tarjeta de cambio de grupo + `studio-swap` acepta `soreAreas` y `buildSessionFocusChange` aplica modulación REAL (baja carga/volumen y avisa si la zona dolorida coincide con el foco). Mockup ya aprobado. SIGUIENTE PASO.
+- [ ] Limpieza: retirar la `CheckinCard` ya sin uso de `screen-train.jsx`.
 
 ## P2 - Check-in diario seguro
 
