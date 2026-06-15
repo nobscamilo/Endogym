@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **15 de junio de 2026, noche-2 (check-in único en Entreno desplegado; pendiente #3)**.
+Ultima actualizacion: **15 de junio de 2026, noche-3 (#3 check-in por grupo muscular desplegado; siguiente: #1)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -100,7 +100,7 @@ Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada í
 - [x] **(UI) Fusionar los 2 check-ins de Entreno en 1, el más completo** (Q4). `screen-train.jsx`: "¿Cómo fue tu sesión?" con completada + cargas/reps + RPE + fatiga + sueño + síntomas en un guardado; doble escritura idempotente (manual + daily_checkin) que la fusión por día colapsa. **Desplegado** (commit `531f7a7`, bundle `v=8688935aeb`).
 - [x] **(UI) Mostrar la sesión ya registrada al volver a Entreno** (Q2 visible): consume `todaySession.logged`/`loggedSummary` → tarjeta "Sesión registrada" + "Editar registro". **Desplegado** (`531f7a7`).
 - [x] **(UI) Etiquetas kg/reps explícitas por ejercicio.** **Desplegado** (`531f7a7`).
-- [ ] **#3 Check-in por grupo muscular antes de cambiar foco** (agujetas/dolor local pierna/torso/hombro/lumbar). DISEÑO: pills en la tarjeta de cambio de grupo + `studio-swap` acepta `soreAreas` y `buildSessionFocusChange` aplica modulación REAL (baja carga/volumen y avisa si la zona dolorida coincide con el foco). Mockup ya aprobado. SIGUIENTE PASO.
+- [x] **#3 Check-in por grupo muscular antes de cambiar foco.** Pills de molestias (pierna/torso/hombro/lumbar) en la tarjeta de cambio de grupo → `studio-swap` acepta `soreAreas`; `buildSessionFocusChange` mapea zona→familia y, si la zona dolorida carga el grupo elegido, baja `volumeFactor` ~15% (menos series Y carga) y devuelve `soreNote` que la UI muestra. **Desplegado** (commit `483f889`, bundle `v=7bd8891e8f`, +2 tests). Mejora futura: evitar patrones específicos dolorosos (no solo bajar volumen).
 - [ ] Limpieza: retirar la `CheckinCard` ya sin uso de `screen-train.jsx`.
 
 ## P2 - Check-in diario seguro

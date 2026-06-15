@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **15 de junio de 2026, noche-2 (check-in ÚNICO en Entreno + rehidratación, desplegado)**.
+Ultima actualizacion: **15 de junio de 2026, noche-3 (#3 check-in por grupo muscular con modulación real, desplegado)**.
+
+## Sesión del 15 de junio de 2026, noche-3 (#3 check-in por grupo muscular antes de cambiar foco)
+
+**Desplegado y verificado:** commit `483f889`, deployment `endogym-hodh1mmjr…`, bundle `v=7bd8891e8f` (root/health 200; el bundle contiene "Molestias o agujetas"). Build OK; el único test rojo siguió siendo el flaky por hora de `weekly-plan` (UTC aún 22:3x del 15). +2 tests en `studio-swap.route` (259 en total).
+
+- **UI (`screen-train.jsx`):** pills de molestias por zona (pierna/torso/hombro/lumbar) en la tarjeta de cambio de grupo; estado `soreAreas` enviado en el body de `studio-swap`; muestra `soreNote` tras el cambio.
+- **Backend (`planner.js` + `studio-swap`):** `studio-swap` valida y pasa `soreAreas`. `buildSessionFocusChange` (nuevo `evaluateSoreModulation`) mapea zona→familia (`leg→lower`, `torso/shoulder→upper`, `lumbar→lower`; `full_body` matchea cualquiera) y, si la zona dolorida carga el grupo elegido, reduce `adaptiveTuning.workout.volumeFactor` ~15% (en `buildSessionExercises` eso baja series Y carga) y devuelve `soreApplied`/`soreNote`. Si no coincide, no modula.
+- **Mejora futura anotada:** evitar patrones específicos dolorosos (no solo reducir volumen global).
+- **SIGUIENTE:** **#1** — exponer la matriz de opciones de grupo bloqueadas/disponibles en la UI (el backend ya la calcula en `listSessionFocusChangeOptions`).
+
+## Sesión del 15 de junio de 2026, noche-2 (UI: check-in único + rehidratación)
 
 ## Sesión del 15 de junio de 2026, noche-2 (UI: check-in único + rehidratación)
 
