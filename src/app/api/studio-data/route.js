@@ -17,6 +17,7 @@ import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRac
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
+import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
@@ -221,6 +222,8 @@ function mapUser(profile, authUser) {
   out.initials = initialsFrom(name, last);
   if (goal) { out.goalRaw = goal; out.goal = goal; out.goalShort = GOAL_LABELS[goal] || goal; }
   if (modality) { out.modalityRaw = modality; out.modality = MODALITY_LABELS[modality] || modality; }
+  // #8 — primeros pasos: marca si el perfil ya pasó por la encuesta del Studio.
+  out.profileComplete = p.studioAvailability === true && Boolean(goal);
   // Para prefijar el formulario de Perfil:
   if (num(p.age) !== undefined) out.age = num(p.age);
   if (num(p.weightKg) !== undefined) out.weightKg = num(p.weightKg);
@@ -715,6 +718,9 @@ export async function GET(request) {
       setIf('runFitness', mapRunFitness(workouts, profile));
       setIf('reentry', mapReentry({ workouts, profile, lastDoneAtHint, tuning: reentryTuning }));
       setIf('goalProgress', profile ? buildGoalProgress({ profile, metrics, workouts }) : null);
+      // #7 — revisión del mesociclo: solo si hay señales de que conviene regenerar el bloque.
+      const review = buildMesocycleReview({ plan: latestPlan, workouts, today });
+      setIf('mesocycleReview', review && review.status === 'review' ? review : null);
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

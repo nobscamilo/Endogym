@@ -573,6 +573,12 @@ function AvailabilitySurvey() {
   return (
     <SectionCard title="Tu perfil y disponibilidad" icon="settings" sub="Objetivo, modalidad y calendario del bloque. Al guardar, reajustamos tu plan y comidas.">
       <div className="availability-flow">
+        {!u.profileComplete ? (
+          <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)', marginBottom: 4 }}>
+            <strong style={{ fontSize: '0.95rem' }}>Primeros pasos</strong>
+            <p className="tiny" style={{ margin: '4px 0 0', lineHeight: 1.5 }}>Solo necesitas 3 cosas para empezar: tu <strong>objetivo</strong>, <strong>dónde entrenas</strong> y <strong>cuántos días</strong>. Lo demás (datos, salud, material) es opcional y lo afinamos luego. Pulsa Guardar y te creamos el bloque.</p>
+          </div>
+        ) : null}
         <section className="profile-step">
           <div className="profile-step-head">
             <div>

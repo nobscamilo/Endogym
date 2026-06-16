@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **16 de junio de 2026, madrugada-4 (#4 inventario de equipo + #6 "por qué de tu sesión")**.
+Ultima actualizacion: **16 de junio de 2026, mañana (#7 revisión del mesociclo + #8 onboarding mínimo + limpieza)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -91,7 +91,7 @@ Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada í
 - [x] **#4 Inventario de equipo y preferencias.** `equipmentPreferences.js` clasifica el `equipment` (texto libre) a categorías y filtra el pool por material disponible + ejercicios excluidos, priorizando favoritos (relaja si vaciaría el pool). Cableado en `buildSessionExercises` y alternativas/swaps. Perfil: chips de "Material disponible" (vacío = sin restricción). `studio-availability` persiste `equipment`/`excludedExercises`/`favoriteExercises`; `studio-data` los expone. **Desplegado** (commit `ac1ae3e`, bundle `v=fc16703d0f`, +6 tests). Follow-up: UI para excluir/favorito desde el modal de detalle de ejercicio (el backend ya lo soporta).
 - [x] **#5 Registrar ejecución por serie.** Modo detallado opcional por ejercicio (toca el icono de lista): kg·reps·**RIR** por set, con "Añadir serie". El **modo rápido** (1 valor/ejercicio) sigue por defecto y es el puente con el un-tap. Al guardar, la serie más pesada queda como serie principal (weightKg/reps) y el **RPE del ejercicio se deriva del RIR** (10−RIR) → alimenta DAPRE/e1RM. `sanitizeExercise` persiste `rir`+`setLogs`; `workout-history` y el historial de Perfil los muestran por set (y se arregló el peso corporal con `kg` null). **Desplegado** (commit `7e9e1cd`, bundle `v=ebbdbc99ff`, +1 test). Pendiente futuro: dolor/técnica por serie y usar el mejor e1RM por set (no solo el top por carga).
 - [x] **#6 "Por qué de tu sesión".** Tarjeta en Entreno con explicación DETERMINISTA (volumen ajustado a nivel/duración, carga por DAPRE vs fase, selección por foco/comorbilidades/material), construida desde los datos reales del usuario y su propia prescripción (`buildSessionRationale` en `studio-data`). Disciplina anti-alucinación respetada: NO afirma claims científicos sin sustento; para la base con citas remite al coach (que sí hace RAG). **Desplegado** (commit pendiente abajo). Follow-up: adjuntar citas RAG reales del plan cuando estén disponibles.
-- [ ] **#7 Revisión mensual del mesociclo desde datos reales:** detectar si el usuario cambia mucho de grupo/sesión, si se saltan patrones o si hay fatiga localizada repetida, y proponer regenerar el bloque en lugar de acumular parches.
+- [x] **#7 Revisión del mesociclo desde datos reales.** `mesocycleReview.js` detecta señales deterministas (≥3 cambios de foco en el bloque, bloque ≥28 días, dolor articular o fatiga ≥8 repetidos en check-ins) y, si disparan, `studio-data` expone `mesocycleReview` con motivos. UI: tarjeta "Revisión del bloque" en la pestaña Semana de Entreno con botón para regenerar (confirm + rebuild). **Desplegado** (+4 tests).
 
 ## P2 - Registro de sesiones e historial (bugs reportados 15 jun 2026)
 
@@ -101,7 +101,7 @@ Decisiones de diseño tomadas con el usuario el 15 jun 2026 (anotadas en cada í
 - [x] **(UI) Mostrar la sesión ya registrada al volver a Entreno** (Q2 visible): consume `todaySession.logged`/`loggedSummary` → tarjeta "Sesión registrada" + "Editar registro". **Desplegado** (`531f7a7`).
 - [x] **(UI) Etiquetas kg/reps explícitas por ejercicio.** **Desplegado** (`531f7a7`).
 - [x] **#3 Check-in por grupo muscular antes de cambiar foco.** Pills de molestias (pierna/torso/hombro/lumbar) en la tarjeta de cambio de grupo → `studio-swap` acepta `soreAreas`; `buildSessionFocusChange` mapea zona→familia y, si la zona dolorida carga el grupo elegido, baja `volumeFactor` ~15% (menos series Y carga) y devuelve `soreNote` que la UI muestra. **Desplegado** (commit `483f889`, bundle `v=7bd8891e8f`, +2 tests). Mejora futura: evitar patrones específicos dolorosos (no solo bajar volumen).
-- [ ] Limpieza: retirar la `CheckinCard` ya sin uso de `screen-train.jsx`.
+- [x] Limpieza: `CheckinCard` sin uso retirada de `screen-train.jsx` (se conservan `Scale10` y `CHECKIN_SYMPTOMS`).
 
 ## P2 - Check-in diario seguro
 
@@ -133,6 +133,6 @@ Mejora a búsqueda semántica respetando "no Vertex". Estado:
 - [ ] Mejorar recomendaciones pre/post entreno con limites clinicos claros.
 - [ ] Diseñar reevaluación o clearance explícito para levantar el gate diario de síntomas sin depender solo de la ventana reciente.
 - [ ] Revisar y completar la sección de perfil del usuario (queda onboarding/UX más guiado; la dosis de prescripción Perfil se reforzó el 15 jun 2026).
-- [ ] Refinar onboarding corto de Perfil: guiar el primer objetivo en menos pasos y explicar solo lo necesario sin tutorial largo.
+- [~] **#8 Onboarding corto de Perfil (versión mínima).** Aviso "Primeros pasos" al inicio de la encuesta cuando el perfil está incompleto (`user.profileComplete=false`): orienta a fijar objetivo + modalidad + días, marcando el resto como opcional. **Desplegado.** Pendiente (necesita decisión de diseño del usuario): flujo guiado multi-paso real con time-to-value corto.
 - [ ] Activar entrega automatica de alertas: bloqueado por plan Vercel `hobby`.
 - [ ] Completar revision legal humana de privacidad, consentimiento y disclaimer por mercado.

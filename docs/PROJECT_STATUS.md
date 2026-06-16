@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, madrugada-4 (#4 inventario de equipo + #6 "por qué de tu sesión")**.
+Ultima actualizacion: **16 de junio de 2026, mañana (#7 revisión del mesociclo + #8 onboarding mínimo + limpieza; BACKLOG COMPLETO)**.
+
+## Sesión del 16 de junio de 2026, mañana (#7 + #8 + limpieza — fin del backlog)
+
+Con esto el backlog de "Prescripción de ejercicio: mejoras sugeridas" y "Registro de sesiones e historial" queda **cerrado**. **272/272 tests verdes** (39 archivos), build OK, bundle `v=43e411f10c`.
+
+- **#7 Revisión del mesociclo** (`mesocycleReview.js`): señales deterministas — ≥3 sesiones con `focusChangeApplied` en el bloque, bloque ≥28 días (`blockStartDate`→hoy), dolor articular (`symptoms.jointPain`) o fatiga ≥8 repetidos (≥3) en check-ins del bloque. `studio-data` expone `mesocycleReview` solo cuando hay señales. UI: `MesocycleReviewCard` en la pestaña Semana de Entreno con motivos + "Regenerar bloque" (confirm + rebuild + reload). +4 tests.
+- **#8 Onboarding mínimo**: `mapUser` expone `profileComplete` (= `studioAvailability && goal`); la encuesta de Perfil muestra un aviso "Primeros pasos" (objetivo + modalidad + días; resto opcional) solo si está incompleto. El flujo guiado multi-paso completo queda pendiente de decisión de diseño del usuario.
+- **Limpieza**: retirada la `CheckinCard` ya sin uso de `screen-train.jsx` (se conservan `Scale10` y `CHECKIN_SYMPTOMS`).
+- **Pendientes futuros anotados (no bloqueantes):** UI de excluir/favorito desde el modal de ejercicio (#4, backend listo); citas RAG reales en el "por qué" (#6); dolor/técnica por serie y e1RM por mejor set (#5); scheduler completo de reprogramación (#2). Y lo de siempre fuera de este backlog: revisión legal (P2) y push/offline (FASE 3.2/3.3).
+
+## Sesión del 16 de junio de 2026, madrugada-4 (#4 inventario de equipo + #6 "por qué")
 
 ## Sesión del 16 de junio de 2026, madrugada-4 (#4 inventario de equipo + #6 "por qué")
 

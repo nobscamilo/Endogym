@@ -169,87 +169,8 @@ function Scale10({ value, onChange }) {
     </div>
   );
 }
-function CheckinCard() {
-  const D = window.STUDIO;
-  const [completed, setCompleted] = useStateTr(true);
-  const [rpe, setRpe] = useStateTr(7);
-  const [fatigue, setFatigue] = useStateTr(4);
-  const [sleep, setSleep] = useStateTr(7.5);
-  const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
-  const [status, setStatus] = useStateTr('idle'); // idle|saving|ok|err|noauth
-  const toggleSym = (k) => setSymptoms((p) => ({ ...p, [k]: !p[k] }));
-
-  async function submit() {
-    setStatus('saving');
-    try {
-      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
-      if (!token) { setStatus('noauth'); return; }
-      const today = new Date().toISOString().slice(0, 10);
-      const title = (D.todaySession && D.todaySession.title) || 'Sesión';
-      const base = { source: 'daily_checkin', dailyCheckinDate: today, performedAt: `${today}T12:00:00.000Z`, symptoms, title, mode: 'studio' };
-      const body = completed
-        ? { ...base, completed: true, checkinSkipped: false, sessionRpe: Number(rpe), fatigue: Number(fatigue), sleepHours: Number(sleep) }
-        : { ...base, completed: false, checkinSkipped: true, sessionRpe: null, fatigue: null, sleepHours: null };
-      const res = await fetch('/api/workouts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-        body: JSON.stringify(body),
-      });
-      setStatus(res.ok ? 'ok' : 'err');
-    } catch (e) { setStatus('err'); }
-  }
-
-  const alarm = Object.values(symptoms).some(Boolean);
-  if (status === 'ok') {
-    return (
-      <SectionCard title="Check-in de hoy" icon="check" sub="Guardado">
-        <div className="checkin-done"><span className="cd-ic"><Icon name="check" size={20} /></span>
-          <div><strong>¡Registrado!</strong><div className="tiny muted">El coach usará esto para ajustar tu próximo plan.{alarm ? ' Detectamos síntomas de alarma: priorizaremos seguridad.' : ''}</div></div>
-        </div>
-      </SectionCard>
-    );
-  }
-  return (
-    <SectionCard title="Check-in de hoy" icon="bolt" sub="Cuéntale al coach cómo fue — ajusta tu plan">
-      <div className="stack" style={{ gap: 16 }}>
-        <div>
-          <div className="mb-label">¿Completaste la sesión?</div>
-          <div className="segc" style={{ alignSelf: 'flex-start', maxWidth: 240 }}>
-            <div className="segc-thumb" style={{ left: `calc(4px + ${completed ? 0 : 1} * (100% - 8px) / 2)`, width: 'calc((100% - 8px) / 2)' }} />
-            <button className={completed ? 'on' : ''} onClick={() => setCompleted(true)}>Sí</button>
-            <button className={!completed ? 'on' : ''} onClick={() => setCompleted(false)}>No</button>
-          </div>
-        </div>
-        {completed && (
-          <React.Fragment>
-            <div><div className="mb-label">Esfuerzo percibido (RPE) · {rpe}/10</div><Scale10 value={rpe} onChange={setRpe} /></div>
-            <div><div className="mb-label">Fatiga · {fatigue}/10</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
-            <div className="row ac" style={{ gap: 12 }}>
-              <div className="mb-label" style={{ margin: 0 }}>Horas de sueño</div>
-              <input type="number" min="0" max="24" step="0.5" value={sleep} onChange={(e) => setSleep(e.target.value)} className="num-input" />
-            </div>
-          </React.Fragment>
-        )}
-        <div>
-          <div className="mb-label">¿Algún síntoma? (seguridad)</div>
-          <div className="chips">
-            {CHECKIN_SYMPTOMS.map((s) => (
-              <button key={s.key} type="button" className={`pill ${symptoms[s.key] ? 'accent' : ''}`} onClick={() => toggleSym(s.key)}>{s.label}</button>
-            ))}
-          </div>
-          {alarm ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0' }}>El coach limitará la intensidad y recomendará valoración médica.</p> : null}
-        </div>
-        <div className="row ac" style={{ gap: 12 }}>
-          <button className="btn" onClick={submit} disabled={status === 'saving'}>
-            <Icon name="check" size={16} /> {status === 'saving' ? 'Guardando…' : 'Guardar check-in'}
-          </button>
-          {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
-          {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
-        </div>
-      </div>
-    </SectionCard>
-  );
-}
+// (CheckinCard retirada: el check-in unificado de la sesión vive ahora inline en TrainToday;
+// se conservan Scale10 y CHECKIN_SYMPTOMS, que ese check-in reutiliza.)
 
 /* Sub-tabs animadas reutilizables */
 function SegTabs({ tabs, value, onChange }) {
@@ -940,13 +861,52 @@ function TrainSession() {
 }
 
 /* ---------- SEMANA ---------- */
+// #7 — Revisión del mesociclo: si el bloque acumuló señales (muchos cambios de foco, edad,
+// molestias/fatiga repetidas), propone regenerarlo en vez de seguir parcheándolo.
+function MesocycleReviewCard({ review }) {
+  const [status, setStatus] = useStateTr('idle'); // idle|loading|ok|err|noauth
+  async function regen() {
+    if (!window.confirm('Tu bloque acumuló varios ajustes. ¿Regenerarlo desde cero con tus datos actuales? (Para cambios pequeños usa "Cambiar sesión").')) return;
+    setStatus('loading');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setStatus('noauth'); return; }
+      const r = await fetch('/api/weekly-plan', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token }, body: JSON.stringify({ rebuild: true }) });
+      if (!r.ok) { setStatus('err'); return; }
+      setStatus('ok');
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) { setStatus('err'); }
+  }
+  return (
+    <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}>
+      <div className="row ac" style={{ gap: 10, marginBottom: 8 }}>
+        <span className="pill accent tiny"><Icon name="sparkles" size={12} /> Revisión del bloque</span>
+      </div>
+      <p className="tiny" style={{ margin: '0 0 8px', lineHeight: 1.5 }}>Tu bloque acumuló señales de que conviene regenerarlo en vez de seguir parcheándolo:</p>
+      <ul className="step-list" style={{ margin: '0 0 10px' }}>
+        {review.reasons.map((r, i) => <li key={i}>{r}</li>)}
+      </ul>
+      <div className="row ac wrap" style={{ gap: 10 }}>
+        <button className="btn" onClick={regen} disabled={status === 'loading'}>
+          <Icon name="sparkles" size={16} /> {status === 'loading' ? 'Regenerando…' : 'Regenerar bloque (21 días)'}
+        </button>
+        {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan actualizado ✨</span> : null}
+        {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo. Reintenta.</span> : null}
+        {status === 'noauth' ? <span className="tiny muted">Inicia sesión.</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function TrainWeek() {
   const D = window.STUDIO;
   const { week, progress } = D;
   const adjust = D.coachAdjust;
   const adjustRules = adjust && Array.isArray(adjust.rules) ? adjust.rules : [];
+  const review = D.mesocycleReview;
   return (
     <React.Fragment>
+      {review && Array.isArray(review.reasons) && review.reasons.length ? <MesocycleReviewCard review={review} /> : null}
       <div className="grid g-4">
         <div className="card"><Stat num={progress.sessionsPlan} label="Sesiones" /></div>
         <div className="card"><Stat num="3,8" unit="h" label="Volumen semanal" /></div>
