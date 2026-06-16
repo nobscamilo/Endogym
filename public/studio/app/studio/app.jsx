@@ -4,7 +4,7 @@ const { useState: useStateA, useEffect: useEffectA, useRef: useRefA } = React;
 const NAV = [
   { id: 'today', label: 'Hoy', icon: 'today' },
   { id: 'train', label: 'Entreno', icon: 'train' },
-  { id: 'nutrition', label: 'Nutrición', icon: 'nutrition', badge: '2' },
+  { id: 'nutrition', label: 'Nutrición', icon: 'nutrition' },
   { id: 'progress', label: 'Progreso', icon: 'progress' },
   { id: 'profile', label: 'Perfil', icon: 'profile' },
 ];
