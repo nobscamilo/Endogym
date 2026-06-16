@@ -18,6 +18,7 @@ import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
+import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
 import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
@@ -399,6 +400,9 @@ function mapTodaySession(plan, today, workouts = [], profile = null) {
   // #6 — explicación determinista del "por qué" de la sesión.
   const rationale = buildSessionRationale(day, profile);
   if (rationale) out.rationale = rationale;
+  // Recomendaciones pre/post entreno (deterministas, con límites clínicos).
+  const nutritionAround = buildPrePostNutrition({ day, profile });
+  if (nutritionAround) out.nutritionAround = nutritionAround;
   // Rehidratación de Entreno: si HOY ya hay una sesión registrada (check-in/manual/Strava),
   // la UI muestra "Registrada ✓" y el resumen en vez de pedir registro de nuevo.
   const loggedToday = findDaySession(workouts, today);

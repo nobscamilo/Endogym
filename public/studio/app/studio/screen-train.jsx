@@ -726,6 +726,29 @@ function TrainSession() {
         </SectionCard>
       ) : null}
 
+      {/* Recomendaciones pre/post entreno (deterministas, con límites clínicos) */}
+      {s.nutritionAround ? (
+        <SectionCard title="Antes y después de entrenar" icon="nutrition" sub="Cómo alimentarte alrededor de la sesión">
+          <div className="grid g-2" style={{ alignItems: 'start', gap: 12 }}>
+            <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
+              <span className="pill tiny accent" style={{ marginBottom: 8 }}>Antes</span>
+              <ul className="step-list" style={{ margin: 0 }}>
+                {s.nutritionAround.pre.items.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+              {s.nutritionAround.pre.caution ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0', lineHeight: 1.45 }}>{s.nutritionAround.pre.caution}</p> : null}
+            </div>
+            <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
+              <span className="pill tiny accent" style={{ marginBottom: 8 }}>Después</span>
+              <ul className="step-list" style={{ margin: 0 }}>
+                {s.nutritionAround.post.items.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+              {s.nutritionAround.post.caution ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0', lineHeight: 1.45 }}>{s.nutritionAround.post.caution}</p> : null}
+            </div>
+          </div>
+          {s.nutritionAround.note ? <p className="tiny muted" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{s.nutritionAround.note}</p> : null}
+        </SectionCard>
+      ) : null}
+
       {/* Calentamiento y enfriamiento */}
       {(Array.isArray(s.warmup) && s.warmup.length) || (Array.isArray(s.cooldown) && s.cooldown.length) ? (
         <div className="grid g-2" style={{ alignItems: 'start' }}>

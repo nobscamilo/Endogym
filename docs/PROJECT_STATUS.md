@@ -1,6 +1,12 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana (#7 revisión del mesociclo + #8 onboarding mínimo + limpieza; BACKLOG COMPLETO)**.
+Ultima actualizacion: **16 de junio de 2026, mañana-2 (recomendaciones pre/post entreno + fix badge Nutrición)**.
+
+## Sesión del 16 de junio de 2026, mañana-2 (recomendaciones pre/post entreno + fix badge)
+
+- **Fix badge Nutrición:** el "2" del menú era un `badge: '2'` HARDCODEADO en `app.jsx` (resto del diseño de muestra, como "Marta García"); retirado. Commit `b8672b3`.
+- **Recomendaciones pre/post entreno** (`prePostNutrition.js`, determinista, +6 tests): pre (carbohidrato + proteína 1-3 h antes / snack ligero; nada si corta-suave) y post (proteína ~0.3 g/kg acotada 20-40 g dentro del objetivo diario; reposición de carbo si exigente; rehidratación). Cautelas: diabetes → hipoglucemia antes y tardía; HTA → anti-Valsalva/cafeína. `studio-data` expone `todaySession.nutritionAround`; tarjeta "Antes y después de entrenar" en Entreno. Bundle `v=61bc39acda`. **278/278 tests.**
+- Doc: corregido un duplicado del #3 en el ROADMAP (estaba sin marcar en la lista original).
 
 ## Sesión del 16 de junio de 2026, mañana (#7 + #8 + limpieza — fin del backlog)
 
