@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, madrugada-3 (#5 registro por serie con modo rápido, desplegado)**.
+Ultima actualizacion: **16 de junio de 2026, madrugada-4 (#4 inventario de equipo + #6 "por qué de tu sesión")**.
+
+## Sesión del 16 de junio de 2026, madrugada-4 (#4 inventario de equipo + #6 "por qué")
+
+Nota: a partir de las 00:00 UTC el test flaky de `weekly-plan` volvió a pasar solo → confirmado que era 100% horario (frontera UTC/Madrid), nunca regresión. **268/268 verdes** en el run de #6.
+
+- **#4 Inventario de equipo** — **desplegado** (commit `ac1ae3e`, bundle `v=fc16703d0f`, +6 tests). `equipmentPreferences.js` clasifica el `equipment` (texto libre) a categorías y filtra el pool por material disponible + excluidos, priorizando favoritos (relaja si vaciaría el pool). Cableado en `buildSessionExercises` y alternativas/swaps. Perfil: chips "Material disponible". `studio-availability` persiste `equipment`/`excludedExercises`/`favoriteExercises`; `studio-data` los expone. Follow-up: UI de excluir/favorito desde el modal de ejercicio (backend ya listo).
+- **#6 "Por qué de tu sesión"** — bundle `v=6d60bdeb44`. `buildSessionRationale` (en `studio-data`) genera explicación DETERMINISTA: volumen (nº ejercicios/series ajustado a nivel y duración), carga (DAPRE desde tu registro vs estimación por fase), selección (foco + comorbilidades + material). Tarjeta en Entreno. Disciplina anti-alucinación: sin claims científicos sin sustento; para citas remite al coach (RAG). Follow-up: adjuntar citas RAG reales del plan.
+- **Backlog restante del roadmap:** #7 (revisión mensual del mesociclo), #8 (onboarding), y la limpieza de `CheckinCard` sin uso.
+
+## Sesión del 16 de junio de 2026, madrugada-3 (#5 registro por serie)
 
 ## Sesión del 16 de junio de 2026, madrugada-3 (#5 registro por serie)
 

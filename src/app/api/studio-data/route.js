@@ -306,7 +306,40 @@ function dayNumber(dateStr) {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapTodaySession(plan, today, workouts = []) {
+// #6 — "Por qué de tu sesión": explicación DETERMINISTA (volumen, carga, selección) a partir de
+// los datos reales del usuario y de su propia prescripción. Sin claims científicos inventados;
+// para la base con citas se remite al coach (que sí hace RAG). Disciplina: no afirmar lo que no
+// se puede sustentar con un pasaje recuperable.
+const RATIONALE_EXPERIENCE_LABELS = { novice: 'principiante', intermediate: 'intermedio', advanced: 'avanzado' };
+const RATIONALE_FOCUS_LABELS = { upper: 'torso', push: 'empuje', pull: 'tracción', lower: 'pierna', full_body: 'cuerpo completo', general_resistance: 'fuerza general' };
+
+function buildSessionRationale(day, profile) {
+  const ex = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
+  if (!['resistance', 'mixed'].includes(day.sessionType) || !ex.length) return null;
+  const experience = RATIONALE_EXPERIENCE_LABELS[profile?.trainingExperience] || 'intermedio';
+  const totalSets = ex.reduce((a, e) => a + (Number(e.prescription?.sets) || 0), 0);
+  const usesDapre = ex.some((e) => e.prescription?.progression?.method === 'dapre');
+  const dur = Number(day.workout?.durationMinutes) || null;
+  const focusLabel = RATIONALE_FOCUS_LABELS[day.sessionFocus || day.workout?.sessionFocus] || null;
+
+  const selection = [];
+  if (focusLabel) selection.push(`foco en ${focusLabel}`);
+  const c = profile?.conditions;
+  const hasConds = c && (c.hypertension || c.diabetes || c.osteoarthritis || c.osteoporosis || (Array.isArray(c.injuryZones) && c.injuryZones.length));
+  if (hasConds) selection.push('evitamos patrones que cargan tus zonas sensibles');
+  if (Array.isArray(profile?.equipment) && profile.equipment.length) selection.push('solo ejercicios con tu material disponible');
+
+  return {
+    volume: `${ex.length} ejercicios${totalSets ? ` · ~${totalSets} series` : ''}. Ajustado a tu nivel ${experience}${dur ? ` y a ${dur} min de sesión` : ''}.`,
+    load: usesDapre
+      ? 'La carga de cada ejercicio sale de tu última sesión registrada (progresión por desempeño, DAPRE).'
+      : 'Carga estimada por la fase del bloque; se afinará en cuanto registres tus series reales.',
+    selection: selection.length ? `Selección: ${selection.join('; ')}.` : null,
+    note: 'Para la base científica con citas, pregúntale al coach.',
+  };
+}
+
+function mapTodaySession(plan, today, workouts = [], profile = null) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
   const day = days.find((d) => d.date === today && d.isTrainingDay)
@@ -360,6 +393,9 @@ function mapTodaySession(plan, today, workouts = []) {
     const focusOptions = listSessionFocusChangeOptions({ days, dayIndex });
     if (focusOptions.length) out.focusOptions = focusOptions;
   }
+  // #6 — explicación determinista del "por qué" de la sesión.
+  const rationale = buildSessionRationale(day, profile);
+  if (rationale) out.rationale = rationale;
   // Rehidratación de Entreno: si HOY ya hay una sesión registrada (check-in/manual/Strava),
   // la UI muestra "Registrada ✓" y el resumen en vez de pedir registro de nuevo.
   const loggedToday = findDaySession(workouts, today);
@@ -665,7 +701,7 @@ export async function GET(request) {
 
       setIf('user', mapUser(profile, user));
       setIf('runPaces', planForStudio?.runPaces || null);
-      setIf('todaySession', mapTodaySession(planForStudio, today, workouts));
+      setIf('todaySession', mapTodaySession(planForStudio, today, workouts, profile));
       setIf('week', mapWeek(planForStudio, today));
       setIf('library', mapLibrary(planForStudio));
       setIf('macroTargets', mapMacroTargets(planForStudio, today));

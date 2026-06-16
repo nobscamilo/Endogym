@@ -793,6 +793,18 @@ function TrainSession() {
         <p className="tiny muted" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>Anota la carga real (kg) y las reps de cada ejercicio. Toca <Icon name="list" size={12} /> para registrar <strong>por serie</strong> (kg · reps · RIR) y afinar la progresión; abajo, en el check-in, lo guardas todo de una vez.</p>
       </SectionCard>
 
+      {/* #6 — Por qué de tu sesión (explicación determinista; base científica vía coach) */}
+      {s.rationale ? (
+        <SectionCard title="Por qué de tu sesión" icon="sparkles" sub="Cómo decidimos volumen, carga y selección con tus datos">
+          <div className="stack" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="pill tiny" style={{ flexShrink: 0 }}>Volumen</span><span className="tiny" style={{ lineHeight: 1.5 }}>{s.rationale.volume}</span></div>
+            <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="pill tiny" style={{ flexShrink: 0 }}>Carga</span><span className="tiny" style={{ lineHeight: 1.5 }}>{s.rationale.load}</span></div>
+            {s.rationale.selection ? <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="pill tiny" style={{ flexShrink: 0 }}>Selección</span><span className="tiny" style={{ lineHeight: 1.5 }}>{s.rationale.selection}</span></div> : null}
+            {s.rationale.note ? <p className="tiny muted" style={{ margin: '2px 0 0', lineHeight: 1.5 }}>{s.rationale.note}</p> : null}
+          </div>
+        </SectionCard>
+      ) : null}
+
       {/* Calentamiento y enfriamiento */}
       {(Array.isArray(s.warmup) && s.warmup.length) || (Array.isArray(s.cooldown) && s.cooldown.length) ? (
         <div className="grid g-2" style={{ alignItems: 'start' }}>
