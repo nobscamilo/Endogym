@@ -19,6 +19,7 @@ import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
+import { buildWaistAssessment } from '../../../core/waistRisk.js';
 import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
@@ -562,14 +563,16 @@ function groupOf(muscle) {
   return null;
 }
 
-function mapProgress(metrics, workouts, plan) {
+function mapProgress(metrics, workouts, plan, profile = null) {
   const out = {};
   const wlist = Array.isArray(workouts) ? workouts : [];
+  // Las métricas guardan `takenAt`; toleramos `performedAt` por compatibilidad con registros viejos.
+  const metricDate = (m) => m.takenAt || m.performedAt || '';
 
   // Peso (métricas)
   const weights = (Array.isArray(metrics) ? metrics : [])
-    .filter((m) => Number.isFinite(Number(m.weightKg)) && m.performedAt)
-    .sort((a, b) => String(a.performedAt).localeCompare(String(b.performedAt)))
+    .filter((m) => Number.isFinite(Number(m.weightKg)) && metricDate(m))
+    .sort((a, b) => String(metricDate(a)).localeCompare(String(metricDate(b))))
     .map((m) => Number(m.weightKg));
   if (weights.length >= 2) {
     const series = weights.slice(-7);
@@ -582,6 +585,23 @@ function mapProgress(metrics, workouts, plan) {
     out.weightNow = weights.length === 1 ? weights[0] : null;
     out.weightDelta6w = null;
     out.weightDeltaWk = null;
+  }
+
+  // Perímetro abdominal (cintura): serie temporal + evaluación de riesgo (ICA + cintura/sexo).
+  const waists = (Array.isArray(metrics) ? metrics : [])
+    .filter((m) => Number.isFinite(Number(m.waistCm)) && Number(m.waistCm) > 0 && metricDate(m))
+    .sort((a, b) => String(metricDate(a)).localeCompare(String(metricDate(b))))
+    .map((m) => Number(m.waistCm));
+  if (waists.length) {
+    const series = waists.slice(-8);
+    const now = series[series.length - 1];
+    const assessment = buildWaistAssessment({ waistCm: now, heightCm: profile?.heightCm, sex: profile?.sex });
+    out.waist = {
+      now,
+      series,
+      delta: series.length >= 2 ? Number((now - series[0]).toFixed(1)) : null,
+      ...(assessment || {}),
+    };
   }
 
   // Sesiones / adherencia / volumen (plan + entrenos)
@@ -714,7 +734,7 @@ export async function GET(request) {
       setIf('macroTargets', mapMacroTargets(planForStudio, today));
       setIf('macroEaten', mapMacroEaten(todayMeals));
       setIf('glycemic', mapGlycemic(todayMeals));
-      setIf('progress', mapProgress(metrics, workouts, planForStudio));
+      setIf('progress', mapProgress(metrics, workouts, planForStudio, profile));
       setIf('strava', mapStrava(stravaConn, workouts));
       setIf('coachAdjust', mapCoachAdjust(planForStudio));
       setIf('recentWorkouts', mapRecentWorkouts(workouts));

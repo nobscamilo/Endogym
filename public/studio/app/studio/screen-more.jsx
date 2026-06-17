@@ -279,6 +279,69 @@ function GoalProgressCard() {
   );
 }
 
+// Biometría: perímetro abdominal + ICA + riesgo + evolución, con registro de medición.
+function BiometryCard() {
+  const D = window.STUDIO || {};
+  const [view, setView] = useStateP((D.progress && D.progress.waist) || null);
+  const [waist, setWaist] = useStateP('');
+  const [weight, setWeight] = useStateP('');
+  const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth
+  const [guide, setGuide] = useStateP(false);
+  const bandColor = (lvl) => lvl === 'high' ? 'var(--glu-high)' : lvl === 'raised' ? 'var(--glu-mid)' : 'var(--glu-good)';
+
+  async function save() {
+    const wc = Number(waist);
+    if (!Number.isFinite(wc) || wc <= 0) { setStatus('err'); return; }
+    setStatus('saving');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setStatus('noauth'); return; }
+      const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
+      const body = { takenAt: new Date().toISOString(), waistCm: wc };
+      const wk = Number(weight); if (Number.isFinite(wk) && wk > 0) body.weightKg = wk;
+      const r = await fetch('/api/metrics', { method: 'POST', headers, body: JSON.stringify(body) });
+      if (!r.ok) { setStatus('err'); return; }
+      const d = await fetch('/api/studio-data', { headers });
+      if (d.ok) { const j = await d.json(); const o = j && j.ok ? j.overrides : null; if (o && o.progress) { D.progress = o.progress; setView(o.progress.waist || null); } }
+      setWaist(''); setWeight(''); setStatus('ok');
+      setTimeout(() => setStatus('idle'), 2500);
+    } catch (e) { setStatus('err'); }
+  }
+
+  const cur = view;
+  return (
+    <SectionCard title="Perímetro abdominal" icon="scale" sub="Cintura, índice cintura/altura y riesgo cardiometabólico — sigue tu evolución">
+      {cur && cur.now ? (
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="row between" style={{ alignItems: 'flex-end' }}>
+            <Stat num={String(cur.now).replace('.', ',')} unit="cm" label={cur.delta != null ? `${cur.delta <= 0 ? '↓' : '↑'} ${Math.abs(cur.delta)} cm` : 'Tu evolución'} color="var(--accent)" />
+            {Array.isArray(cur.series) && cur.series.length >= 2 ? <div style={{ flex: 1, maxWidth: 380 }}><Spark data={cur.series} color="var(--accent)" height={80} /></div> : null}
+          </div>
+          <div className="row wrap" style={{ gap: 8 }}>
+            {cur.whtr != null ? <span className="pill tiny" style={{ borderColor: bandColor(cur.whtrBand && cur.whtrBand.level), color: bandColor(cur.whtrBand && cur.whtrBand.level) }}>ICA {String(cur.whtr).replace('.', ',')} · {cur.whtrBand && cur.whtrBand.label}</span> : null}
+            {cur.waistBand ? <span className="pill tiny" style={{ borderColor: bandColor(cur.waistBand.level), color: bandColor(cur.waistBand.level) }}>Cintura · {cur.waistBand.label}</span> : null}
+          </div>
+          {cur.note ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>{cur.note}</p> : null}
+        </div>
+      ) : (
+        <div className="empty">Mídete la cintura y regístrala para ver tu índice cintura/altura y su evolución.</div>
+      )}
+      <div className="stack" style={{ gap: 8, marginTop: 14 }}>
+        <div className="row ac wrap" style={{ gap: 10 }}>
+          <label className="row ac" style={{ gap: 6 }}><span className="tiny muted">Cintura</span><input className="num-input" type="number" min="40" max="200" step="0.5" value={waist} onChange={(e) => setWaist(e.target.value)} placeholder="cm" style={{ width: 90 }} /></label>
+          <label className="row ac" style={{ gap: 6 }}><span className="tiny muted">Peso (opc.)</span><input className="num-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="kg" style={{ width: 90 }} /></label>
+          <button className="btn sm" onClick={save} disabled={status === 'saving'}><Icon name="check" size={15} /> {status === 'saving' ? 'Guardando…' : 'Guardar medición'}</button>
+        </div>
+        {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Medición guardada ✨</span> : null}
+        {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Introduce una cintura válida (cm).</span> : null}
+        {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setGuide((g) => !g)}><Icon name="list" size={13} /> {guide ? 'Ocultar guía' : 'Cómo medirte'}</button>
+        {guide ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>De pie y relajado, mide alrededor del abdomen a la altura del ombligo (punto medio entre la última costilla y la cresta ilíaca), al final de una espiración normal, sin apretar la cinta ni meter barriga. Mídete siempre igual y a la misma hora para que la evolución sea fiable.</p> : null}
+      </div>
+    </SectionCard>
+  );
+}
+
 function ProgressScreen() {
   const D = window.STUDIO;
   const p = D.progress || {};
@@ -406,6 +469,9 @@ function ProgressScreen() {
           <div className="empty">Registra tu peso para ver tu evolución.</div>
         )}
       </SectionCard>
+
+      {/* Perímetro abdominal (cintura) + ICA + riesgo + evolución */}
+      <BiometryCard />
 
       {/* Volumen por músculo + PRs */}
       <div className="grid g-2" style={{ alignItems: 'start' }}>

@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-4 (follow-up #6: citas RAG reales en el "por qué")**.
+Ultima actualizacion: **16 de junio de 2026, mañana-5 (perímetro abdominal + riesgo cardiometabólico)**.
+
+## Sesión del 16 de junio de 2026, mañana-5 (perímetro abdominal + riesgo cardiometabólico)
+
+Petición del usuario. Decisiones suyas: **ICA primero, sin % grasa** (evitar falsa precisión); **riesgo por ICA + cintura/sexo con aviso de etnia**. **283/283 tests**, bundle `v=63ce19508e`.
+
+- **`waistRisk.js`** (`buildWaistAssessment`): ICA (cintura/altura: <0,5 saludable, 0,5-0,6 aumentado, ≥0,6 alto) + banda por cintura según sexo (H 94/102, M 80/88, cortes IDF/NCEP) + nivel global = el peor + nota de etnia/no-diagnóstico. +5 tests.
+- **Datos:** la colección `metrics` YA soportaba `waistCm`; `studio-data.mapProgress` ahora construye serie de cintura (`out.waist = { now, series, delta, whtr, whtrBand, waistBand, level, note }`) y recibe `profile` para altura/sexo. **Bug latente arreglado:** las series de métricas filtraban por `performedAt` pero los registros guardan `takenAt` → ahora `takenAt || performedAt` (la serie de peso estaba vacía para registros reales).
+- **UI:** `BiometryCard` en Progreso (`screen-more`): cintura actual + ICA + bandas de riesgo coloreadas + evolución (Spark) + formulario para registrar medición (POST `/api/metrics`, refresca progreso) + guía de "cómo medirte" + disclaimer.
+- **Nota:** ninguna pantalla del front posteaba a `/api/metrics` antes; esta tarjeta estrena el registro de métricas (cintura y, opcionalmente, peso).
+- Follow-up posible: % grasa método Navy (pediría cuello, y cadera en mujeres), etiquetado como estimación.
 
 ## Sesión del 16 de junio de 2026, mañana-4 (follow-up #6: citas RAG reales en el "por qué")
 
