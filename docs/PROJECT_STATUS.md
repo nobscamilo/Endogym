@@ -1,6 +1,10 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-3 (follow-up #4: UI excluir/favorito desde el modal)**.
+Ultima actualizacion: **16 de junio de 2026, mañana-4 (follow-up #6: citas RAG reales en el "por qué")**.
+
+## Sesión del 16 de junio de 2026, mañana-4 (follow-up #6: citas RAG reales en el "por qué")
+
+- **Citas RAG reales:** nuevo `GET /api/session-rationale` (bajo demanda, para no añadir latencia del retriever al dashboard) que llama a `retrieveGuidelinesContextWithCitations` con una `userQuery` sobre volumen/intensidad/descanso/selección según el objetivo, y devuelve `sources` = nombres de archivo de los pasajes realmente recuperados (deduplicados, máx 6). Degrada en silencio a `[]`. UI: `RationaleSources` en la tarjeta "Por qué de tu sesión" — botón "Ver base científica (fuentes)"; si no hay citas, remite al coach (no inventa). Bundle `v=c4fb58caea`, 278 tests.
 
 ## Sesión del 16 de junio de 2026, mañana-3 (follow-up #4: UI excluir/favorito)
 

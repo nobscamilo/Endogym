@@ -722,6 +722,7 @@ function TrainSession() {
             <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="pill tiny" style={{ flexShrink: 0 }}>Carga</span><span className="tiny" style={{ lineHeight: 1.5 }}>{s.rationale.load}</span></div>
             {s.rationale.selection ? <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="pill tiny" style={{ flexShrink: 0 }}>Selección</span><span className="tiny" style={{ lineHeight: 1.5 }}>{s.rationale.selection}</span></div> : null}
             {s.rationale.note ? <p className="tiny muted" style={{ margin: '2px 0 0', lineHeight: 1.5 }}>{s.rationale.note}</p> : null}
+            <RationaleSources />
           </div>
         </SectionCard>
       ) : null}
@@ -884,6 +885,40 @@ function TrainSession() {
 }
 
 /* ---------- SEMANA ---------- */
+// #6 — Citas RAG reales bajo demanda para el "por qué". Pulsa para recuperar las fuentes de la
+// biblioteca médica realmente usadas; si no hay, remite al coach (no inventa citas).
+function RationaleSources() {
+  const [state, setState] = useStateTr('idle'); // idle|loading|done|err
+  const [sources, setSources] = useStateTr([]);
+  async function load() {
+    setState('loading');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      const r = await fetch('/api/session-rationale', { headers: token ? { authorization: 'Bearer ' + token } : {} });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { setSources(Array.isArray(j.sources) ? j.sources : []); setState('done'); }
+      else setState('err');
+    } catch (e) { setState('err'); }
+  }
+  return (
+    <div style={{ marginTop: 4 }}>
+      {state === 'idle' ? (
+        <button className="btn ghost sm" onClick={load}><Icon name="list" size={14} /> Ver base científica (fuentes)</button>
+      ) : null}
+      {state === 'loading' ? <span className="tiny muted">Buscando fuentes en la biblioteca médica…</span> : null}
+      {state === 'done' && sources.length ? (
+        <div className="stack" style={{ gap: 2 }}>
+          <span className="tiny muted">Fuentes recuperadas para tu prescripción:</span>
+          {sources.map((src, i) => <span key={i} className="tiny" style={{ lineHeight: 1.4 }}>· {src}</span>)}
+          <span className="tiny muted" style={{ marginTop: 2 }}>Para la justificación detallada con estas referencias, pregúntale al coach.</span>
+        </div>
+      ) : null}
+      {state === 'done' && !sources.length ? <span className="tiny muted">No hay citas recuperables ahora mismo; pregúntale al coach para la justificación con referencias.</span> : null}
+      {state === 'err' ? <span className="tiny muted">No se pudieron cargar las fuentes. Pregúntale al coach para la base científica.</span> : null}
+    </div>
+  );
+}
+
 // #7 — Revisión del mesociclo: si el bloque acumuló señales (muchos cambios de foco, edad,
 // molestias/fatiga repetidas), propone regenerarlo en vez de seguir parcheándolo.
 function MesocycleReviewCard({ review }) {
