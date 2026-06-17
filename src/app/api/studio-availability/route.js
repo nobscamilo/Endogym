@@ -125,13 +125,16 @@ export async function POST(request) {
         answeredAt: new Date().toISOString(),
         daysOut: Number.isFinite(daysOut) ? Math.min(365, Math.max(0, Math.round(daysOut))) : null,
       };
-      // Si el POST es SOLO el check-in de reentrada (sin encuesta), no marcar
-      // studioAvailability: ese flag cambia cómo el planner honra duración/frecuencia.
-      if (!GOALS.has(body?.goal) && !MODALITIES.has(body?.trainingModality)
-        && body?.sessionMinutes == null && body?.preferredDurationMinutes == null && body?.daysPerWeek == null) {
-        delete patch.studioAvailability;
-        delete patch.lastSurveyAt;
-      }
+    }
+
+    // Solo un POST de ENCUESTA marca `studioAvailability` (ese flag cambia cómo el planner
+    // honra duración/frecuencia). Un POST de solo check-in de reentrada o de solo preferencias
+    // (excluir/favorito, equipo) NO debe marcarlo ni tocar `lastSurveyAt`.
+    const isSurveyPost = GOALS.has(body?.goal) || MODALITIES.has(body?.trainingModality)
+      || body?.sessionMinutes != null || body?.preferredDurationMinutes != null || body?.daysPerWeek != null;
+    if (!isSurveyPost) {
+      delete patch.studioAvailability;
+      delete patch.lastSurveyAt;
     }
 
     try {

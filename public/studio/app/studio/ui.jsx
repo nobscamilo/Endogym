@@ -89,6 +89,50 @@ function VideoThumb({ item, variant = 'card' }) {
   );
 }
 
+/* #4 — Excluir / marcar favorito un ejercicio desde su modal. Persiste en el perfil
+   (excludedExercises/favoriteExercises) vía studio-availability; se aplica en próximas
+   sesiones y cambios de ejercicio. */
+function ExercisePrefActions({ item }) {
+  const id = item && item.id;
+  const u = (window.STUDIO && window.STUDIO.user) || {};
+  const [excluded, setExcluded] = useStateU(Array.isArray(u.excludedExercises) && u.excludedExercises.includes(id));
+  const [fav, setFav] = useStateU(Array.isArray(u.favoriteExercises) && u.favoriteExercises.includes(id));
+  const [busy, setBusy] = useStateU(false);
+  if (!id) return null;
+  async function persist(nextExcluded, nextFav) {
+    setBusy(true);
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setBusy(false); return; }
+      const cur = (window.STUDIO && window.STUDIO.user) || {};
+      const exSet = new Set(cur.excludedExercises || []);
+      const favSet = new Set(cur.favoriteExercises || []);
+      if (nextExcluded) exSet.add(id); else exSet.delete(id);
+      if (nextFav) favSet.add(id); else favSet.delete(id);
+      const excludedExercises = Array.from(exSet);
+      const favoriteExercises = Array.from(favSet);
+      const r = await fetch('/api/studio-availability', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ excludedExercises, favoriteExercises }),
+      });
+      if (r.ok && window.STUDIO) window.STUDIO.user = { ...cur, excludedExercises, favoriteExercises };
+    } catch (e) { /* noop */ } finally { setBusy(false); }
+  }
+  return (
+    <React.Fragment>
+      <button className={`btn ghost sm ${fav ? 'on' : ''}`} disabled={busy} title="Priorizar este ejercicio en tus sesiones"
+        onClick={() => { const n = !fav; setFav(n); if (n) setExcluded(false); persist(n ? false : excluded, n); }}>
+        <Icon name="heart" size={15} /> {fav ? 'Favorito ✓' : 'Favorito'}
+      </button>
+      <button className={`btn ghost sm ${excluded ? 'on' : ''}`} disabled={busy} title="No volver a proponer este ejercicio"
+        onClick={() => { const n = !excluded; setExcluded(n); if (n) setFav(false); persist(n, n ? false : fav); }}>
+        <Icon name="close" size={15} /> {excluded ? 'Excluido ✓' : 'Excluir'}
+      </button>
+    </React.Fragment>
+  );
+}
+
 /* Reproductor a pantalla (overlay) con FLIP desde la miniatura */
 function VideoPlayer({ state, onClose }) {
   const stageRef = useRefU(null);
@@ -205,7 +249,7 @@ function VideoPlayer({ state, onClose }) {
             </p>
           )}
           <div className="row wrap" style={{ gap: 8, marginTop: 16 }}>
-            <button className="btn sm"><Icon name="check" size={15} /> Marcar como vista</button>
+            <ExercisePrefActions item={it} />
             <button className="btn ghost sm"><Icon name="share" size={15} /> Compartir</button>
           </div>
         </div>

@@ -1,6 +1,11 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-2 (recomendaciones pre/post entreno + fix badge Nutrición)**.
+Ultima actualizacion: **16 de junio de 2026, mañana-3 (follow-up #4: UI excluir/favorito desde el modal)**.
+
+## Sesión del 16 de junio de 2026, mañana-3 (follow-up #4: UI excluir/favorito)
+
+- **Excluir / favorito desde el modal de ejercicio** (`ExercisePrefActions` en `ui.jsx`): botones Favorito (heart) y Excluir (close) en el detalle de ejercicio; persisten en `profile.excludedExercises`/`favoriteExercises` vía `studio-availability` y actualizan `window.STUDIO.user` en local. Se aplican en próximas sesiones y cambios de ejercicio (el filtro `filterByEquipmentAndPreferences` ya los usa). Bundle `v=8265849eb2`, **278 tests**.
+- **Fix de efecto secundario:** `studio-availability` ahora solo marca `studioAvailability`/`lastSurveyAt` en POST de ENCUESTA (hay goal/modalidad/duración/días); un POST de solo preferencias o de solo reentrada ya no marca el perfil como completo (guard generalizado, antes solo cubría reentrada).
 
 ## Sesión del 16 de junio de 2026, mañana-2 (recomendaciones pre/post entreno + fix badge)
 
