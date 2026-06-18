@@ -606,6 +606,11 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [weight, setWeight] = useStateP(u.weightKg != null ? u.weightKg : 75);
   const [height, setHeight] = useStateP(u.heightCm != null ? u.heightCm : 170);
   const [hrMax, setHrMax] = useStateP(u.hrMaxBpm != null ? String(u.hrMaxBpm) : '');
+  // Biometría inicial (opcional): cintura + Navy (cuello, y cadera en mujeres). Se guardan como
+  // primera medición en /api/metrics (serie de Progreso), no en el perfil.
+  const [waistCm, setWaistCm] = useStateP('');
+  const [neckCm, setNeckCm] = useStateP('');
+  const [hipCm, setHipCm] = useStateP('');
   const [mins, setMins] = useStateP(u.sessionMinutes != null ? u.sessionMinutes : 60);
   const [days, setDays] = useStateP(u.daysPerWeek != null ? u.daysPerWeek : 5);
   const [meals, setMeals] = useStateP(u.mealsPerDay != null ? u.mealsPerDay : 4);
@@ -648,6 +653,14 @@ function AvailabilitySurvey({ onSaved } = {}) {
         }),
       });
       if (!r.ok) { setStatus('err'); return; }
+      // Biometría inicial (opcional): primera medición de cintura (+ Navy cuello/cadera) y peso.
+      const wc = Number(waistCm);
+      if (Number.isFinite(wc) && wc > 0) {
+        const mbody = { takenAt: new Date().toISOString(), waistCm: wc, weightKg: Number(weight) || null };
+        const nk = Number(neckCm); if (Number.isFinite(nk) && nk > 0) mbody.neckCm = nk;
+        const hp = Number(hipCm); if (sex === 'female' && Number.isFinite(hp) && hp > 0) mbody.hipCm = hp;
+        await fetch('/api/metrics', { method: 'POST', headers, body: JSON.stringify(mbody) }).catch(() => {});
+      }
       // Cambió el perfil/disponibilidad → reconstruye el bloque de 21 días.
       await fetch('/api/weekly-plan', { method: 'POST', headers, body: JSON.stringify({ rebuild: true }) }).catch(() => {});
       try {
@@ -819,6 +832,13 @@ function AvailabilitySurvey({ onSaved } = {}) {
             <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
             <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
           </div>
+          <div className="mb-label" style={{ marginTop: 14 }}>Biometría <span className="tiny muted">(opcional — para tu riesgo cardiometabólico y su evolución)</span></div>
+          <div className="grid g-4" style={{ gap: 10 }}>
+            <div className="field"><label>Cintura (cm)</label><input className="text-input" type="number" min="40" max="200" step="0.5" placeholder="opcional" value={waistCm} onChange={(e) => setWaistCm(e.target.value)} /></div>
+            <div className="field"><label>Cuello (cm) <span className="tiny muted">Navy</span></label><input className="text-input" type="number" min="20" max="80" step="0.5" placeholder="opcional" value={neckCm} onChange={(e) => setNeckCm(e.target.value)} /></div>
+            {sex === 'female' ? <div className="field"><label>Cadera (cm) <span className="tiny muted">Navy</span></label><input className="text-input" type="number" min="60" max="200" step="0.5" placeholder="opcional" value={hipCm} onChange={(e) => setHipCm(e.target.value)} /></div> : null}
+          </div>
+          <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>La cintura te da el índice cintura/altura y tu banda de riesgo. Si añades el cuello{sex === 'female' ? ' y la cadera' : ''}, estimamos tu % grasa (método Navy, ±3-4%). Mídete relajado, a la altura del ombligo y sin apretar. Podrás seguir su evolución en Progreso.</p>
         </section>
 
         <div className="row ac wrap" style={{ gap: 12 }}>

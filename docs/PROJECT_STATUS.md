@@ -1,6 +1,14 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-7 (FIX crítico: gate de onboarding para usuarios nuevos)**.
+Ultima actualizacion: **16 de junio de 2026, mañana-8 (landing mejorada + biometría en la encuesta inicial)**.
+
+## Sesión del 16 de junio de 2026, mañana-8 (landing mejorada + biometría en la encuesta inicial)
+
+Aprobado por el usuario vía mockup (Visualize). **290 tests verdes**, build OK, bundle `v=7b86ef92d9`.
+
+- **Landing (`src/app/page.js`)** mejorada reusando las clases `landing-*` existentes (sin CSS nuevo): titular más fuerte ("Tu plan de fuerza y nutrición, personalizado y con base científica"), strip de capacidades ampliado, rejilla de **6 capacidades** (antes 3: + Coach IA con citas, Biometría y riesgo, Check-in de sesión) y nueva sección **"Cómo funciona" en 3 pasos** (encuesta → plan/comidas → registra y ajusta), que refuerza que lo primero es la encuesta. Login/registro intactos.
+- **Biometría en la encuesta inicial (`AvailabilitySurvey`):** nuevo bloque opcional en "Datos personales" con cintura + Navy (cuello, y cadera si `sex==='female'`); al guardar, hace una primera medición en `/api/metrics` (cintura + cuello/cadera + peso) → alimenta la `BiometryCard` de Progreso desde el día 1. Como la encuesta es también el gate de onboarding, los usuarios nuevos pueden meter sus biométricas al crear la cuenta.
+- NO toca `studio-data` → la glucosa concurrente sigue sin commitear, intacta.
 
 ## Sesión del 16 de junio de 2026, mañana-7 (FIX crítico: gate de onboarding para usuarios nuevos)
 

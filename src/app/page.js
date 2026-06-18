@@ -352,13 +352,13 @@ export default function HomePage() {
             {/* Left Copy Panel */}
             <div className="landing-copy-block">
               <h1 className="landing-title">
-                Tu seguimiento deportivo, en un solo lugar
+                Tu plan de fuerza y nutrición, personalizado y con base científica
               </h1>
               <p className="landing-subtitle">
-                Accede a tu plan semanal, registra nutrición y métricas, y revisa cómo evoluciona tu adherencia. Ignios es una herramienta educativa y no sustituye atención médica.
+                Responde una breve encuesta y te creamos un bloque de 21 días y tus comidas, adaptados a tu objetivo, tu salud y tu material. Registra y el coach ajusta. Ignios es una herramienta educativa y no sustituye atención médica.
               </p>
               <div className="landing-athlete-banner">
-                <span className="landing-athlete-text">Plan semanal · Nutrición · Check-in de sesión · Métricas</span>
+                <span className="landing-athlete-text">Plan periodizado · Nutrición y glucemia · Check-in de sesión · Biometría · Coach IA con citas</span>
               </div>
             </div>
 
@@ -593,6 +593,72 @@ export default function HomePage() {
                 <p>
                   Conserva tus métricas, sesiones y preferencias en tu cuenta. Puedes exportar tus datos o solicitar su eliminación desde la app.
                 </p>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="landing-bento-card">
+                <div className="landing-bento-icon-wrapper">
+                  <span className="material-symbols-outlined">psychology</span>
+                </div>
+                <h3>Coach IA con citas</h3>
+                <p>
+                  Te explica el porqué de tu prescripción y puede mostrar las fuentes de su biblioteca médica realmente recuperadas, sin inventar referencias.
+                </p>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="landing-bento-card">
+                <div className="landing-bento-icon-wrapper">
+                  <span className="material-symbols-outlined">straighten</span>
+                </div>
+                <h3>Biometría y riesgo</h3>
+                <p>
+                  Registra tu perímetro abdominal y sigue tu índice cintura/altura, tu banda de riesgo cardiometabólico y, si quieres, una estimación de % grasa.
+                </p>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="landing-bento-card">
+                <div className="landing-bento-icon-wrapper">
+                  <span className="material-symbols-outlined">task_alt</span>
+                </div>
+                <h3>Check-in de sesión</h3>
+                <p>
+                  Anota cargas, repeticiones y cómo te sentiste en un solo paso; tus datos afinan la progresión y los avisos de seguridad del coach.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Cómo funciona — 3 pasos */}
+        <section className="landing-features-section">
+          <div className="landing-features-container">
+            <div className="landing-section-header">
+              <span className="landing-badge">CÓMO FUNCIONA</span>
+              <h2 className="landing-section-title">De la encuesta a tu plan en 3 pasos</h2>
+            </div>
+            <div className="landing-bento-grid">
+              <div className="landing-bento-card">
+                <div className="landing-bento-icon-wrapper">
+                  <span className="material-symbols-outlined">assignment</span>
+                </div>
+                <h3>1 · Encuesta inicial</h3>
+                <p>Tu objetivo, salud, material, días y biometría. Es lo primero que haces al crear tu cuenta.</p>
+              </div>
+              <div className="landing-bento-card active">
+                <div className="landing-bento-icon-wrapper">
+                  <span className="material-symbols-outlined">calendar_month</span>
+                </div>
+                <h3>2 · Tu plan y comidas</h3>
+                <p>Generamos tu bloque de 21 días y tu nutrición, adaptados a lo que nos contaste.</p>
+              </div>
+              <div className="landing-bento-card">
+                <div className="landing-bento-icon-wrapper">
+                  <span className="material-symbols-outlined">trending_up</span>
+                </div>
+                <h3>3 · Registra y ajusta</h3>
+                <p>Con tus sesiones y métricas reales, el coach afina la progresión semana a semana.</p>
               </div>
             </div>
           </div>
