@@ -1,6 +1,15 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-6 (% grasa método Navy; biometría separada de la glucosa concurrente)**.
+Ultima actualizacion: **16 de junio de 2026, mañana-7 (FIX crítico: gate de onboarding para usuarios nuevos)**.
+
+## Sesión del 16 de junio de 2026, mañana-7 (FIX crítico: gate de onboarding para usuarios nuevos)
+
+El usuario creó una cuenta nueva y vio **datos demo de base** (la sesión "Empuje · Fuerza" de `data.js`) sin que le pidiera la encuesta. Causa: `data.js` trae datos de muestra; para un usuario nuevo (sin plan) `studio-data` no sobreescribe `todaySession`/`week`/etc. → quedaban los demo, y **no había gate** que forzara la encuesta.
+
+- **Fix (`app.jsx`):** gate de onboarding BLOQUEANTE. Si `window.STUDIO.user.profileComplete === false` (usuario logueado e incompleto), la app renderiza SOLO la encuesta (`AvailabilitySurvey`) a pantalla completa, sin nav ni datos demo. El demo público (sin login) no trae `profileComplete` (undefined) → no se gatea, se conserva. Al completar la encuesta, `onSaved` recarga y entra a la app real.
+- **`AvailabilitySurvey`** acepta ahora `onSaved` opcional (en `ProfileScreen` normal no se pasa → comportamiento intacto).
+- Bundle `v=888e3f8f71`, 290 tests. NO toca `studio-data` → no re-entrelaza con la glucosa concurrente (sigue sin commitear en el árbol).
+- PENDIENTE (pedido del usuario, subjetivo): rediseñar la **página de inicio** (TodayHub), que ve "simple" — requiere decidir dirección.
 
 ## Sesión del 16 de junio de 2026, mañana-6 (% grasa método Navy, opcional)
 

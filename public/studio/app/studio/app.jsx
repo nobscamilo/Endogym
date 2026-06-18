@@ -78,6 +78,38 @@ function App() {
 
   const navIdx = Math.max(0, NAV.findIndex((n) => n.id === view));
 
+  // Gate de onboarding: un usuario logueado SIN encuesta completada (profileComplete === false)
+  // NO debe ver datos demo ni el dashboard; lo primero es la encuesta. El demo público (sin login)
+  // no trae profileComplete (undefined) → no se gatea.
+  const needsOnboarding = Boolean(window.STUDIO && window.STUDIO.user && window.STUDIO.user.profileComplete === false);
+  if (needsOnboarding) {
+    return (
+      <VideoProvider>
+        <div className="stage">
+          <div className="viewport">
+            <div className="device">
+              <div className={`app ${isMobile ? 'mobile' : ''}`}>
+                <main className="main" ref={mainRef}>
+                  <div className="page" style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px' }}>
+                    <div className="row ac" style={{ gap: 12, marginBottom: 6 }}>
+                      <span className="rail-logo"><Logo size={36} /></span>
+                      <div>
+                        <p className="eyebrow">Bienvenido a Ignios</p>
+                        <h1 style={{ margin: '2px 0 0' }}>Empecemos por tu encuesta</h1>
+                      </div>
+                    </div>
+                    <p className="sub" style={{ marginBottom: 16, lineHeight: 1.5 }}>Para crear tu plan necesitamos conocerte. Completa esta encuesta y te generamos tu bloque de entrenamiento y tus comidas. Hasta entonces no verás datos.</p>
+                    <AvailabilitySurvey onSaved={() => window.location.reload()} />
+                  </div>
+                </main>
+              </div>
+            </div>
+          </div>
+        </div>
+      </VideoProvider>
+    );
+  }
+
   return (
     <VideoProvider>
       <div className="stage">

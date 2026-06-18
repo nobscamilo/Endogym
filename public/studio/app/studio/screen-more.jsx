@@ -580,7 +580,7 @@ const RUN_REF_DIST = [['', '—'], ['5000', '5K'], ['10000', '10K'], ['21097', '
 function findChoice(list, value) { return list.find((item) => item.value === value) || list[0]; }
 function secsToMMSS(s) { const n = Number(s); if (!Number.isFinite(n) || n <= 0) return ''; const m = Math.floor(n / 60); const r = Math.round(n % 60); return `${m}:${String(r).padStart(2, '0')}`; }
 function mmssToSecs(str) { const m = /^(\d{1,3}):([0-5]?\d)$/.exec(String(str || '').trim()); if (!m) return null; return Number(m[1]) * 60 + Number(m[2]); }
-function AvailabilitySurvey() {
+function AvailabilitySurvey({ onSaved } = {}) {
   const D = window.STUDIO;
   const u = D.user || {};
   const [goal, setGoal] = useStateP(u.goalRaw || 'recomposition');
@@ -659,6 +659,8 @@ function AvailabilitySurvey() {
         }
       } catch (e) { /* noop */ }
       setStatus('ok'); setTimeout(() => setStatus('idle'), 3500);
+      // En onboarding, al completar la encuesta el gate recarga para salir a la app real.
+      if (typeof onSaved === 'function') onSaved();
     } catch (e) { setStatus('err'); }
   }
 
