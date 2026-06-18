@@ -440,39 +440,39 @@ export default function HomePage() {
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'rgba(255, 255, 255, 0.04)', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <p style={{ margin: 0, fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)' }}>Para crear tu cuenta (con email o con Google) acepta:</p>
-                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', textAlign: 'left', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
                           <input
                             type="checkbox"
                             checked={consentTerms}
                             onChange={(e) => setConsentTerms(e.target.checked)}
-                            style={{ marginTop: '2px' }}
+                            style={{ width: '18px', height: '18px', flex: 'none', marginTop: '2px', accentColor: '#3b82f6', cursor: 'pointer' }}
                           />
                           <span>Acepto los <Link href="/legal/terms" target="_blank" style={{ color: '#a9c7ff', fontWeight: 'bold' }}>Términos y condiciones</Link>.</span>
                         </label>
-                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', textAlign: 'left', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
                           <input
                             type="checkbox"
                             checked={consentPrivacy}
                             onChange={(e) => setConsentPrivacy(e.target.checked)}
-                            style={{ marginTop: '2px' }}
+                            style={{ width: '18px', height: '18px', flex: 'none', marginTop: '2px', accentColor: '#3b82f6', cursor: 'pointer' }}
                           />
                           <span>Acepto la <Link href="/legal/privacy" target="_blank" style={{ color: '#a9c7ff', fontWeight: 'bold' }}>Política de privacidad</Link>.</span>
                         </label>
-                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', textAlign: 'left', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
                           <input
                             type="checkbox"
                             checked={consentData}
                             onChange={(e) => setConsentData(e.target.checked)}
-                            style={{ marginTop: '2px' }}
+                            style={{ width: '18px', height: '18px', flex: 'none', marginTop: '2px', accentColor: '#3b82f6', cursor: 'pointer' }}
                           />
                           <span>Consiento el tratamiento de datos de salud y actividad física para generar mi plan personalizado.</span>
                         </label>
-                        <label style={{ display: 'flex', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', textAlign: 'left', gap: '0.6rem', color: '#f8f9ff', fontSize: '0.8rem', cursor: 'pointer', lineHeight: '1.4' }}>
                           <input
                             type="checkbox"
                             checked={consentMarketing}
                             onChange={(e) => setConsentMarketing(e.target.checked)}
-                            style={{ marginTop: '2px' }}
+                            style={{ width: '18px', height: '18px', flex: 'none', marginTop: '2px', accentColor: '#3b82f6', cursor: 'pointer' }}
                           />
                           <span>Acepto comunicaciones informativas (opcional).</span>
                         </label>
