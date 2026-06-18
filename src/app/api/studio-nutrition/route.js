@@ -327,11 +327,17 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
       }
     }
 
+    // Presupuesto GLOBAL de generación: todas las llamadas a Gemini y los reintentos lo respetan,
+    // para devolver lo que haya (parcial o error claro) ANTES de que Vercel mate la función a los
+    // 60s (maxDuration). Antes, 2 rondas con timeouts de 50s + reintento interno superaban 60s → 504.
+    const genDeadline = Date.now() + 50000;
+    const remainingBudget = () => Math.max(8000, genDeadline - Date.now());
+
     async function genChunk(daysList, withShoppingBatch, styleHint) {
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
-        timeoutMs: 50000,
+        timeoutMs: remainingBudget(),
         parts: [{ text: buildPrompt(daysList, withShoppingBatch, styleHint) }],
         generationConfig: {
           temperature: 0.7,
@@ -351,10 +357,12 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
     }
 
     // Un reintento por trozo: cubre truncaciones puntuales o errores transitorios de Gemini.
+    // Solo reintenta si queda presupuesto suficiente (si no, propaga el error sin colgar la función).
     async function genChunkSafe(daysList, withShoppingBatch, styleHint) {
       try {
         return await genChunk(daysList, withShoppingBatch, styleHint);
       } catch (e1) {
+        if (Date.now() > genDeadline - 9000) throw e1;
         return genChunk(daysList, withShoppingBatch, styleHint);
       }
     }
@@ -426,7 +434,7 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
       // Reintento DIRIGIDO: si hay drift diario o proteína global baja, regenera SOLO los
       // trozos que contienen días desviados (más barato que regenerar la semana entera y
       // conserva los días que ya cumplen). Se queda con la mejor de las dos versiones.
-      if (best.days.length >= 7 && check.n >= 4 && (check.proteinRatio < 0.82 || check.driftDays.length > 0)) {
+      if (best.days.length >= 7 && check.n >= 4 && (check.proteinRatio < 0.82 || check.driftDays.length > 0) && Date.now() < genDeadline - 16000) {
         const failingChunks = [...new Set(
           check.driftDays
             .map((day) => DAY_CHUNKS.findIndex((c) => c.includes(day)))
