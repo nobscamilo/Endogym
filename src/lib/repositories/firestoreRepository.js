@@ -398,6 +398,8 @@ export async function createMetricLog(userId, payload) {
     takenAt: payload.takenAt,
     weightKg: payload.weightKg ?? null,
     waistCm: payload.waistCm ?? null,
+    neckCm: payload.neckCm ?? null,
+    hipCm: payload.hipCm ?? null,
     fastingGlucoseMgDl: payload.fastingGlucoseMgDl ?? null,
     notes: payload.notes ?? null,
     createdAt: new Date().toISOString(),

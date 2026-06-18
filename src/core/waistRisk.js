@@ -38,3 +38,35 @@ export function buildWaistAssessment({ waistCm, heightCm, sex } = {}) {
 
   return out;
 }
+
+const NAVY_NOTE = 'Estimación por el método U.S. Navy (cinta métrica), con un margen de error de ±3-4% frente a métodos como DEXA. Útil para seguir tu tendencia, no como valor exacto.';
+
+// % grasa OPCIONAL por método Navy (versión métrica, log10). Hombres: cintura+cuello+altura;
+// mujeres: además cadera. Devuelve null si faltan medidas o salen valores inválidos.
+export function estimateBodyFatNavy({ sex, waistCm, neckCm, heightCm, hipCm } = {}) {
+  const waist = Number(waistCm);
+  const neck = Number(neckCm);
+  const height = Number(heightCm);
+  if (![waist, neck, height].every((v) => Number.isFinite(v) && v > 0)) return null;
+  const s = sex === 'female' ? 'female' : sex === 'male' ? 'male' : null;
+  if (!s) return null;
+
+  let pct;
+  if (s === 'male') {
+    const d = waist - neck;
+    if (d <= 0) return null;
+    pct = 495 / (1.0324 - 0.19077 * Math.log10(d) + 0.15456 * Math.log10(height)) - 450;
+  } else {
+    const hip = Number(hipCm);
+    if (!Number.isFinite(hip) || hip <= 0) return null;
+    const d = waist + hip - neck;
+    if (d <= 0) return null;
+    pct = 495 / (1.29579 - 0.35004 * Math.log10(d) + 0.221 * Math.log10(height)) - 450;
+  }
+  if (!Number.isFinite(pct)) return null;
+  return {
+    bodyFatPct: Math.round(Math.min(60, Math.max(3, pct)) * 10) / 10,
+    method: 'navy',
+    note: NAVY_NOTE,
+  };
+}

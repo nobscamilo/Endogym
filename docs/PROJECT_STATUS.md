@@ -1,6 +1,11 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-5 (perímetro abdominal + riesgo cardiometabólico)**.
+Ultima actualizacion: **16 de junio de 2026, mañana-6 (% grasa método Navy; biometría separada de la glucosa concurrente)**.
+
+## Sesión del 16 de junio de 2026, mañana-6 (% grasa método Navy, opcional)
+
+- **% grasa Navy** (decisión del usuario: solo Navy, **sin analíticas** — coincidió en lo legal/ético de no interpretar labs). `estimateBodyFatNavy` en `waistRisk.js` (métrica, log10): H cintura+cuello+altura, M + cadera; clamp 3-60%, etiquetado como estimación ±3-4%. `/api/metrics` + `createMetricLog` guardan `neckCm`/`hipCm`; `mapProgress` expone `out.bodyFat = { now, series, delta, note }`. `BiometryCard`: sección plegable "Estimar % grasa (Navy)" con inputs cuello (+ cadera si `user.sex==='female'`). +3 tests (8 en `waist-risk`).
+- **OJO concurrencia:** durante esta sesión otro agente metió una feature de **glucosa** (`glucose.js`, `glucose.test.js`, exports `partsInTimeZone`/`getAppTimeZone` en `appTime.js`, integración en `mapGlycemic` de `studio-data`). Quedó entrelazada con mi biometría en `studio-data`. Decisión del usuario: **desplegar solo biometría**. Se separó quirúrgicamente: commit de biometría con `studio-data` de-glucosado (revertido `mapGlycemic` a su firma de 1 arg + quitados imports de glucosa), dejando el trabajo de glucosa SIN commitear en el árbol para que el otro agente lo cierre. NO commiteados: `glucose.js`, `appTime.js`, `glucose.test.js`.
 
 ## Sesión del 16 de junio de 2026, mañana-5 (perímetro abdominal + riesgo cardiometabólico)
 

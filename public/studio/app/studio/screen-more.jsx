@@ -282,9 +282,14 @@ function GoalProgressCard() {
 // Biometría: perímetro abdominal + ICA + riesgo + evolución, con registro de medición.
 function BiometryCard() {
   const D = window.STUDIO || {};
+  const isFemale = (D.user && D.user.sex) === 'female';
   const [view, setView] = useStateP((D.progress && D.progress.waist) || null);
+  const [bf, setBf] = useStateP((D.progress && D.progress.bodyFat) || null);
   const [waist, setWaist] = useStateP('');
   const [weight, setWeight] = useStateP('');
+  const [neck, setNeck] = useStateP('');
+  const [hip, setHip] = useStateP('');
+  const [showBf, setShowBf] = useStateP(false);
   const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth
   const [guide, setGuide] = useStateP(false);
   const bandColor = (lvl) => lvl === 'high' ? 'var(--glu-high)' : lvl === 'raised' ? 'var(--glu-mid)' : 'var(--glu-good)';
@@ -299,11 +304,13 @@ function BiometryCard() {
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
       const body = { takenAt: new Date().toISOString(), waistCm: wc };
       const wk = Number(weight); if (Number.isFinite(wk) && wk > 0) body.weightKg = wk;
+      const nk = Number(neck); if (Number.isFinite(nk) && nk > 0) body.neckCm = nk;
+      const hp = Number(hip); if (isFemale && Number.isFinite(hp) && hp > 0) body.hipCm = hp;
       const r = await fetch('/api/metrics', { method: 'POST', headers, body: JSON.stringify(body) });
       if (!r.ok) { setStatus('err'); return; }
       const d = await fetch('/api/studio-data', { headers });
-      if (d.ok) { const j = await d.json(); const o = j && j.ok ? j.overrides : null; if (o && o.progress) { D.progress = o.progress; setView(o.progress.waist || null); } }
-      setWaist(''); setWeight(''); setStatus('ok');
+      if (d.ok) { const j = await d.json(); const o = j && j.ok ? j.overrides : null; if (o && o.progress) { D.progress = o.progress; setView(o.progress.waist || null); setBf(o.progress.bodyFat || null); } }
+      setWaist(''); setWeight(''); setNeck(''); setHip(''); setStatus('ok');
       setTimeout(() => setStatus('idle'), 2500);
     } catch (e) { setStatus('err'); }
   }
@@ -326,6 +333,15 @@ function BiometryCard() {
       ) : (
         <div className="empty">Mídete la cintura y regístrala para ver tu índice cintura/altura y su evolución.</div>
       )}
+      {bf && bf.now != null ? (
+        <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none', marginTop: 12 }}>
+          <div className="row between" style={{ alignItems: 'flex-end' }}>
+            <Stat num={String(bf.now).replace('.', ',')} unit="%" label={bf.delta != null ? `${bf.delta <= 0 ? '↓' : '↑'} ${Math.abs(bf.delta)} % grasa` : '% grasa estimado'} color="var(--accent)" />
+            {Array.isArray(bf.series) && bf.series.length >= 2 ? <div style={{ flex: 1, maxWidth: 320 }}><Spark data={bf.series} color="var(--glu-mid)" height={70} /></div> : null}
+          </div>
+          {bf.note ? <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>{bf.note}</p> : null}
+        </div>
+      ) : null}
       <div className="stack" style={{ gap: 8, marginTop: 14 }}>
         <div className="row ac wrap" style={{ gap: 10 }}>
           <label className="row ac" style={{ gap: 6 }}><span className="tiny muted">Cintura</span><input className="num-input" type="number" min="40" max="200" step="0.5" value={waist} onChange={(e) => setWaist(e.target.value)} placeholder="cm" style={{ width: 90 }} /></label>
@@ -335,6 +351,16 @@ function BiometryCard() {
         {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Medición guardada ✨</span> : null}
         {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Introduce una cintura válida (cm).</span> : null}
         {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowBf((v) => !v)}><Icon name="plus" size={13} /> {showBf ? 'Ocultar % grasa (Navy)' : 'Estimar % grasa (método Navy, opcional)'}</button>
+        {showBf ? (
+          <div className="stack" style={{ gap: 8 }}>
+            <span className="tiny muted">Para estimar tu % grasa (método Navy), añade el cuello{isFemale ? ' y la cadera' : ''} y guárdalos junto con la cintura. Es una estimación (±3-4%), no un valor exacto.</span>
+            <div className="row ac wrap" style={{ gap: 10 }}>
+              <label className="row ac" style={{ gap: 6 }}><span className="tiny muted">Cuello</span><input className="num-input" type="number" min="20" max="80" step="0.5" value={neck} onChange={(e) => setNeck(e.target.value)} placeholder="cm" style={{ width: 90 }} /></label>
+              {isFemale ? <label className="row ac" style={{ gap: 6 }}><span className="tiny muted">Cadera</span><input className="num-input" type="number" min="60" max="200" step="0.5" value={hip} onChange={(e) => setHip(e.target.value)} placeholder="cm" style={{ width: 90 }} /></label> : null}
+            </div>
+          </div>
+        ) : null}
         <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setGuide((g) => !g)}><Icon name="list" size={13} /> {guide ? 'Ocultar guía' : 'Cómo medirte'}</button>
         {guide ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>De pie y relajado, mide alrededor del abdomen a la altura del ombligo (punto medio entre la última costilla y la cresta ilíaca), al final de una espiración normal, sin apretar la cinta ni meter barriga. Mídete siempre igual y a la misma hora para que la evolución sea fiable.</p> : null}
       </div>

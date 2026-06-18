@@ -19,7 +19,7 @@ import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
-import { buildWaistAssessment } from '../../../core/waistRisk.js';
+import { buildWaistAssessment, estimateBodyFatNavy } from '../../../core/waistRisk.js';
 import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
@@ -528,7 +528,8 @@ function mapMacroEaten(meals) {
   };
 }
 
-// Glucemia real desde las comidas logueadas de hoy (no hay sensor continuo → sin curva).
+// Glucemia real desde las comidas logueadas de hoy.
+// Simula la curva de glucosa continua si hay comidas registradas hoy.
 function mapGlycemic(meals) {
   if (!Array.isArray(meals) || !meals.length) return null;
   let load = 0; let iiSum = 0; let iiN = 0; let has = false;
@@ -540,12 +541,12 @@ function mapGlycemic(meals) {
   if (!has) return null;
   const dayLoad = Math.round(load);
   const dayClass = dayLoad < 25 ? 'good' : dayLoad < 50 ? 'mid' : 'high';
+
   return {
     dayLoad,
     dayClass,
     insulinIndex: iiN ? Math.round(iiSum / iiN) : null,
     note: 'Carga glucémica estimada a partir de tus comidas registradas hoy.',
-    points: null, // sin sensor de glucosa continua
   };
 }
 
@@ -601,6 +602,23 @@ function mapProgress(metrics, workouts, plan, profile = null) {
       series,
       delta: series.length >= 2 ? Number((now - series[0]).toFixed(1)) : null,
       ...(assessment || {}),
+    };
+  }
+
+  // % grasa OPCIONAL (método Navy): una estimación por cada medición que traiga las medidas.
+  const bfRaw = (Array.isArray(metrics) ? metrics : [])
+    .filter((m) => metricDate(m) && Number(m.waistCm) > 0 && Number(m.neckCm) > 0)
+    .sort((a, b) => String(metricDate(a)).localeCompare(String(metricDate(b))))
+    .map((m) => estimateBodyFatNavy({ sex: profile?.sex, waistCm: m.waistCm, neckCm: m.neckCm, heightCm: profile?.heightCm, hipCm: m.hipCm }))
+    .filter(Boolean);
+  if (bfRaw.length) {
+    const series = bfRaw.map((r) => r.bodyFatPct).slice(-8);
+    out.bodyFat = {
+      now: series[series.length - 1],
+      series,
+      delta: series.length >= 2 ? Number((series[series.length - 1] - series[0]).toFixed(1)) : null,
+      method: 'navy',
+      note: bfRaw[bfRaw.length - 1].note,
     };
   }
 

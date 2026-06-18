@@ -69,6 +69,9 @@ export async function POST(request) {
         takenAt: payload.takenAt,
         weightKg: toNumber(payload.weightKg),
         waistCm: toNumber(payload.waistCm),
+        // Medidas para el % grasa método Navy (opcional): cuello y, en mujeres, cadera.
+        neckCm: toNumber(payload.neckCm),
+        hipCm: toNumber(payload.hipCm),
         fastingGlucoseMgDl: toNumber(payload.fastingGlucoseMgDl),
         notes: typeof payload.notes === 'string' ? payload.notes.trim() : null,
       });

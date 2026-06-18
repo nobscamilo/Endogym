@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWaistAssessment } from '../../src/core/waistRisk.js';
+import { buildWaistAssessment, estimateBodyFatNavy } from '../../src/core/waistRisk.js';
 
 describe('waistRisk', () => {
   it('ICA: <0,5 saludable, 0,5-0,6 aumentado, ≥0,6 alto', () => {
@@ -37,5 +37,28 @@ describe('waistRisk', () => {
   it('valor inválido → null; incluye aviso de etnia', () => {
     expect(buildWaistAssessment({ waistCm: 0, heightCm: 180, sex: 'male' })).toBeNull();
     expect(buildWaistAssessment({ waistCm: 90, heightCm: 180, sex: 'male' }).note).toMatch(/asi[aá]tico/i);
+  });
+});
+
+describe('estimateBodyFatNavy', () => {
+  it('hombre: estimación plausible y etiquetada como estimación', () => {
+    const r = estimateBodyFatNavy({ sex: 'male', waistCm: 90, neckCm: 38, heightCm: 180 });
+    expect(r.bodyFatPct).toBeGreaterThan(15);
+    expect(r.bodyFatPct).toBeLessThan(25);
+    expect(r.method).toBe('navy');
+    expect(r.note).toMatch(/estimaci[oó]n/i);
+  });
+
+  it('mujer: usa cadera y da estimación plausible', () => {
+    const r = estimateBodyFatNavy({ sex: 'female', waistCm: 75, neckCm: 32, hipCm: 100, heightCm: 165 });
+    expect(r.bodyFatPct).toBeGreaterThan(22);
+    expect(r.bodyFatPct).toBeLessThan(38);
+  });
+
+  it('null si faltan medidas o son inválidas', () => {
+    expect(estimateBodyFatNavy({ sex: 'male', waistCm: 90, heightCm: 180 })).toBeNull(); // sin cuello
+    expect(estimateBodyFatNavy({ sex: 'male', waistCm: 38, neckCm: 40, heightCm: 180 })).toBeNull(); // cintura<=cuello
+    expect(estimateBodyFatNavy({ sex: 'female', waistCm: 75, neckCm: 32, heightCm: 165 })).toBeNull(); // sin cadera
+    expect(estimateBodyFatNavy({ waistCm: 90, neckCm: 38, heightCm: 180 })).toBeNull(); // sin sexo
   });
 });
