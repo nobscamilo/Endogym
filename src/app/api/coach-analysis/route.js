@@ -9,16 +9,13 @@ import {
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { recordAiMetric } from '../../../lib/aiMetrics.js';
 import {
-  COACH_ANALYSIS_LOOKBACK_DAYS,
   COACH_ANALYSIS_REPORT_SCHEMA,
   buildCoachAnalysisDigest,
   buildCoachAnalysisPrompt,
   buildHeuristicCoachReport,
   sanitizeCoachReport,
-  workoutsSignature,
 } from '../../../services/coachAnalysis.js';
 import {
-  listWorkoutsSince,
   saveCoachAnalysis,
   getCoachAnalysis,
   saveCoachRecommendation,
@@ -26,8 +23,8 @@ import {
 
 // Análisis del coach (Progreso): analiza el ÚLTIMO entreno realizado, lo compara con los
 // previos (manuales + Strava + check-ins) y explica los ajustes que aplicará a las próximas
-// sesiones. El informe se cachea en Firestore con una firma de los entrenos analizados:
-// GET devuelve el informe guardado (con stale:true si hay entrenos nuevos sin analizar);
+// sesiones. El informe se cachea en Firestore con una firma versionada del contexto completo:
+// GET devuelve el informe guardado (con stale:true si cambian objetivo, plan o datos reales);
 // POST regenera con Gemini (rate limit persistente) o, si la IA falla, con un resumen
 // heurístico observable construido desde las MISMAS reglas adaptativas reales del planner.
 
@@ -43,10 +40,10 @@ export async function GET(request) {
     try {
       const saved = await getCoachAnalysis(user.uid);
       if (!saved || !saved.report) return jsonResponse({ ok: true, empty: true });
-      // Firma actual vs firma del informe: si entrenó después, el informe está desactualizado.
-      const sinceIso = new Date(Date.now() - COACH_ANALYSIS_LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
-      const workouts = await listWorkoutsSince(user.uid, sinceIso, 120).catch(() => []);
-      const stale = workoutsSignature(workouts) !== saved.signature;
+      // Firma del contexto completo: objetivo/meta/plan, entrenos editados, métricas y comidas.
+      // También incluye una versión de contrato para invalidar informes legacy.
+      const digest = await buildCoachAnalysisDigest(user.uid);
+      const stale = digest.signature !== saved.signature;
       return jsonResponse({ ok: true, report: saved.report, source: saved.source || 'ai', generatedAt: saved.updatedAt || null, stale });
     } catch (error) {
       logError('coach_analysis_get_failed', error, { traceId, userId: user.uid });

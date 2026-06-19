@@ -101,7 +101,7 @@ describe('GET /api/session-for-date', () => {
 
   it('rechaza fecha inválida, futura y demasiado antigua', async () => {
     expect((await get('nope')).status).toBe(400);
-    expect((await get(ymd(1))).status).toBe(400); // mañana
+    expect((await get(ymd(2))).status).toBe(400); // claramente futura (robusto a UTC/Madrid en frontera de medianoche)
     expect((await get(ymd(-(MAX_BACKLOG_DAYS + 2)))).status).toBe(400);
   });
 

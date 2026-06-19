@@ -279,7 +279,7 @@ function TrainSession() {
       const j = await d.json();
       const o = j && j.ok ? j.overrides : null;
       if (o && o.todaySession) { D.todaySession = o.todaySession; setList(o.todaySession.list); }
-      if (o) ['week', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+      if (o) ['week', 'weekVolumeHours', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
     } catch (e) { /* noop */ }
   }
   async function changeFocus() {
@@ -480,8 +480,9 @@ function TrainSession() {
     && (adjust.volumeFactor == null || adjust.volumeFactor !== 1);
   // El cambio de grupo se ofrece en CUALQUIER día con sesión: en días de fuerza/mixto cambia el
   // grupo; en días de cardio/carrera/recuperación CONVIERTE el día en una sesión de fuerza (con aviso).
-  const canChangeSessionFocus = Array.isArray(s.list) && s.list.length > 0;
+  const canChangeSessionFocus = (Array.isArray(s.list) && s.list.length > 0) || Boolean(s.isRestDay);
   const isFocusConversion = Boolean(s.focusConversion)
+    || Boolean(s.isRestDay)
     || Boolean(s.runPrescription)
     || (s.sessionType && !['resistance', 'mixed'].includes(s.sessionType));
   // #1 — matriz de grupos disponibles/bloqueados (con motivo). Si el backend no la trae (datos
@@ -510,13 +511,16 @@ function TrainSession() {
       <div className="card lg" style={{ background: 'linear-gradient(150deg, var(--accent), var(--accent-deep))', color: 'var(--on-accent)', border: 0, overflow: 'hidden' }}>
         <div className="row between wrap" style={{ gap: 16 }}>
           <div>
-            <p className="eyebrow" style={{ color: 'rgba(255,255,255,0.85)' }}>Sesión de hoy</p>
+            <p className="eyebrow" style={{ color: 'rgba(255,255,255,0.85)' }}>{s.isRestDay ? 'Hoy: recuperación' : 'Sesión de hoy'}</p>
             <h2 style={{ fontSize: '1.7rem', margin: '6px 0 0' }}>{s.title}</h2>
-            <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{sessionFocusLabel(s.focus)} · {s.durationMin} min · {s.intensity}</p>
+            <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{[sessionFocusLabel(s.focus), s.durationMin ? `${s.durationMin} min` : null, s.intensity].filter(Boolean).join(' · ')}</p>
+            {s.isRestDay ? <p style={{ margin: '8px 0 0', opacity: 0.92, fontSize: '0.85rem', lineHeight: 1.4 }}>Día de descanso/recuperación. Si quieres entrenar fuerza igualmente, elige un grupo abajo; o registra otra sesión más abajo.</p> : null}
           </div>
           <div className="row ac wrap" style={{ gap: 8 }}>
-            <button className="btn" style={{ background: '#fff', color: 'var(--accent-deep)', boxShadow: 'none', whiteSpace: 'nowrap' }}
-              onClick={() => open(s.list[0], null)}><Icon name="play" size={17} /> Iniciar guiada</button>
+            {Array.isArray(s.list) && s.list.length ? (
+              <button className="btn" style={{ background: '#fff', color: 'var(--accent-deep)', boxShadow: 'none', whiteSpace: 'nowrap' }}
+                onClick={() => open(s.list[0], null)}><Icon name="play" size={17} /> Iniciar guiada</button>
+            ) : null}
             {/* FASE 3.1 — registro con UN TAP: crea el workout con los valores PRESCRITOS
                 (kg/reps/duración del plan vigente); abajo solo se editan desviaciones. */}
             {s.sessionType !== 'aerobic' && Array.isArray(s.list) && s.list.some((e) => e.loadKg != null) ? (
@@ -1188,26 +1192,67 @@ function TrainWeek() {
   const adjust = D.coachAdjust;
   const adjustRules = adjust && Array.isArray(adjust.rules) ? adjust.rules : [];
   const review = D.mesocycleReview;
+  const volH = D.weekVolumeHours;
+  const volLabel = volH != null ? String(volH).replace('.', ',') : '—';
+  // Día abierto para revisar lo realmente hecho (historial por día).
+  const [openDay, setOpenDay] = useStateTr(null);
+  const sel = openDay != null ? week[openDay] : null;
   return (
     <React.Fragment>
       {review && Array.isArray(review.reasons) && review.reasons.length ? <MesocycleReviewCard review={review} /> : null}
       <div className="grid g-4">
         <div className="card"><Stat num={progress.sessionsPlan} label="Sesiones" /></div>
-        <div className="card"><Stat num="3,8" unit="h" label="Volumen semanal" /></div>
+        <div className="card"><Stat num={volLabel} unit="h" label="Volumen semanal" /></div>
         <div className="card"><Stat num={`${progress.sessionsDone}/${progress.sessionsPlan}`} label="Completadas" /></div>
         <div className="card"><Stat num={`${progress.adherence}%`} label="Adherencia" color="var(--glu-good)" /></div>
       </div>
 
-      <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día">
+      <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día · toca un día para ver lo que hiciste">
         <div className="week-strip">
           {week.map((d, i) => (
-            <div key={i} className={`wcol ${d.today ? 'today' : ''} ${d.rest ? 'rest' : ''}`}>
-              <span className="wc-day">{d.day}</span>
+            <button key={i} type="button"
+              className={`wcol ${d.today ? 'today' : ''} ${d.rest ? 'rest' : ''} ${openDay === i ? 'sel' : ''}`}
+              style={{ cursor: 'pointer', border: openDay === i ? '1px solid var(--accent)' : undefined, background: 'none', font: 'inherit', textAlign: 'center' }}
+              onClick={() => setOpenDay(openDay === i ? null : i)}>
+              <span className="wc-day">{d.day}{d.logged ? ' ✓' : ''}</span>
               <div className="wc-bar"><i style={{ height: Math.max(6, d.load * 100) + '%' }} /></div>
               <span className="wc-focus">{d.focus}</span>
-            </div>
+            </button>
           ))}
         </div>
+        {sel ? (
+          <div className="card" style={{ marginTop: 12, background: 'var(--surface-2)', boxShadow: 'none' }}>
+            <div className="row ac between">
+              <strong style={{ fontSize: '0.95rem' }}>{sel.day} · {sel.focus || 'Sesión'}</strong>
+              {sel.today ? <span className="pill accent tiny">Hoy</span> : (sel.rest ? <span className="pill tiny">Descanso</span> : null)}
+            </div>
+            {sel.logged ? (
+              <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+                <div className="chips">
+                  {sel.logged.sessionRpe != null ? <span className="pill tiny">RPE {sel.logged.sessionRpe}</span> : null}
+                  {sel.logged.fatigue != null ? <span className="pill tiny">Fatiga {sel.logged.fatigue}</span> : null}
+                  {sel.logged.durationMinutes != null ? <span className="pill tiny">{sel.logged.durationMinutes} min</span> : null}
+                  {sel.logged.distanceKm != null ? <span className="pill tiny">{sel.logged.distanceKm} km</span> : null}
+                  {(sel.logged.sources || []).includes('strava') ? <span className="pill tiny">Strava</span> : null}
+                </div>
+                {Array.isArray(sel.logged.lifts) && sel.logged.lifts.length ? (
+                  <div className="stack" style={{ gap: 6 }}>
+                    {sel.logged.lifts.map((lf, k) => (
+                      <div key={k} className="row ac between">
+                        <strong style={{ fontSize: '0.88rem' }}>{lf.name}</strong>
+                        <span className="tiny muted">{lf.kg != null ? `${lf.kg} kg` : 'peso corporal'}{lf.reps != null ? ` × ${lf.reps} reps` : ''}{lf.sets ? ` · ${lf.sets} series` : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="tiny muted" style={{ margin: 0 }}>Registrada sin desglose de cargas.</p>}
+              </div>
+            ) : (
+              <p className="tiny muted" style={{ margin: '10px 0 0', lineHeight: 1.45 }}>
+                {sel.past ? 'Sin registro de ese día.' : (sel.today ? 'Aún no has registrado la sesión de hoy.' : `Planificado: ${sel.focus || '—'}.`)}
+              </p>
+            )}
+          </div>
+        ) : null}
       </SectionCard>
 
       <CoachBanner screen="train_week" />

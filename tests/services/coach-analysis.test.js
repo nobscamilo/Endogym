@@ -6,6 +6,7 @@ import {
   buildCoachAnalysisPrompt,
   sanitizeCoachReport,
   workoutsSignature,
+  coachAnalysisContextSignature,
   isDoneWorkout,
   findComparableSessions,
   buildWorkoutAnalysisPrompt,
@@ -16,6 +17,9 @@ import {
   describeLiftProgression,
   buildLiftSnapshot,
   buildRecommendationCompliance,
+  buildRunGoalSignals,
+  describeRunGoalSignals,
+  sanitizePreviousRecommendationForPrompt,
 } from '../../src/services/coachAnalysis.js';
 
 describe('coachAnalysis service', () => {
@@ -35,6 +39,22 @@ describe('coachAnalysis service', () => {
     expect(s1).toBe(s2);
     const s3 = workoutsSignature([a, b, { source: 'manual', performedAt: '2026-06-09T12:00:00.000Z', title: 'Pierna' }]);
     expect(s3).not.toBe(s1);
+  });
+
+  it('coachAnalysisContextSignature invalida al editar objetivo, datos del entreno o métricas', () => {
+    const base = {
+      profile: { goal: 'endurance', runRaceGoal: 'race_21k', raceDate: '2026-11-08' },
+      plan: { phase: 'base', days: [] },
+      workouts: [{ id: 'w1', performedAt: '2026-06-18T12:00:00Z', sessionRpe: 7 }],
+      metrics: [{ takenAt: '2026-06-18T12:00:00Z', weightKg: 84 }],
+      meals: [],
+    };
+    const sig = coachAnalysisContextSignature(base);
+    expect(sig).toMatch(/^v2-/);
+    expect(coachAnalysisContextSignature({ ...base, profile: { ...base.profile, raceDate: '2026-10-01' } })).not.toBe(sig);
+    expect(coachAnalysisContextSignature({ ...base, workouts: [{ ...base.workouts[0], sessionRpe: 9 }] })).not.toBe(sig);
+    expect(coachAnalysisContextSignature({ ...base, metrics: [{ ...base.metrics[0], weightKg: 82 }] })).not.toBe(sig);
+    expect(coachAnalysisContextSignature({ ...base, workouts: [...base.workouts].reverse() })).toBe(sig);
   });
 
   it('describeWorkout: no imprime null/0 falsos (Number(null)===0)', () => {
@@ -81,6 +101,15 @@ describe('coachAnalysis service', () => {
     expect(rep.adjustments[0]).toContain('FC media elevada');
   });
 
+  it('buildHeuristicCoachReport no imprime deriva +null ppm', () => {
+    const rep = buildHeuristicCoachReport({
+      profile: { goal: 'endurance' }, last: null, done: [], loadComparison: [], liftProgression: [],
+      progressMemory: { cardio: { hrDriftBpm: null, recentAvgHr: 125, baselineAvgHr: 138 } },
+      adaptiveTuning: { appliedRules: [] }, runGoalSignals: null,
+    });
+    expect(rep.history).not.toContain('null ppm');
+  });
+
   it('buildCoachAnalysisPrompt: incluye último entreno, comparación de cargas y reglas', () => {
     const digest = {
       profile: { sex: 'male', age: 37, weightKg: 106, goal: 'weight_loss', trainingModality: 'hybrid_run_gym', runRaceGoal: 'race_21k' },
@@ -97,6 +126,68 @@ describe('coachAnalysis service', () => {
     expect(prompt).toContain('Base aeróbica');
     expect(prompt).toContain('no aplicó ajustes adaptativos');
     expect(prompt).toContain('PROHIBIDO inventar');
+  });
+
+  it('buildCoachAnalysisPrompt: prioriza la meta SMART y las señales deterministas de carrera', () => {
+    const digest = {
+      profile: { sex: 'male', age: 37, weightKg: 105, goal: 'endurance', trainingModality: 'hybrid_run_gym', runRaceGoal: 'race_21k', raceDate: '2026-11-08' },
+      plan: { phaseLabel: 'Base aeróbica', weeksToRace: 21 },
+      last: { source: 'strava', sportType: 'Run', performedAt: '2026-06-18T12:00:00.000Z', title: 'Rodaje', durationMinutes: 45, distanceKm: 7, avgHeartRate: 124 },
+      done: [], loadComparison: [], liftProgression: [], progressMemory: { cardio: { hrDriftBpm: null } }, adaptiveTuning: { appliedRules: [] },
+      goalProgressLine: 'Objetivo SMART: e1RM objetivo 140 kg para 2026-12-01. Actual: 120 kg. NO va en camino para su fecha.',
+      runGoalSignals: {
+        raceGoal: '21K', raceDate: '2026-11-08', hrMax: 182, hrMaxSource: 'edad/observada',
+        z2Range: { min: 110, max: 127 },
+        latestZone: { date: '2026-06-18', avgHr: 124, actualZone: 2, target: 'Z2', verdict: 'ok' },
+        keySessionAdherence: { planned: 4, completed: 3, missed: 1, long: { planned: 2, completed: 1 }, quality: { planned: 2, completed: 2 } },
+        prediction: { goal: '21K', time: '2:05:00', basedOn: { date: '2026-06-10', distanceKm: 10 } },
+      },
+      nutrition7d: null, recovery7d: null, previousRecommendation: null, recommendationCompliance: [],
+    };
+    const prompt = buildCoachAnalysisPrompt(digest);
+    expect(prompt).toContain('ALINEACIÓN CON EL OBJETIVO');
+    expect(prompt).toContain('NO va en camino');
+    expect(prompt).toContain('21K');
+    expect(prompt).toContain('Z2 110-127 ppm');
+    expect(prompt).toContain('3/4 sesiones clave');
+    expect(prompt).toContain('PROHIBIDO introducir cifras objetivo');
+    expect(prompt).not.toContain('deriva +null ppm');
+  });
+
+  it('buildRunGoalSignals: calcula zonas, predicción y adherencia a tirada/calidad desde datos reales', () => {
+    const signals = buildRunGoalSignals({
+      profile: { goal: 'endurance', trainingModality: 'hybrid_run_gym', runRaceGoal: 'race_21k', raceDate: '2026-11-08', age: 37 },
+      plan: { days: [
+        { date: '2026-06-01', workout: { runPrescription: { runType: 'long' } } },
+        { date: '2026-06-03', workout: { runPrescription: { runType: 'intervals' } } },
+      ] },
+      workouts: [
+        { source: 'strava', sportType: 'Run', performedAt: '2026-06-01T12:00:00.000Z', durationMinutes: 60, distanceKm: 10, avgPaceSecPerKm: 360, avgHeartRate: 120, maxHeartRate: 181 },
+        { source: 'strava', sportType: 'Run', performedAt: '2026-05-28T12:00:00.000Z', durationMinutes: 38, distanceKm: 6, avgPaceSecPerKm: 380, avgHeartRate: 130, maxHeartRate: 170 },
+        { source: 'strava', sportType: 'Run', performedAt: '2026-05-24T12:00:00.000Z', durationMinutes: 40, distanceKm: 6, avgPaceSecPerKm: 400, avgHeartRate: 132, maxHeartRate: 172 },
+        { source: 'strava', sportType: 'Run', performedAt: '2026-05-20T12:00:00.000Z', durationMinutes: 42, distanceKm: 6, avgPaceSecPerKm: 420, avgHeartRate: 135, maxHeartRate: 175 },
+      ],
+      now: new Date('2026-06-04T12:00:00.000Z'),
+    });
+    expect(signals.raceGoal).toBe('21K');
+    expect(signals.z2Range).toEqual({ min: 110, max: 127 });
+    expect(signals.latestZone).toMatchObject({ actualZone: 2, target: 'Z2', verdict: 'ok' });
+    expect(signals.keySessionAdherence).toMatchObject({ planned: 2, completed: 1, missed: 1 });
+    expect(signals.prediction).toMatchObject({ goal: '21K' });
+    expect(describeRunGoalSignals(signals)).toContain('1/2 sesiones clave');
+  });
+
+  it('no perpetúa cifras inventadas de recomendaciones anteriores en el nuevo prompt', () => {
+    expect(sanitizePreviousRecommendationForPrompt('Corre a 143 ppm y baja el press a 15 kg.')).not.toMatch(/143|15 kg/);
+    const prompt = buildCoachAnalysisPrompt({
+      profile: { goal: 'endurance', runRaceGoal: 'race_21k' }, plan: null, done: [], last: null,
+      loadComparison: [], liftProgression: [], progressMemory: { cardio: {} }, adaptiveTuning: null,
+      nutrition7d: null, recovery7d: null, runGoalSignals: null, goalProgressLine: null,
+      previousRecommendation: { createdAt: '2026-06-18', adjustments: ['Mantén la zona aeróbica a 143 ppm.'] },
+      recommendationCompliance: [],
+    });
+    expect(prompt).not.toContain('143');
+    expect(prompt).toContain('cifra previa omitida');
   });
 
   it('findComparableSessions: prioriza mismo título, solo anteriores, y cae a mismo tipo', () => {
@@ -182,12 +273,30 @@ describe('coachAnalysis service', () => {
     const rep = sanitizeCoachReport({
       lastSession: '  análisis  ',
       history: 'h',
+      goalAlignment: 'alineado con la meta',
       adjustments: ['a', '', 'b', 'c', 'd', 'e', 'f'],
       warning: 'w',
     });
     expect(rep.lastSession).toBe('análisis');
+    expect(rep.goalAlignment).toBe('alineado con la meta');
     expect(rep.adjustments).toEqual(['a', 'b', 'c', 'd', 'e']);
     expect(rep.warning).toBe('w');
+  });
+
+  it.each([
+    ['endurance', { runGoalSignals: { raceGoal: '21K', keySessionAdherence: { planned: 2, completed: 1, missed: 1, long: { planned: 1, completed: 0 }, quality: { planned: 1, completed: 1 } } } }, /carrera|21K/i],
+    ['strength', { goalProgressLine: 'Objetivo SMART: e1RM objetivo 140 kg. Actual: 120 kg.' }, /e1RM|objetivo SMART/i],
+    ['weight_loss', { goalProgressLine: 'Objetivo SMART: Peso objetivo 80 kg. Actual: 84 kg.' }, /peso objetivo|objetivo SMART/i],
+    ['glycemic_control', {}, /glucémic|comidas|síntomas/i],
+  ])('fallback heurístico orienta los ajustes al objetivo %s', (goal, extra, expected) => {
+    const rep = buildHeuristicCoachReport({
+      profile: { goal }, last: null, done: [], loadComparison: [], liftProgression: [],
+      progressMemory: { cardio: {} }, adaptiveTuning: { appliedRules: [] },
+      nutrition7d: null, recovery7d: null, ...extra,
+    });
+    expect(rep.goalAlignment).toMatch(expected);
+    expect(rep.adjustments.join(' ')).toMatch(expected);
+    if (goal === 'endurance') expect(rep.adjustments.join(' ')).not.toContain('progresión normal de cargas');
   });
 });
 
@@ -228,8 +337,8 @@ describe('FASE 2.2 — cierre del loop de recomendaciones', () => {
       recommendationCompliance: ['Sentadilla: e1RM 126.7 → 133 kg (MEJORÓ)'],
     };
     const prompt = buildCoachAnalysisPrompt(digest);
-    expect(prompt).toContain('RECOMENDACIONES PREVIAS DEL COACH (2026-06-04)');
-    expect(prompt).toContain('Sube sentadilla a 105 kg');
+    expect(prompt).toContain('RECOMENDACIONES PREVIAS DEL COACH (2026-06-04;');
+    expect(prompt).toContain('Sube sentadilla a [cifra previa omitida]');
     expect(prompt).toContain('CUMPLIMIENTO');
     const heuristic = buildHeuristicCoachReport(digest);
     expect(heuristic.history).toContain('Desde la última recomendación');

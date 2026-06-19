@@ -214,7 +214,7 @@ function CoachAnalysisCard() {
         <div className="stack" style={{ gap: 14 }}>
           {state.stale ? (
             <div className="row ac wrap" style={{ gap: 10 }}>
-              <span className="tiny" style={{ color: 'var(--glu-mid)' }}>Tienes entrenos nuevos sin analizar.</span>
+              <span className="tiny" style={{ color: 'var(--glu-mid)' }}>Tu objetivo o tus datos cambiaron desde este informe.</span>
               <button className="btn soft sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Actualizar análisis'}</button>
             </div>
           ) : null}
@@ -226,6 +226,12 @@ function CoachAnalysisCard() {
             <div>
               <div className="mb-label">Cómo vas (últimas semanas)</div>
               <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.history}</p>
+            </div>
+          ) : null}
+          {rep.goalAlignment ? (
+            <div>
+              <div className="mb-label">Consonancia con tu objetivo</div>
+              <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.goalAlignment}</p>
             </div>
           ) : null}
           {Array.isArray(rep.adjustments) && rep.adjustments.length ? (
@@ -248,7 +254,7 @@ function CoachAnalysisCard() {
             <span className="tiny muted">{state.generatedAt ? `Generado: ${String(state.generatedAt).slice(0, 16).replace('T', ' ')}` : ''}</span>
             <span className="row ac" style={{ gap: 8 }}>
               {/* FASE 3.4 — feedback del análisis (clave por contenido del informe) */}
-              <CoachFeedback key={state.generatedAt || 'fb'} endpoint="coach-analysis" text={`${rep.lastSession || ''}|${rep.history || ''}`} />
+              <CoachFeedback key={state.generatedAt || 'fb'} endpoint="coach-analysis" text={`${rep.lastSession || ''}|${rep.history || ''}|${rep.goalAlignment || ''}`} />
               {!state.stale ? <button className="btn ghost sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Re-analizar'}</button> : null}
             </span>
           </div>

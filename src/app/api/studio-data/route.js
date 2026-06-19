@@ -350,9 +350,16 @@ function buildSessionRationale(day, profile) {
 export function mapTodaySession(plan, today, workouts = [], profile = null, { exact = false } = {}) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
-  const day = days.find((d) => d.date === today && d.isTrainingDay)
-    || (exact ? null : (days.find((d) => d.isTrainingDay) || days[0]));
+  // Resolución de "hoy": para el dashboard se usa SIEMPRE el día EXACTO por fecha (aunque sea
+  // recuperación/descanso) para que "Sesión de hoy"/"Hoy" coincida con la pestaña Semana. Antes se
+  // exigía isTrainingDay y, en un día de descanso, se caía al primer día de fuerza del bloque →
+  // discrepancia (mostraba Torso un viernes de recuperación). En modo `exact` (registro retroactivo)
+  // se conserva el comportamiento anterior (solo día de entreno) para no alterar ese flujo.
+  const day = exact
+    ? (days.find((d) => d.date === today && d.isTrainingDay) || null)
+    : (days.find((d) => d.date === today) || days.find((d) => d.isTrainingDay) || days[0]);
   if (!day) return null;
+  const isRestDay = !day.isTrainingDay;
   const ex = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
   const list = ex.map((e, i) => {
     const item = {
@@ -373,7 +380,9 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
     if (e.prescription?.loadSource) item.loadSource = e.prescription.loadSource;
     return item;
   });
-  if (!list.length) return null;
+  // Un día de entreno sin ejercicios sí es null; un día de descanso/recuperación se devuelve igual
+  // (con lista vacía + isRestDay) para NO caer a los datos demo y reflejar el día real.
+  if (!list.length && (exact || !isRestDay)) return null;
   const prim = [...new Set(ex.flatMap((e) => e.primaryMuscles || []))].slice(0, 3);
   const sec = [...new Set(ex.flatMap((e) => e.secondaryMuscles || []))].slice(0, 3);
   const out = {
@@ -394,6 +403,7 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   if (cooldown.length) out.cooldown = cooldown;
   if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;
   out.sessionType = day.sessionType || '';
+  out.isRestDay = isRestDay;
   // #1 — matriz de opciones de grupo muscular disponibles/bloqueadas (con motivo), para que la
   // UI pueda deshabilitar p. ej. "Torso" si mañana ya toca torso, sin esperar a enviar el cambio.
   // El cambio de grupo se ofrece en CUALQUIER día con sesión (los no-fuerza se convierten en
@@ -433,7 +443,7 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   return out;
 }
 
-function mapWeek(plan, today) {
+export function mapWeek(plan, today, workouts = []) {
   let days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
   // En un bloque de varias semanas, muestra solo la SEMANA actual (lunes→domingo) que
@@ -455,22 +465,45 @@ function mapWeek(plan, today) {
       days = days.slice(0, 7);
     }
   }
+  let plannedMinutes = 0;
   const week = days.map((d) => {
     const training = d.isTrainingDay;
     const v = rpeAvg(d.workout?.intensityRpe);
     const load = training ? Math.min(1, Math.max(0.4, (v || 7) / 10)) : 0.15;
+    const durMin = Number(d.workout?.durationMinutes);
+    if (training && Number.isFinite(durMin) && durMin > 0) plannedMinutes += durMin;
     const row = {
       day: shortWeekday(d.dayName, d.date),
       date: dayNumber(d.date),
+      dateISO: d.date || null,
       focus: d.workout?.title || d.sessionFocus || '',
       tag: d.sessionFocus || '',
       load: Number(load.toFixed(2)),
     };
     if (d.date === today) row.today = true;
     if (!training) row.rest = true;
+    if (d.date && today) row.past = d.date < today;
+    // Historial REAL del día: si hay una sesión registrada (manual/check-in/Strava), se adjunta su
+    // resumen para poder revisar en Semana lo que de verdad se hizo (ejercicios/kg/reps/RPE).
+    const logged = findDaySession(workouts, d.date);
+    if (logged) {
+      row.logged = {
+        sources: logged.sources || [],
+        sessionRpe: logged.sessionRpe ?? null,
+        fatigue: logged.fatigue ?? null,
+        durationMinutes: Number(logged.durationMinutes) > 0 ? Number(logged.durationMinutes) : null,
+        distanceKm: Number(logged.distanceKm) > 0 ? Number(logged.distanceKm) : null,
+        lifts: (Array.isArray(logged.exercises) ? logged.exercises : [])
+          .filter((e) => e?.name)
+          .slice(0, 14)
+          .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, reps: e.reps ?? null, sets: e.sets ?? null })),
+      };
+    }
     return row;
   });
-  return week.length ? week : null;
+  if (!week.length) return null;
+  const volumeHours = plannedMinutes > 0 ? Math.round((plannedMinutes / 60) * 10) / 10 : null;
+  return { days: week, volumeHours };
 }
 
 function mapLibrary(plan) {
@@ -753,7 +786,9 @@ export async function GET(request) {
       setIf('user', mapUser(profile, user));
       setIf('runPaces', planForStudio?.runPaces || null);
       setIf('todaySession', mapTodaySession(planForStudio, today, workouts, profile));
-      setIf('week', mapWeek(planForStudio, today));
+      const weekData = mapWeek(planForStudio, today, workouts);
+      setIf('week', weekData?.days || null);
+      setIf('weekVolumeHours', weekData?.volumeHours ?? null);
       setIf('library', mapLibrary(planForStudio));
       setIf('macroTargets', mapMacroTargets(planForStudio, today));
       setIf('macroEaten', mapMacroEaten(todayMeals));

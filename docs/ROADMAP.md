@@ -1,6 +1,6 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-2 (recomendaciones pre/post entreno + fix badge Nutrición)**.
+Ultima actualizacion: **19 de junio de 2026, noche (auditoría de alineación del Análisis del coach con objetivos)**.
 
 ## P0 - Recuperacion y seguridad inmediata
 
@@ -122,9 +122,11 @@ Mejora a búsqueda semántica respetando "no Vertex". Estado:
 - [x] Actualizar tests (camino vectorial + fallback).
 - [x] **Crear el índice vectorial de Firestore**. Verificado el 10 jun: modo vector con 12 pasajes y ~20k caracteres de contexto.
 - [x] Tras crear el índice: verificar modo vector en producción (`guidelines_vector_matches` / sonda real).
-- [x] Correr `npm test` y `npm run build` en la Mac tras las fases recientes. Último estado documentado: `235` tests verdes y build OK.
+- [x] Correr `npm test` y `npm run build` en la Mac tras las fases recientes. Suite actual verificada el 19 jun noche-2: `43` archivos / `308` tests verdes y build OK; los cambios del coach siguen pendientes de deploy.
 
 ## P3 - Producto
+
+- [x] **Alinear “Análisis del coach” de Progreso con el objetivo completo del usuario (19 jun, local; pendiente deploy).** Integrados `goalProgress`, meta/fecha/tendencia/`onTrack`, señales de carrera (zonas, sesiones clave, eficiencia, predicción), fallbacks por objetivo y sección visible `goalAlignment`. Corregido `hrDriftBpm:null`; las cifras de recomendaciones previas se redactan. Firma de caché `v2` incluye objetivo/plan/ediciones/métricas/comidas. Tests de servicio + nueva ruta para endurance/fuerza/peso/glucémico.
 
 - [ ] **Animaciones SVG de calentamiento (sesión dedicada — idea aprobada por el usuario el 12 jun 2026).** Ejemplo de referencia ya creado y validado: `public/warmups/a-skip.svg` (figura animada CSS-en-SVG, paleta azul-magenta, respeta `prefers-reduced-motion`, ~3 KB). Plan acordado: (1) elegir 5-6 movimientos prioritarios del calentamiento dinámico (A-skip, skipping bajo, monster walk, puente de glúteo, gato-vaca, rotación torácica); (2) animarlos uno a uno CON revisión técnica del usuario (deportólogo) por patrón; (3) cablearlos como nivel intermedio de la cascada de fallback: vídeo verificado > animación SVG > SVG estático (`EXERCISE_VIDEO_MAP` / modal de detalle de ejercicio). Hacerlo en sesión limpia: cada animación es coreografía artesanal de keyframes (no plantilla) y consume muchos tokens.
 - [ ] Mejorar correccion manual de alimentos y porciones.

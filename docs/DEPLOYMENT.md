@@ -20,12 +20,20 @@ gcloud firestore indexes composite create \
 
 ## Estado verificado
 
-Último estado confirmado en docs: **15 de junio de 2026** para verificación local; producción pública sigue en el deploy del **12 de junio de 2026**.
+Último estado confirmado en docs: **19 de junio de 2026, noche-2**. Producción pública sigue en el deploy del mismo día anterior al ajuste del coach; hay cambios locales pendientes de deploy.
 
-- FASES 0-2 del coach/prescripción completas, Perfil objetivos/equipo rediseñado, chat móvil corregido y calendario/horas de Nutrición corregidos. El 15 de junio se reforzó localmente la prescripción desde Perfil (`trainingExperience`, recorte inteligente de `daysPerWeek`, claims de bibliografía corregidos): `247` tests verdes y build OK.
-- Deploy más reciente documentado: `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` (`https://endogym-a96u5x4jk-juan-camilo-sarmientos-projects.vercel.app`) con alias manual a `endogym.vercel.app`.
+- FASES 0-2 del coach/prescripción completas; registro retroactivo, nombre en alta y cambio de grupo están desplegados. Localmente, `coach-analysis` ya está alineado con objetivos SMART/carrera: `43` archivos / `308` tests, audit 0, smoke/check:conflicts y build OK.
+- Deploy más reciente verificado: `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF` (`https://endogym-aihz8l0ml-juan-camilo-sarmientos-projects.vercel.app`), estado `Ready`; `https://endogym.vercel.app` resuelve a ese deployment.
 - Sondas básicas recientes: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401` y `/api/coach-chat` sin token `401`.
-- Último bundle con cambios de UI desplegado en producción: `08bbcab4a0` (Nutrición selecciona hoy por calendario local y evita titulares horarios engañosos). Bundle local pendiente de deploy tras la mejora de Perfil: `e102303dd5`.
+- Último bundle desplegado: `097b1b9fba` (cambio de grupo muscular también desde días no-fuerza, con aviso y guardarraíles). El asset respondió `200` el 19 de junio.
+- Bundle local pendiente de deploy: `29b865f9b9` (sección “Consonancia con tu objetivo” en Progreso).
+
+Deploy relevante del **19 de junio de 2026**:
+
+- Commit `8e46bd1` (`main` alineado con `origin/main`) → deployment `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF`, estado `Ready`.
+- Bundle `studio.bundle.js?v=097b1b9fba`.
+- Sondas públicas: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401`, bundle `200`.
+- `npm test`: 42 archivos / 296 tests verdes. No se reejecutó `npm run e2e:production` en esta auditoría.
 
 Deploy manual relevante del **12 de junio de 2026**:
 

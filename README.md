@@ -27,13 +27,13 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación local documentada: **15 de junio de 2026** (prescripción desde Perfil + cambio de grupo muscular en Entreno, `251` tests y build OK). Último deploy público documentado: **12 de junio de 2026**, `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq` con alias manual a `endogym.vercel.app` y bundle `08bbcab4a0`. Última sonda integral `e2e:production`: **10 de junio de 2026**; las sondas básicas más recientes verificaron `/`, `/api/health` y rechazos `401` esperados.
+Última verificación local documentada: **19 de junio de 2026, noche-2** (`308` tests y build verdes; Análisis del coach orientado a objetivos, pendiente de deploy). Último deploy público verificado: **19 de junio de 2026**, `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF` (`Ready`), al que resuelve `endogym.vercel.app`, con bundle `097b1b9fba`. Última sonda integral `e2e:production`: **10 de junio de 2026**; las sondas básicas del 19 de junio verificaron `/` `200`, `/api/health` `200`, `/api/meals` sin token `401` y bundle `200`.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
-- `npm install`, `npm run check:conflicts`, `npm run audit`, `npm run smoke`, `npm test` y `npm run build` pasan localmente según la última verificación completa registrada. La suite actual documentada tiene `235` tests.
+- La última verificación completa mantiene `check:conflicts`, audit (0), smoke y build en verde; suite actual: `43` archivos / `308` tests verdes.
 - `playwright` está instalado como devDependency y Chromium de Playwright está disponible para verificación visual local.
 - `npm audit` devuelve `0` vulnerabilidades tras fijar overrides transitivos seguros para `postcss` y `uuid`.
-- La producción Vercel responde en `/` y `/api/health`; `/api/meals` y `/api/coach-chat` sin token responden `401`. Producción más reciente documentada: `dpl_AGJGm6iWwmRP3YLrd8N9pgk8HoQq`.
+- La producción Vercel responde en `/` y `/api/health`; `/api/meals` y `/api/coach-chat` sin token responden `401`. Producción más reciente documentada: `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF`.
 - Firebase Authentication, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se validaron con sondas reales.
 - Firebase Admin y Firestore funcionan localmente y en producción con Firebase ID tokens reales.
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu` del proyecto Firebase/GCP; escritura y borrado fueron verificados.
@@ -42,10 +42,12 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
 - `POST /api/coach-chat` usa Gemini con contexto real del usuario y rate limiting persistente (`coach-chat`, 20 preguntas/h por defecto).
 - El coach tiene persona única server-side, detector determinista de red flags sin Gemini/rate limit, RAG por pregunta, memoria conversacional acotada, digest nutricional/recuperación 7d y cierre del loop entre recomendaciones y evolución real.
+- El Análisis del coach de Progreso integra meta SMART y señales de carrera deterministas, expone “Consonancia con tu objetivo”, usa fallback específico por objetivo e invalida el caché cuando cambia cualquier dato relevante. Implementado/verificado localmente el 19 jun; pendiente de deploy.
 - La prescripción de entrenamiento usa bloque estable de 21 días con overlay adaptativo, DAPRE por desempeño real, objetivos SMART medibles, calentamiento/vuelta a la calma dinámicos y restricciones de comorbilidad en la selección de ejercicios.
 - Perfil muestra objetivos y disponibilidad como decisiones jerárquicas (objetivo, meta, modalidad/equipo, carrera y resumen microciclo/mesociclo), con `Flexible` en vez de `Mixto`; el chat móvil del coach se monta como modal a pantalla completa con input visible.
 - La prescripción desde Perfil ahora guarda `trainingExperience` (`novice`/`intermediate`/`advanced`), modula volumen/series/descanso de fuerza y, al reducir `daysPerWeek`, preserva sesiones clave del microciclo (por ejemplo tirada larga + calidad + fuerza en `Correr + gym` con carrera) en vez de conservar simplemente los primeros días del calendario.
 - Entreno permite cambiar el grupo muscular de la sesión de fuerza/mixta del día (`upper`/`push`/`pull`/`lower`/`full_body`) sin regenerar el bloque: el servidor reconstruye la sesión y bloquea cambios que repitan la familia muscular de días adyacentes.
+- Desde el 19 de junio, el mismo control también permite convertir con aviso un día de cardio/carrera/recuperación en fuerza, conservando guardarraíles de adyacencia y volumen semanal.
 - Entreno permite **registrar o editar la sesión de un día previo** (hasta 14 días atrás, "Registrar otro día") partiendo del plan prescrito de esa fecha vía `GET /api/session-for-date`; el registro es idempotente por día (`manual-{fecha}`) y se fusiona con Strava/check-in sin inflar adherencia. Funciona con o sin Strava.
 - El alta de usuario pide el **nombre** (obligatorio con email, tomado de la cuenta en Google) y lo guarda en el perfil; la app se dirige al usuario por su nombre en vez de por el email.
 - Nutrición usa calendario local de la app (`Europe/Madrid` por defecto) para seleccionar el día actual, calcular la semana cacheada y agrupar comidas de "hoy"; esto evita que después de medianoche siga mostrando el día UTC anterior.

@@ -1,6 +1,48 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **19 de junio de 2026, tarde (cambio de grupo muscular en cualquier día + investigación del "no aparece en móvil")**.
+Ultima actualizacion: **20 de junio de 2026 (fix discrepancia Sesión/Semana en días de descanso + historial por día y volumen real en Semana)**.
+
+## Sesión del 20 de junio de 2026 (resolución de "hoy" + Semana: historial por día y volumen real)
+
+Reporte del usuario: en **Sesión** dice "Gym · Torso" pero en **Semana** el día de hoy (viernes) es "Recuperación activa". Además pidió: revisar en Semana los ejercicios realmente hechos por día, y que el cambio de grupo se refleje en Semana. Desplegado JUNTO con el fix del Análisis del coach del compañero (ver entrada noche-2; estaba sin desplegar). Bundle `v=54afbe4004`.
+
+- **Causa raíz (bug compartido):** `mapTodaySession` (studio-data) y `studio-swap` resolvían "hoy" exigiendo `isTrainingDay`; en un día de recuperación/descanso no lo encontraban y **caían al primer día de fuerza del bloque** (mostraban Torso). `mapWeek` usa la fecha real → la Semana estaba bien; el desajuste era de Sesión/Hoy. El mismo fallback hacía que un cambio de grupo en día de descanso se aplicara al primer día de fuerza, no a hoy.
+- **Fix (decisión del usuario: mostrar el día real + opción de convertir):**
+  - `mapTodaySession`: para el dashboard resuelve el **día EXACTO por fecha** (aunque sea recuperación/descanso) y expone `isRestDay`; no cae a datos demo. El modo `exact` (registro retroactivo) conserva su comportamiento (solo día de entreno).
+  - `studio-swap`: resuelve el día **exacto de hoy** (fallback al primer entreno solo si hoy no está) → el cambio de grupo se aplica a HOY y se refleja en Semana.
+  - UI `TrainSession`: banner de **día de recuperación/descanso** con nota; guardas de "Iniciar guiada"/"Hecho según plan" sin lista; conversión y registro retroactivo disponibles.
+- **Semana (`mapWeek` + `TrainWeek`):** cada día expone `dateISO`/`past`/`logged` (resumen real vía `findDaySession`); en la UI cada día es **clicable** y abre el detalle de lo hecho (o "sin registro"/"planificado"), con ✓ en días con registro.
+- **Volumen semanal REAL** (`weekVolumeHours`): suma de duraciones planificadas de los días de entreno, en vez del `3,8 h` hardcodeado.
+- **Tests:** nuevo `tests/api/studio-data-mappers.test.js` (mapTodaySession resuelve el día real en recuperación; exact sigue exigiendo entreno; mapWeek `logged` y `volumeHours`). Único rojo: el flaky horario conocido de `weekly-plan` (check-in `${today}T00:00:00Z` queda en el futuro cuando UTC va un día por detrás de Madrid). No relacionado.
+
+## Sesión del 19 de junio de 2026, noche-2 (FIX: Análisis del coach orientado a objetivos)
+
+Implementado y verificado localmente; **no desplegado**. Bundle Studio `v=29b865f9b9`. **43 archivos / 308 tests verdes**, audit 0, smoke/check:conflicts y `npm run build` OK.
+
+- **Sección explícita en Progreso:** el contrato del informe añade `goalAlignment`; la UI muestra “Consonancia con tu objetivo” entre tendencia y próximos ajustes. Informes legacy siguen visibles, pero la firma versionada los marca `stale` para pedir actualización.
+- **Objetivos SMART integrados:** `buildCoachAnalysisDigest` calcula `goalProgress`/`goalProgressLine` con meta, actual, tendencia, fecha y `onTrack`; el prompt los trata como fuente determinista. Se evitó un ciclo estático con import dinámico porque `goalProgress.js` reutiliza `epley1Rm`/`isDoneWorkout` de `coachAnalysis.js`.
+- **Carrera/21K trazable:** nuevas `buildRunGoalSignals`/`describeRunGoalSignals`: FCmáx y rango Z2 del modelo de la app, zona real vs prescrita en la última carrera, adherencia a sesiones clave vencidas (tirada larga/calidad), eficiencia ritmo/FC y predicción Riegel basada en esfuerzo real. Sonda de la cuenta principal: 21K 8 nov, FCmáx 182, Z2 110–127, última sesión 131 ppm/Z3 frente a Z4–5, 1/1 sesión clave, eficiencia −15,3% y predicción orientativa 3:19:33 basada en 6,79 km reales.
+- **Anti-alucinación:** prohibido introducir cifras objetivo no presentes en el contexto determinista. Las recomendaciones IA anteriores se reinyectan solo como intención y con todas sus cifras redactadas, para que la falsa recomendación histórica de 143 ppm no se perpetúe. La sonda real confirmó ausencia de `143 ppm` y `+null ppm` en el nuevo prompt.
+- **Fallback por objetivo:** endurance prioriza tirada/calidad/zonas; fuerza usa SMART/e1RM+DAPRE; peso/hipertrofia/recomposición usan tendencia de peso; glucémico se limita a adherencia/registros sin diagnóstico. Ya no devuelve “progresión normal de cargas” como respuesta genérica para endurance.
+- **Caché corregido:** `coachAnalysisContextSignature` `v2` invalida por cambios en objetivo/meta/fecha/modalidad/plan, ediciones de RPE/cargas/sueño/FC, métricas y comidas; antes solo detectaba nuevos documentos de workout. `GET /api/coach-analysis` reconstruye esa firma completa.
+- **Cobertura:** nuevo `tests/api/coach-analysis.route.test.js`; tests del servicio para SMART, 21K, zonas, adherencia, redacción de cifras previas, firma de contexto y fallbacks de endurance/fuerza/peso/glucémico.
+- **Visual:** Studio local abrió Progreso sin errores de consola; captura en `output/playwright/coach-analysis-goal-alignment-progress.png`. Sin sesión, el informe autenticado no se renderiza, por lo que el contenido nuevo se verificó mediante contrato/ruta/bundle y no mediante datos privados en navegador.
+
+## Sesión del 19 de junio de 2026, noche (auditoría: Análisis del coach vs objetivos)
+
+Auditoría de solo lectura del flujo `Progreso → Análisis del coach`, contrastando código, tests y el informe guardado de la cuenta principal. **No se modificó la lógica en esta sesión.** Resultado: consonancia **parcial**, todavía no suficiente para afirmar que el informe evalúa el avance hacia el objetivo completo del usuario.
+
+- **Sí recibe contexto básico:** `buildCoachAnalysisPrompt` incluye `profile.goal`, modalidad, `runRaceGoal`, fase y semanas hasta carrera. En la cuenta principal: `endurance`, `race_21k`, `hybrid_run_gym`, fase Base aeróbica y 21 semanas.
+- **No recibe el objetivo SMART medible:** `buildCoachAnalysisDigest` no calcula `buildGoalProgress`; por tanto el prompt del informe no conoce `goalTarget`, valor actual, tendencia, fecha objetivo ni `onTrack`. El chat sí lo hace (`coach-chat`), de modo que hay una integración asimétrica. La cuenta actual no tiene `goalTarget`, pero el defecto afectaría a usuarios que sí lo definan.
+- **No evalúa bien el subobjetivo de carrera:** el informe no inyecta `runFitness`, predicción de carrera, validación de zonas ni adherencia a sesiones clave (tirada larga/calidad). Conoce la etiqueta `race_21k`, pero no puede concluir de forma trazable si el usuario va en camino al 21K del 8 nov 2026.
+- **Fallback no orientado por objetivo:** con `goal:'endurance'` y señales normales, `buildHeuristicCoachReport` devuelve literalmente “el plan sigue su progresión normal de cargas”, sin recomendación de resistencia. No hay test que proteja la alineación por tipo de objetivo ni tests directos de la ruta `/api/coach-analysis`.
+- **Bug de null numérico en el prompt:** `Number.isFinite(Number(cardio.hrDriftBpm))` acepta `null` (`Number(null)===0`) y genera `deriva +null ppm`. Debe usarse un guard que descarte `null`/`''`, como `posNum` o equivalente firmado.
+- **Hallazgo real de FC no sustentada:** el informe IA guardado recomendó “zona aeróbica objetivo (alrededor de 143 ppm)”, pero esa cifra no estaba en el prompt ni en una validación de zonas. Con FCmáx derivada ≈182, el modelo de 5 zonas del código coloca Z2 aproximadamente en 109–127 ppm; 143 ppm cae en Z3. Tratarlo como alucinación factual, no como prescripción válida.
+- **Informe actual stale:** la firma del informe guardado ya no coincide con los entrenos actuales; la UI debería mostrar “Tienes entrenos nuevos sin analizar”. Re-analizar no corrige por sí solo los gaps anteriores.
+- **Verificación:** `tests/services/coach-analysis.test.js` + `tests/services/goal-progress.test.js`: 23 tests verdes. La suite confirma cada módulo por separado, pero no su integración.
+- **Estado general revalidado:** suite completa 42 archivos / 296 tests verdes; `main`=`origin/main` en `8e46bd1`; `endogym.vercel.app` resolvía a `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF` (`Ready`), bundle `097b1b9fba`; sondas `/` 200, health 200, meals sin token 401 y bundle 200.
+
+Acción recomendada antes de considerar el informe alineado: integrar `goalProgress` y las señales de carrera deterministas en el digest/prompt y fallback, prohibir cifras objetivo no presentes en el contexto, corregir el guard de `hrDriftBpm` y añadir tests por objetivo (peso, fuerza, endurance/21K y glucémico).
 
 ## Sesión del 19 de junio de 2026, tarde (cambio de grupo en cualquier día — conversión a fuerza)
 
