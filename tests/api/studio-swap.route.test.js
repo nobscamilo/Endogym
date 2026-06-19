@@ -170,6 +170,35 @@ describe('/api/studio-swap route', () => {
     )).toBe(true);
   });
 
+  it('converts a non-strength (cardio) day into a strength session with a clinical warning', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      {
+        date: '2026-06-15', dayName: 'Martes', isTrainingDay: true,
+        sessionType: 'aerobic', sessionFocus: 'cardio_easy',
+        workout: { title: 'Rodaje suave', durationMinutes: 40, exercises: [{ id: 'run-z2', name: 'Carrera zona 2' }] },
+      },
+      trainingDay('2026-06-16', 'lower', 'Pierna mañana'),
+    ]));
+
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper' }),
+    }));
+    const json = await response.json();
+    const patch = mocks.updatePlan.mock.calls[0]?.[0];
+    const updatedToday = patch.days[0];
+
+    expect(response.status).toBe(200);
+    expect(json.sessionFocus).toBe('upper');
+    expect(json.converted).toBe(true);
+    expect(typeof json.warning).toBe('string');
+    expect(json.warning.length).toBeGreaterThan(0);
+    expect(updatedToday.sessionType).toBe('resistance');
+    expect(updatedToday.isTrainingDay).toBe(true);
+    expect(updatedToday.workout.exercises.length).toBeGreaterThan(0);
+    expect(updatedToday.workout.runPrescription).toBeUndefined();
+  });
+
   const planForSore = () => planWith([
     trainingDay('2026-06-15', 'lower', 'Pierna actual'),
     {

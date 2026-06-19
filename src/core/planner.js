@@ -1487,9 +1487,15 @@ export function listSessionFocusChangeOptions({
   dayIndex = -1,
 } = {}) {
   const targetDay = Array.isArray(days) ? days[dayIndex] : null;
-  if (!targetDay?.workout || !['resistance', 'mixed'].includes(targetDay.sessionType)) {
+  // Antes solo se permitía en días de fuerza/mixto. Ahora también en días NO de fuerza
+  // (cardio/carrera/recuperación/mindbody) con sesión: se evalúan como si fueran fuerza
+  // ('resistance') porque el cambio CONVIERTE el día en una sesión de fuerza.
+  if (!targetDay?.workout) {
     return [];
   }
+  const effectiveType = ['resistance', 'mixed'].includes(targetDay.sessionType)
+    ? targetDay.sessionType
+    : 'resistance';
 
   const currentFocus = targetDay.sessionFocus || targetDay.workout?.sessionFocus || null;
   const previousDay = dayIndex > 0 ? days[dayIndex - 1] : null;
@@ -1501,14 +1507,15 @@ export function listSessionFocusChangeOptions({
       ? 'Foco actual.'
       : (focusChangeBlockReason({
         targetFocus: meta.id,
-        targetType: targetDay.sessionType,
+        targetType: effectiveType,
         previousDay,
         nextDay,
-      }) || weeklyFocusOverloadReason(meta.id, targetDay.sessionType, days, dayIndex));
+      }) || weeklyFocusOverloadReason(meta.id, effectiveType, days, dayIndex));
 
     // #2 — si está bloqueado por adyacencia y el intercambio con el vecino lo resuelve,
-    // la UI puede ofrecer "reprogramar" en vez de solo rechazar.
-    const reschedule = (!current && blockReason)
+    // la UI puede ofrecer "reprogramar" en vez de solo rechazar. Solo para días de fuerza/mixto
+    // reales: la reprogramación por intercambio no aplica a la conversión de un día no-fuerza.
+    const reschedule = (!current && blockReason && ['resistance', 'mixed'].includes(targetDay.sessionType))
       ? proposeFocusReschedule({ days, dayIndex, targetFocus: meta.id, targetType: targetDay.sessionType })
       : null;
 
@@ -1527,7 +1534,10 @@ export function listSessionFocusChangeOptions({
 
 // Arma el workout de un día para un foco dado (núcleo compartido por el cambio de grupo y la
 // reprogramación por intercambio). Aplica la modulación por molestias (#3).
-function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTuning = null, trainingModality = null, trainingMode = null, goal: planGoal = null, phase = null, soreAreas = [] }) {
+function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTuning = null, trainingModality = null, trainingMode = null, goal: planGoal = null, phase = null, soreAreas = [], sessionType = null }) {
+  // `sessionType` efectivo: para convertir un día NO de fuerza (cardio/recuperación/mindbody) en
+  // una sesión de fuerza, se fuerza a 'resistance'. Para días ya de fuerza/mixto se respeta el suyo.
+  const effectiveType = sessionType || day.sessionType;
   const modality = resolveTrainingModality(
     trainingModality || day.trainingModality || profile.trainingModality,
     trainingMode || day.trainingMode || profile.trainingMode
@@ -1535,11 +1545,11 @@ function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTunin
   const goal = resolveGoal(planGoal || day.goal || profile.goal);
   const phaseParams = phase ? resolvePhaseParams(phase) : { loadFactor: 1 };
   const interferenceScale = ((modality === TrainingModality.HYBRID_RUN_GYM || modality === TrainingModality.RUNNING || modality === TrainingModality.CYCLING)
-    && (day.sessionType === 'resistance' || day.sessionType === 'mixed'))
+    && (effectiveType === 'resistance' || effectiveType === 'mixed'))
     ? (INTERFERENCE_BY_PHASE[phase] ?? 1) : 1;
   const durationMinutes = day.workout?.durationMinutes || 45;
   const title = focusChangeTitle(modality, focus);
-  const sore = evaluateSoreModulation(soreAreas, focus, day.sessionType);
+  const sore = evaluateSoreModulation(soreAreas, focus, effectiveType);
   let effectiveAdaptive = adaptiveTuning;
   if (sore.matched) {
     const baseVf = Number(adaptiveTuning?.workout?.volumeFactor);
@@ -1549,7 +1559,7 @@ function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTunin
   }
   const exercises = buildSessionExercises({
     modality,
-    sessionType: day.sessionType,
+    sessionType: effectiveType,
     sessionTitle: title,
     sessionFocus: focus,
     goal,
@@ -1566,9 +1576,9 @@ function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTunin
     title,
     sessionFocus: focus,
     durationMinutes,
-    warmup: buildWarmupProtocol({ sessionType: day.sessionType, modality, sessionFocus: focus, profile }),
+    warmup: buildWarmupProtocol({ sessionType: effectiveType, modality, sessionFocus: focus, profile }),
     exercises,
-    cooldown: buildCooldownProtocol({ sessionType: day.sessionType, profile }),
+    cooldown: buildCooldownProtocol({ sessionType: effectiveType, profile }),
     focusChangeApplied: true,
   };
   delete workout.runPrescription;
@@ -1591,14 +1601,11 @@ export function buildSessionFocusChange({
   if (!targetDay?.workout) {
     return { ok: false, status: 404, error: 'No se encontró la sesión a ajustar.' };
   }
-  if (!['resistance', 'mixed'].includes(targetDay.sessionType)) {
-    return {
-      ok: false,
-      status: 409,
-      error: 'El cambio de grupo muscular solo aplica a sesiones de fuerza o mixtas.',
-      details: { options: [] },
-    };
-  }
+  // Conversión (decisión del usuario, jun 2026): se permite cambiar el grupo muscular también en
+  // días NO de fuerza, convirtiéndolos en sesión de fuerza. Se mantienen los guardarraíles de
+  // adyacencia/sobrecarga (vía listSessionFocusChangeOptions) y se devuelve un AVISO clínico.
+  const converted = !['resistance', 'mixed'].includes(targetDay.sessionType);
+  const effectiveType = converted ? 'resistance' : targetDay.sessionType;
 
   const normalizedFocus = String(targetFocus || '').trim();
   const meta = focusChangeMeta(normalizedFocus);
@@ -1633,7 +1640,7 @@ export function buildSessionFocusChange({
   }
 
   const composed = composeFocusWorkout({
-    day: targetDay, dayIndex, focus: normalizedFocus,
+    day: targetDay, dayIndex, focus: normalizedFocus, sessionType: effectiveType,
     profile, adaptiveTuning, trainingModality, trainingMode, goal: planGoal, phase, soreAreas,
   });
   if (!composed.ok) {
@@ -1645,14 +1652,36 @@ export function buildSessionFocusChange({
     };
   }
 
+  let warning = null;
+  if (converted) {
+    const modality = resolveTrainingModality(
+      trainingModality || targetDay.trainingModality || profile.trainingModality,
+      trainingMode || targetDay.trainingMode || profile.trainingMode
+    );
+    const enduranceModality = [TrainingModality.HYBRID_RUN_GYM, TrainingModality.RUNNING, TrainingModality.CYCLING].includes(modality);
+    if (targetDay.sessionType === 'aerobic') {
+      warning = enduranceModality
+        ? 'Convertiste un día de cardio/carrera en fuerza. Si tu objetivo es de resistencia, sustituir sesiones clave (tirada larga, tempo) puede frenar esa adaptación.'
+        : 'Convertiste un día de cardio en fuerza. Tenlo en cuenta para no perder tu trabajo aeróbico de la semana.';
+    } else if (targetDay.sessionType === 'recovery' || targetDay.sessionType === 'mindbody') {
+      warning = 'Convertiste un día de recuperación en fuerza. El descanso también es parte del plan: vigila la fatiga acumulada.';
+    } else {
+      warning = 'Convertiste este día en una sesión de fuerza.';
+    }
+  }
+
   return {
     ok: true,
     day: {
       ...targetDay,
+      sessionType: effectiveType,
+      isTrainingDay: true,
       sessionFocus: normalizedFocus,
       workout: composed.workout,
     },
     options,
+    converted,
+    warning,
     soreApplied: composed.soreMatched,
     soreNote: composed.soreNote,
   };

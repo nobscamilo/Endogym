@@ -119,7 +119,7 @@ export async function POST(request) {
         const { db } = await getAdminServices();
         await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
           .update({ days: plan.days, updatedAt: new Date().toISOString() });
-        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options, soreNote: change.soreNote || null, soreApplied: Boolean(change.soreApplied) });
+        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options, converted: Boolean(change.converted), warning: change.warning || null, soreNote: change.soreNote || null, soreApplied: Boolean(change.soreApplied) });
       }
 
       if (!exercises.length) return errorResponse('La sesión no tiene ejercicios.', 409);

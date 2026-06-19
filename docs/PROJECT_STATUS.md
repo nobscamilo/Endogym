@@ -1,6 +1,21 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **19 de junio de 2026 (registro retroactivo de sesiones + nombre en el alta)**.
+Ultima actualizacion: **19 de junio de 2026, tarde (cambio de grupo muscular en cualquier día + investigación del "no aparece en móvil")**.
+
+## Sesión del 19 de junio de 2026, tarde (cambio de grupo en cualquier día — conversión a fuerza)
+
+Reporte del usuario: "en el móvil no deja cambiar de grupo muscular, no aparece la opción". **Investigado a fondo con verificación objetiva** (Chrome en la cuenta real + sondeo JS del DOM): la tarjeta "Grupo muscular" **NO es device-dependent** — mismo markup en móvil/escritorio (`app.jsx` solo cambia el chrome de navegación, no el contenido de `TrainScreen`), sin `display:none` ni media query que la oculte; en la cuenta del usuario, en un día de fuerza, está presente. **Causa real:** el cambio de grupo estaba **restringido por diseño a días de fuerza/mixto** (UI `canChangeSessionFocus` + `buildSessionFocusChange` devolvía 409 en no-fuerza). En días de cardio/carrera/recuperación/mindbody no aparecía a propósito; el usuario coincidió en esos días.
+
+**Decisión del usuario:** poder cambiar el grupo **también en días no-fuerza** (convertir el día en fuerza), opción **"permitir con aviso"** conservando guardarraíles de adyacencia. Implementado. **296/296 tests verdes** (42 archivos), bundle `v=097b1b9fba`. Desplegado: ver línea de deploy abajo.
+
+- **Backend (`planner.js`):** `buildSessionFocusChange`, `composeFocusWorkout` y `listSessionFocusChangeOptions` aceptan días no-fuerza usando `effectiveType='resistance'` (conversión). El día convertido pasa a `sessionType:'resistance'`, `isTrainingDay:true`, se elimina `runPrescription`, y se devuelve `converted:true` + `warning` clínico (cardio/carrera → riesgo para la adaptación de resistencia; recuperación → vigilar fatiga). Se **mantienen** los guardarraíles de adyacencia y sobrecarga semanal. La **reprogramación por intercambio** sigue siendo solo para días de fuerza/mixto reales (no se ofrece en conversiones, evita un camino roto).
+- **`studio-data.mapTodaySession`:** calcula `focusOptions` para CUALQUIER día con sesión (no solo fuerza/mixto) y marca `focusConversion:true` en días no-fuerza.
+- **`studio-swap`:** devuelve `converted` + `warning` al frontend.
+- **UI (`screen-train.jsx`):** `canChangeSessionFocus` se muestra en cualquier sesión con lista; nota previa de conversión ("Hoy no es un día de fuerza… convertirá esta sesión en fuerza…") y se muestra el `warning` del backend tras cambiar.
+- **Tests:** +1 en `studio-swap.route` (cardio→fuerza: 200, `converted:true`, `warning` no vacío, `sessionType:'resistance'`, sin `runPrescription`).
+- **NOTA (móvil):** no se reprodujo ningún fallo de render específico de móvil; el navegador controlado no permite reducir el viewport real (<760px = `isMobile`). Si tras este cambio el usuario sigue sin ver la opción **en un día de fuerza** en su teléfono, sospechar **caché del bundle** (forzar recarga) y pedir captura.
+
+## Sesión del 19 de junio de 2026 (registro retroactivo de sesiones + nombre en el alta)
 
 ## Sesión del 19 de junio de 2026 (registro retroactivo de sesiones e historial + nombre en signup)
 

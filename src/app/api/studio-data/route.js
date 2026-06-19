@@ -396,10 +396,13 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   out.sessionType = day.sessionType || '';
   // #1 — matriz de opciones de grupo muscular disponibles/bloqueadas (con motivo), para que la
   // UI pueda deshabilitar p. ej. "Torso" si mañana ya toca torso, sin esperar a enviar el cambio.
-  if (['resistance', 'mixed'].includes(day.sessionType)) {
+  // El cambio de grupo se ofrece en CUALQUIER día con sesión (los no-fuerza se convierten en
+  // fuerza); por eso la matriz de opciones se calcula también para cardio/recuperación/mindbody.
+  if (day.workout && Array.isArray(day.workout.exercises) && day.workout.exercises.length) {
     const dayIndex = days.indexOf(day);
     const focusOptions = listSessionFocusChangeOptions({ days, dayIndex });
     if (focusOptions.length) out.focusOptions = focusOptions;
+    if (!['resistance', 'mixed'].includes(day.sessionType)) out.focusConversion = true;
   }
   // #6 — explicación determinista del "por qué" de la sesión.
   const rationale = buildSessionRationale(day, profile);

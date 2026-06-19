@@ -231,6 +231,7 @@ function TrainSession() {
   const [focusTarget, setFocusTarget] = useStateTr('');
   const [focusStatus, setFocusStatus] = useStateTr('idle'); // idle|saving|ok|err
   const [focusError, setFocusError] = useStateTr('');
+  const [focusWarning, setFocusWarning] = useStateTr(''); // aviso clínico al convertir un día no-fuerza
   // #3 — molestias/agujetas por zona antes de cambiar de grupo (modula la sesión nueva).
   const [soreAreas, setSoreAreas] = useStateTr([]);
   const [soreNote, setSoreNote] = useStateTr('');
@@ -299,6 +300,7 @@ function TrainSession() {
         await refreshSession();
         setFocusTarget('');
         setSoreNote(j.soreNote || '');
+        setFocusWarning(j.warning || '');
         setFocusStatus('ok');
         setTimeout(() => setFocusStatus('idle'), 2600);
       } else {
@@ -476,8 +478,12 @@ function TrainSession() {
   const adjust = D.coachAdjust;
   const adjustVisible = adjust && Array.isArray(adjust.rules) && adjust.rules.length
     && (adjust.volumeFactor == null || adjust.volumeFactor !== 1);
-  const canChangeSessionFocus = ['resistance', 'mixed'].includes(s.sessionType)
-    || (!s.sessionType && !s.runPrescription && Array.isArray(s.list) && s.list.length);
+  // El cambio de grupo se ofrece en CUALQUIER día con sesión: en días de fuerza/mixto cambia el
+  // grupo; en días de cardio/carrera/recuperación CONVIERTE el día en una sesión de fuerza (con aviso).
+  const canChangeSessionFocus = Array.isArray(s.list) && s.list.length > 0;
+  const isFocusConversion = Boolean(s.focusConversion)
+    || Boolean(s.runPrescription)
+    || (s.sessionType && !['resistance', 'mixed'].includes(s.sessionType));
   // #1 — matriz de grupos disponibles/bloqueados (con motivo). Si el backend no la trae (datos
   // antiguos), caemos a las opciones simples marcando solo el foco actual.
   const focusOpts = (Array.isArray(s.focusOptions) && s.focusOptions.length)
@@ -539,6 +545,11 @@ function TrainSession() {
               <span>{sessionFocusLabel(s.focus)}</span>
             </div>
           </div>
+          {isFocusConversion ? (
+            <p className="tiny" style={{ flexBasis: '100%', width: '100%', margin: '2px 0 0', color: 'var(--accent)', lineHeight: 1.45 }}>
+              Hoy no es un día de fuerza. Elegir un grupo <strong>convertirá esta sesión en fuerza</strong>; puede afectar tu trabajo de cardio/carrera o tu recuperación de la semana.
+            </p>
+          ) : null}
           <div className="focus-sore" style={{ flexBasis: '100%', width: '100%', marginTop: 4 }}>
             <div className="mb-label" style={{ marginBottom: 6 }}>¿Molestias o agujetas hoy? <span className="tiny muted">(ajusta la sesión nueva)</span></div>
             <div className="chips">
@@ -589,6 +600,7 @@ function TrainSession() {
           ) : null}
           {focusStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Sesión ajustada.</span> : null}
           {focusStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{focusError}</span> : null}
+          {focusWarning ? <span className="tiny" style={{ color: 'var(--accent)', flexBasis: '100%' }}>{focusWarning}</span> : null}
           {soreNote ? <span className="tiny" style={{ color: 'var(--accent)', flexBasis: '100%' }}>{soreNote}</span> : null}
         </div>
       ) : null}
