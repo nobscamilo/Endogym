@@ -133,6 +133,45 @@ describe('/api/workouts route', () => {
     expect(response.status).toBe(201);
   });
 
+  it('POST accepts a backdated manual workout with a deterministic id (idempotent edit)', async () => {
+    const payload = {
+      id: 'manual-2026-06-18',
+      title: 'Empuje · Fuerza',
+      mode: 'studio',
+      source: 'manual',
+      performedAt: '2026-06-18T12:00:00.000Z',
+      completed: true,
+      exercises: [{ id: 'gym-bench-press', name: 'Press banca', sets: 4, reps: 6, weightKg: 82 }],
+    };
+    mocks.createWorkout.mockResolvedValue({ ...payload });
+
+    const response = await POST(new Request('http://localhost/api/workouts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createWorkout).toHaveBeenCalledWith('user-1', payload);
+  });
+
+  it('POST rejects an unsafe document id', async () => {
+    const response = await POST(new Request('http://localhost/api/workouts', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'manual/../hack',
+        title: 'X',
+        mode: 'studio',
+        source: 'manual',
+        performedAt: '2026-06-18T12:00:00.000Z',
+        completed: true,
+        exercises: [{ id: 'a', name: 'A', weightKg: 10, reps: 5 }],
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.createWorkout).not.toHaveBeenCalled();
+  });
+
   it('POST rejects future daily check-ins', async () => {
     const response = await POST(new Request('http://localhost/api/workouts', {
       method: 'POST',

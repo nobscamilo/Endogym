@@ -21,6 +21,10 @@ const MAX_EXERCISES_PER_WORKOUT = 60;
 const MAX_TITLE_LENGTH = 200;
 const MAX_NOTES_LENGTH = 2000;
 const ISO_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+// id de documento opcional y determinista (p. ej. `manual-2026-06-18` para registro retroactivo
+// idempotente: reeditar un día reemplaza el doc en vez de crear duplicados). Acotado a un patrón
+// seguro de Firestore. Solo afecta a la subcolección del propio usuario.
+const SAFE_DOC_ID_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
 const DAILY_CHECKIN_SYMPTOM_KEYS = ['dyspnea', 'jointPain', 'dizziness', 'tachycardia'];
 
 function isValidDateKey(value) {
@@ -90,6 +94,7 @@ function isValidWorkoutPayload(payload) {
   if (payload.completed != null && typeof payload.completed !== 'boolean') return false;
   if (payload.notes != null && typeof payload.notes !== 'string') return false;
   if (payload.source != null && !['manual', 'daily_checkin'].includes(payload.source)) return false;
+  if (payload.id != null && (typeof payload.id !== 'string' || !SAFE_DOC_ID_PATTERN.test(payload.id))) return false;
   if (!isValidDailyCheckin(payload)) return false;
   return true;
 }

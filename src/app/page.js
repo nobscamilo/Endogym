@@ -12,6 +12,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from 'firebase/auth';
 import { getFirebaseClient, isFirebaseClientConfigured } from '../lib/firebaseClient.js';
 
@@ -49,6 +50,7 @@ export default function HomePage() {
   const [signedOutRequested, setSignedOutRequested] = useState(false);
 
   const [mode, setMode] = useState('login'); // 'login' or 'register'
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -160,8 +162,9 @@ export default function HomePage() {
   }, [signedOutRequested, authReady, firebaseClient]);
 
 
-  async function upsertInitialProfile(user) {
+  async function upsertInitialProfile(user, displayName = '') {
     const token = await user.getIdToken();
+    const cleanName = String(displayName || '').trim().slice(0, 80);
     const response = await fetch('/api/profile', {
       method: 'PUT',
       headers: {
@@ -169,6 +172,7 @@ export default function HomePage() {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        displayName: cleanName,
         legalConsents: {
           termsAccepted: true,
           privacyAccepted: true,
@@ -206,6 +210,10 @@ export default function HomePage() {
 
     try {
       if (mode === 'register') {
+        const cleanName = name.trim();
+        if (!cleanName) {
+          throw new Error('Escribe tu nombre para crear la cuenta.');
+        }
         if (password !== confirmPassword) {
           throw new Error('Las contraseñas no coinciden.');
         }
@@ -214,7 +222,10 @@ export default function HomePage() {
         }
 
         const credentials = await createUserWithEmailAndPassword(firebaseClient.auth, email, password);
-        await upsertInitialProfile(credentials.user);
+        // displayName en Firebase Auth (lo usan algunos clientes) + en el perfil de Firestore
+        // (fuente que prioriza studio-data sobre el email para dirigirse al usuario).
+        try { await updateProfile(credentials.user, { displayName: cleanName.slice(0, 80) }); } catch { /* no bloquea el alta */ }
+        await upsertInitialProfile(credentials.user, cleanName);
       } else {
         await signInWithEmailAndPassword(firebaseClient.auth, email, password);
       }
@@ -252,7 +263,8 @@ export default function HomePage() {
       // Primer acceso con Google = se crea la cuenta automáticamente (también desde "Iniciar
       // sesión"). Al crearla se registran los consentimientos legales (versión vigente).
       if (additionalInfo?.isNewUser || mode === 'register') {
-        await upsertInitialProfile(credentials.user);
+        // Google ya trae el nombre de la cuenta → lo usamos como displayName del perfil.
+        await upsertInitialProfile(credentials.user, credentials.user?.displayName || '');
       }
 
       setStatus('Autenticación con Google correcta. Abriendo tu Studio...');
@@ -386,6 +398,24 @@ export default function HomePage() {
                 ) : null}
 
                 <form className="landing-form" onSubmit={submitAuth}>
+                  {/* Nombre (solo registro): así la app se dirige al usuario por su nombre y no por el email. */}
+                  {mode === 'register' && (
+                    <div className="landing-field-group">
+                      <label className="landing-label" htmlFor="name">Nombre</label>
+                      <input
+                        id="name"
+                        type="text"
+                        required
+                        autoComplete="given-name"
+                        maxLength={80}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="landing-input"
+                        placeholder="¿Cómo te llamamos?"
+                      />
+                    </div>
+                  )}
+
                   {/* Email + contraseña (ambos modos) */}
                   <div className="landing-field-group">
                     <label className="landing-label" htmlFor="email">Email</label>

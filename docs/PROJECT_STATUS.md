@@ -1,6 +1,19 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **16 de junio de 2026, mañana-8 (landing mejorada + biometría en la encuesta inicial)**.
+Ultima actualizacion: **19 de junio de 2026 (registro retroactivo de sesiones + nombre en el alta)**.
+
+## Sesión del 19 de junio de 2026 (registro retroactivo de sesiones e historial + nombre en signup)
+
+Petición del usuario: poder registrar/editar la sesión de un día previo (se le olvidó registrar el 18 jun; Strava sí la tenía pero faltaba complementarla con cargas + check-in) y, además, que sirva para **cualquier usuario** (con o sin Strava). Segundo arreglo: al crear cuenta nunca se pedía el **nombre** y la app llamaba al usuario por su email. **295/295 tests verdes** (42 archivos), bundle `v=01463ba21e`. Implementado y verificado en local; **pendiente build+deploy desde la Mac** (el `next build` no corre en el sandbox por el `EPERM unlink` en `.next/`, limitación conocida).
+
+- **Hallazgo:** el backend YA aceptaba fechas pasadas (`POST /api/workouts`: `manual` sin tope de fecha; `daily_checkin` valida solo `fecha ≤ mañana`). La imposibilidad de "ajustar" un día previo era **solo de la UI** (`logSession` hardcodeaba `today` en `performedAt`/`dailyCheckinDate`).
+- **Nuevo `GET /api/session-for-date?date=YYYY-MM-DD`** (`src/app/api/session-for-date/route.js`): devuelve la sesión PRESCRITA de una fecha pasada (validación: fecha válida, no futura, ≤ **14 días** atrás — alineado con las ventanas de reentrada) reutilizando `mapTodaySession` con esa fecha, más el resumen de lo ya registrado ese día (`findDaySession`) para poder **editar**. No toca el dashboard del día actual. Helpers puros exportados y testeados (`isValidDateKey`, `dayDiff`, `validateBacklogDate`, `MAX_BACKLOG_DAYS`).
+- **`mapTodaySession` ahora exportable con opción `{ exact }`** (backward-compatible): con `exact:true` solo devuelve sesión si la fecha es EXACTAMENTE un día de entrenamiento del plan (sin fallback al primer día de entreno, que falsearía un descanso/fuera de bloque).
+- **Registro retroactivo idempotente:** `POST /api/workouts` acepta un `id` de documento opcional y seguro (`/^[A-Za-z0-9_-]{1,120}$/`). La UI usa `manual-{fecha}` para que **reeditar un día reemplace el doc** en vez de duplicar; la fusión por día (`collapseWorkoutsByDay`) lo une con Strava/check-in (no infla adherencia).
+- **UI (`screen-train.jsx`): nuevo componente aislado `PastSessionLogger`** (tarjeta "Registrar otro día" al final de la pestaña Sesión). Selector de fecha (últimos 14 días, "Ayer · …"), trae el plan de ese día, prefija cargas del plan o del registro existente (edición), check-in completo (completada/RPE/fatiga/sueño/síntomas) y guarda con la fecha correcta. **Decisión de diseño:** componente separado en vez de hilar `logDate` por todo `TrainSession` → mínimo blast-radius en un archivo crítico. Si la fecha no era día de fuerza en el plan, permite igualmente el check-in (+ cargas libres).
+- **Nombre en el alta (`page.js`):** campo "Nombre" **obligatorio** en registro por email; se envía a `upsertInitialProfile` → `PUT /api/profile` (`displayName`) y se setea también en Firebase Auth (`updateProfile`). En Google se toma el `displayName` de la cuenta. `studio-data.mapUser` ya priorizaba `firstName/name/displayName` sobre el email → el bug queda resuelto.
+- **Tests:** `tests/api/session-for-date.route.test.js` (7: helpers + 401 + validación de fecha + ok sin plan + edición de día con registro) y +2 en `workouts.route.test.js` (id determinista aceptado / id inseguro rechazado).
+- **PENDIENTE (Mac):** `npm run build` + deploy (Vercel `--prod` + alias manual, patrón conocido de "Running Checks"). **Primer uso previsto:** registrar la sesión de fuerza del 18 jun (Strava: "Entrenamiento con pesas vespertino", ~53 min) con sus cargas + check-in.
 
 ## Sesión del 16 de junio de 2026, mañana-8 (landing mejorada + biometría en la encuesta inicial)
 

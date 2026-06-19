@@ -344,11 +344,14 @@ function buildSessionRationale(day, profile) {
   };
 }
 
-function mapTodaySession(plan, today, workouts = [], profile = null) {
+// `exact` (registro retroactivo): cuando es true, solo se devuelve la sesión si la fecha
+// pedida es EXACTAMENTE un día de entrenamiento del plan; sin fallback al primer día de
+// entreno (que falsearía la prescripción de un día de descanso o fuera de bloque).
+export function mapTodaySession(plan, today, workouts = [], profile = null, { exact = false } = {}) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
   const day = days.find((d) => d.date === today && d.isTrainingDay)
-    || days.find((d) => d.isTrainingDay) || days[0];
+    || (exact ? null : (days.find((d) => d.isTrainingDay) || days[0]));
   if (!day) return null;
   const ex = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
   const list = ex.map((e, i) => {

@@ -880,7 +880,221 @@ function TrainSession() {
           </div>
         </SectionCard>
       )}
+
+      {/* Registro retroactivo: registrar/editar la sesión de un día previo (hasta 14 días),
+          partiendo del plan prescrito de ese día. Independiente de Strava. */}
+      <PastSessionLogger />
     </React.Fragment>
+  );
+}
+
+/* ---------- REGISTRAR OTRO DÍA (registro retroactivo) ---------- */
+// Permite registrar o editar la sesión de un día pasado (hasta 14 días) sin tocar el flujo del
+// día actual: trae el plan prescrito de esa fecha (GET /api/session-for-date), prefija las cargas
+// del plan (o del registro existente si ya hay) y guarda con la fecha correcta. El doc manual usa
+// id determinista `manual-{fecha}` → reeditar reemplaza en vez de duplicar; la fusión por día del
+// backend lo une con lo de Strava/check-in.
+const PAST_MAX_BACK_DAYS = 14;
+function backlogDateOptions(maxBack = PAST_MAX_BACK_DAYS) {
+  const opts = [];
+  for (let i = 1; i <= maxBack; i++) {
+    const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const d = new Date(key + 'T12:00:00.000Z');
+    const long = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const cap = long.charAt(0).toUpperCase() + long.slice(1);
+    opts.push({ value: key, label: i === 1 ? `Ayer · ${cap}` : cap });
+  }
+  return opts;
+}
+
+function PastSessionLogger() {
+  const [open, setOpen] = useStateTr(false);
+  const [dateOpts] = useStateTr(() => backlogDateOptions());
+  const [date, setDate] = useStateTr(dateOpts[0].value);
+  const [load, setLoad] = useStateTr('idle'); // idle|loading|loaded|err
+  const [session, setSession] = useStateTr(null);
+  const [isTraining, setIsTraining] = useStateTr(false);
+  const [existing, setExisting] = useStateTr(null);
+  const [rows, setRows] = useStateTr([]); // [{id,name,sets,loadKg,kg,reps}]
+  const [completed, setCompleted] = useStateTr(true);
+  const [rpe, setRpe] = useStateTr(7);
+  const [fatigue, setFatigue] = useStateTr(4);
+  const [sleepHours, setSleepHours] = useStateTr(7.5);
+  const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
+  const [save, setSave] = useStateTr('idle'); // idle|saving|ok|err
+  const [err, setErr] = useStateTr('');
+  const toggleSym = (k) => setSymptoms((p) => ({ ...p, [k]: !p[k] }));
+  const updateRow = (i, field, val) => setRows((p) => p.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
+
+  async function loadDate(d) {
+    setLoad('loading'); setErr(''); setSave('idle');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setLoad('err'); setErr('Inicia sesión para registrar.'); return; }
+      const r = await fetch('/api/session-for-date?date=' + encodeURIComponent(d), { headers: { authorization: 'Bearer ' + token } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { setLoad('err'); setErr(j.error || 'No se pudo cargar la sesión de esa fecha.'); return; }
+      const sess = j.session || null;
+      const planEx = sess && Array.isArray(sess.list) ? sess.list : [];
+      const loggedLifts = j.logged && Array.isArray(j.logged.lifts) ? j.logged.lifts : [];
+      const findLog = (it) => loggedLifts.find((l) => (it.id && l.id === it.id) || l.name === it.name) || null;
+      const newRows = planEx.map((it) => {
+        const lg = findLog(it);
+        return {
+          id: it.id || null, name: it.name, sets: it.sets ?? null, loadKg: it.loadKg ?? null,
+          kg: lg && lg.kg != null ? String(lg.kg) : (it.loadKg != null ? String(it.loadKg) : ''),
+          reps: lg && lg.reps != null ? String(lg.reps) : (it.reps != null ? String(it.reps) : ''),
+        };
+      });
+      // Cargas registradas que no estén en el plan de ese día (p. ej. ejercicios libres) → se conservan.
+      loggedLifts.forEach((l) => {
+        if (!newRows.some((rw) => (l.id && rw.id === l.id) || rw.name === l.name)) {
+          newRows.push({ id: l.id || null, name: l.name, sets: l.sets ?? null, loadKg: null, kg: l.kg != null ? String(l.kg) : '', reps: l.reps != null ? String(l.reps) : '' });
+        }
+      });
+      setSession(sess); setIsTraining(Boolean(j.isTrainingDay)); setExisting(j.logged || null); setRows(newRows);
+      if (j.logged) {
+        setCompleted(j.logged.completed !== false);
+        setRpe(j.logged.sessionRpe != null ? j.logged.sessionRpe : 7);
+        setFatigue(j.logged.fatigue != null ? j.logged.fatigue : 4);
+        setSleepHours(j.logged.sleepHours != null ? j.logged.sleepHours : 7.5);
+        const sy = j.logged.symptoms || {};
+        setSymptoms({ dyspnea: !!sy.dyspnea, jointPain: !!sy.jointPain, dizziness: !!sy.dizziness, tachycardia: !!sy.tachycardia });
+      } else {
+        setCompleted(true); setRpe(7); setFatigue(4); setSleepHours(7.5);
+        setSymptoms({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
+      }
+      setLoad('loaded');
+    } catch (e) { setLoad('err'); setErr('No se pudo cargar la sesión de esa fecha.'); }
+  }
+
+  function expand() { setOpen(true); if (load === 'idle') loadDate(date); }
+  function onPickDate(d) { setDate(d); loadDate(d); }
+
+  async function logPast() {
+    setSave('saving'); setErr('');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setSave('err'); setErr('Inicia sesión para registrar.'); return; }
+      const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
+      const performedAt = date + 'T12:00:00.000Z';
+      const title = (session && session.title) || 'Sesión';
+      const exercises = rows
+        .map((rw) => {
+          const ex = { name: rw.name, weightKg: Number(rw.kg) || null, reps: Number(rw.reps) || null, sets: rw.sets ?? null };
+          if (rw.id) ex.id = rw.id;
+          return ex;
+        })
+        .filter((e) => e.name && e.weightKg);
+      // 1) Cargas (manual idempotente por día) — solo si completada y con cargas.
+      let okManual = true;
+      if (completed && exercises.length) {
+        const r = await fetch('/api/workouts', {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            id: 'manual-' + date, source: 'manual', performedAt, title, mode: 'studio', completed: true,
+            exercises, sessionRpe: Number(rpe) || null, durationMinutes: (session && session.durationMin) || null,
+          }),
+        });
+        okManual = r.ok;
+      }
+      // 2) Check-in del día (idempotente por `daily-{fecha}`).
+      const base = { source: 'daily_checkin', dailyCheckinDate: date, performedAt, symptoms, title, mode: 'studio' };
+      const body = completed
+        ? { ...base, completed: true, checkinSkipped: false, sessionRpe: Number(rpe) || null, fatigue: Number(fatigue) || null, sleepHours: Number(sleepHours) || null }
+        : { ...base, completed: false, checkinSkipped: true, sessionRpe: null, fatigue: null, sleepHours: null };
+      const rc = await fetch('/api/workouts', { method: 'POST', headers, body: JSON.stringify(body) });
+      const ok = okManual && rc.ok;
+      if (ok) { setSave('ok'); await loadDate(date); setSave('ok'); }
+      else { setSave('err'); setErr('No se pudo guardar. Reintenta.'); }
+    } catch (e) { setSave('err'); setErr('No se pudo guardar. Reintenta.'); }
+  }
+
+  const selectedLabel = (dateOpts.find((o) => o.value === date) || {}).label || date;
+
+  return (
+    <SectionCard title="Registrar otro día" icon="today" sub="¿Olvidaste registrar una sesión? Regístrala o edítala (hasta 14 días atrás)">
+      {!open ? (
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={expand}>
+          <Icon name="edit" size={14} /> Registrar un día pasado
+        </button>
+      ) : (
+        <div className="stack" style={{ gap: 16 }}>
+          <div>
+            <div className="mb-label">Fecha</div>
+            <select className="num-input" style={{ width: '100%', maxWidth: 320 }} value={date} onChange={(e) => onPickDate(e.target.value)}>
+              {dateOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          {load === 'loading' ? <span className="tiny muted">Cargando el plan de {selectedLabel}…</span> : null}
+          {load === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{err || 'No se pudo cargar.'}</span> : null}
+
+          {load === 'loaded' ? (
+            <React.Fragment>
+              {existing ? <span className="pill accent" style={{ alignSelf: 'flex-start' }}>Editando el registro de ese día</span> : null}
+              {isTraining && session ? (
+                <p className="tiny muted" style={{ margin: 0 }}>Plan de ese día: <strong>{session.title}</strong>{session.durationMin ? ` · ${session.durationMin} min` : ''}. Ajusta las cargas reales si difieren.</p>
+              ) : (
+                <p className="tiny muted" style={{ margin: 0 }}>Ese día no tenía sesión de fuerza en tu plan. Puedes registrar el check-in (y las cargas si hiciste algo de fuerza).</p>
+              )}
+
+              {rows.length ? (
+                <div className="stack" style={{ gap: 10 }}>
+                  {rows.map((rw, i) => (
+                    <div key={(rw.id || rw.name) + i} className="row ac between wrap" style={{ gap: 8 }}>
+                      <strong style={{ fontSize: '0.9rem', flex: '1 1 140px' }}>{rw.name}</strong>
+                      <div className="row ac" style={{ gap: 6 }}>
+                        <input type="number" min="0" step="0.5" className="num-input" style={{ width: 78 }} placeholder="kg" value={rw.kg} onChange={(e) => updateRow(i, 'kg', e.target.value)} />
+                        <span className="tiny muted">kg</span>
+                        <input type="number" min="0" step="1" className="num-input" style={{ width: 64 }} placeholder="reps" value={rw.reps} onChange={(e) => updateRow(i, 'reps', e.target.value)} />
+                        <span className="tiny muted">reps</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div>
+                <div className="mb-label">¿Completaste la sesión?</div>
+                <div className="segc" style={{ alignSelf: 'flex-start', maxWidth: 240 }}>
+                  <div className="segc-thumb" style={{ left: `calc(4px + ${completed ? 0 : 1} * (100% - 8px) / 2)`, width: 'calc((100% - 8px) / 2)' }} />
+                  <button className={completed ? 'on' : ''} onClick={() => setCompleted(true)}>Sí</button>
+                  <button className={!completed ? 'on' : ''} onClick={() => setCompleted(false)}>No</button>
+                </div>
+              </div>
+              {completed ? (
+                <React.Fragment>
+                  <div><div className="mb-label">Esfuerzo percibido (RPE) · {rpe}/10</div><Scale10 value={rpe} onChange={setRpe} /></div>
+                  <div><div className="mb-label">Fatiga · {fatigue}/10</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
+                  <div className="row ac" style={{ gap: 12 }}>
+                    <div className="mb-label" style={{ margin: 0 }}>Horas de sueño</div>
+                    <input type="number" min="0" max="24" step="0.5" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="num-input" />
+                  </div>
+                </React.Fragment>
+              ) : null}
+              <div>
+                <div className="mb-label">¿Algún síntoma? (seguridad)</div>
+                <div className="chips">
+                  {CHECKIN_SYMPTOMS.map((sy) => (
+                    <button key={sy.key} type="button" className={`pill ${symptoms[sy.key] ? 'accent' : ''}`} onClick={() => toggleSym(sy.key)}>{sy.label}</button>
+                  ))}
+                </div>
+                {Object.values(symptoms).some(Boolean) ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0' }}>El coach limitará la intensidad y recomendará valoración médica.</p> : null}
+              </div>
+
+              <div className="row ac wrap" style={{ gap: 12 }}>
+                <button className="btn" onClick={logPast} disabled={save === 'saving'}>
+                  <Icon name="check" size={16} /> {save === 'saving' ? 'Guardando…' : (save === 'ok' ? 'Guardado ✓' : (existing ? 'Actualizar día' : 'Registrar día'))}
+                </button>
+                <button className="btn ghost sm" onClick={() => setOpen(false)}>Cerrar</button>
+                {save === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{err || 'No se pudo guardar. Reintenta.'}</span> : null}
+              </div>
+            </React.Fragment>
+          ) : null}
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
