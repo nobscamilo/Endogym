@@ -27,6 +27,7 @@ import {
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
+import { getMissingNutritionProfileFields } from './profileCompleteness.js';
 
 const ACTIVITY_FACTORS = {
   sedentary: 1.2,
@@ -536,11 +537,11 @@ function formatSpanishWeekday(date) {
 }
 
 function estimateCaloriesFromProfile(profile) {
-  const weightKg = clamp(toNumber(profile.weightKg, 75), 35, 250);
-  const heightCm = clamp(toNumber(profile.heightCm, 175), 120, 230);
-  const age = clamp(toNumber(profile.age, 30), 15, 90);
-  const sex = profile.sex === 'female' ? 'female' : 'male';
-  const activityLevel = profile.activityLevel in ACTIVITY_FACTORS ? profile.activityLevel : 'moderate';
+  const weightKg = clamp(Number(profile.weightKg), 35, 250);
+  const heightCm = clamp(Number(profile.heightCm), 120, 230);
+  const age = clamp(Number(profile.age), 15, 90);
+  const sex = profile.sex;
+  const activityLevel = profile.activityLevel;
   const goal = resolveGoal(profile.goal);
 
   const bmr = sex === 'female'
@@ -633,11 +634,15 @@ function anchorProteinToBodyweight(target, weightKg, goal, adaptiveTuning = null
 }
 
 export function buildMacroTargetFromProfile(profile, adaptiveTuning = null) {
+  const missingFields = getMissingNutritionProfileFields(profile);
+  if (missingFields.length > 0) {
+    throw new Error(`Perfil nutricional incompleto: ${missingFields.join(', ')}.`);
+  }
   const goal = resolveGoal(profile.goal);
   const targetCalories = toNumber(profile.targetCalories, null) ?? estimateCaloriesFromProfile(profile);
   const baseTarget = buildMacroPlan(targetCalories, resolveMacroStrategy(goal));
   const adapted = applyAdaptiveNutritionToBaseTarget(baseTarget, adaptiveTuning);
-  const weightKg = clamp(toNumber(profile.weightKg, 75), 35, 250);
+  const weightKg = clamp(Number(profile.weightKg), 35, 250);
   return anchorProteinToBodyweight(adapted, weightKg, goal, adaptiveTuning);
 }
 

@@ -581,15 +581,20 @@ const TRAINING_LEVELS = [
   { value: 'intermediate', title: 'Intermedio', icon: 'progress', detail: 'Entrenas con regularidad' },
   { value: 'advanced', title: 'Avanzado', icon: 'bolt', detail: 'Toleras más volumen' },
 ];
+const ACTIVITY_LEVELS = [
+  { value: 'sedentary', title: 'Mayormente sentado' },
+  { value: 'light', title: 'Algo activo' },
+  { value: 'moderate', title: 'Activo' },
+  { value: 'high', title: 'Muy activo' },
+];
 const RUN_GOALS = [['health', 'Salud'], ['race_5k', '5K'], ['race_10k', '10K'], ['race_21k', '21K'], ['race_42k', '42K']];
 const RUN_REF_DIST = [['', '—'], ['5000', '5K'], ['10000', '10K'], ['21097', '21K'], ['42195', '42K']];
-function findChoice(list, value) { return list.find((item) => item.value === value) || list[0]; }
 function secsToMMSS(s) { const n = Number(s); if (!Number.isFinite(n) || n <= 0) return ''; const m = Math.floor(n / 60); const r = Math.round(n % 60); return `${m}:${String(r).padStart(2, '0')}`; }
 function mmssToSecs(str) { const m = /^(\d{1,3}):([0-5]?\d)$/.exec(String(str || '').trim()); if (!m) return null; return Number(m[1]) * 60 + Number(m[2]); }
 function AvailabilitySurvey({ onSaved } = {}) {
   const D = window.STUDIO;
   const u = D.user || {};
-  const [goal, setGoal] = useStateP(u.goalRaw || 'recomposition');
+  const [goal, setGoal] = useStateP(u.goalRaw || '');
   // Comorbilidades estructuradas (checkboxes): adaptan calentamiento, retorno,
   // selección de ejercicios y avisos del coach. Complementan al texto libre.
   const [conds, setConds] = useStateP(u.conditions || { hypertension: false, diabetes: false, osteoarthritis: false, osteoporosis: false, injuryZones: [] });
@@ -598,65 +603,81 @@ function AvailabilitySurvey({ onSaved } = {}) {
   // Objetivo SMART: meta numérica + fecha (como el objetivo de carrera).
   const [goalValue, setGoalValue] = useStateP(u.goalTargetValue != null ? String(u.goalTargetValue) : '');
   const [goalDate, setGoalDate] = useStateP(u.goalTargetDate || '');
-  const [equip, setEquip] = useStateP(u.modalityRaw || 'full_gym');
+  const [equip, setEquip] = useStateP(u.modalityRaw || '');
   // #4 — inventario de equipo disponible (vacío = sin restricción).
   const [gear, setGear] = useStateP(Array.isArray(u.equipment) ? u.equipment : []);
   const toggleGear = (id) => setGear((g) => g.includes(id) ? g.filter((x) => x !== id) : [...g, id]);
-  const [trainingExperience, setTrainingExperience] = useStateP(u.trainingExperience || 'intermediate');
+  const [trainingExperience, setTrainingExperience] = useStateP(u.trainingExperience || '');
+  const [activityLevel, setActivityLevel] = useStateP(u.activityLevel || '');
   const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
   const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
   const [refTime, setRefTime] = useStateP(secsToMMSS(u.runRefTimeSeconds));
   const [raceDate, setRaceDate] = useStateP(u.raceDate || '');
-  const [sex, setSex] = useStateP(u.sex || 'male');
-  const [age, setAge] = useStateP(u.age != null ? u.age : 30);
-  const [weight, setWeight] = useStateP(u.weightKg != null ? u.weightKg : 75);
-  const [height, setHeight] = useStateP(u.heightCm != null ? u.heightCm : 170);
+  const [sex, setSex] = useStateP(u.sex || '');
+  const [age, setAge] = useStateP(u.age != null ? String(u.age) : '');
+  const [weight, setWeight] = useStateP(u.weightKg != null ? String(u.weightKg) : '');
+  const [height, setHeight] = useStateP(u.heightCm != null ? String(u.heightCm) : '');
   const [hrMax, setHrMax] = useStateP(u.hrMaxBpm != null ? String(u.hrMaxBpm) : '');
   // Biometría inicial (opcional): cintura + Navy (cuello, y cadera en mujeres). Se guardan como
   // primera medición en /api/metrics (serie de Progreso), no en el perfil.
   const [waistCm, setWaistCm] = useStateP('');
   const [neckCm, setNeckCm] = useStateP('');
   const [hipCm, setHipCm] = useStateP('');
-  const [mins, setMins] = useStateP(u.sessionMinutes != null ? u.sessionMinutes : 60);
-  const [days, setDays] = useStateP(u.daysPerWeek != null ? u.daysPerWeek : 5);
-  const [meals, setMeals] = useStateP(u.mealsPerDay != null ? u.mealsPerDay : 4);
-  const [weeks, setWeeks] = useStateP(4);
-  const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth
-  const selectedGoal = findChoice(AV_GOALS, goal);
-  const selectedModality = findChoice(AV_EQUIP, equip);
+  const [mins, setMins] = useStateP(u.sessionMinutes != null ? String(u.sessionMinutes) : '');
+  const [days, setDays] = useStateP(u.daysPerWeek != null ? String(u.daysPerWeek) : '');
+  const [meals, setMeals] = useStateP(u.mealsPerDay != null ? String(u.mealsPerDay) : '');
+  const [weeks, setWeeks] = useStateP(u.resurveyWeeks != null ? String(u.resurveyWeeks) : '');
+  const [status, setStatus] = useStateP('idle'); // idle|saving|ok|err|noauth|invalid
+  const selectedGoal = AV_GOALS.find((item) => item.value === goal) || null;
+  const selectedModality = AV_EQUIP.find((item) => item.value === equip) || null;
   const targetEnabled = GOALS_WITH_TARGET.includes(goal);
   const usesRace = equip === 'hybrid_run_gym';
   const raceLabel = (RUN_GOALS.find(([v]) => v === raceGoal) || [null, 'Salud'])[1];
   const keyDate = usesRace && raceDate ? raceDate : (targetEnabled && goalDate ? goalDate : null);
 
   async function save() {
+    const inRange = (value, min, max) => value !== '' && Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max;
+    const requiredComplete = goal && equip && trainingExperience && activityLevel && sex
+      && inRange(age, 12, 100)
+      && inRange(weight, 30, 300)
+      && inRange(height, 120, 230)
+      && inRange(meals, 3, 6)
+      && inRange(mins, 20, 150)
+      && inRange(days, 1, 7);
+    if (!requiredComplete) {
+      setStatus('invalid');
+      return;
+    }
     setStatus('saving');
     try {
       const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
       if (!token) { setStatus('noauth'); return; }
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
+      const surveyPayload = {
+        goal, trainingModality: equip,
+        trainingExperience,
+        activityLevel,
+        sex,
+        age: Number(age),
+        weightKg: Number(weight),
+        heightCm: Number(height),
+        sessionMinutes: Number(mins),
+        daysPerWeek: Number(days),
+        mealsPerDay: Number(meals),
+        runRaceGoal: usesRace ? raceGoal : 'health',
+        runRefDistanceMeters: usesRace && refDist ? Number(refDist) : null,
+        runRefTimeSeconds: usesRace ? mmssToSecs(refTime) : null,
+        raceDate: usesRace ? (raceDate || null) : null,
+        hrMaxBpm: hrMax ? Number(hrMax) : null,
+        conditions: conds,
+        equipment: gear,
+        goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
+        goalTargetDate: targetEnabled ? (goalDate || null) : null,
+      };
+      if (weeks !== '') surveyPayload.resurveyWeeks = Number(weeks);
       const r = await fetch('/api/studio-availability', {
         method: 'POST', headers,
-        body: JSON.stringify({
-          goal, trainingModality: equip, sex,
-          trainingExperience,
-          age: Number(age), weightKg: Number(weight), heightCm: Number(height),
-          sessionMinutes: Number(mins), daysPerWeek: Number(days), mealsPerDay: Number(meals), resurveyWeeks: Number(weeks),
-          // Carrera: objetivo + marca de referencia (para ritmos numéricos).
-          runRaceGoal: usesRace ? raceGoal : 'health',
-          runRefDistanceMeters: usesRace && refDist ? Number(refDist) : null,
-          runRefTimeSeconds: usesRace ? mmssToSecs(refTime) : null,
-          raceDate: usesRace ? (raceDate || null) : null,
-          // FCmáx medida (opcional): prevalece sobre la estimación por edad en zonas y coach.
-          hrMaxBpm: hrMax ? Number(hrMax) : null,
-          // Comorbilidades estructuradas (checkboxes de salud).
-          conditions: conds,
-          // #4 — equipo disponible (vacío = sin restricción).
-          equipment: gear,
-          // Objetivo SMART medible (meta + fecha); null borra el objetivo.
-          goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
-          goalTargetDate: targetEnabled ? (goalDate || null) : null,
-        }),
+        body: JSON.stringify(surveyPayload),
       });
       if (!r.ok) { setStatus('err'); return; }
       // Biometría inicial (opcional): primera medición de cintura (+ Navy cuello/cadera) y peso.
@@ -674,7 +695,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         if (d.ok) {
           const j = await d.json();
           const o = j && j.ok ? j.overrides : null;
-          if (o) ['user', 'todaySession', 'week', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic', 'goalProgress', 'runFitness', 'runZones', 'coachAdjust', 'reentry'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+          if (o) ['user', 'todaySession', 'week', 'weekVolumeHours', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic', 'goalProgress', 'runFitness', 'runZones', 'coachAdjust', 'reentry', 'planStatus'].forEach((k) => { if (Object.prototype.hasOwnProperty.call(o, k)) D[k] = o[k]; });
         }
       } catch (e) { /* noop */ }
       setStatus('ok'); setTimeout(() => setStatus('idle'), 3500);
@@ -689,14 +710,14 @@ function AvailabilitySurvey({ onSaved } = {}) {
         {!u.profileComplete ? (
           <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)', marginBottom: 4 }}>
             <strong style={{ fontSize: '0.95rem' }}>Primeros pasos</strong>
-            <p className="tiny" style={{ margin: '4px 0 0', lineHeight: 1.5 }}>Solo necesitas 3 cosas para empezar: tu <strong>objetivo</strong>, <strong>dónde entrenas</strong> y <strong>cuántos días</strong>. Lo demás (datos, salud, material) es opcional y lo afinamos luego. Pulsa Guardar y te creamos el bloque.</p>
+            <p className="tiny" style={{ margin: '4px 0 0', lineHeight: 1.5 }}>Para prescribir sin inventar datos necesitamos tu objetivo, modalidad, nivel, actividad cotidiana, disponibilidad y datos básicos para estimar energía y cargas. Salud, material, biometría y metas con fecha siguen siendo opcionales.</p>
           </div>
         ) : null}
         <section className="profile-step">
           <div className="profile-step-head">
             <div>
               <div className="mb-label">Objetivo principal</div>
-              <h4>{selectedGoal.title}</h4>
+              <h4>{selectedGoal?.title || 'Elige tu objetivo'}</h4>
             </div>
             <span className="pill tiny accent">Resultado</span>
           </div>
@@ -711,7 +732,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
           {targetEnabled ? (
             <div className="profile-target-panel">
               <div className="field">
-                <label>{selectedGoal.targetLabel}</label>
+                <label>{selectedGoal?.targetLabel}</label>
                 <input className="text-input" type="number" min={goal === 'strength' ? 10 : 30} max={goal === 'strength' ? 500 : 300} step="0.5" placeholder="opcional" value={goalValue} onChange={(e) => setGoalValue(e.target.value)} />
               </div>
               <div className="field">
@@ -727,7 +748,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
           <div className="profile-step-head">
             <div>
               <div className="mb-label">Dónde y cómo entrenas</div>
-              <h4>{selectedModality.title}</h4>
+              <h4>{selectedModality?.title || 'Elige dónde entrenas'}</h4>
             </div>
             <span className="pill tiny">Modalidad</span>
           </div>
@@ -752,7 +773,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
           <div className="profile-step-head">
             <div>
               <div className="mb-label">Nivel actual</div>
-              <h4>{(TRAINING_LEVELS.find((x) => x.value === trainingExperience) || TRAINING_LEVELS[1]).title}</h4>
+              <h4>{(TRAINING_LEVELS.find((x) => x.value === trainingExperience) || {}).title || 'Sin seleccionar'}</h4>
             </div>
             <span className="pill tiny">Volumen</span>
           </div>
@@ -796,19 +817,23 @@ function AvailabilitySurvey({ onSaved } = {}) {
         <section className="plan-summary-band">
           <div className="plan-summary-main">
             <div className="mb-label">Bloque resultante</div>
-            <strong>{selectedGoal.title} · {selectedModality.title}</strong>
+            <strong>{selectedGoal?.title || 'Objetivo pendiente'} · {selectedModality?.title || 'Modalidad pendiente'}</strong>
           </div>
           <div className="plan-summary-grid">
-            <span><b>Microciclo</b><em>{days} días/sem · {mins} min</em></span>
+            <span><b>Microciclo</b><em>{days || '—'} días/sem · {mins || '—'} min</em></span>
             <span><b>Mesociclo</b><em>Bloque de 21 días</em></span>
-            <span><b>Revisión</b><em>Cada {weeks} sem</em></span>
+            <span><b>Revisión</b><em>{weeks ? `Cada ${weeks} sem` : 'Sin configurar'}</em></span>
             <span><b>Fecha clave</b><em>{keyDate || 'Sin fecha'}</em></span>
           </div>
         </section>
 
         <section className="profile-step compact">
-          <div className="mb-label">Datos personales</div>
+          <div className="mb-label">Datos necesarios para personalizar</div>
           <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
+          <p className="tiny muted" style={{ margin: '7px 0 0' }}>Se usa en la fórmula energética; no se muestra como métrica de rendimiento.</p>
+
+          <div className="mb-label" style={{ marginTop: 14 }}>Actividad cotidiana</div>
+          <div className="chips">{ACTIVITY_LEVELS.map((item) => <button key={item.value} type="button" className={`pill ${activityLevel === item.value ? 'accent' : ''}`} onClick={() => setActivityLevel(item.value)}>{item.title}</button>)}</div>
 
           <div style={{ marginTop: 14 }}>
             <div className="mb-label">Salud (opcional — adapta tu plan con seguridad)</div>
@@ -827,15 +852,15 @@ function AvailabilitySurvey({ onSaved } = {}) {
           </div>
 
           <div className="grid g-4" style={{ gap: 10, marginTop: 12 }}>
-            <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" value={age} onChange={(e) => setAge(e.target.value)} /></div>
-            <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>
-            <div className="field"><label>Altura (cm)</label><input className="text-input" type="number" min="120" max="230" value={height} onChange={(e) => setHeight(e.target.value)} /></div>
-            <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
+            <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" placeholder="Años" value={age} onChange={(e) => setAge(e.target.value)} /></div>
+            <div className="field"><label>Peso (kg)</label><input className="text-input" type="number" min="30" max="300" step="0.1" placeholder="kg" value={weight} onChange={(e) => setWeight(e.target.value)} /></div>
+            <div className="field"><label>Altura (cm)</label><input className="text-input" type="number" min="120" max="230" placeholder="cm" value={height} onChange={(e) => setHeight(e.target.value)} /></div>
+            <div className="field"><label>Comidas/día</label><input className="text-input" type="number" min="3" max="6" placeholder="3–6" value={meals} onChange={(e) => setMeals(e.target.value)} /></div>
           </div>
           <div className="grid g-4" style={{ gap: 10, marginTop: 10 }}>
-            <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
+            <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" placeholder="20–150" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
             <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
-            <div className="field"><label>Re-encuesta (sem)</label><input className="text-input" type="number" min="1" max="26" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
+            <div className="field"><label>Re-encuesta (sem, opc.)</label><input className="text-input" type="number" min="1" max="26" placeholder="Sin indicar" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
             <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
           </div>
           <div className="mb-label" style={{ marginTop: 14 }}>Biometría <span className="tiny muted">(opcional — para tu riesgo cardiometabólico y su evolución)</span></div>
@@ -851,6 +876,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
           <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando...' : 'Guardar cambios'}</button>
           {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado.</span> : null}
           {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
+          {status === 'invalid' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Completa los campos necesarios: objetivo, modalidad, nivel, actividad, sexo, edad, peso, altura, comidas, minutos y días.</span> : null}
           {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
         </div>
       </div>
@@ -953,12 +979,9 @@ function StravaCard() {
 }
 
 /* ============ PERFIL ============ */
-function ProfileScreen({ theme, setTheme, notif, setNotif }) {
+function ProfileScreen({ theme, setTheme, notif }) {
   const D = window.STUDIO;
   const u = D.user;
-  const [goal, setGoal] = useStateP('Recomposición');
-  const goals = ['Bajar peso', 'Recomposición', 'Hipertrofia', 'Glucémico'];
-  const gi = goals.indexOf(goal);
   return (
     <div className="page stagger screen-enter">
       <div className="page-head"><div><p className="eyebrow">Perfil</p><h1>Tu cuenta</h1></div></div>
@@ -992,8 +1015,8 @@ function ProfileScreen({ theme, setTheme, notif, setNotif }) {
             </div>
           </div>
           <div className="set-row">
-            <div><strong style={{ fontSize: '0.92rem' }}>Recordatorios de comida</strong><div className="tiny muted">Avisos antes de cada comida</div></div>
-            <div className={`switch ${notif ? 'on' : ''}`} onClick={() => setNotif(!notif)}><i /></div>
+            <div><strong style={{ fontSize: '0.92rem' }}>Recordatorios de comida</strong><div className="tiny muted">Próximamente · requiere activar notificaciones push</div></div>
+            <div className={`switch ${notif ? 'on' : ''}`} aria-disabled="true" title="Próximamente"><i /></div>
           </div>
           <div className="set-row">
             <div><strong style={{ fontSize: '0.92rem' }}>Wearable</strong><div className="tiny muted">Conecta Strava arriba (Apple Watch → Strava → Ignios)</div></div>

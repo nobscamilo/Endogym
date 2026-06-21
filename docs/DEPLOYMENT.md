@@ -20,13 +20,22 @@ gcloud firestore indexes composite create \
 
 ## Estado verificado
 
-Último estado confirmado en docs: **19 de junio de 2026, noche-2**. Producción pública sigue en el deploy del mismo día anterior al ajuste del coach; hay cambios locales pendientes de deploy.
+Último estado local y de producción confirmado: **20 de junio de 2026**.
 
-- FASES 0-2 del coach/prescripción completas; registro retroactivo, nombre en alta y cambio de grupo están desplegados. Localmente, `coach-analysis` ya está alineado con objetivos SMART/carrera: `43` archivos / `308` tests, audit 0, smoke/check:conflicts y build OK.
-- Deploy más reciente verificado: `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF` (`https://endogym-aihz8l0ml-juan-camilo-sarmientos-projects.vercel.app`), estado `Ready`; `https://endogym.vercel.app` resuelve a ese deployment.
-- Sondas básicas recientes: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401` y `/api/coach-chat` sin token `401`.
-- Último bundle desplegado: `097b1b9fba` (cambio de grupo muscular también desde días no-fuerza, con aviso y guardarraíles). El asset respondió `200` el 19 de junio.
-- Bundle local pendiente de deploy: `29b865f9b9` (sección “Consonancia con tu objetivo” en Progreso).
+- Working tree validado: contrato demo/autenticado estricto, perfil obligatorio sin supuestos, planes vencidos sin reciclaje, coach-analysis orientado a objetivos y vídeos contextuales sin feed simulado. `46` archivos / `339` tests, audit 0, smoke/check:conflicts y build OK.
+- Producción: `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`, estado `Ready`, URL `https://endogym-9d6ey3oz8-juan-camilo-sarmientos-projects.vercel.app`, bundle `bb2659ac92`.
+- `endogym.vercel.app` se reasignó manualmente al deployment nuevo porque `vercel deploy --prod` volvió a quedar esperando en `Running Checks` después de crear correctamente el artefacto.
+- Sondas: `/` `200`, `/api/health` `200`, `/api/meals` sin token `401`, `POST /api/coach-chat` sin token `401`, index/bundle `200`; el bundle contiene “Abrir en YouTube” y no contiene el feed ficticio.
+- Playwright producción abrió “Sigue aprendiendo” y el iframe real de YouTube sin errores de consola. Runtime logs filtrados del deployment: sin errores encontrados.
+- El deployment salió del working tree de `main` en HEAD `a7b7482`; esos cambios siguen sin commit/push y producción no es reproducible desde `origin/main`.
+
+Para una futura sonda autenticada integral, verifica además:
+
+- cuenta nueva: `/api/profile` no persiste valores personales por defecto;
+- encuesta incompleta: `studio-availability` `400` y `weekly-plan` `409` con `missingFields`;
+- sesión autenticada sin datos: ningún texto, entreno, métrica, comida o curva del demo;
+- bloque vencido: `planStatus:'stale'`, sin sesión reciclada ni swap sobre el primer día;
+- onboarding móvil y desktop: todos los campos requeridos parten vacíos y el plan solo se crea tras completarlos.
 
 Deploy relevante del **19 de junio de 2026**:
 

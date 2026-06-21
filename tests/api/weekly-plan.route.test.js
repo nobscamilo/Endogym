@@ -166,6 +166,24 @@ describe('/api/weekly-plan route', () => {
     expect(json.error).toContain('No existe perfil');
   });
 
+  it('POST rejects an incomplete profile instead of generating from invented defaults', async () => {
+    mocks.getUserProfile.mockResolvedValue({
+      goal: 'recomposition',
+      trainingMode: 'gym',
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/weekly-plan', { method: 'POST', body: '{}' })
+    );
+    const json = await readJson(response);
+
+    expect(response.status).toBe(409);
+    expect(json.error).toContain('Completa tu perfil');
+    expect(json.details.missingFields).toContain('weightKg');
+    expect(json.details.missingFields).toContain('trainingExperience');
+    expect(mocks.listWorkoutsSince).not.toHaveBeenCalled();
+  });
+
   it('POST returns 429 with Retry-After when plan generation limit is exhausted', async () => {
     mocks.enforceUserRateLimit.mockResolvedValue({
       allowed: false,
@@ -205,6 +223,9 @@ describe('/api/weekly-plan route', () => {
       weightKg: 80,
       heightCm: 178,
       mealsPerDay: 4,
+      trainingExperience: 'intermediate',
+      daysPerWeek: 4,
+      preferredDurationMinutes: 60,
       preparticipation: {
         knownCardiometabolicDisease: false,
         exerciseSymptoms: false,
@@ -248,7 +269,7 @@ describe('/api/weekly-plan route', () => {
   });
 
   it('POST refreshes adaptive overlay for an active block without rebuilding it', async () => {
-    const { dateKeyInTimeZone } = await import('../../src/lib/appTime.js');
+    const { dateKeyInTimeZone, dateKeyStartIso } = await import('../../src/lib/appTime.js');
     const today = dateKeyInTimeZone(); // fecha CIVIL, igual que la ruta
     const days = Array.from({ length: 14 }, (_, index) => ({
       date: index === 0 ? today : `2099-01-${String(index + 1).padStart(2, '0')}`,
@@ -279,6 +300,9 @@ describe('/api/weekly-plan route', () => {
       weightKg: 80,
       heightCm: 178,
       mealsPerDay: 4,
+      trainingExperience: 'intermediate',
+      daysPerWeek: 4,
+      preferredDurationMinutes: 60,
       preparticipation: {
         knownCardiometabolicDisease: false,
         exerciseSymptoms: false,
@@ -289,11 +313,11 @@ describe('/api/weekly-plan route', () => {
       },
     });
     mocks.getLatestWeeklyPlan.mockResolvedValue(activeBlock);
-    // OJO: 00:00Z y no 12:00Z — si la suite corre antes del mediodía UTC, un check-in a
-    // las 12:00Z queda "en el futuro" y progressMemory lo excluye (test flaky por hora).
+    // Inicio REAL del día civil de la app. `${today}T00:00Z` aún puede estar en el futuro
+    // entre medianoche y las 02:00 de Madrid durante el horario de verano.
     mocks.listWorkoutsSince.mockResolvedValue([{
       source: 'daily_checkin',
-      performedAt: `${today}T00:00:00.000Z`,
+      performedAt: dateKeyStartIso(today),
       completed: true,
       sessionRpe: 9,
       fatigue: 9,
@@ -335,6 +359,9 @@ describe('/api/weekly-plan route', () => {
       weightKg: 80,
       heightCm: 178,
       mealsPerDay: 4,
+      trainingExperience: 'intermediate',
+      daysPerWeek: 4,
+      preferredDurationMinutes: 60,
       onboardingCompleted: false,
       preparticipationUpdatedAt: '2026-03-20T00:00:00.000Z',
       preparticipation: {
@@ -379,6 +406,9 @@ describe('/api/weekly-plan route', () => {
       weightKg: 80,
       heightCm: 178,
       mealsPerDay: 4,
+      trainingExperience: 'intermediate',
+      daysPerWeek: 4,
+      preferredDurationMinutes: 60,
       preparticipation: {
         knownCardiometabolicDisease: false,
         exerciseSymptoms: false,
@@ -442,6 +472,9 @@ describe('/api/weekly-plan route', () => {
       weightKg: 80,
       heightCm: 178,
       mealsPerDay: 4,
+      trainingExperience: 'intermediate',
+      daysPerWeek: 4,
+      preferredDurationMinutes: 60,
       preparticipation: {
         knownCardiometabolicDisease: false,
         exerciseSymptoms: false,
@@ -525,6 +558,9 @@ describe('/api/weekly-plan route', () => {
       weightKg: 80,
       heightCm: 178,
       mealsPerDay: 4,
+      trainingExperience: 'intermediate',
+      daysPerWeek: 4,
+      preferredDurationMinutes: 60,
       preparticipation: {
         knownCardiometabolicDisease: false,
         exerciseSymptoms: false,

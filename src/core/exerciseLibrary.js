@@ -23,165 +23,80 @@ function roundToStep(value, step = 2.5) {
   return Math.round(value / step) * step;
 }
 
-// Curated exercise video mappings pointing to @DeltaBolic YouTube videos/Shorts.
-// Exercises without a mapping will fall back to search within his channel.
-const EXERCISE_VIDEO_MAP = {
-  // Chest
+// Vídeos curados 1:1: el movimiento y el implemento deben coincidir con el ejercicio.
+// NO reutilizar un vídeo solo por compartir patrón o grupo muscular. Si no existe una
+// demostración exacta verificada, `youtubeLinks()` conserva la búsqueda específica y la UI
+// usa su fallback local en vez de enseñar una técnica distinta como si fuera equivalente.
+export const EXERCISE_VIDEO_MAP = Object.freeze({
+  // Pecho / empuje horizontal
   'gym-bench-press': 'XjrsqShr-Ic', // Bench Press LIKE THIS! (Shorts)
-  'gym-db-bench-press': 'XjrsqShr-Ic',
+  'gym-db-bench-press': 'Y_7aHqXeCfQ', // Dumbbell Bench Press | 3 GOLDEN RULES
+  'gym-incline-db-press': 'IP4oeKh1Sd4', // Incline Dumbbell Bench Press | 2 Minute Tutorial
+  'home-floor-press': 'uUGDRwge4F8', // Dumbbell Floor Press
+  'home-band-chest-press': 'Rn-hf5iauTc', // Chest Press With Resistance Band
   'gym-pushup': 'J-vItVuxDl0', // Push-Up Variations (Shorts)
   'home-push-up': 'J-vItVuxDl0',
-  'home-incline-push-up': 'J-vItVuxDl0',
-  'home-floor-press': 'XjrsqShr-Ic',
-  'home-band-chest-press': 'XjrsqShr-Ic',
-  'trx-chest-press': 'J-vItVuxDl0',
-  'trx-chest-fly': 'eGjt4lk6g34',
+  'gym-cable-fly': 'JUDTGZh4rhg', // Cable Flys (proper form)
 
-  // Back / Pull
+  // Espalda / tirón
   'gym-pullup': 'ZPG8OsHKXLw', // The PERFECT Pull-Up (5 Steps)
   'home-pull-up': 'ZPG8OsHKXLw',
-  'calis-pull-up-assisted': 'ZPG8OsHKXLw',
   'gym-lat-pulldown': 'S481pmnNTYY',
   'gym-barbell-row': 'phVtqawIgbk',
-  'gym-seated-row': 'G35gTqGcXXA',
+  'gym-seated-row': 'vwHG9Jfu4sw', // Seated Cable Row | 2 Minute Tutorial
   'gym-chest-supported-row': 'G35gTqGcXXA',
-  'home-band-row': 'phVtqawIgbk',
-  'home-band-lat-pulldown': 'S481pmnNTYY',
-  'home-towel-row': 'phVtqawIgbk',
-  'trx-row': 'ZuV_NokRESN',
-  'trx-single-arm-row': 'ZuV_NokRESN',
 
-  // Arms
+  // Brazos / hombro
   'gym-bicep-curl': '8xqUwVT_OYg', // Fix Your Bicep Curl Mistakes! (Shorts)
   'gym-db-curl': '8xqUwVT_OYg',
-  'home-band-curl': '8xqUwVT_OYg',
-  'trx-biceps-curl': '8xqUwVT_OYg',
   'gym-hammer-curl': 'zC3nLlEvin4',
+  'gym-lateral-raise': 'Myim1WH6Qec',
+  'gym-triceps-pushdown': 'v2fMq8RjNBw',
+  'gym-face-pull': 'ywQsaOTRjzM',
+  'gym-facepull': 'ywQsaOTRjzM',
+  'gym-overhead-press': '4LBVP2Oe7fg',
 
-  // Legs / Posterior Chain
+  // Pierna / cadena posterior
   'gym-barbell-back-squat': 'ZaSetOZFo-k', // How To Do A Barbell Back Squat
-  'home-bodyweight-squat': 'ZaSetOZFo-k',
+  'gym-front-squat': 'v-mQm_droHg', // How To Front Squat
+  'gym-hack-squat': 'u--5-ukCQdU', // Hack Squat Basics
   'gym-conventional-deadlift': 'K8a_Ab9R-aI', // The PERFECT Deadlift Guide (Shorts)
-  'gym-romanian-deadlift': 'K8a_Ab9R-aI',
-  'home-single-leg-rdl': 'K8a_Ab9R-aI',
+  'gym-romanian-deadlift': '_oyxCn2iSjU', // How To Do Romanian Deadlifts
   'gym-split-squat': 'or1frhkjBDc',
-  'home-chair-split-squat': 'or1frhkjBDc',
-  'trx-bulgarian-split-squat': 'or1frhkjBDc',
   'gym-hip-thrust': '96uDbymTaHM',
   'gym-leg-press': 'Hpag6J2_4LY',
-
-  // Shoulders
-  'gym-overhead-press': '4LBVP2Oe7fg',
-  'home-band-overhead-press': '4LBVP2Oe7fg',
-  'gym-face-pull': 'ywQsaOTRjzM', // Do Face Pulls LIKE THIS! (Shorts)
-  'gym-facepull': 'ywQsaOTRjzM',
-  'trx-face-pull': 'ywQsaOTRjzM',
-
-  // Other curated guidelines
-  'gym-plank': 'pSHjTRCQxIw',
+  'gym-leg-curl': 'HQyWDIE_ILU',
+  'gym-calf-raise': 'rsOLKY02m70',
   'gym-dumbbell-lunge': 'D7KaRcUTQeE',
-  'gym-dips': '2z8JmcrW-As',
   'gym-lunges': 'D7KaRcUTQeE',
-  'gym-crunch': 'Xyd_fa5zoEU',
-  'gym-dumbbell-flye': 'eGjt4lk6g34',
-  'gym-burpee': 'dZgVxmf6jkA',
 
-  // --- Cobertura de fuerza (ampliación): todos verificados vía oEmbed (jun 2026). Shorts de
-  // técnica. Donde no existe un Short 1:1, se usa el vídeo del MISMO patrón de movimiento. ---
-  // Tirón / espalda
-  'trx-t-fly': 'ywQsaOTRjzM',            // deltoides posterior (face pull)
-  'trx-y-fly': 'ywQsaOTRjzM',
-  'trx-reverse-fly': 'ywQsaOTRjzM',
-  'home-band-pull-apart': 'ywQsaOTRjzM',
-  'home-band-pullover': 'S481pmnNTYY',   // dorsales (jalón)
-  'trx-high-row': 'phVtqawIgbk',         // remo
-  'trx-crossover-row': 'phVtqawIgbk',
-  'calis-inverted-row': 'phVtqawIgbk',
-  'trx-power-pull': 'phVtqawIgbk',
-  // Cadena posterior
-  'calis-arch-hold': 'uexOGyxLr7E',      // superman / extensión
-  'trx-hip-hinge': 'K8a_Ab9R-aI',        // bisagra (peso muerto)
-  'home-banded-good-morning': 'K8a_Ab9R-aI',
-  'gym-leg-curl': 'HQyWDIE_ILU',         // curl femoral
-  'trx-hamstring-curl': 'HQyWDIE_ILU',
-  'trx-hamstring-runner': 'HQyWDIE_ILU',
-  'home-reverse-plank': 'bf7MS2rtfIg',   // puente glúteo
-  'trx-hip-press': '96uDbymTaHM',        // hip thrust
-  'home-hip-bridge': 'bf7MS2rtfIg',
-  'home-single-leg-glute-bridge': 'bf7MS2rtfIg',
-  'trx-glute-bridge': 'bf7MS2rtfIg',
-  // Core
+  // Peso corporal / core / acondicionamiento
+  'gym-plank': 'pSHjTRCQxIw',
+  'home-plank': 'pSHjTRCQxIw',
+  'home-side-plank': 'HyAct6eyrvg',
   'home-bird-dog': 'LWdKrBi9Lks',
   'home-dead-bug': 'Aoipu_fl3HA',
   'calis-hollow-hold': 'KgkU7yAEW90',
-  'home-band-woodchop': 'eMfhcGOzC7Y',
-  'home-plank': 'pSHjTRCQxIw',
-  'home-side-plank': 'HyAct6eyrvg',
-  'trx-side-plank': 'HyAct6eyrvg',
-  'home-suitcase-carry': 'HyAct6eyrvg',
-  'trx-oblique-crunch': 'Xyd_fa5zoEU',
-  'trx-knee-tuck': 'pSHjTRCQxIw',
-  'trx-fallout': 'pSHjTRCQxIw',
-  'trx-pike': 'pSHjTRCQxIw',
-  'trx-plank-saw': 'pSHjTRCQxIw',
-  'trx-rollout': 'pSHjTRCQxIw',
-  // Empuje superior / hombro / tríceps
-  'gym-cable-fly': 'eGjt4lk6g34',
-  'gym-incline-db-press': 'XjrsqShr-Ic',
-  'gym-lateral-raise': 'Myim1WH6Qec',
-  'home-band-lateral-raise': 'Myim1WH6Qec',
-  'gym-triceps-pushdown': 'v2fMq8RjNBw',
-  'home-band-triceps-pressdown': 'v2fMq8RjNBw',
-  'trx-triceps-extension': 'v2fMq8RjNBw',
-  'home-pike-push-up': '4LBVP2Oe7fg',    // empuje vertical (press militar)
-  'calis-hindu-push-up': 'J-vItVuxDl0',  // flexión
-  'trx-atomic-pushup': 'J-vItVuxDl0',
-  'calis-dip-assisted': '2z8JmcrW-As',   // fondos
-  'calis-bench-dip': '2z8JmcrW-As',
-  // Gemelos
-  'gym-calf-raise': 'rsOLKY02m70',
-  'home-single-leg-calf-raise': 'rsOLKY02m70',
-  // Acondicionamiento
+  'home-hip-bridge': 'bf7MS2rtfIg',
   'home-mountain-climber': 'hZb6jTbCLeE',
-  'trx-sprinter-start': 'hZb6jTbCLeE',
   'home-bear-crawl': '-9L3rTrYo4Q',
+  'gym-dips': '2z8JmcrW-As',
+  'gym-crunch': 'Xyd_fa5zoEU',
+  'gym-burpee': 'dZgVxmf6jkA',
+
   // Movilidad
   'yoga-cat-cow': 'MSBOBAIeLqI',
   'mobility-ankle': 'WlRbt0hewIs',
   'mobility-thoracic': 'j6hv8Q5QtL8',
-  // Neuromotor
-  'home-hip-airplane': 'K8a_Ab9R-aI',
-  // Pierna unilateral
-  'home-step-up': '5ksu8nrdVIE',
   'home-cossack-squat': 'VdN137mr2mM',
-  'trx-single-leg-squat': 'or1frhkjBDc',
-  'trx-assisted-pistol-squat': 'or1frhkjBDc',
-  'home-skater-squat-box': 'or1frhkjBDc',
-  'trx-curtsy-lunge': 'D7KaRcUTQeE',
-  'trx-lunge': 'D7KaRcUTQeE',
-  'home-reverse-lunge': 'D7KaRcUTQeE',
-  // Pierna (sentadilla)
-  'trx-squat': 'ZaSetOZFo-k',
-  'gym-front-squat': 'ZaSetOZFo-k',
-  'gym-hack-squat': 'ZaSetOZFo-k',
-  'home-wall-sit': 'ZaSetOZFo-k',
 
-  // --- Cardio (carrera/ciclismo): para la modalidad híbrida runner+gym y planes con cardio ---
-  'run-zone2': 'UmJbXtnwopI',          // técnica de carrera
-  'run-tempo': 'UmJbXtnwopI',
-  'run-fartlek': 'V8u_llDIJSQ',        // intervalos
+  // Carrera / ciclismo: solo drills o sesiones que coinciden con el contenido del vídeo.
   'run-intervals': 'V8u_llDIJSQ',
-  'run-hill-repeats': 'afvcZEgF9M0',   // cuestas
-  'run-strides': 'KSoL-w9bNns',        // aceleraciones
-  'run-a-skip-drill': 'O9wh-huxbxU',   // técnica A-skip
-  'cycle-zone2': 'lm0XnGDC1DE',        // cadencia/técnica ciclismo
-  'cycle-intervals': 'lm0XnGDC1DE',
-  'cycle-sweet-spot': 'lm0XnGDC1DE',
+  'run-hill-repeats': 'afvcZEgF9M0',
+  'run-strides': 'KSoL-w9bNns',
+  'run-a-skip-drill': 'O9wh-huxbxU',
   'cycle-cadence-drill': 'lm0XnGDC1DE',
-  'cycle-spin-ups': 'lm0XnGDC1DE',
-  'cycle-low-cadence-climb': 'lm0XnGDC1DE',
-  'cycle-standing-climb': 'lm0XnGDC1DE',
-};
+});
 
 function youtubeLinks(query, exerciseId = '') {
   const videoId = EXERCISE_VIDEO_MAP[exerciseId] || null;
@@ -1235,8 +1150,8 @@ function resolveTimePrescription(sessionType) {
 
 function resolveTrainingExperience(profile) {
   const value = String(profile?.trainingExperience || '').toLowerCase();
-  if (value === 'novice' || value === 'advanced') return value;
-  return 'intermediate';
+  if (value === 'novice' || value === 'intermediate' || value === 'advanced') return value;
+  return null;
 }
 
 function experienceSetFactor(experience) {
@@ -1306,7 +1221,8 @@ function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 
     return { loadKg: null, source: null };
   }
 
-  const bodyWeight = clamp(toNumber(profile?.weightKg, 75), 35, 250);
+  const profileWeight = toNumber(profile?.weightKg, null);
+  const bodyWeight = profileWeight == null ? null : clamp(profileWeight, 35, 250);
   const readinessModifier = toNumber(adaptiveTuning?.workout?.rpeShift, 0) * 0.03;
   const prog = clamp(toNumber(loadProgression, 1), 0.8, 1.3);
   // FASE 1.3 — reentrada tras inactividad: multiplicador de carga (p. ej. 0.9 = −10%).
@@ -1320,13 +1236,16 @@ function prescribeLoadKg(exercise, profile, adaptiveTuning, { loadProgression = 
     raw = hl * prog * (1 + readinessModifier) * loadFactor;
     source = historySource || 'history';
   } else {
+    if (bodyWeight == null) {
+      return { loadKg: null, source: 'profile_required' };
+    }
     // Estimación inicial por peso corporal × ratio del ejercicio (hasta tener historial).
     const ratio = toNumber(exercise.loadRatio, 0.15);
     const volumeFactor = toNumber(adaptiveTuning?.workout?.volumeFactor, 1);
     raw = bodyWeight * ratio * (1 + readinessModifier) * volumeFactor * prog * loadFactor;
     source = 'estimate';
   }
-  const bounded = clamp(raw, 5, bodyWeight * 1.6);
+  const bounded = clamp(raw, 5, bodyWeight == null ? 400 : bodyWeight * 1.6);
   return { loadKg: roundToStep(bounded, 2.5), source };
 }
 
@@ -1379,9 +1298,11 @@ export function buildExercisePrescription(exercise, { goal, sessionType, profile
     reps: repRange.reps,
     restSeconds: resolveRestSeconds(goal, experience),
     loadKg,
-    loadSource: source, // 'history'/'history_name' (desde registro) | 'estimate' (estimación inicial)
+    loadSource: source, // historial | estimación inicial | profile_required (sin peso real)
     // Transparencia del método: 'dapre' (desempeño real) o 'phase' (fallback sin reps).
-    progression: dapreApplied
+    progression: source === 'profile_required'
+      ? { method: 'profile_required', factor: null }
+      : dapreApplied
       ? { method: 'dapre', factor: dapre.factor, reason: dapre.reason }
       : { method: 'phase', factor: clamp(toNumber(loadProgression, 1), 0.8, 1.3) },
     loadGuidance:
@@ -1391,7 +1312,9 @@ export function buildExercisePrescription(exercise, { goal, sessionType, profile
           : (isHistory
             ? 'Progresa desde tu última carga registrada; termina cada serie con 1-3 reps en reserva (RIR).'
             : 'Estimación inicial: ajusta para terminar con 1-3 reps en reserva (RIR) y se afinará con tu registro.'))
-        : 'Usa progresión de dificultad (ángulo, palanca o tempo) para mantener RPE objetivo.',
+        : source === 'profile_required'
+          ? 'Añade tu peso al perfil para estimar una carga inicial; hasta entonces elige una carga que deje 1-3 repeticiones en reserva.'
+          : 'Usa progresión de dificultad (ángulo, palanca o tempo) para mantener RPE objetivo.',
   };
 }
 

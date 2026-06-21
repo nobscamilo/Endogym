@@ -17,10 +17,12 @@ import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRac
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
+import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
 import { buildWaistAssessment, estimateBodyFatNavy } from '../../../core/waistRisk.js';
-import { dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
+import { isPrescriptionProfileComplete } from '../../../core/profileCompleteness.js';
+import { addDaysToDateKey, dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
@@ -181,14 +183,13 @@ function mapStrava(connection, workouts) {
   };
 }
 
-// Datos reales para el rediseño Studio (fase 2). Devuelve overrides que el bundle
-// estático fusiona sobre window.STUDIO (datos de muestra) ANTES de renderizar.
-// Cada sección es defensiva: si faltan datos válidos, se omite y se conserva la muestra.
+// Datos reales para el rediseño Studio. En una sesión autenticada devuelve un contrato completo:
+// cada sección reemplaza la muestra por dato real, null o colección vacía ANTES de renderizar.
 //
 // REAL: perfil, sesión de hoy (con vídeos reales de YouTube), semana, biblioteca,
 //       macros objetivo/consumidas, progreso (peso + sesiones).
-// MUESTRA (no hay equivalente en backend aún): recetas de comidas, lista de compra,
-//       batch cooking, curva glucémica, strain/recovery/volumen muscular/PRs.
+// Las recetas, compra y batch llegan después desde /api/studio-nutrition; mientras tanto quedan
+// vacías. El dataset de muestra se reserva exclusivamente para el modo demo sin token.
 
 const HUES = [55, 232, 18, 300, 162, 78, 200, 120];
 
@@ -217,7 +218,7 @@ function mapUser(profile, authUser) {
   const last = p.lastName || p.surname || '';
   const goal = p.goal || '';
   const modality = p.trainingModality || p.trainingMode || '';
-  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : undefined);
+  const num = (v) => (v == null || v === '' ? undefined : (Number.isFinite(Number(v)) ? Number(v) : undefined));
   const out = {};
   out.name = name;                       // SIEMPRE (evita heredar el nombre de muestra)
   out.last = last;                       // siempre (evita heredar el apellido de muestra)
@@ -225,12 +226,13 @@ function mapUser(profile, authUser) {
   if (goal) { out.goalRaw = goal; out.goal = goal; out.goalShort = GOAL_LABELS[goal] || goal; }
   if (modality) { out.modalityRaw = modality; out.modality = MODALITY_LABELS[modality] || modality; }
   // #8 — primeros pasos: marca si el perfil ya pasó por la encuesta del Studio.
-  out.profileComplete = p.studioAvailability === true && Boolean(goal);
+  out.profileComplete = p.studioAvailability === true && isPrescriptionProfileComplete(p);
   // Para prefijar el formulario de Perfil:
   if (num(p.age) !== undefined) out.age = num(p.age);
   if (num(p.weightKg) !== undefined) out.weightKg = num(p.weightKg);
   if (num(p.heightCm) !== undefined) out.heightCm = num(p.heightCm);
   if (p.sex) out.sex = p.sex;
+  if (['sedentary', 'light', 'moderate', 'high'].includes(p.activityLevel)) out.activityLevel = p.activityLevel;
   // Comorbilidades estructuradas (prefill de los checkboxes de Perfil)
   if (p.conditions && typeof p.conditions === 'object') out.conditions = p.conditions;
   // Objetivo SMART (prefill del formulario de Perfil)
@@ -239,6 +241,7 @@ function mapUser(profile, authUser) {
   if (num(p.mealsPerDay) !== undefined) out.mealsPerDay = num(p.mealsPerDay);
   if (num(p.preferredDurationMinutes) !== undefined) out.sessionMinutes = num(p.preferredDurationMinutes);
   if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
+  if (num(p.resurveyWeeks) !== undefined) out.resurveyWeeks = num(p.resurveyWeeks);
   if (['novice', 'intermediate', 'advanced'].includes(p.trainingExperience)) out.trainingExperience = p.trainingExperience;
   // #4 — inventario de equipo y preferencias (prefill).
   if (Array.isArray(p.equipment)) out.equipment = p.equipment;
@@ -357,11 +360,16 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   // se conserva el comportamiento anterior (solo día de entreno) para no alterar ese flujo.
   const day = exact
     ? (days.find((d) => d.date === today && d.isTrainingDay) || null)
-    : (days.find((d) => d.date === today) || days.find((d) => d.isTrainingDay) || days[0]);
+    : (days.find((d) => d.date === today) || null);
   if (!day) return null;
   const isRestDay = !day.isTrainingDay;
   const ex = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
   const list = ex.map((e, i) => {
+    // El plan persiste una instantánea de metadatos. Los vídeos, en cambio, deben salir
+    // siempre del mapa curado actual por ID para que una asociación corregida o retirada
+    // se aplique al bloque activo sin obligar al usuario a regenerarlo.
+    const videoMetadata = resolveExerciseMetadata(e);
+    const currentVideoId = videoMetadata.videoEmbedId;
     const item = {
       id: e.id || null,
       name: e.name || 'Ejercicio',
@@ -372,7 +380,8 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
       hue: HUES[i % HUES.length],
       done: false,
     };
-    if (e.videoEmbedId) item.yt = e.videoEmbedId;
+    if (currentVideoId) item.yt = currentVideoId;
+    if (videoMetadata.videoUrl) item.videoUrl = videoMetadata.videoUrl;
     if (Array.isArray(e.cues) && e.cues.length) item.cues = e.cues.slice(0, 3);
     if (e.prescription?.loadKg != null) item.loadKg = e.prescription.loadKg;
     if (e.prescription?.sets != null) item.sets = e.prescription.sets;
@@ -446,8 +455,10 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
 export function mapWeek(plan, today, workouts = []) {
   let days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
-  // En un bloque de varias semanas, muestra solo la SEMANA actual (lunes→domingo) que
-  // contiene "today"; si today cae fuera, la primera semana del bloque.
+  // Un bloque vencido no se presenta como la semana actual. El usuario debe regenerarlo.
+  if (!days.some((d) => d.date === today)) return null;
+  // En un bloque de varias semanas, muestra solo la SEMANA actual (lunes→domingo).
+  // La salida temprana anterior ya descartó bloques que no contienen "today".
   if (days.length > 7) {
     const ref = days.find((d) => d.date === today) ? new Date(today) : new Date(days[0].date);
     if (!Number.isNaN(ref.getTime())) {
@@ -506,7 +517,7 @@ export function mapWeek(plan, today, workouts = []) {
   return { days: week, volumeHours };
 }
 
-function mapLibrary(plan) {
+export function mapLibrary(plan) {
   const days = plan?.days;
   if (!Array.isArray(days)) return null;
   const seen = new Set();
@@ -515,7 +526,10 @@ function mapLibrary(plan) {
     for (const e of (d.workout?.exercises || [])) {
       if (!e?.name || seen.has(e.name)) continue;
       seen.add(e.name);
+      const videoMetadata = resolveExerciseMetadata(e);
+      const currentVideoId = videoMetadata.videoEmbedId;
       const item = {
+        id: e.id || null,
         name: e.name,
         muscle: (Array.isArray(e.primaryMuscles) && e.primaryMuscles[0]) || e.category || '',
         level: e.difficulty || 'Base',
@@ -523,7 +537,8 @@ function mapLibrary(plan) {
         len: '',
         hue: HUES[lib.length % HUES.length],
       };
-      if (e.videoEmbedId) item.yt = e.videoEmbedId;
+      if (currentVideoId) item.yt = currentVideoId;
+      if (videoMetadata.videoUrl) item.videoUrl = videoMetadata.videoUrl;
       lib.push(item);
       if (lib.length >= 12) break;
     }
@@ -549,10 +564,9 @@ function mapMacroTargets(plan, today) {
   };
 }
 
-function mapMacroEaten(meals) {
-  if (!Array.isArray(meals) || !meals.length) return null;
+export function mapMacroEaten(meals) {
   const sum = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
-  for (const m of meals) {
+  for (const m of (Array.isArray(meals) ? meals : [])) {
     const t = m.totals || {};
     sum.kcal += Number(t.calories) || 0;
     sum.protein += Number(t.proteinGrams) || 0;
@@ -567,9 +581,9 @@ function mapMacroEaten(meals) {
   };
 }
 
-// Glucemia real desde las comidas logueadas de hoy.
-// Simula la curva de glucosa continua si hay comidas registradas hoy.
-function mapGlycemic(meals) {
+// Carga glucémica estimada desde las comidas logueadas de hoy. No fabrica una curva continua:
+// esa visualización solo puede existir con datos de un sensor CGM real.
+export function mapGlycemic(meals) {
   if (!Array.isArray(meals) || !meals.length) return null;
   let load = 0; let iiSum = 0; let iiN = 0; let has = false;
   for (const m of meals) {
@@ -603,7 +617,7 @@ function groupOf(muscle) {
   return null;
 }
 
-function mapProgress(metrics, workouts, plan, profile = null) {
+export function mapProgress(metrics, workouts, plan, profile = null, todayKey = dateKeyInTimeZone()) {
   const out = {};
   const wlist = Array.isArray(workouts) ? workouts : [];
   // Las métricas guardan `takenAt`; toleramos `performedAt` por compatibilidad con registros viejos.
@@ -673,11 +687,9 @@ function mapProgress(metrics, workouts, plan, profile = null) {
   if (planVolMin) out.volumeWk = Number((planVolMin / 60).toFixed(1));
 
   // Strain (últimos 7 días) desde check-ins/entrenos: RPE del día (0-10).
-  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
   const strain = [];
   for (let i = 6; i >= 0; i -= 1) {
-    const d = new Date(today); d.setUTCDate(today.getUTCDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = addDaysToDateKey(todayKey, -i);
     const w = wlist.find((x) => String(x.performedAt || '').slice(0, 10) === key);
     strain.push(w && Number.isFinite(Number(w.sessionRpe)) ? Number(w.sessionRpe) : 0);
   }
@@ -780,30 +792,41 @@ export async function GET(request) {
         }).plan;
       }
 
-      const overrides = {};
-      const setIf = (key, val) => { if (val != null) overrides[key] = val; };
-
-      setIf('user', mapUser(profile, user));
-      setIf('runPaces', planForStudio?.runPaces || null);
-      setIf('todaySession', mapTodaySession(planForStudio, today, workouts, profile));
-      const weekData = mapWeek(planForStudio, today, workouts);
-      setIf('week', weekData?.days || null);
-      setIf('weekVolumeHours', weekData?.volumeHours ?? null);
-      setIf('library', mapLibrary(planForStudio));
-      setIf('macroTargets', mapMacroTargets(planForStudio, today));
-      setIf('macroEaten', mapMacroEaten(todayMeals));
-      setIf('glycemic', mapGlycemic(todayMeals));
-      setIf('progress', mapProgress(metrics, workouts, planForStudio, profile));
-      setIf('strava', mapStrava(stravaConn, workouts));
-      setIf('coachAdjust', mapCoachAdjust(planForStudio));
-      setIf('recentWorkouts', mapRecentWorkouts(workouts));
-      setIf('runZones', mapRunZones(workouts, planForStudio, profile));
-      setIf('runFitness', mapRunFitness(workouts, profile));
-      setIf('reentry', mapReentry({ workouts, profile, lastDoneAtHint, tuning: reentryTuning }));
-      setIf('goalProgress', profile ? buildGoalProgress({ profile, metrics, workouts }) : null);
+      const planHasToday = Array.isArray(planForStudio?.days)
+        && planForStudio.days.some((day) => day?.date === today);
+      const displayPlan = planHasToday ? planForStudio : null;
+      const weekData = mapWeek(displayPlan, today, workouts);
+      // Contrato de verdad: en una sesión autenticada cada clave demo se reemplaza de forma
+      // explícita por dato real, null o colección vacía. Nunca se omite para "conservar muestra".
+      const overrides = {
+        mode: 'authenticated',
+        dataStatus: 'ready',
+        planStatus: displayPlan ? 'active' : (latestPlan ? 'stale' : 'missing'),
+        user: mapUser(profile, user),
+        runPaces: displayPlan?.runPaces || null,
+        todaySession: mapTodaySession(displayPlan, today, workouts, profile),
+        week: weekData?.days || [],
+        weekVolumeHours: weekData?.volumeHours ?? null,
+        library: mapLibrary(displayPlan) || [],
+        macroTargets: mapMacroTargets(displayPlan, today),
+        macroEaten: mapMacroEaten(todayMeals),
+        glycemic: mapGlycemic(todayMeals),
+        progress: mapProgress(metrics, workouts, displayPlan, profile, today),
+        strava: mapStrava(stravaConn, workouts),
+        coachAdjust: mapCoachAdjust(displayPlan),
+        recentWorkouts: mapRecentWorkouts(workouts) || [],
+        runZones: mapRunZones(workouts, displayPlan, profile),
+        runFitness: mapRunFitness(workouts, profile),
+        reentry: mapReentry({ workouts, profile, lastDoneAtHint, tuning: reentryTuning }),
+        goalProgress: profile ? buildGoalProgress({ profile, metrics, workouts }) : null,
+        nutritionDays: [],
+        meals: [],
+        shopping: [],
+        batch: [],
+      };
       // #7 — revisión del mesociclo: solo si hay señales de que conviene regenerar el bloque.
       const review = buildMesocycleReview({ plan: latestPlan, workouts, today });
-      setIf('mesocycleReview', review && review.status === 'review' ? review : null);
+      overrides.mesocycleReview = review && review.status === 'review' ? review : null;
 
       return jsonResponse({ ok: true, overrides });
     } catch (error) {

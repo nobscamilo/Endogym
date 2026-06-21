@@ -63,6 +63,16 @@ describe('buildExercisePrescription con DAPRE', () => {
     expect(p.progression.method).toBe('phase');
   });
 
+  it('sin peso ni historial no inventa una carga inicial de 75 kg de referencia', () => {
+    const p = buildExercisePrescription(exercise, {
+      ...base,
+      profile: { trainingExperience: 'novice' },
+      liftHistory: null,
+    });
+    expect(p.loadKg).toBeNull();
+    expect(p.loadSource).toBe('profile_required');
+  });
+
   it('DAPRE convive con la reentrada: loadFactor 0.9 se aplica encima', () => {
     const p = buildExercisePrescription(exercise, {
       ...base,

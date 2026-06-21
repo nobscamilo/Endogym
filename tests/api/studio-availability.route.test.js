@@ -28,6 +28,23 @@ function post(body) {
   }));
 }
 
+function completeSurvey(overrides = {}) {
+  return {
+    goal: 'strength',
+    trainingModality: 'full_gym',
+    trainingExperience: 'intermediate',
+    activityLevel: 'moderate',
+    sex: 'male',
+    age: 32,
+    weightKg: 80,
+    heightCm: 178,
+    mealsPerDay: 4,
+    sessionMinutes: 60,
+    daysPerWeek: 4,
+    ...overrides,
+  };
+}
+
 describe('/api/studio-availability — objetivo SMART y reentrada', () => {
   beforeEach(() => {
     mocks.getAuthenticatedUser.mockReset();
@@ -71,10 +88,20 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
   });
 
   it('la encuesta completa con reentrada sí marca studioAvailability', async () => {
-    await post({ goal: 'strength', trainingModality: 'full_gym', sessionMinutes: 60, daysPerWeek: 4, reentryReason: 'otro' });
+    await post(completeSurvey({ reentryReason: 'otro' }));
     const patch = mocks.upsertUserProfile.mock.calls[0][1];
     expect(patch.studioAvailability).toBe(true);
     expect(patch.reentry.reason).toBe('otro');
+  });
+
+  it('rechaza una encuesta incompleta en vez de completar el perfil con supuestos', async () => {
+    const res = await post({ goal: 'strength', trainingModality: 'full_gym', daysPerWeek: 4 });
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.details.missingFields).toContain('weightKg');
+    expect(json.details.missingFields).toContain('activityLevel');
+    expect(mocks.upsertUserProfile).not.toHaveBeenCalled();
   });
 
   it('persiste comorbilidades estructuradas validando zonas', async () => {

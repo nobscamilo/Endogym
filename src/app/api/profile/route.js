@@ -5,6 +5,7 @@ import {
   TrainingMode,
 } from '../../../domain/models.js';
 import { buildMacroTargetFromProfile } from '../../../core/planner.js';
+import { getMissingNutritionProfileFields } from '../../../core/profileCompleteness.js';
 import { normalizeNutritionPreferencesInput } from '../../../core/nutritionPlanner.js';
 import { normalizeAdaptiveThresholds } from '../../../core/progressMemory.js';
 import { normalizePreparticipationInput } from '../../../core/screening.js';
@@ -93,19 +94,29 @@ function normalizeLegalConsentsInput(raw = {}, existing = null) {
 
 function normalizePayload(payload = {}, existingProfile = null) {
   const source = payload && typeof payload === 'object' ? payload : {};
+  const existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
   const nowIso = new Date().toISOString();
-  const goal = GOALS.has(payload.goal) ? payload.goal : GoalType.WEIGHT_LOSS;
-  const trainingMode = TRAINING_MODES.has(payload.trainingMode) ? payload.trainingMode : TrainingMode.GYM;
-  const trainingModality = TRAINING_MODALITIES.has(payload.trainingModality)
-    ? payload.trainingModality
-    : trainingMode === TrainingMode.HOME
-      ? TrainingModality.HOME
-      : TrainingModality.FULL_GYM;
-  const activityLevel = ACTIVITY_LEVELS.has(payload.activityLevel) ? payload.activityLevel : 'moderate';
-  const sex = SEX_VALUES.has(payload.sex) ? payload.sex : 'male';
-  const metabolicProfile = METABOLIC_PROFILES.has(payload.metabolicProfile)
-    ? payload.metabolicProfile
-    : MetabolicProfile.NONE;
+  const goal = hasOwn(source, 'goal')
+    ? (GOALS.has(payload.goal) ? payload.goal : null)
+    : (GOALS.has(existing.goal) ? existing.goal : null);
+  const trainingMode = hasOwn(source, 'trainingMode')
+    ? (TRAINING_MODES.has(payload.trainingMode) ? payload.trainingMode : null)
+    : (TRAINING_MODES.has(existing.trainingMode) ? existing.trainingMode : null);
+  const explicitModality = hasOwn(source, 'trainingModality')
+    ? (TRAINING_MODALITIES.has(payload.trainingModality) ? payload.trainingModality : null)
+    : (TRAINING_MODALITIES.has(existing.trainingModality) ? existing.trainingModality : null);
+  const trainingModality = explicitModality
+    || (trainingMode === TrainingMode.HOME ? TrainingModality.HOME : null)
+    || (trainingMode === TrainingMode.GYM ? TrainingModality.FULL_GYM : null);
+  const activityLevel = hasOwn(source, 'activityLevel')
+    ? (ACTIVITY_LEVELS.has(payload.activityLevel) ? payload.activityLevel : null)
+    : (ACTIVITY_LEVELS.has(existing.activityLevel) ? existing.activityLevel : null);
+  const sex = hasOwn(source, 'sex')
+    ? (SEX_VALUES.has(payload.sex) ? payload.sex : null)
+    : (SEX_VALUES.has(existing.sex) ? existing.sex : null);
+  const metabolicProfile = hasOwn(source, 'metabolicProfile')
+    ? (METABOLIC_PROFILES.has(payload.metabolicProfile) ? payload.metabolicProfile : null)
+    : (METABOLIC_PROFILES.has(existing.metabolicProfile) ? existing.metabolicProfile : null);
   const existingPreparticipation = normalizePreparticipationInput(existingProfile?.preparticipation);
   const payloadIncludesPreparticipation = hasOwn(source, 'preparticipation');
   const preparticipation = payloadIncludesPreparticipation
@@ -125,13 +136,19 @@ function normalizePayload(payload = {}, existingProfile = null) {
     payload.screeningRefreshDays,
     existingProfile?.screeningRefreshDays
   );
-  const preferredDurationMinutes = clamp(
-    Math.round(toNumber(payload.preferredDurationMinutes ?? existingProfile?.preferredDurationMinutes, 60)),
-    20,
-    180
+  const preferredDurationValue = toNumber(
+    hasOwn(source, 'preferredDurationMinutes') ? payload.preferredDurationMinutes : existing.preferredDurationMinutes,
+    null
   );
-  const nutritionPreferences = normalizeNutritionPreferencesInput(payload.nutritionPreferences);
-  const adaptiveThresholds = normalizeAdaptiveThresholds(payload.adaptiveThresholds);
+  const preferredDurationMinutes = preferredDurationValue == null
+    ? null
+    : clamp(Math.round(preferredDurationValue), 20, 180);
+  const nutritionPreferences = hasOwn(source, 'nutritionPreferences')
+    ? normalizeNutritionPreferencesInput(payload.nutritionPreferences)
+    : (existing.nutritionPreferences || normalizeNutritionPreferencesInput());
+  const adaptiveThresholds = hasOwn(source, 'adaptiveThresholds')
+    ? normalizeAdaptiveThresholds(payload.adaptiveThresholds)
+    : (existing.adaptiveThresholds || normalizeAdaptiveThresholds());
   const legalConsents = normalizeLegalConsentsInput(payload.legalConsents, existingProfile?.legalConsents);
   const onboardingCompleted = payload?.onboardingCompleted === true
     ? true
@@ -142,18 +159,22 @@ function normalizePayload(payload = {}, existingProfile = null) {
       : false;
 
   return {
-    displayName: typeof payload.displayName === 'string' ? payload.displayName.trim() : '',
+    displayName: typeof payload.displayName === 'string'
+      ? payload.displayName.trim()
+      : (typeof existing.displayName === 'string' ? existing.displayName : ''),
     goal,
-    trainingMode: trainingModality === TrainingModality.FULL_GYM ? TrainingMode.GYM : TrainingMode.HOME,
+    trainingMode: trainingModality
+      ? (trainingModality === TrainingModality.FULL_GYM ? TrainingMode.GYM : TrainingMode.HOME)
+      : trainingMode,
     trainingModality,
     metabolicProfile,
     activityLevel,
     sex,
-    age: toNumber(payload.age, 30),
-    weightKg: toNumber(payload.weightKg, 75),
-    heightCm: toNumber(payload.heightCm, 175),
-    mealsPerDay: toNumber(payload.mealsPerDay, 4),
-    targetCalories: toNumber(payload.targetCalories, null),
+    age: toNumber(hasOwn(source, 'age') ? payload.age : existing.age, null),
+    weightKg: toNumber(hasOwn(source, 'weightKg') ? payload.weightKg : existing.weightKg, null),
+    heightCm: toNumber(hasOwn(source, 'heightCm') ? payload.heightCm : existing.heightCm, null),
+    mealsPerDay: toNumber(hasOwn(source, 'mealsPerDay') ? payload.mealsPerDay : existing.mealsPerDay, null),
+    targetCalories: toNumber(hasOwn(source, 'targetCalories') ? payload.targetCalories : existing.targetCalories, null),
     medicalConditions: typeof payload.medicalConditions === 'string' ? payload.medicalConditions.trim().slice(0, 500) : (existingProfile?.medicalConditions || ''),
     physicalInjuries: typeof payload.physicalInjuries === 'string' ? payload.physicalInjuries.trim().slice(0, 500) : (existingProfile?.physicalInjuries || ''),
     preferredDurationMinutes,
@@ -172,20 +193,20 @@ function buildDefaultProfile(user) {
     userId: user.uid,
     email: user.email ?? null,
     displayName: '',
-    goal: GoalType.WEIGHT_LOSS,
-    trainingMode: TrainingMode.GYM,
-    trainingModality: TrainingModality.FULL_GYM,
-    metabolicProfile: MetabolicProfile.NONE,
-    activityLevel: 'moderate',
-    sex: 'male',
-    age: 30,
-    weightKg: 75,
-    heightCm: 175,
-    mealsPerDay: 4,
+    goal: null,
+    trainingMode: null,
+    trainingModality: null,
+    metabolicProfile: null,
+    activityLevel: null,
+    sex: null,
+    age: null,
+    weightKg: null,
+    heightCm: null,
+    mealsPerDay: null,
     targetCalories: null,
     medicalConditions: '',
     physicalInjuries: '',
-    preferredDurationMinutes: 60,
+    preferredDurationMinutes: null,
     preparticipation: normalizePreparticipationInput(),
     preparticipationUpdatedAt: null,
     screeningRefreshDays: DEFAULT_SCREENING_REFRESH_DAYS,
@@ -231,7 +252,9 @@ export async function PUT(request) {
 
       const currentProfile = await getUserProfile(user.uid);
       const normalized = normalizePayload(payload, currentProfile);
-      const targetMacros = buildMacroTargetFromProfile(normalized);
+      const targetMacros = getMissingNutritionProfileFields(normalized).length === 0
+        ? buildMacroTargetFromProfile(normalized)
+        : null;
       const needsSetup = normalized.onboardingCompleted !== true;
       const profile = await upsertUserProfile(user.uid, {
         ...normalized,

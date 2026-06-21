@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dateKeyInTimeZone } from '../../src/lib/appTime.js';
 
 const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
@@ -56,7 +57,7 @@ vi.mock('../../src/lib/logger.js', () => ({
 const { POST } = await import('../../src/app/api/analyze-plate/route.js');
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKeyInTimeZone();
 }
 
 async function readJson(response) {

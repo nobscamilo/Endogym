@@ -1,4 +1,5 @@
 import { jsonResponse } from '../../../lib/http.js';
+import { getAppTimeZone } from '../../../lib/appTime.js';
 
 // Devuelve la configuración PÚBLICA de Firebase Web (valores NEXT_PUBLIC_*, ya
 // expuestos al navegador en el cliente normal). La usa el bundle estático de
@@ -12,5 +13,6 @@ export function GET() {
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || null,
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || null,
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || null,
+    timeZone: getAppTimeZone(),
   });
 }

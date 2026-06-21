@@ -37,7 +37,7 @@ describe('/api/profile route', () => {
     mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1', email: 'user@example.com' });
   });
 
-  it('GET returns default profile when no profile exists', async () => {
+  it('GET returns an honest empty profile when no profile exists', async () => {
     mocks.getUserProfile.mockResolvedValue(null);
 
     const response = await GET(new Request('http://localhost/api/profile'));
@@ -47,9 +47,12 @@ describe('/api/profile route', () => {
     expect(json.traceId).toBe('trace-test');
     expect(json.profile.userId).toBe('user-1');
     expect(json.profile.needsSetup).toBe(true);
-    expect(json.profile.goal).toBe('weight_loss');
-    expect(json.profile.trainingModality).toBe('full_gym');
-    expect(json.profile.metabolicProfile).toBe('none');
+    expect(json.profile.goal).toBeNull();
+    expect(json.profile.trainingModality).toBeNull();
+    expect(json.profile.metabolicProfile).toBeNull();
+    expect(json.profile.sex).toBeNull();
+    expect(json.profile.age).toBeNull();
+    expect(json.profile.weightKg).toBeNull();
     expect(json.profile.preparticipation).toBeTruthy();
     expect(json.profile.preparticipation.desiredIntensity).toBe('moderate');
     expect(json.profile.preparticipationUpdatedAt).toBeNull();
@@ -71,7 +74,7 @@ describe('/api/profile route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           displayName: '  Juan  ',
-          goal: 'invalid-goal',
+          goal: 'recomposition',
           trainingMode: 'gym',
           activityLevel: 'high',
           sex: 'male',
@@ -111,7 +114,7 @@ describe('/api/profile route', () => {
       const json = await readJson(response);
       expect(response.status).toBe(200);
       expect(json.profile.displayName).toBe('Juan');
-      expect(json.profile.goal).toBe('weight_loss');
+      expect(json.profile.goal).toBe('recomposition');
       expect(json.profile.trainingModality).toBe('trx');
       expect(json.profile.metabolicProfile).toBe('prediabetes');
       expect(json.profile.medicalConditions).toBe('diabetes tipo 2, asma');
@@ -125,6 +128,28 @@ describe('/api/profile route', () => {
       expect(json.profile.targetMacros).toBeTruthy();
       expect(json.profile.targetMacros.targetCalories).toBeGreaterThan(0);
     });
+
+  it('PUT de consentimiento no inventa datos personales ni macros', async () => {
+    mocks.getUserProfile.mockResolvedValue(null);
+    mocks.upsertUserProfile.mockImplementation(async (uid, payload) => ({ userId: uid, ...payload }));
+
+    const response = await PUT(new Request('http://localhost/api/profile', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Ana',
+        legalConsents: { termsAccepted: true, privacyAccepted: true, dataProcessingAccepted: true },
+      }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.profile.goal).toBeNull();
+    expect(json.profile.sex).toBeNull();
+    expect(json.profile.age).toBeNull();
+    expect(json.profile.weightKg).toBeNull();
+    expect(json.profile.targetMacros).toBeNull();
+  });
 
   it('PUT conserva fecha de cribado si no cambian respuestas y respeta ventana mínima', async () => {
     mocks.getUserProfile.mockResolvedValue({

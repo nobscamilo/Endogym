@@ -27,13 +27,13 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
-Última verificación local documentada: **19 de junio de 2026, noche-2** (`308` tests y build verdes; Análisis del coach orientado a objetivos, pendiente de deploy). Último deploy público verificado: **19 de junio de 2026**, `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF` (`Ready`), al que resuelve `endogym.vercel.app`, con bundle `097b1b9fba`. Última sonda integral `e2e:production`: **10 de junio de 2026**; las sondas básicas del 19 de junio verificaron `/` `200`, `/api/health` `200`, `/api/meals` sin token `401` y bundle `200`.
+Última verificación local y despliegue documentados: **20 de junio de 2026** (`46` archivos / `339` tests, build, smoke, audit 0 y conflictos verdes; contrato de datos reales + vídeos contextuales). Producción: `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`, bundle `bb2659ac92`, alias `endogym.vercel.app` reasignado y verificado con sondas HTTP + Playwright. Última sonda integral autenticada `e2e:production`: **10 de junio de 2026**.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.
-- La última verificación completa mantiene `check:conflicts`, audit (0), smoke y build en verde; suite actual: `43` archivos / `308` tests verdes.
+- La última verificación completa mantiene `check:conflicts`, audit (0), smoke y build en verde; suite actual: `46` archivos / `339` tests verdes.
 - `playwright` está instalado como devDependency y Chromium de Playwright está disponible para verificación visual local.
 - `npm audit` devuelve `0` vulnerabilidades tras fijar overrides transitivos seguros para `postcss` y `uuid`.
-- La producción Vercel responde en `/` y `/api/health`; `/api/meals` y `/api/coach-chat` sin token responden `401`. Producción más reciente documentada: `dpl_yiR1GVoJnYZVdo4njGxy7yqbNwVF`.
+- La producción Vercel responde en `/` y `/api/health`; `/api/meals` y `/api/coach-chat` sin token responden `401`. Producción más reciente documentada: `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h` (`Ready`).
 - Firebase Authentication, la API key publica del cliente y Google OAuth para `endogym.vercel.app` se validaron con sondas reales.
 - Firebase Admin y Firestore funcionan localmente y en producción con Firebase ID tokens reales.
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu` del proyecto Firebase/GCP; escritura y borrado fueron verificados.
@@ -42,7 +42,7 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
 - `POST /api/coach-chat` usa Gemini con contexto real del usuario y rate limiting persistente (`coach-chat`, 20 preguntas/h por defecto).
 - El coach tiene persona única server-side, detector determinista de red flags sin Gemini/rate limit, RAG por pregunta, memoria conversacional acotada, digest nutricional/recuperación 7d y cierre del loop entre recomendaciones y evolución real.
-- El Análisis del coach de Progreso integra meta SMART y señales de carrera deterministas, expone “Consonancia con tu objetivo”, usa fallback específico por objetivo e invalida el caché cuando cambia cualquier dato relevante. Implementado/verificado localmente el 19 jun; pendiente de deploy.
+- El Análisis del coach de Progreso integra meta SMART y señales de carrera deterministas, expone “Consonancia con tu objetivo”, usa fallback específico por objetivo e invalida el caché cuando cambia cualquier dato relevante. Desplegado el 20 jun en `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`.
 - La prescripción de entrenamiento usa bloque estable de 21 días con overlay adaptativo, DAPRE por desempeño real, objetivos SMART medibles, calentamiento/vuelta a la calma dinámicos y restricciones de comorbilidad en la selección de ejercicios.
 - Perfil muestra objetivos y disponibilidad como decisiones jerárquicas (objetivo, meta, modalidad/equipo, carrera y resumen microciclo/mesociclo), con `Flexible` en vez de `Mixto`; el chat móvil del coach se monta como modal a pantalla completa con input visible.
 - La prescripción desde Perfil ahora guarda `trainingExperience` (`novice`/`intermediate`/`advanced`), modula volumen/series/descanso de fuerza y, al reducir `daysPerWeek`, preserva sesiones clave del microciclo (por ejemplo tirada larga + calidad + fuerza en `Correr + gym` con carrera) en vez de conservar simplemente los primeros días del calendario.
@@ -53,12 +53,15 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - Nutrición usa calendario local de la app (`Europe/Madrid` por defecto) para seleccionar el día actual, calcular la semana cacheada y agrupar comidas de "hoy"; esto evita que después de medianoche siga mostrando el día UTC anterior.
 - `POST /api/studio-nutrition` genera semana completa con Gemini, cachea por semana, valida kcal/proteína por día antes de guardar planes completos e invalida cache si cambia la huella del plan de entrenamiento.
 - La raíz `/` entrega el Firebase ID token al iframe del Studio por `postMessage` de mismo origen para evitar que móvil/iframe muestre el entreno demo cuando la restauración interna de Firebase Auth se retrasa.
+- Con token, el Studio elimina el dataset demo **antes** de consultar la API y muestra solo datos reales, `null` o vacíos honestos incluso si la carga falla. El perfil no genera plan ni macros desde valores personales supuestos: la encuesta exige los datos mínimos de prescripción y devuelve los campos faltantes si está incompleta. El modo demo solo existe sin sesión.
+- Los indicadores glucémicos de la app son estimaciones de carga/índice a partir de comidas registradas; no se presentan como una curva ni como glucosa medida sin una fuente CGM real.
 - Las cargas de ejercicios registradas conservan `exercise.id`, de modo que la progresión por `liftHistory` puede enlazar historial y catálogo por ID estable. Para datos legacy sin ID existe fallback por nombre normalizado.
 - Los bloques activos de 21 días conservan estabilidad, pero exponen un overlay adaptativo diario para reflejar fatiga, FC o check-ins recientes sin regenerar todo el bloque.
 - Las fotos caducan a los 30 días, el bucket no conserva copias recuperables tras borrado y las rutas IA tienen rate limiting persistente en Firestore.
 
 - La interfaz de usuario fue rediseñada con menú hamburguesa lateral, dashboard con lenguaje accesible, atlas anatómico 3D con modelos clínicos `gymbro-front-crop.png` / `gymbro-back-crop.png` y vistas frontal/posterior corregidas, y biblioteca de ejercicios con tarjetas colapsables por categoría y modal de detalle.
-- El cierre local del 2 de junio retiró claims no sustentados de la landing, sustituyó recursos remotos por assets propios, añadió recuperación de contraseña y conservó solo 14 embeds de YouTube verificados con fallback SVG para el resto.
+- El cierre local del 2 de junio retiró claims no sustentados de la landing, sustituyó recursos remotos por assets propios y añadió recuperación de contraseña. La auditoría local del 20 de junio dejó 55 asociaciones exactas de ejercicios (49 vídeos únicos resolubles por YouTube oEmbed): no reutiliza vídeos entre implementos o movimientos distintos y usa búsqueda específica/fallback local cuando falta una demostración exacta.
+- “Sigue aprendiendo” ya no consume un feed editorial inventado: muestra únicamente vídeos verificados de los ejercicios de la sesión real de hoy. Las tarjetas sin embed exacto enlazan a una búsqueda específica de YouTube y nunca simulan reproducción.
 - El check-in diario quedó estructurado e idempotente por fecha: rehidrata estado, no inventa ceros al omitir encuesta y bloquea alta intensidad en el siguiente plan si hay síntomas de alarma.
 - Se añadieron CSP, HSTS, `nosniff`, política de referrer, permisos y framing; `withTrace()` separa rechazos auth esperados de fallos operativos. Las cabeceras están verificadas en producción.
 - `npm run e2e:production` pasó tras el despliegue con Gemini live, Storage, rate limits y limpieza del usuario temporal.

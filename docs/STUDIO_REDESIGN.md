@@ -23,13 +23,13 @@ Implementación del diseño entregado por Claude Design (handoff bundle) — vis
 - **Nutrición por calendario local (12 jun):** el rail de días se sincroniza con la semana civil del navegador y selecciona hoy por `dateISO`; el backend usa `Europe/Madrid` por defecto para "hoy", límites de comidas y `weekKey` del plan nutricional. Esto evita que pasada medianoche en España se siga mostrando el día UTC anterior o un índice obsoleto del cache.
 - **Prescripción desde Perfil (15 jun, desplegada):** Perfil añade `trainingExperience` (Base/Intermedio/Avanzado). El backend lo persiste y lo usa para modular volumen/series/descanso. Si `daysPerWeek` recorta el microciclo, el planner conserva sesiones prioritarias por objetivo/modalidad (p. ej. tirada larga + calidad + fuerza para `Correr + gym` con carrera) en lugar de guardar los primeros días del calendario.
 - **Cambio de grupo muscular (15–19 jun, desplegado):** Entreno muestra "Grupo muscular" en cualquier día con sesión. En fuerza/mixto reconstruye el foco; en cardio/carrera/recuperación convierte el día a fuerza con aviso clínico. `POST /api/studio-swap` mantiene guardarraíles de adyacencia y volumen semanal; la reprogramación por intercambio sigue limitada a días de fuerza/mixto reales.
-- **Consonancia del coach con el objetivo (19 jun, local):** la tarjeta “Análisis del coach” muestra un bloque `goalAlignment`; el servidor aporta SMART/meta/tendencia/fecha y señales deterministas de carrera. Informes legacy se marcan stale mediante firma de contexto `v2`. Bundle local `29b865f9b9`, pendiente de deploy.
+- **Consonancia del coach con el objetivo (desplegado 20 jun):** la tarjeta “Análisis del coach” muestra un bloque `goalAlignment`; el servidor aporta SMART/meta/tendencia/fecha y señales deterministas de carrera. Informes legacy se marcan stale mediante firma de contexto `v2`. Incluido en `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`, bundle acumulado `bb2659ac92`.
 
 > Estas features se editan en `public/studio/app/studio/{screen-train,screen-nutrition}.jsx` + `screens.css` y requieren **regenerar el bundle** (`npm run build:studio`, mantenedor) y commitearlo.
 
 ## Disponibilidad y swap (epic Endogym, por fases)
 
-- **Fase 1 — Encuesta de disponibilidad (hecha):** en Perfil (`AvailabilitySurvey`): objetivo, equipo (→`trainingModality`), min/sesión (`preferredDurationMinutes`), días/semana (`daysPerWeek`), comidas/día, y cada cuántas semanas re-preguntar (`resurveyWeeks`). Endpoint **`/api/studio-availability`** (merge PARCIAL del perfil con `upsertUserProfile`, no resetea; marca `studioAvailability:true`). Al guardar, regenera el plan (`/api/weekly-plan`) y refresca datos. El planner honra `preferredDurationMinutes` **solo si `studioAvailability===true`** (no altera defaults ni tests).
+- **Fase 1 — Encuesta de disponibilidad (hecha; contrato reforzado localmente el 20 jun):** en Perfil (`AvailabilitySurvey`) se requieren objetivo, modalidad, nivel, actividad cotidiana, sexo/edad/peso/altura para la estimación, min/sesión, días/semana y comidas/día. Salud, material, carrera, biometría, meta fechada y re-encuesta siguen opcionales. **`/api/studio-availability`** hace merge parcial, pero solo marca `studioAvailability:true` si el conjunto requerido está completo; si no, devuelve los campos faltantes. Al guardar, regenera el plan y refresca datos.
   - **Objetivo, equipo, tiempo, comidas y días/semana re-ajustan el plan/macros de verdad** (el planner ya los usa, gated por `studioAvailability`).
 - **Fase 2 — Swap de ejercicios y foco muscular (hecho):** endpoint **`/api/studio-swap`** (POST) cambia un ejercicio (`scope:'one'` + `exerciseId`) o toda la sesión de hoy (`scope:'all'`) con alternativas de `suggestExerciseAlternatives()` y **lógica no-repeat** (evita ejercicios de otros días del plan). `reason`: `variety` | `time` (recorta nº de ejercicios) | `equipment`. También acepta `scope:'focus'` + `sessionFocus` (`upper`/`push`/`pull`/`lower`/`full_body`) para cambiar el grupo muscular de fuerza/mixto sin regenerar el bloque; el servidor bloquea conflictos con días adyacentes. Aplica en servidor (persiste el plan) y el cliente refresca `/api/studio-data`. UI en Entreno: botón "Cambiar" por ejercicio (necesita `id`, ya expuesto en `studio-data`), "Cambiar sesión" con selector de motivo y control "Grupo muscular".
   - **Honor de `daysPerWeek` (hecho):** el planner convierte los días de entreno sobrantes en descanso activo cuando `daysPerWeek` es menor (gated por `studioAvailability`).
@@ -63,13 +63,14 @@ El diseño es un SPA React. Para máxima fidelidad y aislamiento total del resto
 
 - **Coach IA ("Pregúntale al coach" + guía contextual):** el bundle define `window.claude.complete` → `POST /api/coach-chat` (`src/app/api/coach-chat/route.js`) enviando `{ message }`. El servidor mantiene la persona única en `coachPersona.js`, evalúa red flags deterministas antes de Gemini/rate limit y usa el transporte Gemini existente (`gemini-2.5-flash`) en el flujo normal. Requiere auth y aplica rate limit persistente `coach-chat` (20/h por defecto). Si no hay sesión o falla, `coach.jsx` usa respuesta de respaldo honesta. El banner estático ya no se presenta como IA live ni inventa métricas personales; la IA live es el modal de preguntas. En móvil, el modal se monta por portal en `document.body`, bloquea el scroll de fondo y mantiene el input dentro del viewport.
 - **Auth del iframe:** `GET /api/public-config` devuelve la config pública de Firebase; el shim inicializa Firebase web y lee la sesión existente del mismo origen para obtener el ID token. Además, desde el 8 jun 2026 la raíz `/` entrega el token al iframe por `postMessage` same-origin (`IGNIOS_AUTH_TOKEN`) y el iframe lo solicita con `IGNIOS_TOKEN_REQUEST`. Esto evita que Safari/móvil caiga al dataset demo si la restauración interna de Firebase Auth llega tarde. No pasar tokens por URL.
-- **Datos reales (fase 2 implementada):** `GET /api/studio-data` mapea datos reales del backend a la forma `window.STUDIO` y el cargador del bundle los fusiona sobre la muestra ANTES de renderizar (cada sección es defensiva: si faltan datos válidos, se conserva la muestra). Si hay bloque activo, recalcula un overlay adaptativo en lectura para que el Studio muestre fatiga/FC/check-in recientes sin regenerar el mesociclo. Si no hay sesión, todo queda en muestra.
+- **Datos reales (contrato vigente local):** `GET /api/studio-data` mapea el backend a `window.STUDIO`. Sin token se conserva la muestra pública. Con token, el cargador elimina la muestra antes de consultar y cada sección se **reemplaza completa** por real, `null` o vacío; un error queda como autenticado/error y nunca recupera demo. Si hay bloque activo, recalcula un overlay adaptativo en lectura. Si el bloque no contiene hoy, queda `planStatus:'stale'` y no se recicla su primer entreno.
 
   **Ya REAL** (desde Firestore del usuario):
   - `user` — perfil (nombre, iniciales, objetivo, modalidad).
-  - `todaySession` — sesión de hoy del último plan: título, foco, duración, intensidad (RPE→etiqueta), músculos primarios/secundarios, y la lista de ejercicios con esquema (series×reps), carga, cues y **vídeo real de YouTube** (`videoEmbedId` de `EXERCISE_VIDEO_MAP`).
+  - `todaySession` — sesión de hoy del último plan: título, foco, duración, intensidad (RPE→etiqueta), músculos primarios/secundarios, y la lista de ejercicios con esquema (series×reps), carga, cues y vídeo exacto de YouTube cuando existe (`videoEmbedId` del `EXERCISE_VIDEO_MAP` vigente, resuelto por `exercise.id`; no se confía en la instantánea persistida del plan).
   - `week` — los 7 días del plan (foco, carga relativa, hoy, descanso).
-  - `library` — biblioteca derivada de los ejercicios del plan, con vídeos reales.
+  - `library` — biblioteca derivada de los ejercicios del plan, con la misma resolución de vídeos vigente. Auditoría local del 20 jun 2026: 55 asociaciones, 49 vídeos únicos resolubles por oEmbed; solo comparten vídeo los alias del mismo ejercicio. Sin coincidencia exacta de movimiento e implemento, la UI usa búsqueda específica/fallback local.
+  - No existe un feed `discover` autenticado. “Sigue aprendiendo” toma hasta tres ejercicios con embed verificado desde `todaySession.list`; si no los hay, se omite. La biblioteca abre el iframe real cuando hay `yt` y `videoUrl` como búsqueda externa cuando no lo hay; no existe reproducción simulada.
   - `macroTargets` / `macroEaten` — objetivo nutricional del plan y suma de comidas logueadas hoy.
   - `progress` — serie de peso (métricas), peso actual y deltas, sesiones hechas/planificadas.
   - `coachAdjust` — reglas adaptativas reales del plan; la UI muestra estas reglas o un estado vacío, no claims fijos.
@@ -77,6 +78,8 @@ El diseño es un SPA React. Para máxima fidelidad y aislamiento total del resto
   **Glucemia y Progreso reales (6 jun, de-sample):** carga glucémica e índice insulínico del día desde las comidas registradas; en Progreso: peso, sesiones, adherencia, **strain** (RPE de check-ins), **recovery** (proxy sueño/fatiga del último check-in), **volumen por grupo** (del plan) y **PRs** (entrenos con carga). Todo con **estados vacíos honestos** cuando no hay datos. La **curva continua** de glucosa muestra una nota (necesita CGM). Recetas/compra/batch se generan con IA (botón).
 
   **Sigue en MUESTRA** solo en modo demo (sin login): los datos de ejemplo de `data.js`. Con sesión, el contenido es real o vacío.
+
+  **Glucemia:** la app muestra carga glucémica e índice insulínico estimados desde comidas, no una medición de glucosa. Sin CGM no dibuja curva ni afirma “en rango”; sin registros muestra estado desconocido. El alta manual tampoco aplica un IG universal a cualquier alimento.
 
 ## Seguridad (CSP)
 
@@ -142,3 +145,15 @@ Verificación local adicional del 19 jun 2026, noche-2:
 - `npm run build:studio` → bundle `29b865f9b9`.
 - `check:conflicts`, audit (0), smoke, 43 archivos / 308 tests y `npm run build` OK.
 - Studio local: Progreso renderiza sin errores de consola; el contenido autenticado nuevo queda cubierto por tests de ruta/contrato y por presencia en el bundle.
+
+Verificación del 20 jun 2026 (contrato de verdad; **desplegado** en `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`):
+
+- `npm run build:studio` → bundle `e5e1cb2067`.
+- `check:conflicts`, audit (0), smoke, **46 archivos / 331 tests** y `npm run build` (44 páginas) OK.
+- Playwright con token/API simulados verificó que la sesión autenticada vacía no hereda demo en móvil/escritorio, Nutrición muestra estado vacío y el onboarding no tiene selecciones ni números precargados. Captura: `output/playwright/studio-onboarding-required-real-data.png`.
+
+Verificación local y producción del 20 jun 2026 (“Sigue aprendiendo” real; **desplegado**):
+
+- `npm run build:studio` → bundle `bb2659ac92`.
+- `check:conflicts`, audit (0), smoke, **46 archivos / 339 tests** y `npm run build` (44 páginas) OK.
+- Playwright local confirmó que Inicio deriva sus tarjetas de `todaySession`, que el modal contiene un iframe real y enlace a YouTube, y que una entrada sin embed exacto aparece como enlace de búsqueda en la biblioteca. Playwright de producción confirmó el mismo iframe/enlace en `endogym.vercel.app`, sin errores de consola.

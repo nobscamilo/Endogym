@@ -110,7 +110,6 @@
 .mbar .m-spacer { flex: 1; }
 .icon-btn { appearance: none; border: 1px solid var(--line); background: var(--surface); cursor: pointer; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; color: var(--ink); transition: all var(--t-fast) var(--ease); flex: none; position: relative; }
 .icon-btn:hover { border-color: var(--line-2); transform: translateY(-1px); }
-.icon-btn .ib-dot { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
 
 /* ---- Mobile bottom tab bar (flotante, glass) ---- */
 .tabbar {

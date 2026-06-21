@@ -1,5 +1,36 @@
 /* ENDOGYM STUDIO — datos demo */
 (function () {
+  const DEFAULT_TIME_ZONE = 'Europe/Madrid';
+  function dateParts(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: window.__APP_TIME_ZONE || DEFAULT_TIME_ZONE,
+      hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    }).formatToParts(date);
+    const out = {};
+    parts.forEach((part) => { if (part.type !== 'literal') out[part.type] = part.value; });
+    return out;
+  }
+  function dateKey(date = new Date()) {
+    const p = dateParts(date);
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+  function addDays(dateKeyValue, amount) {
+    const [y, m, d] = String(dateKeyValue).split('-').map(Number);
+    const next = new Date(Date.UTC(y, m - 1, d + Number(amount || 0)));
+    return next.toISOString().slice(0, 10);
+  }
+  function dateLabel(date = new Date()) {
+    return new Intl.DateTimeFormat('es-ES', {
+      timeZone: window.__APP_TIME_ZONE || DEFAULT_TIME_ZONE,
+      weekday: 'long', day: 'numeric', month: 'short',
+    }).format(date).replace(/\.$/, '');
+  }
+  window.__studioDateParts = dateParts;
+  window.__studioDateKey = dateKey;
+  window.__studioAddDays = addDays;
+  window.__studioDateLabel = dateLabel;
+
   // Identidad NEUTRA de muestra: si por algún motivo no cargan los datos reales, nunca debe
   // verse el nombre de otra persona. El backend (/api/studio-data) siempre sobreescribe esto.
   const user = {
@@ -16,17 +47,18 @@
     primaryMuscles: ['Pecho', 'Hombro', 'Tríceps'],
     secondaryMuscles: ['Core', 'Antebrazo', 'Espalda alta'],
     list: [
-      { name: 'Press banca con mancuernas', scheme: '4 × 8', load: '22 kg', tag: 'Principal', muscle: 'Pecho', dur: '0:48', hue: 55, done: true, yt: 'jrDDz7x1Dpo',
+      { id: 'gym-db-bench-press', name: 'Press banca con mancuernas', scheme: '4 × 8', load: '22 kg', tag: 'Principal', muscle: 'Pecho', hue: 55, done: true, yt: 'Y_7aHqXeCfQ',
         cues: ['Escápulas retraídas y pecho alto', 'Baja en 2s hasta rozar el pecho', 'Empuja sin bloquear del todo el codo'] },
-      { name: 'Press militar de pie', scheme: '4 × 10', load: '14 kg', tag: 'Principal', muscle: 'Hombro', dur: '0:52', hue: 232, done: true, yt: 'n_8dwMLPD8U',
+      { id: 'gym-overhead-press', name: 'Press militar de pie', scheme: '4 × 10', load: '14 kg', tag: 'Principal', muscle: 'Hombro', hue: 232, done: true, yt: '4LBVP2Oe7fg',
         cues: ['Glúteos y core firmes', 'Barra/mancuernas sobre la coronilla', 'No arquees la zona lumbar'] },
-      { name: 'Press inclinado en máquina', scheme: '3 × 12', load: 'Selecciona', tag: 'Accesorio', muscle: 'Pecho alto', dur: '0:41', hue: 18, done: false, yt: 'oTD5g77GgSA',
+      { name: 'Press inclinado en máquina', scheme: '3 × 12', load: 'Selecciona', tag: 'Accesorio', muscle: 'Pecho alto', hue: 18, done: false,
+        videoUrl: 'https://www.youtube.com/results?search_query=press+inclinado+en+maquina+tecnica+de+ejecucion',
         cues: ['Banco a 30-45°', 'Recorrido completo y controlado', 'Aprieta arriba 1s'] },
-      { name: 'Elevaciones laterales', scheme: '3 × 15', load: '6 kg', tag: 'Accesorio', muscle: 'Deltoides', dur: '0:36', hue: 300, done: false,
+      { id: 'gym-lateral-raise', name: 'Elevaciones laterales', scheme: '3 × 15', load: '6 kg', tag: 'Accesorio', muscle: 'Deltoides', hue: 300, done: false, yt: 'Myim1WH6Qec',
         cues: ['Codo ligeramente flexionado', 'Sube hasta la línea del hombro', 'Sin impulso de cadera'] },
-      { name: 'Fondos asistidos', scheme: '3 × 10', load: 'Asistencia 20 kg', tag: 'Tríceps', muscle: 'Tríceps', dur: '0:44', hue: 162, done: false,
+      { id: 'gym-dips', name: 'Fondos asistidos', scheme: '3 × 10', load: 'Asistencia 20 kg', tag: 'Tríceps', muscle: 'Tríceps', hue: 162, done: false, yt: '2z8JmcrW-As',
         cues: ['Pecho ligeramente adelante', 'Baja hasta 90° de codo', 'Hombros lejos de las orejas'] },
-      { name: 'Extensión de tríceps en polea', scheme: '3 × 14', load: 'Selecciona', tag: 'Tríceps', muscle: 'Tríceps', dur: '0:38', hue: 78, done: false,
+      { id: 'gym-triceps-pushdown', name: 'Extensión de tríceps en polea', scheme: '3 × 14', load: 'Selecciona', tag: 'Tríceps', muscle: 'Tríceps', hue: 78, done: false, yt: 'v2fMq8RjNBw',
         cues: ['Codos pegados al cuerpo', 'Extiende del todo', 'Vuelve despacio'] },
     ],
   };
@@ -39,25 +71,6 @@
     { day: 'Vie', date: 6, focus: 'Full body', tag: 'Fuerza general', load: 0.7 },
     { day: 'Sáb', date: 7, focus: 'Descanso activo', tag: 'Paseo · estiramientos', rest: true, load: 0.18 },
     { day: 'Dom', date: 8, focus: 'Descanso', tag: 'Recuperación total', rest: true, load: 0 },
-  ];
-
-  /* ---- Vídeos: feed Descubrir ---- */
-  const discover = [
-    { cat: 'Recomendado para ti', items: [
-      { title: 'Técnica perfecta de press banca', author: 'Ignios Coaches', len: '6:24', tag: 'Técnica', hue: 55, views: '1,2 M', yt: 'MeyuOEimrC0' },
-      { title: 'Calentamiento de hombro en 5 minutos', author: 'Movilidad Diaria', len: '5:10', tag: 'Movilidad', hue: 232, views: '840 K' },
-      { title: 'Cómo progresar en fuerza sin lesionarte', author: 'Ciencia del Músculo', len: '11:38', tag: 'Guía', hue: 300, views: '2,1 M' },
-    ]},
-    { cat: 'Empuje · tu sesión de hoy', items: [
-      { title: 'Press militar: errores comunes', author: 'Ignios Coaches', len: '7:02', tag: 'Técnica', hue: 18, views: '560 K', yt: 'KLT18ahosQw' },
-      { title: 'Elevaciones laterales que sí funcionan', author: 'Hipertrofia Lab', len: '4:55', tag: 'Accesorios', hue: 162, views: '930 K' },
-      { title: 'Fondos: del asistido al lastrado', author: 'Calistenia Pro', len: '9:14', tag: 'Progresión', hue: 78, views: '410 K' },
-    ]},
-    { cat: 'Recuperación y movilidad', items: [
-      { title: 'Rutina de estiramientos post-entreno', author: 'Movilidad Diaria', len: '12:30', tag: 'Recuperación', hue: 232, views: '3,4 M' },
-      { title: 'Respiración para bajar pulsaciones', author: 'Mente y Cuerpo', len: '8:20', tag: 'Bienestar', hue: 300, views: '1,8 M' },
-      { title: 'Movilidad de cadera para sentadilla', author: 'Ignios Coaches', len: '6:48', tag: 'Movilidad', hue: 55, views: '720 K' },
-    ]},
   ];
 
   /* ---- Nutrición ---- */
@@ -125,14 +138,14 @@
 
   /* ---- Biblioteca de ejercicios (con vídeo) ---- */
   const library = [
-    { name: 'Press banca mancuernas', muscle: 'Pecho', level: 'Intermedio', equip: 'Mancuernas', len: '0:48', hue: 55, yt: 'jrDDz7x1Dpo' },
-    { name: 'Sentadilla goblet', muscle: 'Cuádriceps', level: 'Base', equip: 'Mancuerna', len: '0:52', hue: 162 },
-    { name: 'Remo con barra', muscle: 'Dorsales', level: 'Intermedio', equip: 'Barra', len: '0:44', hue: 232 },
-    { name: 'Peso muerto rumano', muscle: 'Isquios', level: 'Avanzado', equip: 'Barra', len: '0:58', hue: 300 },
-    { name: 'Press militar', muscle: 'Hombro', level: 'Intermedio', equip: 'Barra', len: '0:50', hue: 18, yt: 'n_8dwMLPD8U' },
-    { name: 'Zancadas', muscle: 'Glúteo', level: 'Base', equip: 'Mancuernas', len: '0:42', hue: 78 },
-    { name: 'Plancha', muscle: 'Core', level: 'Base', equip: 'Peso corporal', len: '0:36', hue: 162 },
-    { name: 'Curl de bíceps', muscle: 'Bíceps', level: 'Base', equip: 'Mancuernas', len: '0:34', hue: 55 },
+    { id: 'gym-db-bench-press', name: 'Press banca mancuernas', muscle: 'Pecho', level: 'Intermedio', equip: 'Mancuernas', hue: 55, yt: 'Y_7aHqXeCfQ' },
+    { name: 'Sentadilla goblet', muscle: 'Cuádriceps', level: 'Base', equip: 'Mancuerna', hue: 162, videoUrl: 'https://www.youtube.com/results?search_query=sentadilla+goblet+tecnica+de+ejecucion' },
+    { id: 'gym-barbell-row', name: 'Remo con barra', muscle: 'Dorsales', level: 'Intermedio', equip: 'Barra', hue: 232, yt: 'phVtqawIgbk' },
+    { id: 'gym-romanian-deadlift', name: 'Peso muerto rumano', muscle: 'Isquios', level: 'Avanzado', equip: 'Barra', hue: 300, yt: '_oyxCn2iSjU' },
+    { id: 'gym-overhead-press', name: 'Press militar', muscle: 'Hombro', level: 'Intermedio', equip: 'Barra', hue: 18, yt: '4LBVP2Oe7fg' },
+    { id: 'gym-dumbbell-lunge', name: 'Zancadas', muscle: 'Glúteo', level: 'Base', equip: 'Mancuernas', hue: 78, yt: 'D7KaRcUTQeE' },
+    { id: 'gym-plank', name: 'Plancha', muscle: 'Core', level: 'Base', equip: 'Peso corporal', hue: 162, yt: 'pSHjTRCQxIw' },
+    { id: 'gym-db-curl', name: 'Curl de bíceps', muscle: 'Bíceps', level: 'Base', equip: 'Mancuernas', hue: 55, yt: '8xqUwVT_OYg' },
   ];
 
   /* ---- Progreso (data-driven) ---- */
@@ -154,7 +167,8 @@
   };
 
   window.STUDIO = {
-    user, todaySession, week, discover, macroTargets, macroEaten,
+    mode: 'demo', dataStatus: 'demo', planStatus: 'demo',
+    user, todaySession, week, macroTargets, macroEaten,
     nutritionDays, meals, glycemic, shopping, batch, library, progress,
   };
 })();

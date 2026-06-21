@@ -91,20 +91,20 @@ function simplifyDeveloperJargon(str) {
 
 const DEFAULT_PROFILE = {
   displayName: '',
-  goal: 'weight_loss',
-  trainingMode: 'gym',
-  trainingModality: 'full_gym',
-  metabolicProfile: 'none',
-  activityLevel: 'moderate',
-  sex: 'male',
-  age: 30,
-  weightKg: 75,
-  heightCm: 175,
-  mealsPerDay: 4,
+  goal: '',
+  trainingMode: '',
+  trainingModality: '',
+  metabolicProfile: '',
+  activityLevel: '',
+  sex: '',
+  age: '',
+  weightKg: '',
+  heightCm: '',
+  mealsPerDay: '',
   targetCalories: '',
   medicalConditions: '',
   physicalInjuries: '',
-  preferredDurationMinutes: 60,
+  preferredDurationMinutes: '',
   preparticipation: {
     knownCardiometabolicDisease: false,
     exerciseSymptoms: false,
@@ -717,19 +717,21 @@ function buildProfilePayload(profile) {
   return {
     displayName: profile.displayName || '',
     goal: profile.goal,
-    trainingMode: profile.trainingModality === 'full_gym' ? 'gym' : 'home',
-    trainingModality: profile.trainingModality,
-    metabolicProfile: profile.metabolicProfile,
-    activityLevel: profile.activityLevel,
-    sex: profile.sex,
-    age: toNumber(profile.age, 30),
-    weightKg: toNumber(profile.weightKg, 75),
-    heightCm: toNumber(profile.heightCm, 175),
-    mealsPerDay: toNumber(profile.mealsPerDay, 4),
+    trainingMode: profile.trainingModality
+      ? (profile.trainingModality === 'full_gym' ? 'gym' : 'home')
+      : null,
+    trainingModality: profile.trainingModality || null,
+    metabolicProfile: profile.metabolicProfile || null,
+    activityLevel: profile.activityLevel || null,
+    sex: profile.sex || null,
+    age: toNumber(profile.age, null),
+    weightKg: toNumber(profile.weightKg, null),
+    heightCm: toNumber(profile.heightCm, null),
+    mealsPerDay: toNumber(profile.mealsPerDay, null),
     targetCalories: toNumber(profile.targetCalories, null),
     medicalConditions: profile.medicalConditions || '',
     physicalInjuries: profile.physicalInjuries || '',
-    preferredDurationMinutes: toNumber(profile.preferredDurationMinutes, 60),
+    preferredDurationMinutes: toNumber(profile.preferredDurationMinutes, null),
     preparticipation: {
       knownCardiometabolicDisease: toBoolean(profile.preparticipation?.knownCardiometabolicDisease, false),
       exerciseSymptoms: toBoolean(profile.preparticipation?.exerciseSymptoms, false),
@@ -770,7 +772,7 @@ function buildProfilePayload(profile) {
       consentVersion: profile.legalConsents?.consentVersion || '2026-04-02',
       acceptedAt: profile.legalConsents?.acceptedAt ?? null,
     },
-    onboardingCompleted: true,
+    onboardingCompleted: profile.onboardingCompleted === true,
   };
 }
 
@@ -996,12 +998,12 @@ export default function DashboardPage() {
   const [dailyCheckinStatus, setDailyCheckinStatus] = useState('');
   const [workoutLoading, setWorkoutLoading] = useState(false);
   const [workoutCheckin, setWorkoutCheckin] = useState({
-    title: 'Sesión planificada',
-    mode: 'full_gym',
-    durationMinutes: 60,
-    sessionRpe: 6,
-    fatigue: 4,
-    sleepHours: 7,
+    title: '',
+    mode: '',
+    durationMinutes: '',
+    sessionRpe: '',
+    fatigue: '',
+    sleepHours: '',
     completed: true,
     notes: '',
   });
@@ -1362,9 +1364,12 @@ export default function DashboardPage() {
         primaryMuscles: exercise.primaryMuscles || metadata.primaryMuscles,
         secondaryMuscles: exercise.secondaryMuscles || metadata.secondaryMuscles,
         anatomyRegions: exercise.anatomyRegions || metadata.anatomyRegions,
-        videoUrl: exercise.videoUrl || metadata.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((exercise.youtubeQuery || exercise.name || '') + ' tecnica ejecucion')}`,
-        videoEmbedUrl: exercise.videoEmbedUrl || metadata.videoEmbedUrl || null,
-        videoEmbedId: exercise.videoEmbedId || metadata.videoEmbedId || null,
+        // El vídeo persistido es solo una instantánea del momento en que se creó el plan.
+        // La biblioteca curada actual es la fuente de verdad: así una asociación retirada
+        // no reaparece en planes antiguos y una corrección se aplica sin regenerarlos.
+        videoUrl: metadata.videoUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent((exercise.youtubeQuery || exercise.name || '') + ' tecnica ejecucion')}`,
+        videoEmbedUrl: metadata.videoEmbedUrl || null,
+        videoEmbedId: metadata.videoEmbedId || null,
         youtubeQuery: exercise.youtubeQuery || metadata.youtubeQuery || '',
       };
     }
@@ -1524,22 +1529,22 @@ export default function DashboardPage() {
       const serverProfile = data.profile || {};
       setProfile({
         displayName: serverProfile.displayName || '',
-        goal: serverProfile.goal || 'weight_loss',
-        trainingMode: serverProfile.trainingMode || 'gym',
-        trainingModality: serverProfile.trainingModality || 'full_gym',
-        metabolicProfile: serverProfile.metabolicProfile || 'none',
-        activityLevel: serverProfile.activityLevel || 'moderate',
-        sex: serverProfile.sex || 'male',
-        age: serverProfile.age ?? 30,
-        weightKg: serverProfile.weightKg ?? 75,
-        heightCm: serverProfile.heightCm ?? 175,
-        mealsPerDay: serverProfile.mealsPerDay ?? 4,
+        goal: serverProfile.goal || '',
+        trainingMode: serverProfile.trainingMode || '',
+        trainingModality: serverProfile.trainingModality || '',
+        metabolicProfile: serverProfile.metabolicProfile || '',
+        activityLevel: serverProfile.activityLevel || '',
+        sex: serverProfile.sex || '',
+        age: serverProfile.age ?? '',
+        weightKg: serverProfile.weightKg ?? '',
+        heightCm: serverProfile.heightCm ?? '',
+        mealsPerDay: serverProfile.mealsPerDay ?? '',
         targetCalories: serverProfile.targetCalories ?? '',
         medicalConditions: serverProfile.medicalConditions || '',
         physicalInjuries: serverProfile.physicalInjuries || '',
         preferredDurationMinutes: Number.isFinite(Number(serverProfile.preferredDurationMinutes))
           ? Number(serverProfile.preferredDurationMinutes)
-          : 60,
+          : '',
         preparticipation: {
           knownCardiometabolicDisease: serverProfile.preparticipation?.knownCardiometabolicDisease ?? false,
           exerciseSymptoms: serverProfile.preparticipation?.exerciseSymptoms ?? false,
@@ -1582,7 +1587,7 @@ export default function DashboardPage() {
       });
       setWorkoutCheckin((prev) => ({
         ...prev,
-        mode: serverProfile.trainingModality || 'full_gym',
+        mode: serverProfile.trainingModality || '',
       }));
       setProfileStatus('Perfil cargado.');
     } catch (error) {
@@ -1627,31 +1632,9 @@ export default function DashboardPage() {
     }
   }
 
-  async function completeQuickOnboarding() {
-    if (profileLoading) return;
-    setProfileLoading(true);
-    setProfileStatus('Guardando onboarding inicial...');
-
-    try {
-      const payload = buildProfilePayload(profile);
-      const data = await apiFetch('/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      });
-      setProfile((prev) => ({
-        ...prev,
-        onboardingCompleted: true,
-        preparticipationUpdatedAt: data.profile?.preparticipationUpdatedAt || prev.preparticipationUpdatedAt || null,
-        screeningRefreshDays: Number.isFinite(Number(data.profile?.screeningRefreshDays))
-          ? Math.max(15, Math.round(Number(data.profile.screeningRefreshDays)))
-          : prev.screeningRefreshDays,
-      }));
-      setProfileStatus(`Onboarding completado. Objetivo: ${data.profile.targetMacros?.targetCalories || 'n/d'} kcal`);
-    } catch (error) {
-      setProfileStatus(`Error guardando onboarding: ${error.message}`);
-    } finally {
-      setProfileLoading(false);
-    }
+  function completeQuickOnboarding() {
+    setProfileStatus('Abriendo el onboarding oficial de Ignios Studio…');
+    if (typeof window !== 'undefined') window.location.assign('/');
   }
 
   async function loadWeeklyPlan() {
@@ -2206,6 +2189,10 @@ export default function DashboardPage() {
 
   async function registerWorkoutCheckin() {
     if (workoutLoading) return;
+    if (!String(workoutCheckin.title || '').trim() || !workoutCheckin.mode) {
+      setWorkoutStatus('Completa el título y la modalidad antes de registrar la sesión.');
+      return;
+    }
     setWorkoutLoading(true);
     setWorkoutStatus('Registrando sesión...');
 
@@ -2213,13 +2200,13 @@ export default function DashboardPage() {
       await apiFetch('/api/workouts', {
         method: 'POST',
         body: JSON.stringify({
-          title: workoutCheckin.title || 'Sesión',
-          mode: workoutCheckin.mode || profile.trainingModality || 'full_gym',
+          title: workoutCheckin.title.trim(),
+          mode: workoutCheckin.mode,
           performedAt: new Date().toISOString(),
-          durationMinutes: toNumber(workoutCheckin.durationMinutes, 45),
-          sessionRpe: toNumber(workoutCheckin.sessionRpe, 6),
-          fatigue: toNumber(workoutCheckin.fatigue, 4),
-          sleepHours: toNumber(workoutCheckin.sleepHours, 7),
+          durationMinutes: toNumber(workoutCheckin.durationMinutes, null),
+          sessionRpe: toNumber(workoutCheckin.sessionRpe, null),
+          fatigue: toNumber(workoutCheckin.fatigue, null),
+          sleepHours: toNumber(workoutCheckin.sleepHours, null),
           completed: toBoolean(workoutCheckin.completed, true),
           notes: workoutCheckin.notes || '',
           planId: weeklyPlan?.id ?? null,
@@ -2247,7 +2234,7 @@ export default function DashboardPage() {
         method: 'POST',
         body: JSON.stringify({
           title: selectedDay.workout?.title || 'Entrenamiento del día',
-          mode: selectedDay.workout?.trainingModality || profile.trainingModality || 'full_gym',
+          mode: selectedDay.workout?.trainingModality || profile.trainingModality || null,
           source: 'daily_checkin',
           dailyCheckinDate: selectedDay.date,
           checkinSkipped: true,
@@ -2258,7 +2245,7 @@ export default function DashboardPage() {
             tachycardia: false,
           },
           performedAt: buildNoonIsoForDateKey(selectedDay.date),
-          durationMinutes: toNumber(selectedDay.workout?.durationMinutes || 45),
+          durationMinutes: toNumber(selectedDay.workout?.durationMinutes, null),
           completed: false,
           notes: '[SESIÓN INCOMPLETA: El usuario omitió la encuesta subjetiva de check-in clínico]',
           planId: weeklyPlan?.id ?? null,
@@ -2306,13 +2293,13 @@ export default function DashboardPage() {
         method: 'POST',
         body: JSON.stringify({
           title: selectedDay.workout?.title || 'Entrenamiento del día',
-          mode: selectedDay.workout?.trainingModality || profile.trainingModality || 'full_gym',
+          mode: selectedDay.workout?.trainingModality || profile.trainingModality || null,
           source: 'daily_checkin',
           dailyCheckinDate: selectedDay.date,
           checkinSkipped: false,
           symptoms: dailyCheckinSymptoms,
           performedAt: buildNoonIsoForDateKey(selectedDay.date),
-          durationMinutes: toNumber(selectedDay.workout?.durationMinutes || 45),
+          durationMinutes: toNumber(selectedDay.workout?.durationMinutes, null),
           sessionRpe: toNumber(dailyCheckinRpe, 6),
           fatigue: toNumber(dailyCheckinFatigue, 4),
           sleepHours: toNumber(dailyCheckinSleep, 7),
@@ -2714,15 +2701,7 @@ export default function DashboardPage() {
       ), 0) / nutritionDays.length
     )
     : 0;
-  const hasBaseData =
-    Boolean(String(profile.displayName || '').trim())
-    || Boolean(profile.preparticipationUpdatedAt)
-    || Number(toNumber(profile.weightKg, 75)) !== 75
-    || Number(toNumber(profile.heightCm, 175)) !== 175
-    || Number(toNumber(profile.age, 30)) !== 30
-    || Boolean(profile.targetCalories)
-    || Boolean(weeklyPlan);
-  const needsOnboarding = profile.onboardingCompleted !== true && !hasBaseData;
+  const needsOnboarding = profile.onboardingCompleted !== true;
   const screeningRefreshDays = Math.max(15, Math.round(toNumber(profile.screeningRefreshDays, 15) || 15));
   const screeningLastUpdateDate = profile.preparticipationUpdatedAt ? new Date(profile.preparticipationUpdatedAt) : null;
   const hasValidScreeningDate = Boolean(
@@ -3218,7 +3197,7 @@ export default function DashboardPage() {
               <header className="dashboard-greeting-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h2 style={{ fontSize: '1.8rem', fontWeight: 850, color: '#172f4a', margin: 0, fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.03em' }}>
-                    ¡Hola, {profile.displayName || 'David'}!
+                    ¡Hola, {profile.displayName || 'atleta'}!
                   </h2>
                   <p style={{ fontSize: '0.88rem', color: '#68819d', margin: '0.2rem 0 0 0' }}>
                     {dashboardFocusDay ? (
@@ -3247,12 +3226,12 @@ export default function DashboardPage() {
                 <article className="visual-bento-card calories">
                   <div className="bento-card-header">
                     <span className="material-symbols-outlined" style={{ color: '#db2777' }}>local_fire_department</span>
-                    <span className="bento-card-trend">+12% vs ayer</span>
+                    <span className="bento-card-trend">Según tu plan</span>
                   </div>
                   <div>
                     <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Calorías Planificadas</p>
                     <p className="bento-card-value">
-                      {weeklyPlan?.mealsPlanKcal || 1842} <span style={{ fontSize: '0.8rem' }}>kcal</span>
+                      {weeklyCaloriesTotal > 0 ? Math.round(weeklyCaloriesTotal / Math.max(1, plannedDays.length)) : '—'} <span style={{ fontSize: '0.8rem' }}>kcal/día</span>
                     </p>
                   </div>
                 </article>
@@ -3261,12 +3240,12 @@ export default function DashboardPage() {
                 <article className="visual-bento-card activity">
                   <div className="bento-card-header">
                     <span className="material-symbols-outlined" style={{ color: '#2ecc71' }}>timer</span>
-                    <span className="bento-card-trend neutral">Meta: {weeklyMinutesTotal || 60}m</span>
+                    <span className="bento-card-trend neutral">Plan semanal</span>
                   </div>
                   <div>
                     <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Tiempo de Actividad</p>
                     <p className="bento-card-value">
-                      {weeklyMinutesTotal || 45} <span style={{ fontSize: '0.8rem' }}>min</span>
+                      {weeklyMinutesTotal || '—'} <span style={{ fontSize: '0.8rem' }}>min</span>
                     </p>
                   </div>
                 </article>
@@ -3275,12 +3254,12 @@ export default function DashboardPage() {
                 <article className="visual-bento-card streak">
                   <div className="bento-card-header">
                     <span className="material-symbols-outlined" style={{ color: '#34495e' }}>bolt</span>
-                    <span className="bento-card-trend">Racha</span>
+                    <span className="bento-card-trend">Esta semana</span>
                   </div>
                   <div>
-                    <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Racha Actual</p>
+                    <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Sesiones previstas</p>
                     <p className="bento-card-value">
-                      {profile.streak || 12} <span style={{ fontSize: '0.8rem' }}>días</span>
+                      {plannedDays.length || '—'} <span style={{ fontSize: '0.8rem' }}>sesiones</span>
                     </p>
                   </div>
                 </article>
@@ -3289,12 +3268,12 @@ export default function DashboardPage() {
                 <article className="visual-bento-card workout">
                   <div className="bento-card-header">
                     <span className="material-symbols-outlined" style={{ color: '#1888f7' }}>calendar_today</span>
-                    <span className="bento-card-trend" style={{ color: '#1888f7' }}>HOY, 18:00</span>
+                    <span className="bento-card-trend" style={{ color: '#1888f7' }}>{dashboardFocusDay ? 'PLAN' : 'SIN PLAN'}</span>
                   </div>
                   <div>
                     <p className="bento-card-header" style={{ fontSize: '0.65rem', margin: 0 }}>Siguiente Rutina</p>
                     <p className="bento-card-value" style={{ fontSize: '1.1rem', margin: '0.4rem 0', lineHeight: '1.3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {dashboardFocusDay?.workout?.title || 'Pecho & Tríceps'}
+                      {dashboardFocusDay?.workout?.title || 'Sin sesión programada'}
                     </p>
                   </div>
                 </article>
@@ -3314,10 +3293,12 @@ export default function DashboardPage() {
                   </div>
                   <div className="chart-stage">
                     {['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'].map((dayName, idx) => {
-                      const heights = ['40%', '85%', '30%', '95%', '10%', '70%', '55%'];
+                      const plannedDay = plannedDays[idx] || null;
+                      const plannedMinutes = Number(plannedDay?.workout?.durationMinutes) || 0;
+                      const height = plannedMinutes > 0 ? `${Math.min(100, Math.max(6, Math.round((plannedMinutes / 90) * 100)))}%` : '0%';
                       return (
                         <div key={dayName} className="chart-bar-container">
-                          <div className="chart-bar" style={{ height: heights[idx] }} />
+                          <div className="chart-bar" style={{ height }} />
                           <span className="chart-bar-label">{dayName}</span>
                         </div>
                       );
@@ -3335,7 +3316,7 @@ export default function DashboardPage() {
                       <span>COACH AI — SPOTLIGHT</span>
                     </div>
                     <p className="coach-spotlight-text">
-                      "{simplifyDeveloperJargon(coachWeeklySummary) || `David, tu volumen en Pecho ha bajado un 5% esta semana. ¿Ajustamos la sesión de hoy para compensar?`}"
+                      {simplifyDeveloperJargon(coachWeeklySummary) || 'Aún no hay un análisis del coach para este plan.'}
                     </p>
                   </article>
 
@@ -3343,25 +3324,15 @@ export default function DashboardPage() {
                   <article className="recent-activity-card">
                     <h3>Actividad Reciente</h3>
 
-                    <div className="activity-item">
+                    {dashboardFocusDay ? <div className="activity-item">
                       <div className="activity-icon-container">
                         <span className="material-symbols-outlined">fitness_center</span>
                       </div>
                       <div className="activity-info">
-                        <h4>{dashboardFocusDay?.workout?.title || 'Pecho & Tríceps'}</h4>
-                        <p>Hoy • {dashboardFocusDay?.workout?.durationMinutes || 45} min • RPE {dashboardFocusDay?.workout?.intensityRpe || '8'}</p>
+                        <h4>{dashboardFocusDay.workout?.title || 'Sesión planificada'}</h4>
+                        <p>{formatDayNameFromIso(dashboardFocusDay.date)} • {dashboardFocusDay.workout?.durationMinutes || '—'} min • RPE {dashboardFocusDay.workout?.intensityRpe || '—'}</p>
                       </div>
-                    </div>
-
-                    <div className="activity-item">
-                      <div className="activity-icon-container green">
-                        <span className="material-symbols-outlined">directions_run</span>
-                      </div>
-                      <div className="activity-info">
-                        <h4>HIIT Metabólico</h4>
-                        <p>Ayer • 25 min • 320 kcal</p>
-                      </div>
-                    </div>
+                    </div> : <p className="empty-text">No hay actividad ni sesión programada.</p>}
                   </article>
                 </div>
               </section>
@@ -3372,8 +3343,8 @@ export default function DashboardPage() {
           {activeTab === 'user' && needsOnboarding ? (
             <section className="panel onboarding-panel">
               <SectionLabel
-                title="Onboarding rápido"
-                subtitle="Completa tu setup inicial en menos de 1 minuto."
+                title="Onboarding pendiente"
+                subtitle="La configuración oficial vive en Ignios Studio y no precarga datos personales ficticios."
               />
               <div className="onboarding-grid">
                 <Field label="Nombre">
@@ -3402,6 +3373,7 @@ export default function DashboardPage() {
                     value={profile.goal}
                     onChange={(event) => setProfile((prev) => ({ ...prev, goal: event.target.value }))}
                   >
+                    <option value="">Selecciona un objetivo</option>
                     <option value="weight_loss">Bajar peso</option>
                     <option value="maintain_weight">Mantener peso</option>
                     <option value="endurance">Aumentar resistencia</option>
@@ -3521,6 +3493,7 @@ export default function DashboardPage() {
                         trainingMode: event.target.value === 'full_gym' ? 'gym' : 'home',
                       }))}
                   >
+                    <option value="">Selecciona una modalidad</option>
                     <option value="full_gym">Gimnasio completo</option>
                     <option value="home">Entrenamiento en casa</option>
                     <option value="yoga">Yoga</option>
@@ -3594,7 +3567,7 @@ export default function DashboardPage() {
               </div>
               <div className="inline-actions">
                 <button onClick={completeQuickOnboarding} disabled={profileLoading}>
-                  {profileLoading ? 'Guardando...' : 'Finalizar onboarding'}
+                  Completar en Ignios Studio
                 </button>
                 <small>{profileStatus}</small>
               </div>
@@ -3612,8 +3585,8 @@ export default function DashboardPage() {
               <div className="profile-header-info">
                 <h2 className="profile-header-name">{profile.displayName || 'Usuario'}</h2>
                 <p className="profile-header-sub">
-                  {profile.sex === 'female' ? '♀' : '♂'} {profile.age} años · {profile.weightKg} kg · {profile.heightCm} cm
-                  <span className="profile-goal-badge">🎯 {GOAL_LABELS[profile.goal] || profile.goal}</span>
+                  {[profile.sex === 'female' ? '♀' : profile.sex === 'male' ? '♂' : null, profile.age ? `${profile.age} años` : null, profile.weightKg ? `${profile.weightKg} kg` : null, profile.heightCm ? `${profile.heightCm} cm` : null].filter(Boolean).join(' · ') || 'Datos personales pendientes'}
+                  {profile.goal ? <span className="profile-goal-badge">🎯 {GOAL_LABELS[profile.goal] || profile.goal}</span> : null}
                 </p>
               </div>
             </div>
@@ -3622,18 +3595,18 @@ export default function DashboardPage() {
             <div className="achievements-grid">
               <div className="achievement-card">
                 <span className="achievement-icon">🏆</span>
-                <span className="achievement-title">Racha</span>
-                <span className="achievement-value">{profile.streak || 12} Días</span>
+                <span className="achievement-title">Sesiones previstas</span>
+                <span className="achievement-value">{plannedDays.length || '—'}</span>
               </div>
               <div className="achievement-card">
                 <span className="achievement-icon">⏱️</span>
-                <span className="achievement-title">Minutos Totales</span>
-                <span className="achievement-value">{weeklyMinutesTotal || 1420}</span>
+                <span className="achievement-title">Minutos planificados</span>
+                <span className="achievement-value">{weeklyMinutesTotal || '—'}</span>
               </div>
               <div className="achievement-card">
                 <span className="achievement-icon">⚡</span>
-                <span className="achievement-title">Intensidad Avg</span>
-                <span className="achievement-value">88%</span>
+                <span className="achievement-title">Objetivo</span>
+                <span className="achievement-value">{GOAL_LABELS[profile.goal] || '—'}</span>
               </div>
             </div>
 
@@ -3663,6 +3636,7 @@ export default function DashboardPage() {
                       value={profile.sex}
                       onChange={(e) => setProfile((p) => ({ ...p, sex: e.target.value }))}
                     >
+                      <option value="">Sin indicar</option>
                       <option value="male">Masculino</option>
                       <option value="female">Femenino</option>
                     </select>
@@ -3702,6 +3676,7 @@ export default function DashboardPage() {
                       value={profile.goal}
                       onChange={(e) => setProfile((p) => ({ ...p, goal: e.target.value }))}
                     >
+                      <option value="">Selecciona un objetivo</option>
                       <option value="weight_loss">Bajar peso</option>
                       <option value="maintain_weight">Mantener peso</option>
                       <option value="endurance">Aumentar resistencia</option>
@@ -3726,6 +3701,7 @@ export default function DashboardPage() {
                         setWorkoutCheckin((p) => ({ ...p, mode: nextModality }));
                       }}
                     >
+                      <option value="">Selecciona una modalidad</option>
                       <option value="full_gym">Gimnasio completo</option>
                       <option value="home">Entrenamiento en casa</option>
                       <option value="yoga">Yoga</option>
@@ -3744,6 +3720,7 @@ export default function DashboardPage() {
                         value={profile.activityLevel}
                         onChange={(e) => setProfile((p) => ({ ...p, activityLevel: e.target.value }))}
                       >
+                        <option value="">Sin indicar</option>
                         <option value="sedentary">Sedentario</option>
                         <option value="light">Ligero</option>
                         <option value="moderate">Moderado</option>
@@ -3756,6 +3733,7 @@ export default function DashboardPage() {
                         value={profile.metabolicProfile}
                         onChange={(e) => setProfile((p) => ({ ...p, metabolicProfile: e.target.value }))}
                       >
+                        <option value="">Sin indicar</option>
                         <option value="none">Sin condición</option>
                         <option value="insulin_resistance">Resist. insulina</option>
                         <option value="prediabetes">Prediabetes</option>
@@ -3804,7 +3782,7 @@ export default function DashboardPage() {
                     type="number"
                     min="20"
                     max="180"
-                    value={profile.preferredDurationMinutes ?? 60}
+                    value={profile.preferredDurationMinutes ?? ''}
                     onChange={(e) => setProfile((p) => ({ ...p, preferredDurationMinutes: Number(e.target.value) }))}
                   />
                 </div>
@@ -4305,6 +4283,7 @@ export default function DashboardPage() {
                     value={workoutCheckin.mode}
                     onChange={(event) => setWorkoutCheckin((prev) => ({ ...prev, mode: event.target.value }))}
                   >
+                    <option value="">Selecciona una modalidad</option>
                     <option value="full_gym">Gimnasio completo</option>
                     <option value="home">Casa</option>
                     <option value="yoga">Yoga</option>

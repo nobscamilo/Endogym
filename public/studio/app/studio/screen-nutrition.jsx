@@ -108,9 +108,8 @@ function AddFood({ onAdded }) {
         carbsGrams: Number(f.carbsGrams) || 0,
         fatGrams: Number(f.fatGrams) || 0,
       };
-      // Estima la carga glucémica (GL ≈ carbohidratos × IG/100, IG medio ~55) para que sume al día.
-      const glycemicLoad = Math.round(food.carbsGrams * 0.55);
-      const totals = { calories: food.calories, proteinGrams: food.proteinGrams, carbsGrams: food.carbsGrams, fatGrams: food.fatGrams, glycemicLoad };
+      // Sin alimento/porción con IG conocido no se inventa una carga glucémica media.
+      const totals = { calories: food.calories, proteinGrams: food.proteinGrams, carbsGrams: food.carbsGrams, fatGrams: food.fatGrams };
       const r = await fetch('/api/meals', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
@@ -189,23 +188,22 @@ function normMeals(arr) {
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 function localDateKey(date = new Date()) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  return window.__studioDateKey(date);
 }
 function localDowIndex(date = new Date()) {
-  const js = date.getDay(); // 0=Dom … 6=Sáb
+  const key = localDateKey(date);
+  const js = new Date(`${key}T00:00:00.000Z`).getUTCDay(); // 0=Dom … 6=Sáb
   return js === 0 ? 6 : js - 1;
 }
 
 // Fechas de la semana ACTUAL, empezando en lunes — calendario local del navegador.
 function weekDateInfo() {
   const now = new Date();
-  const toMonday = -localDowIndex(now);
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + toMonday);
+  const todayKey = localDateKey(now);
+  const mondayKey = window.__studioAddDays(todayKey, -localDowIndex(now));
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return { date: d.getDate(), dateISO: localDateKey(d), today: localDateKey(d) === localDateKey(now) };
+    const key = window.__studioAddDays(mondayKey, i);
+    return { date: Number(key.slice(8, 10)), dateISO: key, today: key === todayKey };
   });
 }
 
@@ -215,7 +213,7 @@ function todayDowIndex(D) {
   const byIso = (D.nutritionDays || []).findIndex((d) => d.dateISO === todayKey);
   if (byIso >= 0) return byIso;
   const localIdx = localDowIndex();
-  const todayDate = new Date().getDate();
+  const todayDate = Number(todayKey.slice(8, 10));
   const flagged = (D.nutritionDays || []).findIndex((d, i) => d.today && i === localIdx && Number(d.date) === todayDate);
   return flagged >= 0 ? flagged : localIdx;
 }
@@ -268,6 +266,8 @@ function NutritionScreen({ layout }) {
   const [dayIdx, setDayIdx] = useStateN(tIdx);
   const [gen, setGen] = useStateN(0);
   const [genStatus, setGenStatus] = useStateN('idle'); // idle|loading|ok|err|noauth
+  const hasNutritionPlan = Array.isArray(D.nutritionDays) && D.nutritionDays.length > 0
+    && Array.isArray(D.meals) && D.meals.length > 0;
   const TABS = [{ id: 'hoy', label: 'Qué comer hoy' }, { id: 'compra', label: 'Compra & Batch' }, { id: 'glu', label: 'Glucemia' }];
 
   // Muestra las comidas del día seleccionado (D.meals se mantiene sincronizado con la selección).
@@ -362,7 +362,7 @@ function NutritionScreen({ layout }) {
         <div>
           <p className="eyebrow">Nutrición</p>
           <h1>Tu plan de comidas</h1>
-          <p className="sub">Tu plan semanal: elige el día para ver su menú, la lista de la compra lista para el súper y cómo responde tu glucosa.</p>
+          <p className="sub">Tu plan semanal: elige el día para ver su menú, la lista de la compra y la carga glucémica estimada.</p>
         </div>
         <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
           <button className="btn" onClick={generate} disabled={genStatus === 'loading'}>
@@ -375,7 +375,12 @@ function NutritionScreen({ layout }) {
         </div>
       </div>
 
-      <div className="day-rail">
+      {!hasNutritionPlan ? (
+        <SectionCard title="Plan nutricional" icon="nutrition">
+          <div className="empty">{genStatus === 'loading' || genStatus === 'idle' ? 'Cargando tu plan real…' : genStatus === 'err' ? 'No pudimos cargar ni generar tu plan. No mostraremos un menú de muestra.' : 'Aún no hay un plan nutricional guardado.'}</div>
+          <AddFood />
+        </SectionCard>
+      ) : <React.Fragment><div className="day-rail">
         {D.nutritionDays.map((d, i) => (
           <button key={i} className={`day-pill ${dayIdx === i ? 'active' : ''}`} onClick={() => showDay(i)}>
             <div className="dp-day">{d.day}</div>
@@ -390,6 +395,7 @@ function NutritionScreen({ layout }) {
       {tab === 'hoy' && <NutritionToday key={`hoy-${dayIdx}-${gen}`} layout={layout} />}
       {tab === 'compra' && <NutritionShop key={`shop-${gen}`} />}
       {tab === 'glu' && <NutritionGlu key={`glu-${dayIdx}-${gen}`} />}
+      </React.Fragment>}
     </div>
   );
 }
@@ -414,7 +420,7 @@ function NutritionToday({ layout }) {
     if (isSelectedToday) setMe(next);
   };
   // Próxima comida: solo se llama "Toca ahora" si el día seleccionado es hoy y la hora encaja.
-  const nowMin = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+  const nowMin = (() => { const p = window.__studioDateParts(); return Number(p.hour) * 60 + Number(p.minute); })();
   const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 9999; };
   const next = meals.find((m) => !m.done && toMin(m.time) >= nowMin)
     || meals.find((m) => toMin(m.time) >= nowMin)
@@ -522,7 +528,7 @@ function MealDetail({ m }) {
         </div>
       </div>
       <div className="row wrap ac" style={{ gap: 8 }}>
-        <button className="btn soft sm"><Icon name="check" size={15} /> Marcar como hecha</button>
+        <span className="tiny muted">Para registrarla como consumida, usa “Añadir alimento” con la cantidad real.</span>
         <button className="btn ghost sm" onClick={swapThisMeal} disabled={sw === 'busy'}>
           <Icon name="sparkles" size={15} /> {sw === 'busy' ? 'Buscando alternativa…' : 'Cambiar comida'}
         </button>
@@ -614,15 +620,28 @@ function MealsPlate({ meals }) {
 /* ---------- COMPRA & BATCH ---------- */
 function NutritionShop() {
   const D = window.STUDIO;
-  const [cats, setCats] = useStateN(D.shopping);
+  const [cats, setCats] = useStateN(Array.isArray(D.shopping) ? D.shopping : []);
+  const [shareStatus, setShareStatus] = useStateN('idle');
   const toggle = (ci, ii) => setCats((p) => p.map((c, x) => x !== ci ? c : { ...c, items: c.items.map((it, y) => y !== ii ? it : { ...it, checked: !it.checked }) }));
   const total = cats.reduce((a, c) => a + c.items.length, 0);
   const checked = cats.reduce((a, c) => a + c.items.filter((i) => i.checked).length, 0);
+  async function shareList() {
+    const text = cats.map((cat) => `${cat.cat}:\n${cat.items.map((item) => `- ${item.name}${item.qty ? ` (${item.qty})` : ''}`).join('\n')}`).join('\n\n');
+    if (!text) return;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Lista de la compra · Ignios', text });
+      else if (navigator.clipboard) await navigator.clipboard.writeText(text);
+      else throw new Error('share_unavailable');
+      setShareStatus('ok'); setTimeout(() => setShareStatus('idle'), 2000);
+    } catch (e) { if (e?.name !== 'AbortError') setShareStatus('err'); }
+  }
   return (
     <div className="grid g-2" style={{ gridTemplateColumns: '1.05fr 0.95fr', alignItems: 'start' }}>
       <SectionCard title="Lista de la compra" icon="cart" sub={`${checked} de ${total} en el carro`}
-        action={<button className="btn ghost sm"><Icon name="share" size={15} /> Compartir</button>}>
-        <div className="bar" style={{ marginBottom: 16 }}><i style={{ width: (checked / total * 100) + '%' }} /></div>
+        action={<button className="btn ghost sm" onClick={shareList} disabled={!cats.length}><Icon name="share" size={15} /> {shareStatus === 'ok' ? 'Copiada ✓' : 'Compartir'}</button>}>
+        <div className="bar" style={{ marginBottom: 16 }}><i style={{ width: (total ? checked / total * 100 : 0) + '%' }} /></div>
+        {!cats.length ? <div className="empty">La lista aparecerá cuando exista un plan nutricional real.</div> : null}
+        {shareStatus === 'err' ? <div className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo compartir en este dispositivo.</div> : null}
         {cats.map((c, ci) => (
           <div key={ci} className="shop-cat">
             <div className="shop-cat-head"><span className="sc-ico">{c.icon}</span><h4>{c.cat}</h4><span className="sc-count num">{c.items.filter((i) => i.checked).length}/{c.items.length}</span></div>
@@ -639,7 +658,7 @@ function NutritionShop() {
 
       <SectionCard title="Batch cooking del domingo" icon="pot" sub="Cocina una vez, come toda la semana.">
         <div className="grid" style={{ gap: 12 }}>
-          {D.batch.map((b, i) => (
+          {(Array.isArray(D.batch) ? D.batch : []).map((b, i) => (
             <div key={i} className="card batch-card">
               <div className="batch-emoji">{b.emoji}</div>
               <div style={{ flex: 1 }}>
@@ -661,15 +680,24 @@ function NutritionShop() {
 /* ---------- GLUCEMIA ---------- */
 function NutritionGlu() {
   const D = window.STUDIO;
-  const g = D.glycemic, meals = D.meals;
+  const g = D.glycemic;
+  const meals = Array.isArray(D.meals) ? D.meals : [];
+  if (!g || !Number.isFinite(Number(g.dayLoad))) {
+    return <div className="empty">No hay carga glucémica calculable en las comidas registradas de hoy. Sin un dato válido no mostramos valores ni curvas de muestra.</div>;
+  }
+  const state = g.dayClass === 'high'
+    ? { label: 'Carga alta', pill: 'Alta', color: 'var(--glu-high)', cls: 'high' }
+    : g.dayClass === 'mid'
+      ? { label: 'Carga moderada', pill: 'Moderada', color: 'var(--glu-mid)', cls: 'mid' }
+      : { label: 'Carga baja', pill: 'Baja', color: 'var(--glu-good)', cls: 'good' };
   const needle = Math.min(96, Math.max(4, g.dayLoad));
   return (
     <React.Fragment>
       <div className="grid g-2">
-        <SectionCard title="Carga glucémica del día" icon="drop" sub="Cuánto eleva tu glucosa lo que comes hoy">
+        <SectionCard title="Carga glucémica del día" icon="drop" sub="Estimación nutricional de las comidas registradas; no es una medición de glucosa">
           <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
-            <Stat num={g.dayLoad} unit="GL" label="Carga baja-moderada" color="var(--glu-good)" />
-            <span className="pill good"><span className="dot" /> En rango</span>
+            <Stat num={g.dayLoad} unit="GL" label={state.label} color={state.color} />
+            <span className={`pill ${state.cls}`}><span className="dot" /> {state.pill}</span>
           </div>
           <div className="glu-gauge">
             <div className="glu-track"><div className="glu-needle" style={{ left: needle + '%' }} /></div>
@@ -691,7 +719,7 @@ function NutritionGlu() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Impacto por comida" icon="nutrition" sub="Ordenadas por carga glucémica">
+      <SectionCard title="Impacto estimado del menú" icon="nutrition" sub="Valores del plan de comidas, no una medición de glucosa">
         <div className="stack">
           {[...meals].sort((a, b) => b.gl - a.gl).map((m, i) => (
             <div key={i} className="row between" style={{ padding: '12px 4px', borderBottom: i < meals.length - 1 ? '1px solid var(--line)' : 'none' }}>

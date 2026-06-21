@@ -106,6 +106,7 @@ __requestParentToken();
 const __firebaseReady = fetch('/api/public-config')
   .then((r) => (r.ok ? r.json() : null))
   .then((cfg) => {
+    if (cfg && cfg.timeZone) window.__APP_TIME_ZONE = cfg.timeZone;
     if (!cfg || !cfg.apiKey) return;
     const app = getApps().length ? getApps()[0] : initializeApp(cfg);
     __auth = getAuth(app);
@@ -153,13 +154,27 @@ function __applyOverrides(base, ov) {
   if (!base || !ov) return;
   Object.keys(ov).forEach(function (k) {
     const v = ov[k];
-    if (v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object') {
-      Object.assign(base[k], v);
-    } else if (k !== 'todaySessionTitle') {
-      base[k] = v;
-    }
+    // Las secciones reales reemplazan por completo a la muestra. Fusionar objetos conservaba
+    // propiedades demo anidadas (p. ej. glycemic.points) aunque la API hubiera respondido.
+    if (k !== 'todaySessionTitle') base[k] = v;
   });
   if (ov.todaySessionTitle && base.todaySession) base.todaySession.title = ov.todaySessionTitle;
+}
+
+function __setAuthenticatedBase(status) {
+  window.STUDIO = {
+    mode: 'authenticated', dataStatus: status || 'loading', planStatus: 'missing',
+    user: { name: 'Atleta', last: '', initials: 'A', profileComplete: true },
+    todaySession: null, week: [], weekVolumeHours: null, library: [],
+    macroTargets: null, macroEaten: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+    nutritionDays: [], meals: [], glycemic: null, shopping: [], batch: [],
+    progress: { weightSeries: [], weightNow: null, weightDelta6w: null, weightDeltaWk: null,
+      sessionsDone: 0, sessionsPlan: 0, adherence: null, volumeWk: null, strain: [],
+      recovery: null, muscleVolume: [], pr: [] },
+    strava: { connected: false, recent: [] }, coachAdjust: null, recentWorkouts: [],
+    runPaces: null, runZones: null, runFitness: null, reentry: null,
+    goalProgress: null, mesocycleReview: null,
+  };
 }
 
 async function __fetchStudioData(token) {
@@ -184,6 +199,10 @@ async function __mergeRealData() {
       await new Promise((r) => setTimeout(r, 1200));
       try { token = await __getIdToken(); } catch (e) { token = null; }
     }
+    // Sin token se conserva exclusivamente el modo demo público. Con token se retira la muestra
+    // antes de tocar la API para que ningún fallo pueda presentarla como datos de esa persona.
+    if (!token) return;
+    __setAuthenticatedBase('loading');
     let r = await __fetchStudioData(token);
     if (r && r.status === 401) {
       try { token = await __getIdToken({ forceRefresh: true }); } catch (e) { token = null; }
@@ -196,9 +215,16 @@ async function __mergeRealData() {
     }
     if (r && r.ok) {
       const j = await r.json();
-      if (j && j.ok && j.overrides && window.STUDIO) __applyOverrides(window.STUDIO, j.overrides);
+      if (j && j.ok && j.overrides && window.STUDIO) {
+        __applyOverrides(window.STUDIO, j.overrides);
+        window.STUDIO.dataStatus = 'ready';
+        return;
+      }
     }
-  } catch (e) { /* datos de muestra (identidad neutra) */ }
+    if (window.STUDIO && window.STUDIO.mode === 'authenticated') window.STUDIO.dataStatus = 'error';
+  } catch (e) {
+    if (window.STUDIO && window.STUDIO.mode === 'authenticated') window.STUDIO.dataStatus = 'error';
+  }
 }
 `;
 

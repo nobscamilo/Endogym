@@ -121,7 +121,7 @@ function TrainScreen({ initialTab }) {
       if (r.ok) {
         const j = await r.json();
         const o = j && j.ok ? j.overrides : null;
-        if (o) { if (o.todaySession) D.todaySession = o.todaySession; if (o.week) D.week = o.week; if (o.library) D.library = o.library; }
+        if (o) ['todaySession', 'week', 'weekVolumeHours', 'library', 'planStatus'].forEach((k) => { if (Object.prototype.hasOwnProperty.call(o, k)) D[k] = o[k]; });
       }
       setGen((g) => g + 1);
       setGenStatus('ok');
@@ -132,7 +132,7 @@ function TrainScreen({ initialTab }) {
     <div className="page stagger screen-enter">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Entrenamiento · Semana 6</p>
+          <p className="eyebrow">Entrenamiento</p>
           <h1>Entreno</h1>
           <p className="sub">Tu sesión guiada, el plan de la semana y vídeos para perfeccionar la técnica.</p>
         </div>
@@ -146,8 +146,9 @@ function TrainScreen({ initialTab }) {
         </div>
       </div>
       <SegTabs tabs={TABS} value={tab} onChange={setTab} />
-      {tab === 'sesion' && <TrainSession key={`s-${gen}`} />}
-      {tab === 'semana' && <TrainWeek key={`w-${gen}`} />}
+      {D.dataStatus === 'error' ? <div className="empty">No pudimos cargar tus datos de entrenamiento. Recarga para reintentar.</div> : null}
+      {tab === 'sesion' && (D.todaySession ? <TrainSession key={`s-${gen}`} /> : <div className="empty">{D.planStatus === 'stale' ? 'Tu bloque terminó. Crea un bloque nuevo para planificar hoy.' : 'Aún no hay una sesión para hoy. Completa tu perfil o crea un bloque nuevo.'}</div>)}
+      {tab === 'semana' && (Array.isArray(D.week) && D.week.length ? <TrainWeek key={`w-${gen}`} /> : <div className="empty">No hay una semana activa que mostrar.</div>)}
       {tab === 'videos' && <TrainVideos key={`v-${gen}`} />}
     </div>
   );
@@ -253,14 +254,14 @@ function TrainSession() {
     return { ...sl, [id]: arr };
   });
   const [logStatus, setLogStatus] = useStateTr('idle'); // idle|saving|ok|err
-  const [logRpe, setLogRpe] = useStateTr(7);
+  const [logRpe, setLogRpe] = useStateTr(null);
   const [autoStatus, setAutoStatus] = useStateTr('idle'); // idle|analyzing|done|limited|err
   const [autoAnalysis, setAutoAnalysis] = useStateTr(null); // { analysis, source }
   // Check-in UNIFICADO de la sesión (sustituye a la antigua tarjeta CheckinCard + el bloque
   // de RPE duplicado): completada + cargas + RPE + fatiga + sueño + síntomas en un solo guardado.
   const [completedSession, setCompletedSession] = useStateTr(true);
-  const [fatigue, setFatigue] = useStateTr(4);
-  const [sleepHours, setSleepHours] = useStateTr(7.5);
+  const [fatigue, setFatigue] = useStateTr(null);
+  const [sleepHours, setSleepHours] = useStateTr('');
   const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
   const toggleSym = (k) => setSymptoms((p) => ({ ...p, [k]: !p[k] }));
   // Rehidratación: si HOY ya hay sesión registrada, mostramos el resumen en vez del formulario.
@@ -367,7 +368,7 @@ function TrainSession() {
     try {
       const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
       if (!token) { setLogStatus('err'); return; }
-      const today = new Date().toISOString().slice(0, 10);
+      const today = window.__studioDateKey();
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
       const exercises = list
         .filter((e) => e.loadKg != null && e.id)
@@ -411,7 +412,8 @@ function TrainSession() {
           body: JSON.stringify({
             source: 'manual', performedAt: `${today}T12:00:00.000Z`, title: (s.title || 'Sesión'),
             mode: 'studio', completed: true, exercises,
-            sessionRpe: Number(logRpe) || null,
+            // El registro rápido confirma cargas/reps prescritas, no inventa esfuerzo percibido.
+            sessionRpe: withCheckin ? (Number(logRpe) || null) : null,
             durationMinutes: s.durationMin || null,
           }),
         });
@@ -862,11 +864,11 @@ function TrainSession() {
                 {list.some((e) => e.loadKg != null) ? (
                   <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Las cargas (kg) y repeticiones que anotaste arriba en cada ejercicio se guardan con este check-in.</p>
                 ) : null}
-                <div><div className="mb-label">Esfuerzo percibido (RPE) · {logRpe}/10</div><Scale10 value={logRpe} onChange={setLogRpe} /></div>
-                <div><div className="mb-label">Fatiga · {fatigue}/10</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
+                <div><div className="mb-label">Esfuerzo percibido (RPE) · {logRpe != null ? `${logRpe}/10` : 'sin indicar'}</div><Scale10 value={logRpe} onChange={setLogRpe} /></div>
+                <div><div className="mb-label">Fatiga · {fatigue != null ? `${fatigue}/10` : 'sin indicar'}</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
                 <div className="row ac" style={{ gap: 12 }}>
                   <div className="mb-label" style={{ margin: 0 }}>Horas de sueño</div>
-                  <input type="number" min="0" max="24" step="0.5" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="num-input" />
+                  <input type="number" min="0" max="24" step="0.5" placeholder="Sin indicar" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="num-input" />
                 </div>
               </React.Fragment>
             )}
@@ -913,8 +915,9 @@ function TrainSession() {
 const PAST_MAX_BACK_DAYS = 14;
 function backlogDateOptions(maxBack = PAST_MAX_BACK_DAYS) {
   const opts = [];
+  const todayKey = window.__studioDateKey();
   for (let i = 1; i <= maxBack; i++) {
-    const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const key = window.__studioAddDays(todayKey, -i);
     const d = new Date(key + 'T12:00:00.000Z');
     const long = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
     const cap = long.charAt(0).toUpperCase() + long.slice(1);
@@ -933,9 +936,9 @@ function PastSessionLogger() {
   const [existing, setExisting] = useStateTr(null);
   const [rows, setRows] = useStateTr([]); // [{id,name,sets,loadKg,kg,reps}]
   const [completed, setCompleted] = useStateTr(true);
-  const [rpe, setRpe] = useStateTr(7);
-  const [fatigue, setFatigue] = useStateTr(4);
-  const [sleepHours, setSleepHours] = useStateTr(7.5);
+  const [rpe, setRpe] = useStateTr(null);
+  const [fatigue, setFatigue] = useStateTr(null);
+  const [sleepHours, setSleepHours] = useStateTr('');
   const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
   const [save, setSave] = useStateTr('idle'); // idle|saving|ok|err
   const [err, setErr] = useStateTr('');
@@ -971,13 +974,13 @@ function PastSessionLogger() {
       setSession(sess); setIsTraining(Boolean(j.isTrainingDay)); setExisting(j.logged || null); setRows(newRows);
       if (j.logged) {
         setCompleted(j.logged.completed !== false);
-        setRpe(j.logged.sessionRpe != null ? j.logged.sessionRpe : 7);
-        setFatigue(j.logged.fatigue != null ? j.logged.fatigue : 4);
-        setSleepHours(j.logged.sleepHours != null ? j.logged.sleepHours : 7.5);
+        setRpe(j.logged.sessionRpe != null ? j.logged.sessionRpe : null);
+        setFatigue(j.logged.fatigue != null ? j.logged.fatigue : null);
+        setSleepHours(j.logged.sleepHours != null ? j.logged.sleepHours : '');
         const sy = j.logged.symptoms || {};
         setSymptoms({ dyspnea: !!sy.dyspnea, jointPain: !!sy.jointPain, dizziness: !!sy.dizziness, tachycardia: !!sy.tachycardia });
       } else {
-        setCompleted(true); setRpe(7); setFatigue(4); setSleepHours(7.5);
+        setCompleted(true); setRpe(null); setFatigue(null); setSleepHours('');
         setSymptoms({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
       }
       setLoad('loaded');
@@ -1081,11 +1084,11 @@ function PastSessionLogger() {
               </div>
               {completed ? (
                 <React.Fragment>
-                  <div><div className="mb-label">Esfuerzo percibido (RPE) · {rpe}/10</div><Scale10 value={rpe} onChange={setRpe} /></div>
-                  <div><div className="mb-label">Fatiga · {fatigue}/10</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
+                  <div><div className="mb-label">Esfuerzo percibido (RPE) · {rpe != null ? `${rpe}/10` : 'sin indicar'}</div><Scale10 value={rpe} onChange={setRpe} /></div>
+                  <div><div className="mb-label">Fatiga · {fatigue != null ? `${fatigue}/10` : 'sin indicar'}</div><Scale10 value={fatigue} onChange={setFatigue} /></div>
                   <div className="row ac" style={{ gap: 12 }}>
                     <div className="mb-label" style={{ margin: 0 }}>Horas de sueño</div>
-                    <input type="number" min="0" max="24" step="0.5" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="num-input" />
+                    <input type="number" min="0" max="24" step="0.5" placeholder="Sin indicar" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} className="num-input" />
                   </div>
                 </React.Fragment>
               ) : null}
@@ -1188,7 +1191,8 @@ function MesocycleReviewCard({ review }) {
 
 function TrainWeek() {
   const D = window.STUDIO;
-  const { week, progress } = D;
+  const week = Array.isArray(D.week) ? D.week : [];
+  const progress = D.progress || {};
   const adjust = D.coachAdjust;
   const adjustRules = adjust && Array.isArray(adjust.rules) ? adjust.rules : [];
   const review = D.mesocycleReview;
@@ -1201,10 +1205,10 @@ function TrainWeek() {
     <React.Fragment>
       {review && Array.isArray(review.reasons) && review.reasons.length ? <MesocycleReviewCard review={review} /> : null}
       <div className="grid g-4">
-        <div className="card"><Stat num={progress.sessionsPlan} label="Sesiones" /></div>
+        <div className="card"><Stat num={progress.sessionsPlan ?? 0} label="Sesiones" /></div>
         <div className="card"><Stat num={volLabel} unit="h" label="Volumen semanal" /></div>
-        <div className="card"><Stat num={`${progress.sessionsDone}/${progress.sessionsPlan}`} label="Completadas" /></div>
-        <div className="card"><Stat num={`${progress.adherence}%`} label="Adherencia" color="var(--glu-good)" /></div>
+        <div className="card"><Stat num={`${progress.sessionsDone ?? 0}/${progress.sessionsPlan ?? 0}`} label="Completadas" /></div>
+        <div className="card"><Stat num={progress.adherence != null ? `${progress.adherence}%` : '—'} label="Adherencia" color="var(--glu-good)" /></div>
       </div>
 
       <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día · toca un día para ver lo que hiciste">
@@ -1275,22 +1279,17 @@ function TrainWeek() {
   );
 }
 
-/* ---------- VÍDEOS (descubrir + biblioteca) ---------- */
+/* ---------- VÍDEOS (biblioteca real del plan) ---------- */
 function TrainVideos() {
   const D = window.STUDIO;
   const [q, setQ] = useStateTr('');
   const [filter, setFilter] = useStateTr('Todos');
   const muscles = ['Todos', 'Pecho', 'Hombro', 'Dorsales', 'Cuádriceps', 'Glúteo', 'Bíceps', 'Core'];
-  const lib = D.library.filter((x) => (filter === 'Todos' || x.muscle === filter) && x.name.toLowerCase().includes(q.toLowerCase()));
+  const library = Array.isArray(D.library) ? D.library : [];
+  const lib = library.filter((x) => (filter === 'Todos' || x.muscle === filter) && x.name.toLowerCase().includes(q.toLowerCase()));
   return (
     <React.Fragment>
-      {D.discover.map((sec, i) => (
-        <SectionCard key={i} title={sec.cat} icon={i === 0 ? 'sparkles' : i === 1 ? 'train' : 'heart'}>
-          <div className="vid-rail">{sec.items.map((v, k) => <VideoThumb key={k} item={v} />)}</div>
-        </SectionCard>
-      ))}
-
-      <SectionCard title="Biblioteca de ejercicios" icon="library" sub="Técnica, progresiones y músculos implicados">
+      <SectionCard title="Biblioteca de ejercicios" icon="library" sub="Vídeos verificados o búsqueda específica de técnica para los ejercicios de tu plan">
         <div className="search-field" style={{ marginBottom: 12 }}>
           <span className="s-ico"><Icon name="search" size={18} /></span>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar ejercicio…" />

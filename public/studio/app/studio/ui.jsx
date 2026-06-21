@@ -18,10 +18,12 @@ function SectionCard({ title, icon, sub, action, children, className = '', style
 
 /* ---------- MacroLine ---------- */
 function MacroLine({ label, v, t, u, color }) {
-  const pct = Math.min(100, Math.round((v / t) * 100));
+  const hasTarget = Number.isFinite(Number(t)) && Number(t) > 0;
+  const value = Number.isFinite(Number(v)) ? Number(v) : 0;
+  const pct = hasTarget ? Math.min(100, Math.round((value / Number(t)) * 100)) : 0;
   return (
     <div className="macro-line">
-      <div className="ml-head"><strong>{label}</strong><span className="num muted">{v} / {t} {u}</span></div>
+      <div className="ml-head"><strong>{label}</strong><span className="num muted">{hasTarget ? `${value} / ${t} ${u}` : 'Sin objetivo'}</span></div>
       <div className="bar"><i style={{ width: pct + '%', background: color }} /></div>
     </div>
   );
@@ -53,39 +55,49 @@ function thumbBg(item) {
   return videoGrad(item && item.hue);
 }
 
-/* Miniatura de vídeo — clic dispara el reproductor con transición shared-element */
+/* Vídeo verificado → reproductor real. Sin embed exacto → enlace de búsqueda honesto.
+   Nunca simular playback ni presentar un placeholder como si fuera un vídeo. */
 function VideoThumb({ item, variant = 'card' }) {
   const { open } = useVideo();
   const ref = useRefU(null);
-  const onClick = () => open(item, ref.current);
+  const hasVideo = Boolean(item?.yt);
+  const searchUrl = !hasVideo && item?.videoUrl ? item.videoUrl : null;
+  const Container = hasVideo ? 'button' : searchUrl ? 'a' : 'div';
+  const interactionProps = hasVideo
+    ? { type: 'button', onClick: () => open(item, ref.current) }
+    : searchUrl
+      ? { href: searchUrl, target: '_blank', rel: 'noreferrer noopener' }
+      : { 'aria-disabled': true };
+  const detail = item?.author || item?.muscle || (hasVideo ? 'YouTube' : searchUrl ? 'Buscar técnica en YouTube' : 'Sin vídeo verificado');
+  const duration = item?.len || item?.dur;
   if (variant === 'row') {
     return (
-      <button className="vid-row" onClick={onClick}>
+      <Container className="vid-row" {...interactionProps}>
         <span className="vid-row-thumb" ref={ref} style={{ background: thumbBg(item) }}>
-          <span className="vid-play sm"><Icon name="play" size={15} /></span>
-          <span className="vid-len">{item.len || item.dur}</span>
+          <span className="vid-play sm"><Icon name={hasVideo ? 'play' : 'search'} size={15} /></span>
+          {duration ? <span className="vid-len">{duration}</span> : null}
         </span>
         <span className="vid-row-meta">
           <strong>{item.title || item.name}</strong>
-          <span className="faint tiny">{item.author || item.muscle}{item.views ? ` · ${item.views} vistas` : ''}</span>
+          <span className="faint tiny">{detail}</span>
         </span>
-        <Icon name="chevronRight" size={18} style={{ color: 'var(--ink-3)', flex: 'none' }} />
-      </button>
+        <Icon name={searchUrl ? 'externalLink' : 'chevronRight'} size={18} style={{ color: 'var(--ink-3)', flex: 'none' }} />
+      </Container>
     );
   }
   return (
-    <button className="vid-card" onClick={onClick}>
+    <Container className="vid-card" {...interactionProps}>
       <span className="vid-thumb" ref={ref} style={{ background: thumbBg(item) }}>
         <span className="vid-noise" />
-        <span className="vid-play"><Icon name="play" size={20} /></span>
-        <span className="vid-len">{item.len || item.dur}</span>
+        <span className="vid-play"><Icon name={hasVideo ? 'play' : 'search'} size={20} /></span>
+        {duration ? <span className="vid-len">{duration}</span> : null}
         {item.tag ? <span className="vid-tag">{item.tag}</span> : null}
       </span>
       <span className="vid-meta">
         <strong>{item.title || item.name}</strong>
-        <span className="faint tiny">{item.author || item.muscle}{item.views ? ` · ${item.views} vistas` : ''}</span>
+        <span className="faint tiny">{detail}</span>
       </span>
-    </button>
+    </Container>
   );
 }
 
@@ -135,12 +147,8 @@ function ExercisePrefActions({ item }) {
 
 /* Reproductor a pantalla (overlay) con FLIP desde la miniatura */
 function VideoPlayer({ state, onClose }) {
-  const stageRef = useRefU(null);
   const cardRef = useRefU(null);
-  const [playing, setPlaying] = useStateU(true);
-  const [prog, setProg] = useStateU(0);
   const [closing, setClosing] = useStateU(false);
-  const [embedded, setEmbedded] = useStateU(false);
 
   // FLIP de entrada (con respaldo por si el reloj de animación está limitado)
   useLayoutEffect(() => {
@@ -169,15 +177,7 @@ function VideoPlayer({ state, onClose }) {
     return () => clearTimeout(fb);
   }, [state]);
 
-  // playback simulado (solo cuando no hay vídeo de YouTube embebido)
-  useEffectU(() => {
-    if (!state || !playing || closing || embedded) return;
-    const id = setInterval(() => setProg((p) => (p >= 100 ? 0 : p + 0.6)), 80);
-    return () => clearInterval(id);
-  }, [state, playing, closing, embedded]);
-
-  // reset al abrir
-  useEffectU(() => { if (state) { setProg(0); setPlaying(true); setClosing(false); setEmbedded(false); } }, [state]);
+  useEffectU(() => { if (state) setClosing(false); }, [state]);
 
   const doClose = () => {
     const card = cardRef.current;
@@ -195,39 +195,16 @@ function VideoPlayer({ state, onClose }) {
     setTimeout(onClose, 380);
   };
 
-  if (!state) return null;
+  if (!state?.item?.yt) return null;
   const it = state.item;
-  const mins = Math.floor(prog / 100 * 5);
-  const secs = Math.floor((prog / 100 * 5 - mins) * 60);
   const cues = it.cues || [];
-  const hasYt = !!it.yt;
   return (
     <div className={`player-scrim ${closing ? 'out' : ''}`} onClick={doClose}>
       <div className="player-card" ref={cardRef} onClick={(e) => e.stopPropagation()}>
-        <div className="player-stage" ref={stageRef} style={{ background: videoGrad(it.hue) }}>
-          {hasYt ? (
-            <iframe className="player-iframe" src={`https://www.youtube-nocookie.com/embed/${it.yt}?autoplay=1&rel=0&modestbranding=1`}
-              title={it.title || it.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-          ) : (
-            <React.Fragment>
-              <div className="vid-noise" />
-              <div className="player-toplabel"><span className="yt-dot" /> {hasYt ? 'YouTube' : 'Vídeo'} · {it.author || 'Ignios'}</div>
-              {hasYt ? <div className="player-yt-badge"><span className="yt-dot" /> Vídeo real</div> : null}
-              <button className="player-close" onClick={doClose}><Icon name="close" size={20} /></button>
-              <button className="player-bigplay" onClick={() => hasYt ? setEmbedded(true) : setPlaying((p) => !p)}>
-                <Icon name={playing && !hasYt ? 'pause' : 'play'} size={30} />
-              </button>
-              <div className="player-controls" onClick={(e) => e.stopPropagation()}>
-                <button className="pc-btn" onClick={() => hasYt ? setEmbedded(true) : setPlaying((p) => !p)}><Icon name={playing && !hasYt ? 'pause' : 'play'} size={16} /></button>
-                <span className="pc-time num">{mins}:{String(secs).padStart(2, '0')}</span>
-                <div className="pc-track" onClick={(e) => { if (hasYt) { setEmbedded(true); return; } const r = e.currentTarget.getBoundingClientRect(); setProg(Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100))); }}>
-                  <div className="pc-fill" style={{ width: (hasYt ? 0 : prog) + '%' }} />
-                </div>
-                <span className="pc-time num faint">{it.len || it.dur || '5:00'}</span>
-              </div>
-            </React.Fragment>
-          )}
-          {embedded ? <button className="player-close" onClick={doClose}><Icon name="close" size={20} /></button> : null}
+        <div className="player-stage" style={{ background: videoGrad(it.hue) }}>
+          <iframe className="player-iframe" src={`https://www.youtube-nocookie.com/embed/${it.yt}?autoplay=1&rel=0&modestbranding=1`}
+            title={it.title || it.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+          <button className="player-close" onClick={doClose}><Icon name="close" size={20} /></button>
         </div>
         <div className="player-body">
           <h3>{it.title || it.name}</h3>
@@ -244,13 +221,14 @@ function VideoPlayer({ state, onClose }) {
             </div>
           ) : (
             <p className="muted" style={{ marginTop: 12, lineHeight: 1.5, fontSize: '0.92rem' }}>
-              {hasYt ? 'Pulsa play para ver el vídeo de YouTube. En la app real se abre con marcas de tiempo por serie.'
-                : 'Reproducción guiada. En la app real este reproductor carga el vídeo de YouTube correspondiente con marcas de tiempo por serie.'}
+              Demostración externa de YouTube asociada al ejercicio exacto.
             </p>
           )}
           <div className="row wrap" style={{ gap: 8, marginTop: 16 }}>
             <ExercisePrefActions item={it} />
-            <button className="btn ghost sm"><Icon name="share" size={15} /> Compartir</button>
+            <a className="btn ghost sm" href={`https://www.youtube.com/watch?v=${it.yt}`} target="_blank" rel="noreferrer noopener">
+              <Icon name="externalLink" size={15} /> Abrir en YouTube
+            </a>
           </div>
         </div>
       </div>
@@ -262,6 +240,7 @@ function VideoPlayer({ state, onClose }) {
 function VideoProvider({ children }) {
   const [state, setState] = useStateU(null);
   const open = useCallback((item, el) => {
+    if (!item?.yt) return;
     const rect = el ? el.getBoundingClientRect() : null;
     setState({ item, rect });
   }, []);

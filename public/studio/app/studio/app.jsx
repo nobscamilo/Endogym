@@ -38,7 +38,8 @@ function App() {
 
   const theme = t.theme, accent = t.accent;
   const setTheme = (v) => setTweak('theme', v);
-  const [notif, setNotif] = useStateA(true);
+  // Push/recordatorios aún no están implementados (requieren FCM/VAPID). No simularlos.
+  const [notif] = useStateA(false);
 
   // Usuario real (lo rellena /api/studio-data tras login); fallback a muestra en modo demo.
   const u = (window.STUDIO && window.STUDIO.user) || {};
@@ -71,7 +72,7 @@ function App() {
       case 'train': return <TrainScreen />;
       case 'nutrition': return <NutritionScreen layout={t.nutriLayout} />;
       case 'progress': return <ProgressScreen />;
-      case 'profile': return <ProfileScreen theme={theme} setTheme={setTheme} notif={notif} setNotif={setNotif} />;
+      case 'profile': return <ProfileScreen theme={theme} setTheme={setTheme} notif={notif} />;
       default: return <TodayHub go={go} variant={t.homeLayout} />;
     }
   })();
@@ -146,11 +147,11 @@ function App() {
               ) : (
                 <div className="mbar">
                   <div>
-                    <div className="m-hi">{view === 'today' ? 'Lunes · 2 jun' : 'Ignios'}</div>
+                    <div className="m-hi">{view === 'today' && window.__studioDateLabel ? window.__studioDateLabel() : 'Ignios'}</div>
                     <div className="m-title">{(NAV.find((n) => n.id === view) || { label: 'Hoy' }).label}</div>
                   </div>
                   <span className="m-spacer" />
-                  <button className="icon-btn"><Icon name="bell" size={19} /><span className="ib-dot" /></button>
+                  <button className="icon-btn" title="Notificaciones próximamente" disabled><Icon name="bell" size={19} /></button>
                   <button className="icon-btn" onClick={() => go('profile')}><Icon name="profile" size={19} /></button>
                 </div>
               )}
@@ -177,7 +178,7 @@ function App() {
                 <p className="tiny muted" style={{ margin: '0 0 16px' }}>¿Qué quieres añadir?</p>
                 <div className="stack" style={{ gap: 10 }}>
                   {[
-                    { ico: 'camera', t: 'Foto del plato', d: 'IA estima macros y glucemia', go: 'nutrition' },
+                    { ico: 'camera', t: 'Foto del plato', d: 'IA estima macros y carga glucémica', go: 'nutrition' },
                     { ico: 'barcode', t: 'Escanear producto', d: 'Código de barras', go: 'nutrition' },
                     { ico: 'calc', t: 'Calculadora', d: 'Introducir a mano', go: 'nutrition' },
                     { ico: 'train', t: 'Registrar entreno', d: 'Marcar sesión hecha', go: 'train' },

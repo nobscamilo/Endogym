@@ -21,7 +21,7 @@ vi.mock('../../src/lib/logger.js', () => ({
   logInfo: vi.fn(),
 }));
 
-const { mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
+const { GET, mapGlycemic, mapLibrary, mapMacroEaten, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
 
 const PLAN = {
   days: [
@@ -49,6 +49,43 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
     expect(mapTodaySession(PLAN, '2026-06-19', [], null, { exact: true })).toBeNull();
     expect(mapTodaySession(PLAN, '2026-06-17', [], null, { exact: true })).not.toBeNull();
   });
+
+  it('fuera de las fechas del bloque devuelve null en vez de reciclar el primer entreno', () => {
+    expect(mapTodaySession(PLAN, '2026-07-01')).toBeNull();
+  });
+
+  it('reemplaza el vídeo persistido obsoleto por la asociación curada actual', () => {
+    const plan = {
+      days: [{
+        date: '2026-06-20', isTrainingDay: true, sessionType: 'resistance',
+        workout: {
+          title: 'Pecho',
+          exercises: [{
+            id: 'gym-incline-db-press', name: 'Press inclinado con mancuernas',
+            videoEmbedId: 'XjrsqShr-Ic',
+          }],
+        },
+      }],
+    };
+
+    expect(mapTodaySession(plan, '2026-06-20').list[0].yt).toBe('IP4oeKh1Sd4');
+  });
+
+  it('retira del bloque activo un vídeo aproximado aunque siga persistido en el plan', () => {
+    const plan = {
+      days: [{
+        date: '2026-06-20', isTrainingDay: true, sessionType: 'resistance',
+        workout: {
+          title: 'Tirón',
+          exercises: [{ id: 'trx-row', name: 'Remo TRX', videoEmbedId: 'ZuV_NokRESN' }],
+        },
+      }],
+    };
+
+    const exercise = mapTodaySession(plan, '2026-06-20').list[0];
+    expect(exercise).not.toHaveProperty('yt');
+    expect(exercise.videoUrl).toContain('youtube.com/results');
+  });
 });
 
 describe('mapWeek — historial por día + volumen real', () => {
@@ -75,5 +112,76 @@ describe('mapWeek — historial por día + volumen real', () => {
     const { volumeHours } = mapWeek(PLAN, '2026-06-19', workouts);
     // 75 (fuerza) + 65 (carrera) = 140 min; recuperación NO cuenta → 2,3 h
     expect(volumeHours).toBe(2.3);
+  });
+
+  it('no presenta la primera semana de un bloque vencido como semana actual', () => {
+    expect(mapWeek(PLAN, '2026-07-01', workouts)).toBeNull();
+  });
+});
+
+describe('mapLibrary — vídeos vigentes', () => {
+  it('no confía en el vídeo obsoleto persistido en el plan', () => {
+    const plan = {
+      days: [{
+        workout: {
+          exercises: [
+            { id: 'gym-db-bench-press', name: 'Press banca con mancuernas', videoEmbedId: 'XjrsqShr-Ic' },
+            { id: 'trx-row', name: 'Remo TRX', videoEmbedId: 'ZuV_NokRESN' },
+          ],
+        },
+      }],
+    };
+
+    const library = mapLibrary(plan);
+    expect(library[0].yt).toBe('Y_7aHqXeCfQ');
+    expect(library[1]).not.toHaveProperty('yt');
+    expect(library[1].videoUrl).toContain('youtube.com/results');
+  });
+});
+
+describe('mappers de verdad — vacío no equivale a muestra', () => {
+  it('sin comidas devuelve macros consumidas en cero y glucemia desconocida', () => {
+    expect(mapMacroEaten([])).toEqual({ kcal: 0, protein: 0, carbs: 0, fat: 0 });
+    expect(mapGlycemic([])).toBeNull();
+  });
+
+  it('la glucemia real no fabrica una curva continua', () => {
+    const out = mapGlycemic([{ totals: { glycemicLoad: 31, insulinIndex: 42 } }]);
+    expect(out).toMatchObject({ dayLoad: 31, dayClass: 'mid', insulinIndex: 42 });
+    expect(out).not.toHaveProperty('points');
+  });
+
+  it('la serie de strain termina en la fecha civil recibida, no en el día UTC del proceso', () => {
+    const out = mapProgress([], [{ performedAt: '2026-06-20T12:00:00.000Z', sessionRpe: 8 }], null, null, '2026-06-20');
+    expect(out.strain).toEqual([0, 0, 0, 0, 0, 0, 8]);
+  });
+});
+
+describe('GET /api/studio-data — contrato autenticado explícito', () => {
+  it('reemplaza cada sección demo por real, null o vacío cuando el usuario no tiene datos', async () => {
+    const auth = await import('../../src/lib/auth.js');
+    const repo = await import('../../src/lib/repositories/firestoreRepository.js');
+    auth.getAuthenticatedUser.mockResolvedValue({ uid: 'u-empty', email: 'real@example.com' });
+    repo.getUserProfile.mockResolvedValue(null);
+    repo.getLatestWeeklyPlan.mockResolvedValue(null);
+    repo.listMealsSince.mockResolvedValue([]);
+    repo.listMetricsSince.mockResolvedValue([]);
+    repo.listWorkoutsSince.mockResolvedValue([]);
+    repo.getLastDoneWorkoutAt.mockResolvedValue(null);
+    repo.getStravaConnection.mockResolvedValue(null);
+
+    const response = await GET(new Request('http://localhost/api/studio-data'));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.overrides).toMatchObject({
+      mode: 'authenticated', dataStatus: 'ready', planStatus: 'missing',
+      todaySession: null, week: [], library: [], macroTargets: null,
+      macroEaten: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+      glycemic: null, nutritionDays: [], meals: [], shopping: [], batch: [],
+    });
+    expect(json.overrides.user).not.toHaveProperty('age');
+    expect(json.overrides.user).not.toHaveProperty('weightKg');
+    expect(json.overrides.user.profileComplete).toBe(false);
   });
 });

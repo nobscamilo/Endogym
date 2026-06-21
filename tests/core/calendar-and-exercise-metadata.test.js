@@ -9,6 +9,7 @@ import {
   suggestSessionAlternatives,
 } from '../../src/core/planner.js';
 import {
+  EXERCISE_VIDEO_MAP,
   buildSessionExercises,
   getExerciseLibraryCatalog,
   getExerciseLibrarySummary,
@@ -63,6 +64,51 @@ describe('exercise muscle metadata', () => {
     expect(verified.videoEmbedUrl).toContain('youtube.com/embed/XjrsqShr-Ic');
     expect(fallback.videoEmbedId).toBeNull();
     expect(fallback.videoEmbedUrl).toBeNull();
+  });
+
+  it('uses a distinct exact video for each bench-press implement and angle', () => {
+    expect(resolveExerciseMetadata({ id: 'gym-bench-press' }).videoEmbedId).toBe('XjrsqShr-Ic');
+    expect(resolveExerciseMetadata({ id: 'gym-db-bench-press' }).videoEmbedId).toBe('Y_7aHqXeCfQ');
+    expect(resolveExerciseMetadata({ id: 'gym-incline-db-press' }).videoEmbedId).toBe('IP4oeKh1Sd4');
+    expect(resolveExerciseMetadata({ id: 'home-floor-press' }).videoEmbedId).toBe('uUGDRwge4F8');
+    expect(resolveExerciseMetadata({ id: 'home-band-chest-press' }).videoEmbedId).toBe('Rn-hf5iauTc');
+  });
+
+  it('keeps exact machine and barbell variations separate', () => {
+    expect(resolveExerciseMetadata({ id: 'gym-seated-row' }).videoEmbedId).toBe('vwHG9Jfu4sw');
+    expect(resolveExerciseMetadata({ id: 'gym-cable-fly' }).videoEmbedId).toBe('JUDTGZh4rhg');
+    expect(resolveExerciseMetadata({ id: 'gym-hack-squat' }).videoEmbedId).toBe('u--5-ukCQdU');
+    expect(resolveExerciseMetadata({ id: 'gym-front-squat' }).videoEmbedId).toBe('v-mQm_droHg');
+    expect(resolveExerciseMetadata({ id: 'gym-romanian-deadlift' }).videoEmbedId).toBe('_oyxCn2iSjU');
+  });
+
+  it('does not embed a merely similar movement when no exact video is curated', () => {
+    for (const id of ['trx-row', 'trx-chest-press', 'home-wall-sit', 'run-zone2', 'cycle-intervals']) {
+      const metadata = resolveExerciseMetadata({ id });
+      expect(metadata.videoEmbedId, id).toBeNull();
+      expect(metadata.videoEmbedUrl, id).toBeNull();
+      expect(metadata.videoUrl, id).toContain('youtube.com/results');
+    }
+  });
+
+  it('only reuses a video for explicit aliases of the same exact exercise', () => {
+    const allowedAliasGroups = new Set([
+      ['gym-bicep-curl', 'gym-db-curl'].sort().join('|'),
+      ['gym-dumbbell-lunge', 'gym-lunges'].sort().join('|'),
+      ['gym-face-pull', 'gym-facepull'].sort().join('|'),
+      ['gym-plank', 'home-plank'].sort().join('|'),
+      ['gym-pullup', 'home-pull-up'].sort().join('|'),
+      ['gym-pushup', 'home-push-up'].sort().join('|'),
+    ]);
+    const byVideo = Object.entries(EXERCISE_VIDEO_MAP).reduce((groups, [exerciseId, videoId]) => {
+      groups[videoId] ||= [];
+      groups[videoId].push(exerciseId);
+      return groups;
+    }, {});
+
+    for (const exerciseIds of Object.values(byVideo).filter((ids) => ids.length > 1)) {
+      expect(allowedAliasGroups.has(exerciseIds.sort().join('|')), exerciseIds.join(', ')).toBe(true);
+    }
   });
 
   it('exposes the audit catalog with modalities and muscle metadata', () => {

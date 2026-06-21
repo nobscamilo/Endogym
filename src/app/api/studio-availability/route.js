@@ -3,6 +3,10 @@ import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js'
 import { withTrace, logError } from '../../../lib/logger.js';
 import { upsertUserProfile } from '../../../lib/repositories/firestoreRepository.js';
 import { sanitizeEquipmentList } from '../../../core/equipmentPreferences.js';
+import {
+  getMissingPrescriptionProfileFields,
+  PROFILE_FIELD_LABELS,
+} from '../../../core/profileCompleteness.js';
 
 // Encuesta de disponibilidad del Studio. Hace un MERGE PARCIAL del perfil (upsertUserProfile,
 // no resetea otros campos como el PUT de /api/profile) con: objetivo, equipo (→ modalidad),
@@ -13,6 +17,7 @@ const GOALS = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength'
 const MODALITIES = new Set(['full_gym', 'home', 'trx', 'mixed', 'hybrid_run_gym']);
 const RACE_GOALS = new Set(['health', 'race_5k', 'race_10k', 'race_21k', 'race_42k']);
 const TRAINING_EXPERIENCE = new Set(['novice', 'intermediate', 'advanced']);
+const ACTIVITY_LEVELS = new Set(['sedentary', 'light', 'moderate', 'high']);
 
 export async function POST(request) {
   return withTrace('studio_availability', async ({ traceId }) => {
@@ -34,14 +39,16 @@ export async function POST(request) {
       patch.trainingMode = body.trainingModality === 'full_gym' ? 'gym' : 'home';
     }
     const meals = Number(body?.mealsPerDay);
-    if (Number.isFinite(meals)) patch.mealsPerDay = Math.min(6, Math.max(3, Math.round(meals)));
+    if (body?.mealsPerDay != null && body.mealsPerDay !== '' && Number.isFinite(meals)) patch.mealsPerDay = Math.min(6, Math.max(3, Math.round(meals)));
     const mins = Number(body?.sessionMinutes ?? body?.preferredDurationMinutes);
-    if (Number.isFinite(mins)) patch.preferredDurationMinutes = Math.min(150, Math.max(20, Math.round(mins)));
+    const rawMins = body?.sessionMinutes ?? body?.preferredDurationMinutes;
+    if (rawMins != null && rawMins !== '' && Number.isFinite(mins)) patch.preferredDurationMinutes = Math.min(150, Math.max(20, Math.round(mins)));
     const days = Number(body?.daysPerWeek);
-    if (Number.isFinite(days)) patch.daysPerWeek = Math.min(7, Math.max(1, Math.round(days)));
+    if (body?.daysPerWeek != null && body.daysPerWeek !== '' && Number.isFinite(days)) patch.daysPerWeek = Math.min(7, Math.max(1, Math.round(days)));
     const weeks = Number(body?.resurveyWeeks);
-    if (Number.isFinite(weeks)) patch.resurveyWeeks = Math.min(26, Math.max(1, Math.round(weeks)));
+    if (body?.resurveyWeeks != null && body.resurveyWeeks !== '' && Number.isFinite(weeks)) patch.resurveyWeeks = Math.min(26, Math.max(1, Math.round(weeks)));
     if (TRAINING_EXPERIENCE.has(body?.trainingExperience)) patch.trainingExperience = body.trainingExperience;
+    if (ACTIVITY_LEVELS.has(body?.activityLevel)) patch.activityLevel = body.activityLevel;
     // #4 — inventario de equipo y preferencias (merge parcial; vacío = sin restricción).
     if (Array.isArray(body?.equipment)) patch.equipment = sanitizeEquipmentList(body.equipment);
     if (Array.isArray(body?.excludedExercises)) {
@@ -52,11 +59,11 @@ export async function POST(request) {
     }
     // Datos personales (también merge parcial, no resetean el resto del perfil).
     const age = Number(body?.age);
-    if (Number.isFinite(age)) patch.age = Math.min(100, Math.max(12, Math.round(age)));
+    if (body?.age != null && body.age !== '' && Number.isFinite(age)) patch.age = Math.min(100, Math.max(12, Math.round(age)));
     const weightKg = Number(body?.weightKg);
-    if (Number.isFinite(weightKg)) patch.weightKg = Math.min(300, Math.max(30, Math.round(weightKg * 10) / 10));
+    if (body?.weightKg != null && body.weightKg !== '' && Number.isFinite(weightKg)) patch.weightKg = Math.min(300, Math.max(30, Math.round(weightKg * 10) / 10));
     const heightCm = Number(body?.heightCm);
-    if (Number.isFinite(heightCm)) patch.heightCm = Math.min(230, Math.max(120, Math.round(heightCm)));
+    if (body?.heightCm != null && body.heightCm !== '' && Number.isFinite(heightCm)) patch.heightCm = Math.min(230, Math.max(120, Math.round(heightCm)));
     if (['male', 'female'].includes(body?.sex)) patch.sex = body.sex;
     // Carrera: objetivo + marca de referencia (para ritmos numéricos).
     if (RACE_GOALS.has(body?.runRaceGoal)) patch.runRaceGoal = body.runRaceGoal;
@@ -130,11 +137,26 @@ export async function POST(request) {
     // Solo un POST de ENCUESTA marca `studioAvailability` (ese flag cambia cómo el planner
     // honra duración/frecuencia). Un POST de solo check-in de reentrada o de solo preferencias
     // (excluir/favorito, equipo) NO debe marcarlo ni tocar `lastSurveyAt`.
-    const isSurveyPost = GOALS.has(body?.goal) || MODALITIES.has(body?.trainingModality)
+    const isSurveyPost = MODALITIES.has(body?.trainingModality)
       || body?.sessionMinutes != null || body?.preferredDurationMinutes != null || body?.daysPerWeek != null;
     if (!isSurveyPost) {
       delete patch.studioAvailability;
       delete patch.lastSurveyAt;
+    } else {
+      const missingFields = getMissingPrescriptionProfileFields({
+        ...body,
+        preferredDurationMinutes: rawMins,
+      });
+      if (missingFields.length > 0) {
+        return errorResponse(
+          'Faltan datos para crear una prescripción personalizada.',
+          400,
+          {
+            missingFields,
+            missingLabels: missingFields.map((field) => PROFILE_FIELD_LABELS[field] || field),
+          }
+        );
+      }
     }
 
     try {

@@ -32,6 +32,14 @@
 | `GET` | `/api/account/export` | Exportar datos JSON. |
 | `DELETE` | `/api/account/delete` | Eliminar datos y cuenta. |
 
+## Contrato de perfil y datos autenticados (local, pendiente de deploy)
+
+- `GET /api/profile` devuelve un perfil nuevo con campos personales en `null`; no supone objetivo, modalidad, sexo, edad, peso, altura, comidas ni duración. Un `PUT` parcial conserva lo existente y solo calcula `targetMacros` cuando están presentes objetivo, actividad, sexo, edad, peso, altura y comidas/día.
+- `POST /api/studio-availability` considera encuesta únicamente los envíos de configuración de plan. Para marcar `studioAvailability:true` exige objetivo, modalidad, `trainingExperience`, `activityLevel`, sexo, edad, peso, altura, comidas/día, días/semana y minutos/sesión. Si faltan responde `400` con `details.missingFields` y `details.missingLabels`; los POST parciales de preferencias/reentrada siguen permitidos y no completan el perfil.
+- `POST /api/weekly-plan` devuelve `409` con la misma lista si el perfil de prescripción está incompleto. No genera desde valores personales por defecto.
+- `GET /api/studio-data` devuelve `overrides.mode:'authenticated'`, `dataStatus` y `planStatus`. Todas las secciones de muestra quedan reemplazadas por datos reales, `null` o arrays vacíos. Un bloque que no contiene la fecha civil actual es `stale`; no se reutiliza su primer día. Los vídeos de `todaySession` y `library` se resuelven desde el mapa curado vigente por `exercise.id`, no desde un `videoEmbedId` obsoleto persistido en el plan. Cada ejercicio expone `yt` solo si existe embed exacto y `videoUrl` como búsqueda específica; ya no existe una sección `discover` editorial en el contrato.
+- `GET /api/public-config` incluye `timeZone`, usado por el bundle para la fecha civil. Sin token permanece el demo público; con token, un fallo de carga produce `dataStatus:'error'` sin recuperar datos demo.
+
 ## Analisis de plato
 
 Payload:
@@ -124,11 +132,12 @@ Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y 
 
 ## Disponibilidad Studio
 
-`POST /api/studio-availability` hace merge parcial del perfil. Además de objetivo, modalidad, minutos, días/semana, comidas, carrera, salud estructurada y reentrada, acepta:
+`POST /api/studio-availability` hace merge parcial del perfil. La encuesta completa incluye objetivo, modalidad, nivel, actividad cotidiana, sexo, edad, peso, altura, minutos, días/semana y comidas; carrera, salud estructurada, material, biometría y reentrada son opcionales. Ejemplo de los campos de nivel/actividad:
 
 ```json
 {
-  "trainingExperience": "novice | intermediate | advanced"
+  "trainingExperience": "novice | intermediate | advanced",
+  "activityLevel": "sedentary | light | moderate | high"
 }
 ```
 
@@ -142,7 +151,7 @@ Ese campo se rehidrata por `GET /api/studio-data` y afecta la prescripción dete
 - Sesión completa por variedad/tiempo/equipo: `{ "scope": "all", "reason": "time" }`, `{ "reason": "more_time", "targetMinutes": 75 }`.
 - Grupo muscular de hoy: `{ "scope": "focus", "sessionFocus": "upper" }`, donde `sessionFocus` puede ser `upper`, `push`, `pull`, `lower` o `full_body`.
 
-El cambio de grupo solo aplica a sesiones `resistance`/`mixed`. El servidor reconstruye ejercicios, calentamiento y enfriamiento con la prescripción determinista vigente, conserva fase/interferencia del bloque y rechaza (`409`) focos que choquen con la sesión anterior o siguiente para evitar repetir familias musculares en días consecutivos.
+El cambio de grupo reconstruye ejercicios, calentamiento y enfriamiento con la prescripción determinista vigente. En días no-fuerza convierte la sesión a `resistance` y devuelve `converted` + aviso; conserva los guardarraíles de adyacencia/volumen. La fecha debe existir exactamente en el bloque actual: un bloque vencido responde `409` y nunca modifica su primer entreno.
 
 ## Check-in diario de entrenamiento
 

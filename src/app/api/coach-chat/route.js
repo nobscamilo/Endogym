@@ -57,6 +57,11 @@ async function buildUserContext(uid) {
       listMetricsSince(uid, metricsSinceIso, 100).catch(() => []),
     ]);
     if (!profile && !plan) return { text: '', profile, plan };
+    const todayKey = dateKeyInTimeZone();
+    const today = Array.isArray(plan?.days)
+      ? (plan.days.find((d) => d?.date === todayKey) || null)
+      : null;
+    const currentPlan = today ? plan : null;
     const parts = [];
     const name = profile?.firstName || profile?.name || profile?.displayName;
     if (name) parts.push(`Nombre: ${name}.`);
@@ -75,28 +80,24 @@ async function buildUserContext(uid) {
     if (profile?.runRaceGoal && profile.runRaceGoal !== 'health') {
       parts.push(`Objetivo de carrera: ${profile.runRaceGoal.replace('race_', '').toUpperCase()}.`);
     }
-    if (plan?.runPaces) {
-      const rp = plan.runPaces;
+    if (currentPlan?.runPaces) {
+      const rp = currentPlan.runPaces;
       parts.push(`Ritmos de carrera: fácil ${rp.facil}, larga ${rp.larga}, umbral ${rp.umbral}, intervalos ${rp.intervalos}.`);
     }
     if (modality === 'hybrid_run_gym') {
       parts.push('Entrena CONCURRENTE (correr + gimnasio): ten en cuenta el efecto de interferencia, el orden de sesiones (no fuerza pesada de pierna antes de la tirada larga) y la recuperación entre estímulos.');
     }
-    if (plan?.phaseLabel) {
-      parts.push(`Fase de entrenamiento: ${plan.phaseLabel}${Number.isFinite(Number(plan.weeksToRace)) && plan.weeksToRace > 0 ? ` (faltan ${plan.weeksToRace} semanas para la carrera)` : ''}.`);
+    if (currentPlan?.phaseLabel) {
+      parts.push(`Fase de entrenamiento: ${currentPlan.phaseLabel}${Number.isFinite(Number(currentPlan.weeksToRace)) && currentPlan.weeksToRace > 0 ? ` (faltan ${currentPlan.weeksToRace} semanas para la carrera)` : ''}.`);
     }
     // BUG corregido (10 jun 2026): los días del plan NO tienen flag `.today` — con bloques de
     // 21 días, caer a days[0] daba la sesión del PRIMER día del bloque como "hoy" durante 20 días.
-    const todayKey = dateKeyInTimeZone(); // fecha CIVIL de la app, no UTC
-    const today = Array.isArray(plan?.days)
-      ? (plan.days.find((d) => d?.date === todayKey) || plan.days[0])
-      : null;
     if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
     if (today?.workout?.runPrescription?.structure) parts.push(`Prescripción de hoy: ${today.workout.runPrescription.structure}`);
     if (today?.nutritionTarget?.carbLevel) parts.push(`Carbohidratos hoy: nivel ${today.nutritionTarget.carbLevel}. ${today.nutritionTarget.carbTiming || ''}`);
 
     // FASE 1.1 — Digest nutricional determinista (7 días). Se omite si no hay registros.
-    const nutritionLine = describeNutritionDigest(buildNutritionDigest({ meals, plan }));
+    const nutritionLine = describeNutritionDigest(buildNutritionDigest({ meals, plan: currentPlan }));
     if (nutritionLine) parts.push(nutritionLine);
     // FASE 1.2 — Tendencia de recuperación desde check-ins. Se omite si no hay datos.
     const recoveryLine = describeRecoveryTrend(buildRecoveryTrend({ workouts }));
@@ -117,7 +118,7 @@ async function buildUserContext(uid) {
       if (runs.length && hrMax) {
         const last = runs[0];
         const date = String(last.performedAt || '').slice(0, 10);
-        const runType = (Array.isArray(plan?.days) ? plan.days.find((d) => d.date === date) : null)?.workout?.runPrescription?.runType || null;
+        const runType = (Array.isArray(currentPlan?.days) ? currentPlan.days.find((d) => d.date === date) : null)?.workout?.runPrescription?.runType || null;
         const v = validateRunZone({ avgHr: Number(last.avgHeartRate), hrMax, runType: runType || 'easy' });
         const hrMaxSource = (Number.isFinite(manualHrMax) && manualHrMax >= 120) ? 'medida por el usuario' : 'estimada por su edad/observada';
         if (v) parts.push(`FCmáx ~${hrMax} ppm (${hrMaxSource}). Última carrera: ${v.message}`);
@@ -134,8 +135,8 @@ async function buildUserContext(uid) {
       }
       parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en Z2, apretar en los días de calidad) usando SU FCmáx por edad/medida; cada usuario es distinto.');
     }
-    if (!parts.length) return { text: '', profile, plan };
-    return { text: `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`, profile, plan };
+    if (!parts.length) return { text: '', profile, plan: currentPlan };
+    return { text: `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`, profile, plan: currentPlan };
   } catch { return { text: '', profile: null, plan: null }; }
 }
 

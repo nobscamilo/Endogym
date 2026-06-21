@@ -91,6 +91,17 @@ users/{userId}/rateLimits/{scope}
 - Perfil puede guardar `trainingExperience` (`novice`/`intermediate`/`advanced`); la prescripción de fuerza lo usa para ajustar volumen efectivo, series y descansos sin depender de IA.
 - `studio-swap` puede cambiar el foco muscular de la sesión de hoy (`scope:'focus'`) sin regenerar el bloque. La lógica vive en `planner.js` (`buildSessionFocusChange`/`listSessionFocusChangeOptions`) y bloquea conflictos con días adyacentes antes de persistir el plan.
 
+## Frontera demo/real y completitud del perfil
+
+- `public/studio/app/studio/data.js` es exclusivamente un dataset de demostración para navegación sin sesión.
+- Cuando el iframe obtiene un Firebase ID token, el cargador sustituye `window.STUDIO` por una base autenticada vacía **antes** de pedir `/api/studio-data`. Las respuestas reemplazan secciones completas; no se fusionan objetos anidados con la muestra.
+- El fallo de red/API conserva `mode:'authenticated'` + `dataStatus:'error'`. Nunca degrada a datos demo dentro de una sesión real.
+- `src/core/profileCompleteness.js` centraliza los campos mínimos para nutrición y prescripción. `/api/profile` no fabrica datos personales; `/api/studio-availability` no activa la encuesta y `/api/weekly-plan` no genera mientras falten campos.
+- El planner nutricional rechaza perfiles nutricionales incompletos. La biblioteca de fuerza, si tampoco hay historial, deja la carga en `null`/`profile_required` en vez de estimarla desde un peso corporal supuesto.
+- Los planes pueden contener una instantánea histórica de metadatos del ejercicio, pero el vídeo no se considera fuente de verdad persistida: `studio-data` y el dashboard lo vuelven a resolver por el ID estable contra `EXERCISE_VIDEO_MAP`. Así una asociación corregida o retirada se aplica al bloque activo sin regenerarlo.
+- El Studio no tiene un feed editorial de aprendizaje. “Sigue aprendiendo” es una vista derivada de los ejercicios de `todaySession` con embed verificado. Las entradas sin embed no entran en esa sección y, en la biblioteca, se representan como enlaces de búsqueda externos; el reproductor nunca simula contenido.
+- La fecha civil se inyecta desde `/api/public-config` y se resuelve con `src/lib/appTime.js`; un bloque que no contiene esa fecha queda stale y no aporta “hoy” al Studio, swaps ni coach.
+
 ## Flujo Coach chat Studio
 
 1. `POST /api/coach-chat` requiere Firebase ID token.

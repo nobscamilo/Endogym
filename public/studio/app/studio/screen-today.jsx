@@ -62,21 +62,33 @@ function ReentryCard() {
 
 function TodayHub({ go, variant }) {
   const D = window.STUDIO;
-  const { user, todaySession: s, macroTargets: mt, macroEaten: me, progress } = D;
-  const now = new Date();
-  const fecha = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-  const saludo = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const user = D.user || {};
+  const s = D.todaySession || null;
+  const mt = D.macroTargets || {};
+  const me = D.macroEaten || { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  const progress = D.progress || {};
+  const nowParts = window.__studioDateParts ? window.__studioDateParts() : { hour: new Date().getHours() };
+  const fecha = window.__studioDateLabel ? window.__studioDateLabel() : '';
+  const hour = Number(nowParts.hour);
+  const saludo = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
   const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
   const ws = Array.isArray(progress.weightSeries) ? progress.weightSeries : [];
+  // Contenido real y contextual: solo ejercicios de la sesión actual con embed verificado.
+  // No usar un feed editorial ficticio ni fabricar autores, vistas o duraciones.
+  const learningVideos = Array.isArray(s?.list)
+    ? s.list.filter((exercise) => exercise?.yt).slice(0, 3)
+    : [];
   return (
     <div className="page stagger screen-enter">
       <div className="page-head">
         <div>
           <p className="eyebrow" style={{ textTransform: 'capitalize' }}>{fecha}</p>
           <h1>{saludo}, {user.name}</h1>
-          <p className="sub">Hoy: {s.title}{s.focus ? ` · ${s.focus}` : ''}.{rec != null ? ` Tu disposición está al ${rec}%.` : ''}</p>
+          <p className="sub">{s ? `Hoy: ${s.title}${s.focus ? ` · ${s.focus}` : ''}.` : (D.planStatus === 'stale' ? 'Tu bloque terminó: genera uno nuevo para volver a tener una sesión de hoy.' : 'Aún no hay una sesión planificada para hoy.')}{rec != null ? ` Tu disposición está al ${rec}%.` : ''}</p>
         </div>
       </div>
+
+      {D.dataStatus === 'error' ? <div className="card"><div className="empty">No pudimos cargar tus datos. Reintenta recargando la aplicación; no mostraremos datos de muestra en tu sesión.</div></div> : null}
 
       {variant === 'resumen' ? <HeroResumen go={go} /> : variant === 'editorial' ? <HeroEditorial go={go} /> : <HeroAnillos go={go} />}
 
@@ -87,7 +99,7 @@ function TodayHub({ go, variant }) {
         <CoachCard go={go} />
         <SectionCard title="Sesión de hoy" icon="train"
           action={<button className="btn soft sm" onClick={() => go('train')}>Empezar</button>}>
-          <div className="row between" style={{ marginBottom: 14 }}>
+          {s ? <React.Fragment><div className="row between" style={{ marginBottom: 14 }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.18rem', letterSpacing: '-0.02em' }}>{s.title}</div>
               <div className="muted tiny" style={{ marginTop: 2 }}>{s.focus}</div>
@@ -102,6 +114,7 @@ function TodayHub({ go, variant }) {
           <div className="chips" style={{ marginTop: 14 }}>
             {(s.primaryMuscles || []).map((m) => <span key={m} className="pill tiny">{m}</span>)}
           </div>
+          </React.Fragment> : <div className="empty">{D.planStatus === 'stale' ? 'El bloque anterior ya no corresponde a la fecha actual.' : 'Genera tu bloque para ver aquí la sesión del día.'}</div>}
         </SectionCard>
       </div>
 
@@ -116,8 +129,8 @@ function TodayHub({ go, variant }) {
           </div>
           <div className="divider" style={{ margin: '14px 0' }} />
           <div className="row between">
-            <span className="muted tiny">{me.kcal} de {mt.kcal} kcal hoy</span>
-            {D.glycemic && D.glycemic.dayClass ? <span className={`pill ${D.glycemic.dayClass === 'good' ? 'good' : ''} tiny`}><span className="dot" /> Glucemia {D.glycemic.dayClass === 'good' ? 'en rango' : D.glycemic.dayClass === 'mid' ? 'moderada' : 'alta'}</span> : null}
+            <span className="muted tiny">{mt.kcal ? `${me.kcal} de ${mt.kcal} kcal hoy` : 'Sin objetivo nutricional activo'}</span>
+            {D.glycemic && D.glycemic.dayClass ? <span className={`pill ${D.glycemic.dayClass} tiny`}><span className="dot" /> Carga estimada {D.glycemic.dayClass === 'good' ? 'baja' : D.glycemic.dayClass === 'mid' ? 'moderada' : 'alta'}</span> : null}
           </div>
         </SectionCard>
 
@@ -135,13 +148,13 @@ function TodayHub({ go, variant }) {
         </SectionCard>
       </div>
 
-      {/* Continuar viendo */}
-      <SectionCard title="Sigue aprendiendo" icon="play"
-        action={<button className="btn ghost sm" onClick={() => go('train')}>Explorar <Icon name="arrowRight" size={14} /></button>}>
+      {/* Técnica real de la sesión: nunca feed editorial de muestra. */}
+      {learningVideos.length ? <SectionCard title="Sigue aprendiendo" icon="play"
+        sub="Vídeos de técnica verificados para los ejercicios de hoy">
         <div className="vid-rail">
-          {D.discover[0].items.map((v, i) => <VideoThumb key={i} item={v} />)}
+          {learningVideos.map((exercise, i) => <VideoThumb key={exercise.id || i} item={exercise} />)}
         </div>
-      </SectionCard>
+      </SectionCard> : null}
     </div>
   );
 }
@@ -149,10 +162,12 @@ function TodayHub({ go, variant }) {
 /* ---- Hero variante A: anillos ---- */
 function HeroAnillos({ go }) {
   const D = window.STUDIO;
-  const { macroTargets: mt, macroEaten: me, progress } = D;
+  const mt = D.macroTargets || {};
+  const me = D.macroEaten || { kcal: 0 };
+  const progress = D.progress || {};
   const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
   const done = Number.isFinite(progress.sessionsDone) ? progress.sessionsDone : 0;
-  const plan = Number.isFinite(progress.sessionsPlan) ? progress.sessionsPlan : 5;
+  const plan = Number.isFinite(progress.sessionsPlan) ? progress.sessionsPlan : 0;
   const kcalPct = mt.kcal ? Math.round((me.kcal / mt.kcal) * 100) : 0;
   const rings = [
     { value: done, max: plan || 1, color: 'var(--d-move)', label: 'Entreno' },
@@ -168,7 +183,7 @@ function HeroAnillos({ go }) {
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-move)' }}><Icon name="train" size={18} /></span>
             <div><strong className="num">{done} / {plan}</strong><div className="rm-sub">sesiones esta semana</div></div></div>
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-nutri)' }}><Icon name="nutrition" size={18} /></span>
-            <div><strong className="num">{me.kcal} / {mt.kcal}</strong><div className="rm-sub">kcal · {kcalPct}% del objetivo</div></div></div>
+            <div><strong className="num">{mt.kcal ? `${me.kcal} / ${mt.kcal}` : '—'}</strong><div className="rm-sub">{mt.kcal ? `kcal · ${kcalPct}% del objetivo` : 'sin objetivo nutricional'}</div></div></div>
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-recover)' }}><Icon name="heart" size={18} /></span>
             <div><strong className="num">{rec != null ? rec + '%' : '—'}</strong><div className="rm-sub">{rec != null ? 'recuperación' : 'haz tu check-in en Entreno'}</div></div></div>
         </div>
@@ -180,21 +195,22 @@ function HeroAnillos({ go }) {
 /* ---- Hero variante B: resumen (arco + tiles) ---- */
 function HeroResumen({ go }) {
   const D = window.STUDIO;
-  const { user, progress } = D;
+  const progress = D.progress || {};
+  const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
   return (
     <div className="card lg hero-card">
       <div className="readiness-wrap">
-        <Arc value={user.readiness} max={100} size={240} stroke={20} color="var(--accent)">
-          <div><div className="a-num num">{user.readiness}</div><div className="a-lbl">Disposición</div></div>
+        <Arc value={rec || 0} max={100} size={240} stroke={20} color="var(--accent)">
+          <div><div className="a-num num">{rec != null ? rec : '—'}</div><div className="a-lbl">Disposición</div></div>
         </Arc>
         <div className="stack" style={{ gap: 14, width: '100%' }}>
           <p className="muted" style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.5 }}>
-            Tu cuerpo está listo para entrenar fuerte. Sueño y fatiga en verde.
+            {rec != null ? 'Estimación basada en el último sueño y fatiga que registraste.' : 'Haz el check-in de Entreno para calcular tu disposición sin inventar valores.'}
           </p>
           <div className="tiles">
-            <div className="tile"><div className="t-num num">{user.sleep}h</div><div className="t-lbl">Sueño</div></div>
-            <div className="tile"><div className="t-num num">{user.restHr}</div><div className="t-lbl">FC reposo</div></div>
-            <div className="tile"><div className="t-num num">{Number.isFinite(progress.recovery) ? progress.recovery : '—'}%</div><div className="t-lbl">Recuperación</div></div>
+            <div className="tile"><div className="t-num num">{rec != null ? `${rec}%` : '—'}</div><div className="t-lbl">Recuperación</div></div>
+            <div className="tile"><div className="t-num num">{progress.sessionsDone ?? 0}</div><div className="t-lbl">Sesiones hechas</div></div>
+            <div className="tile"><div className="t-num num">{progress.adherence != null ? `${progress.adherence}%` : '—'}</div><div className="t-lbl">Adherencia</div></div>
           </div>
           <button className="btn block" onClick={() => go('train')}>Ver sesión de hoy <Icon name="arrowRight" size={17} /></button>
         </div>
@@ -206,23 +222,24 @@ function HeroResumen({ go }) {
 /* ---- Hero variante C: editorial ---- */
 function HeroEditorial({ go }) {
   const D = window.STUDIO;
-  const { user, progress } = D;
+  const progress = D.progress || {};
+  const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
   return (
     <div className="card flush hero-card editorial">
       <div className="ed-left">
         <p className="eyebrow">Disposición de hoy</p>
-        <div className="ed-num num">{user.readiness}<span style={{ fontSize: '0.32em', color: 'var(--ink-3)', letterSpacing: 0 }}>/100</span></div>
+        <div className="ed-num num">{rec != null ? rec : '—'}<span style={{ fontSize: '0.32em', color: 'var(--ink-3)', letterSpacing: 0 }}>/100</span></div>
         <p className="muted" style={{ margin: 0, fontSize: '0.96rem', lineHeight: 1.5, maxWidth: '40ch' }}>
-          Listo para empujar fuerte. Dormiste {user.sleep} h y tu fatiga es baja — el día perfecto para subir una repetición.
+          {rec != null ? 'Esta disposición se calcula con el sueño y la fatiga de tu último check-in.' : 'Todavía no hay sueño ni fatiga registrados para estimar tu disposición.'}
         </p>
         <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => go('train')}>Empezar sesión <Icon name="arrowRight" size={17} /></button>
       </div>
       <div className="ed-right">
         <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-recover)' }}><Icon name="moon" size={17} /></span>
-          <div><strong className="num">{user.sleep} h</strong><div className="rm-sub">sueño</div></div></div>
+          <div><strong className="num">{progress.sessionsDone ?? 0}</strong><div className="rm-sub">sesiones hechas</div></div></div>
         <div className="divider" />
         <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-heart)' }}><Icon name="heart" size={17} /></span>
-          <div><strong className="num">{user.restHr} ppm</strong><div className="rm-sub">FC en reposo</div></div></div>
+          <div><strong className="num">{progress.adherence != null ? `${progress.adherence}%` : '—'}</strong><div className="rm-sub">adherencia</div></div></div>
         <div className="divider" />
         <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-nutri)' }}><Icon name="target" size={17} /></span>
           <div><strong className="num">{Number.isFinite(progress.recovery) ? progress.recovery : '—'}%</strong><div className="rm-sub">recuperación</div></div></div>

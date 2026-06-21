@@ -58,12 +58,11 @@ export async function POST(request) {
       }
 
       const today = todayStrUTC();
-      // Día EXACTO de hoy (aunque sea recuperación/descanso): el cambio de grupo/ejercicio debe
-      // aplicarse a HOY, no caer al primer día de fuerza del bloque (causaba que el cambio no se
-      // reflejara donde el usuario lo hace). Fallback al primer día de entreno solo si hoy no está.
+      // Día EXACTO de hoy (aunque sea recuperación/descanso). Un bloque vencido nunca debe mutar
+      // su primer día como sustituto de "hoy".
       const exactIdx = plan.days.findIndex((d) => d.date === today);
-      const idx = exactIdx >= 0 ? exactIdx : plan.days.findIndex((d) => d.isTrainingDay);
-      if (idx < 0) return errorResponse('No hay sesión de entreno hoy.', 409);
+      if (exactIdx < 0) return errorResponse('Tu bloque no contiene el día de hoy. Regenera el plan antes de ajustarlo.', 409);
+      const idx = exactIdx;
       const day = plan.days[idx];
       const exercises = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];
 

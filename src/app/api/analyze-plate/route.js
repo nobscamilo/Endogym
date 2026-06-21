@@ -9,6 +9,7 @@ import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { errorResponse, jsonResponse } from '../../../lib/http.js';
 import { logError, logInfo, withTrace } from '../../../lib/logger.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
+import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -254,7 +255,7 @@ export async function POST(request) {
       }
 
       const [weeklyPlan, profile] = await Promise.all([getLatestWeeklyPlan(user.uid), getUserProfile(user.uid)]);
-      const todayPlanTarget = weeklyPlan?.days?.find((day) => day.date === new Date().toISOString().slice(0, 10))?.nutritionTarget ?? null;
+      const todayPlanTarget = weeklyPlan?.days?.find((day) => day.date === dateKeyInTimeZone())?.nutritionTarget ?? null;
       const promptContext = buildPromptContext({
         payloadContext: payload.context,
         profile,

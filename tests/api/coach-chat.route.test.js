@@ -229,6 +229,20 @@ describe('/api/coach-chat route', () => {
     expect(sentPrompt).toContain('CONTEXTO RAG DE PRUEBA');
   });
 
+  it('no presenta el primer día de un bloque vencido como la sesión de hoy', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue({
+      phaseLabel: 'Fase antigua',
+      days: [{ date: '2025-01-01', workout: { title: 'Sesión antigua que no es hoy' } }],
+    });
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST', body: JSON.stringify({ message: '¿Qué toca hoy?' }),
+    }));
+    expect(response.status).toBe(200);
+    const sentPrompt = mocks.requestGoogleGenerateContent.mock.calls[0][0].parts[0].text;
+    expect(sentPrompt).not.toContain('Sesión antigua que no es hoy');
+    expect(sentPrompt).not.toContain('Fase antigua');
+  });
+
   it('la query del RAG incluye la pregunta del usuario (FASE 0.3)', async () => {
     const pregunta = '¿Cuánta creatina debería tomar al día?';
     const response = await POST(new Request('http://localhost/api/coach-chat', {

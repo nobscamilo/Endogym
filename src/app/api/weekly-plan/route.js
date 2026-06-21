@@ -1,5 +1,9 @@
 import { buildHeuristicCoachPlan, generateWeeklyPlan, generateBlockPlan, normalizeWeeklyPlanSessionFocus } from '../../../core/planner.js';
 import { buildActiveBlockAdaptiveOverlay, isActiveBlockPlan } from '../../../core/activeBlockOverlay.js';
+import {
+  getMissingPrescriptionProfileFields,
+  PROFILE_FIELD_LABELS,
+} from '../../../core/profileCompleteness.js';
 
 // Aplica los ajustes estructurados del coach IA al plan, SIEMPRE dentro de límites de seguridad
 // (carga ±10%, series ±1) y solo a ejercicios de fuerza existentes. Devuelve cuántos aplicó.
@@ -323,6 +327,19 @@ export async function POST(request) {
 
       if (!profile) {
         return errorResponse('No existe perfil. Configura /api/profile antes de generar el plan.', 409);
+      }
+
+      const missingProfileFields = getMissingPrescriptionProfileFields(profile);
+      if (missingProfileFields.length > 0) {
+        return errorResponse(
+          'Completa tu perfil antes de generar un plan personalizado.',
+          409,
+          {
+            missingFields: missingProfileFields,
+            missingLabels: missingProfileFields.map((field) => PROFILE_FIELD_LABELS[field] || field),
+          },
+          rateLimitHeaders
+        );
       }
 
       let payload = {};

@@ -270,4 +270,18 @@ describe('/api/studio-swap route', () => {
     expect(response.status).toBe(409);
     expect(mocks.updatePlan).not.toHaveBeenCalled();
   });
+
+  it('rechaza un bloque vencido en vez de modificar su primer día', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-05-01', 'upper', 'Sesión antigua'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'lower' }),
+    }));
+    const json = await response.json();
+    expect(response.status).toBe(409);
+    expect(json.error).toMatch(/no contiene el día de hoy/i);
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
 });
