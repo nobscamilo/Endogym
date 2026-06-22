@@ -108,7 +108,8 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     await post({ conditions: { hypertension: true, diabetes: false, osteoarthritis: true, osteoporosis: false, injuryZones: ['rodilla', 'inventada', 'lumbar'] } });
     const patch = mocks.upsertUserProfile.mock.calls[0][1];
     expect(patch.conditions).toEqual({
-      hypertension: true, diabetes: false, osteoarthritis: true, osteoporosis: false,
+      hypertension: true, hypertensionControlled: false, diabetes: false, osteoarthritis: true, osteoporosis: false,
+      asthma: false, pregnant: false,
       injuryZones: ['rodilla', 'lumbar'],
     });
   });

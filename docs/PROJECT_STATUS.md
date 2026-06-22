@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **22 de junio de 2026 (auditoría de solo lectura: datos reales / código hardcodeado)**.
+Ultima actualizacion: **22 de junio de 2026 (calentamiento/enfriamiento dirigido por usuario)**.
+
+## Sesión del 22 de junio de 2026 (calentamiento y vuelta a la calma MUY dirigidos)
+
+Petición del usuario: el calentamiento/enfriamiento debe ser muy dirigido por usuario (patología de base, dolores, cansancio, grupo muscular trabajado/a trabajar) y mejorar su prescripción. Decisiones del usuario: precisión **por grupo/patrón** (sin enriquecer catálogo), personalización diaria vía **overlay en lectura**, y **ampliar la encuesta**. **349 tests verdes** (46 archivos; +10 nuevos), `build:studio` → `74714d1b79`, `npm run build` (Next) OK en la Mac, `check:conflicts` y `audit` (0) limpios.
+
+- **Hallazgo previo (causa raíz):** los builders `buildWarmupProtocol`/`buildCooldownProtocol` (`src/core/warmupCooldown.js`) solo recibían `{sessionType, modality, sessionFocus, profile}`. Las señales ricas (ejercicios reales del día, `adaptiveTuning`/overlay, `soreAreas`) estaban en scope en cada call site del planner pero NO se enhebraban. Además `primaryMuscles` NO existe en el catálogo runtime (0/244): la señal fiable es `exercise.category`.
+- **Músculos/patrón reales del día:** nuevo `deriveWorkedGroups(exercises)` mapea `category` → grupos legibles (cuádriceps y glúteos, isquios/glúteos/lumbar, pecho/hombros/tríceps, espalda/bíceps, core, cuerpo completo…). El **enfriamiento** nombra los grupos realmente trabajados hoy (antes texto genérico); el **calentamiento** añade preparación concreta por patrón presente (bisagra/sentadilla/empuje/tracción/core) en "Activación biomecánica". `mindbody` y `recovery` ya tienen movilidad/activación propias (antes caían al bloque de fuerza). Sin ejercicios, se conserva el texto genérico (compat).
+- **Patología más fina (`detectComorbidities`):** se cubren TODAS las zonas lesionadas (antes `slice(0,2)`), priorizando la región que se entrena hoy, con activación dirigida CONCRETA por zona (`ZONE_PREP`). Nuevas condiciones: **asma/broncoespasmo** (calentamiento general ≥10 min muy progresivo + inhalador a mano, por el periodo refractario), **embarazo/postparto** (anti-Valsalva en aproximación, sin decúbito supino prolongado al estirar, control térmico) y **gravedad de HTA** (`hypertensionControlled`: misma duración por seguridad, nota suavizada).
+- **Overlay en lectura (`studio-data.mapTodaySession`):** para días no-aeróbicos con ejercicios, recomputa warmup/cooldown del día desde el perfil ACTUAL + ejercicios reales + señal de fatiga (`bridgeSession`/`maxRpeCap≤6` → `gentle`: alarga el general y añade respiración parasimpática). **No exige "Regenerar plan"** para que hoy refleje los cambios; los días de carrera conservan el protocolo guardado (lleva los drills de runPrescription). El planner sigue pasando `exercises` a los 4 call sites para que el bloque guardado también nazca dirigido.
+- **Encuesta de Perfil ampliada (`screen-more.jsx` + `studio-availability` + `mapUser`):** bloque Salud añade Asma, Embarazo y, si hay HTA, el toggle "Tensión controlada / tratada". Validado server-side en `profile.conditions` (aditivo, sin migración). Bundle regenerado.
+- **Tests:** +10 en `tests/core/warmup-cooldown.test.js` (grupos reales, patrón, asma, embarazo, HTA controlada, múltiples lesiones priorizadas, mindbody/recovery, gentle) y actualizado el shape de `conditions` en `studio-availability.route.test.js`.
+- **Pendiente anotado:** músculo EXACTO (no solo grupo) requeriría poblar `primaryMuscles` en ~244 entradas del catálogo (fase 2 separada); `soreAreas` del día aún modula volumen pero no prepara la zona en el warmup de la sesión diaria (solo en el flujo de cambio de foco).
 
 ## Sesión del 22 de junio de 2026 (AUDITORÍA: hardcodeo y datos reales — solo lectura)
 

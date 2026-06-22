@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectComorbidities, buildWarmupProtocol, buildCooldownProtocol } from '../../src/core/warmupCooldown.js';
+import { detectComorbidities, buildWarmupProtocol, buildCooldownProtocol, deriveWorkedGroups } from '../../src/core/warmupCooldown.js';
 
 describe('detectComorbidities (léxico determinista)', () => {
   it('detecta HTA, artrosis, diabetes, osteoporosis y lesiones por zona', () => {
@@ -137,5 +137,75 @@ describe('fusión del calentamiento técnico de carrera (fuente única)', () => 
     const before = workout.warmup.find((s) => s.step === 'Activación biomecánica').details;
     mergeRunDrillsIntoWarmup(workout);
     expect(workout.warmup.find((s) => s.step === 'Activación biomecánica').details).toBe(before);
+  });
+});
+
+describe('warmup/cooldown dirigidos por ejercicios reales (grupos/patrón) y nuevas patologías', () => {
+  const lowerEx = [{ category: 'lower_body_strength' }, { category: 'posterior_chain' }];
+  const pushEx = [{ category: 'upper_push' }, { category: 'core' }];
+
+  it('deriveWorkedGroups mapea category → grupos legibles y deduplicados', () => {
+    expect(deriveWorkedGroups(lowerEx)).toEqual(['cuádriceps y glúteos', 'isquiosurales, glúteos y lumbar']);
+    expect(deriveWorkedGroups([])).toEqual([]);
+  });
+
+  it('cooldown nombra los grupos realmente trabajados hoy', () => {
+    const cd = buildCooldownProtocol({ sessionType: 'resistance', profile: {}, exercises: pushEx });
+    const stretch = cd.find((s) => s.step === 'Estiramientos suaves');
+    expect(stretch.details).toMatch(/pecho, hombros y tríceps/);
+    expect(stretch.details).toMatch(/core/);
+  });
+
+  it('cooldown sin ejercicios conserva el texto genérico (compat)', () => {
+    const cd = buildCooldownProtocol({ sessionType: 'resistance', profile: {} });
+    expect(cd.find((s) => s.step === 'Estiramientos suaves').details).toMatch(/grupo muscular trabajado hoy/);
+  });
+
+  it('warmup añade preparación específica por patrón presente (bisagra/empuje)', () => {
+    const w = buildWarmupProtocol({ sessionType: 'resistance', sessionFocus: 'lower', profile: {}, exercises: lowerEx });
+    const act = w.find((s) => s.step === 'Activación biomecánica');
+    expect(act.details).toMatch(/Prepara lo que harás hoy/);
+    expect(act.details).toMatch(/bisagra de cadera/);
+  });
+
+  it('asma: calentamiento general ≥10 min con aviso de inhalador/broncoespasmo', () => {
+    const w = buildWarmupProtocol({ sessionType: 'resistance', sessionFocus: 'push', profile: { conditions: { asthma: true } } });
+    expect(w[0].durationMinutes).toBeGreaterThanOrEqual(10);
+    expect(w[0].details).toMatch(/inhalador|broncoespasmo/i);
+  });
+
+  it('embarazo: anti-Valsalva en aproximación y aviso de decúbito supino en estiramientos', () => {
+    const w = buildWarmupProtocol({ sessionType: 'resistance', sessionFocus: 'lower', profile: { conditions: { pregnant: true } }, exercises: lowerEx });
+    expect(w.find((s) => s.step === 'Series de aproximación').details).toMatch(/Valsalva/i);
+    const cd = buildCooldownProtocol({ sessionType: 'resistance', profile: { conditions: { pregnant: true } }, exercises: lowerEx });
+    expect(cd.find((s) => s.step === 'Estiramientos suaves').details).toMatch(/boca arriba/i);
+  });
+
+  it('HTA controlada: misma duración (8 min) con la nota suavizada', () => {
+    const w = buildWarmupProtocol({ sessionType: 'resistance', sessionFocus: 'push', profile: { conditions: { hypertension: true, hypertensionControlled: true } } });
+    expect(w[0].durationMinutes).toBe(8);
+    expect(w[0].details).toMatch(/controlada/i);
+  });
+
+  it('cubre múltiples lesiones (no solo 2) y prioriza la región del día', () => {
+    const w = buildWarmupProtocol({ sessionType: 'resistance', sessionFocus: 'lower', profile: { conditions: { injuryZones: ['hombro', 'rodilla', 'lumbar'] } }, exercises: lowerEx });
+    const zoneSteps = w.filter((s) => s.step.startsWith('Cuidado de tu zona sensible'));
+    expect(zoneSteps.length).toBe(3);
+    expect(zoneSteps[0].step).not.toMatch(/hombro/);
+  });
+
+  it('mindbody y recovery tienen movilidad/activación propias (no caen al bloque de fuerza)', () => {
+    const yoga = buildWarmupProtocol({ sessionType: 'mindbody', sessionFocus: 'mindbody', profile: {} });
+    expect(yoga.find((s) => s.step === 'Movilidad específica').details).toMatch(/columna|respiración/i);
+    const rec = buildWarmupProtocol({ sessionType: 'recovery', sessionFocus: 'recovery', profile: {} });
+    expect(rec.find((s) => s.step === 'Activación biomecánica').details).toMatch(/sin fatigar/i);
+  });
+
+  it('día con menos recuperación (gentle): alarga general y añade respiración parasimpática', () => {
+    const w = buildWarmupProtocol({ sessionType: 'resistance', sessionFocus: 'lower', profile: {}, exercises: lowerEx, adaptive: { gentle: true } });
+    expect(w[0].durationMinutes).toBeGreaterThanOrEqual(6);
+    expect(w[0].details).toMatch(/menos recuperación/i);
+    const cd = buildCooldownProtocol({ sessionType: 'resistance', profile: {}, exercises: lowerEx, adaptive: { gentle: true } });
+    expect(cd.find((s) => s.step === 'Respiración de recuperación')).toBeTruthy();
   });
 });

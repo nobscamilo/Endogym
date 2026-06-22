@@ -87,9 +87,13 @@ export async function POST(request) {
       const VALID_ZONES = new Set(['lumbar', 'rodilla', 'hombro', 'tobillo', 'cadera', 'cervical', 'muñeca']);
       patch.conditions = {
         hypertension: body.conditions.hypertension === true,
+        // Gravedad: solo tiene sentido si hay HTA marcada.
+        hypertensionControlled: body.conditions.hypertension === true && body.conditions.hypertensionControlled === true,
         diabetes: body.conditions.diabetes === true,
         osteoarthritis: body.conditions.osteoarthritis === true,
         osteoporosis: body.conditions.osteoporosis === true,
+        asthma: body.conditions.asthma === true,
+        pregnant: body.conditions.pregnant === true,
         injuryZones: (Array.isArray(body.conditions.injuryZones) ? body.conditions.injuryZones : [])
           .filter((z) => VALID_ZONES.has(z)).slice(0, 7),
       };

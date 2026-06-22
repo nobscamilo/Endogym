@@ -1157,9 +1157,9 @@ export function generateWeeklyPlan({
         adaptiveTuning,
         preparticipationScreening
       ),
-      warmup: buildWarmupProtocol({ sessionType: templateDay.sessionType, modality, sessionFocus, profile }),
+      warmup: buildWarmupProtocol({ sessionType: templateDay.sessionType, modality, sessionFocus, profile, exercises: sessionExercises }),
       exercises: sessionExercises,
-      cooldown: buildCooldownProtocol({ sessionType: templateDay.sessionType, profile }),
+      cooldown: buildCooldownProtocol({ sessionType: templateDay.sessionType, profile, exercises: sessionExercises }),
     };
 
     // Prescripción de carrera (ritmo objetivo, estructura, drills) en días aeróbicos.
@@ -1479,9 +1479,9 @@ export function suggestSessionAlternatives({
           sessionFocus,
           durationMinutes: variation.durationMinutes || targetDay.workout?.durationMinutes || 45,
           intensityRpe: targetDay.workout?.intensityRpe || 'RPE moderado',
-          warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality, sessionFocus, profile }),
+          warmup: buildWarmupProtocol({ sessionType: targetDay.sessionType, modality, sessionFocus, profile, exercises }),
           exercises,
-          cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType, profile }),
+          cooldown: buildCooldownProtocol({ sessionType: targetDay.sessionType, profile, exercises }),
       },
     };
   });
@@ -1581,9 +1581,9 @@ function composeFocusWorkout({ day, dayIndex, focus, profile = {}, adaptiveTunin
     title,
     sessionFocus: focus,
     durationMinutes,
-    warmup: buildWarmupProtocol({ sessionType: effectiveType, modality, sessionFocus: focus, profile }),
+    warmup: buildWarmupProtocol({ sessionType: effectiveType, modality, sessionFocus: focus, profile, exercises }),
     exercises,
-    cooldown: buildCooldownProtocol({ sessionType: effectiveType, profile }),
+    cooldown: buildCooldownProtocol({ sessionType: effectiveType, profile, exercises }),
     focusChangeApplied: true,
   };
   delete workout.runPrescription;

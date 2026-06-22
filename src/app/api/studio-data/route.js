@@ -20,6 +20,7 @@ import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
+import { buildWarmupProtocol, buildCooldownProtocol } from '../../../core/warmupCooldown.js';
 import { buildWaistAssessment, estimateBodyFatNavy } from '../../../core/waistRisk.js';
 import { isPrescriptionProfileComplete } from '../../../core/profileCompleteness.js';
 import { addDaysToDateKey, dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
@@ -406,8 +407,24 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   const mapSteps = (arr) => (Array.isArray(arr) ? arr : []).map((w) => (
     typeof w === 'string' ? { step: w } : { step: w.step || '', min: w.durationMinutes ?? null, details: w.details || '' }
   )).filter((w) => w.step);
-  const warmup = mapSteps(day.workout?.warmup);
-  const cooldown = mapSteps(day.workout?.cooldown);
+  // Overlay en lectura: recomputa el calentamiento/enfriamiento del día desde el perfil ACTUAL
+  // + los ejercicios reales de hoy + señal de fatiga (overlay), SIN regenerar el bloque guardado.
+  // Los días de carrera conservan su protocolo guardado (lleva fusionados los drills de runPrescription).
+  let warmupSource = day.workout?.warmup;
+  let cooldownSource = day.workout?.cooldown;
+  if (day.sessionType !== 'aerobic' && ex.length) {
+    const ov = day.workout?.adaptiveOverlay || {};
+    const gentleDay = ov.bridgeSession === true
+      || (Number.isFinite(Number(ov.maxRpeCap)) && Number(ov.maxRpeCap) <= 6);
+    const adaptive = { gentle: gentleDay };
+    const focusForWarmup = day.sessionFocus || day.workout?.sessionFocus || null;
+    const recomputedWarmup = buildWarmupProtocol({ sessionType: day.sessionType, modality: profile?.trainingModality, sessionFocus: focusForWarmup, profile, exercises: ex, adaptive });
+    const recomputedCooldown = buildCooldownProtocol({ sessionType: day.sessionType, profile, exercises: ex, adaptive });
+    if (recomputedWarmup.length) warmupSource = recomputedWarmup;
+    if (recomputedCooldown.length) cooldownSource = recomputedCooldown;
+  }
+  const warmup = mapSteps(warmupSource);
+  const cooldown = mapSteps(cooldownSource);
   if (warmup.length) out.warmup = warmup;
   if (cooldown.length) out.cooldown = cooldown;
   if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;

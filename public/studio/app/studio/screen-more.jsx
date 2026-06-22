@@ -597,7 +597,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [goal, setGoal] = useStateP(u.goalRaw || '');
   // Comorbilidades estructuradas (checkboxes): adaptan calentamiento, retorno,
   // selección de ejercicios y avisos del coach. Complementan al texto libre.
-  const [conds, setConds] = useStateP(u.conditions || { hypertension: false, diabetes: false, osteoarthritis: false, osteoporosis: false, injuryZones: [] });
+  const [conds, setConds] = useStateP(u.conditions || { hypertension: false, hypertensionControlled: false, diabetes: false, osteoarthritis: false, osteoporosis: false, asthma: false, pregnant: false, injuryZones: [] });
   const toggleCond = (k) => setConds((c) => ({ ...c, [k]: !c[k] }));
   const toggleZone = (z) => setConds((c) => ({ ...c, injuryZones: (c.injuryZones || []).includes(z) ? c.injuryZones.filter((x) => x !== z) : [...(c.injuryZones || []), z] }));
   // Objetivo SMART: meta numérica + fecha (como el objetivo de carrera).
@@ -838,17 +838,22 @@ function AvailabilitySurvey({ onSaved } = {}) {
           <div style={{ marginTop: 14 }}>
             <div className="mb-label">Salud (opcional — adapta tu plan con seguridad)</div>
           <div className="chips">
-            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis']].map(([k, l]) => (
+            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis'], ['asthma', 'Asma'], ['pregnant', 'Embarazo']].map(([k, l]) => (
               <button key={k} type="button" className={`pill ${conds[k] ? 'accent' : ''}`} onClick={() => toggleCond(k)}>{l}</button>
             ))}
           </div>
+          {conds.hypertension ? (
+            <div className="chips" style={{ marginTop: 8 }}>
+              <button type="button" className={`pill ${conds.hypertensionControlled ? 'accent' : ''}`} onClick={() => toggleCond('hypertensionControlled')}>Tensión controlada / tratada</button>
+            </div>
+          ) : null}
           <div className="mb-label" style={{ marginTop: 10 }}>Zonas sensibles o con lesión previa</div>
           <div className="chips">
             {['lumbar', 'rodilla', 'hombro', 'tobillo', 'cadera', 'cervical', 'muñeca'].map((z) => (
               <button key={z} type="button" className={`pill ${((conds.injuryZones || []).includes(z)) ? 'accent' : ''}`} onClick={() => toggleZone(z)} style={{ textTransform: 'capitalize' }}>{z}</button>
             ))}
           </div>
-          <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis). Es educativo, no diagnóstico.</p>
+          <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis, calentamiento más largo con asma, sin Valsalva en el embarazo). Es educativo, no diagnóstico.</p>
           </div>
 
           <div className="grid g-4" style={{ gap: 10, marginTop: 12 }}>
