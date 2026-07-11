@@ -277,7 +277,7 @@ function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinis
     : `Ejercicio ${st.exIdx + 1}/${exercises.length} · Serie ${st.setNum}/${exSets}`;
   const restPct = st.restTotal ? Math.round(((st.restTotal - st.restLeft) / st.restTotal) * 100) : 0;
 
-  return (
+  const overlay = (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', overflowY: 'auto', padding: '18px 16px calc(24px + env(safe-area-inset-bottom))' }}>
       <div style={{ maxWidth: 560, margin: '0 auto' }} className="stack">
         <div className="row ac between">
@@ -339,6 +339,97 @@ function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinis
       </div>
     </div>
   );
+  const createPortal = typeof window !== 'undefined' ? window.__createPortal : null;
+  return createPortal && document.body ? createPortal(overlay, document.body) : overlay;
+}
+
+/* ---- Movilidad GUIADA original: secuencia elegida por categorías musculares reales ---- */
+function GuidedMobility({ routine, onClose }) {
+  const variants = Array.isArray(routine?.variants) && routine.variants.length
+    ? routine.variants : [{ durationMinutes: routine?.durationMinutes || 10, movements: routine?.movements || [], equipment: routine?.equipment || [] }];
+  const [duration, setDuration] = React.useState(routine?.durationMinutes || 10);
+  const variant = variants.find((v) => Number(v.durationMinutes) === Number(duration)) || variants[0];
+  const movements = Array.isArray(variant?.movements) ? variant.movements : [];
+  const [index, setIndex] = React.useState(0);
+  const [left, setLeft] = React.useState(Number(movements[0]?.seconds) || 45);
+  const [playing, setPlaying] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const current = movements[Math.min(index, Math.max(0, movements.length - 1))];
+
+  React.useEffect(() => {
+    setIndex(0); setLeft(Number(movements[0]?.seconds) || 45); setPlaying(false); setDone(false);
+  }, [duration]);
+  React.useEffect(() => {
+    if (!playing || done || !current) return undefined;
+    const timer = setInterval(() => {
+      setLeft((value) => {
+        if (value > 1) return value - 1;
+        if (index >= movements.length - 1) { setPlaying(false); setDone(true); return 0; }
+        const next = index + 1;
+        setIndex(next);
+        return Number(movements[next]?.seconds) || 45;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [playing, done, index, current?.id, movements.length]);
+
+  function skip() {
+    if (index >= movements.length - 1) { setPlaying(false); setDone(true); setLeft(0); return; }
+    const next = index + 1;
+    setIndex(next); setLeft(Number(movements[next]?.seconds) || 45);
+  }
+  const fmt = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  const progress = movements.length ? ((index + (done ? 1 : 0)) / movements.length) * 100 : 0;
+  const nextMovement = movements[index + 1];
+
+  const overlay = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 320, background: 'var(--bg)', overflowY: 'auto', padding: '18px 16px calc(28px + env(safe-area-inset-bottom))' }}>
+      <div style={{ maxWidth: 560, margin: '0 auto' }} className="stack">
+        <div className="row ac between" style={{ gap: 12 }}>
+          <button className="btn ghost sm" onClick={onClose} aria-label="Cerrar movilidad"><Icon name="close" size={16} /> Cerrar</button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{routine.title || 'Movilidad guiada'}</h2>
+          <span style={{ width: 76 }} aria-hidden="true" />
+        </div>
+        <p className="muted" style={{ margin: '4px 0 0', textAlign: 'center', lineHeight: 1.45 }}>{routine.context}</p>
+        <div className="row ac wrap" style={{ justifyContent: 'center', gap: 6 }}>
+          {variants.map((v) => <button key={v.durationMinutes} className={`pill tiny ${Number(v.durationMinutes) === Number(duration) ? 'accent' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setDuration(v.durationMinutes)}>{v.durationMinutes} min</button>)}
+        </div>
+
+        {done ? (
+          <div className="card lg" style={{ textAlign: 'center', marginTop: 8 }}>
+            <Icon name="check" size={38} />
+            <h3 style={{ margin: '10px 0 5px' }}>Movilidad completada</h3>
+            <p className="tiny muted" style={{ lineHeight: 1.5 }}>Has trabajado la recuperación de los grupos usados hoy, sin añadir carga.</p>
+            <button className="btn" onClick={onClose}><Icon name="check" size={15} /> Terminar</button>
+          </div>
+        ) : current ? (
+          <React.Fragment>
+            <div className="card lg" style={{ textAlign: 'center', borderColor: 'var(--accent)', background: 'var(--surface-2)' }}>
+              <p className="eyebrow" style={{ margin: 0 }}>{current.side || 'Movimiento bilateral'}</p>
+              <h3 style={{ margin: '8px 0 14px', fontSize: '1.55rem' }}>{current.name}</h3>
+              <div className="num" style={{ fontSize: '4rem', fontWeight: 800, lineHeight: 1 }}>{fmt(left)}</div>
+              <div className="bar" style={{ margin: '18px 0 12px' }}><i style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} /></div>
+              <p className="tiny muted" style={{ margin: 0 }}>{index + 1} de {movements.length}</p>
+              <p style={{ lineHeight: 1.55, margin: '16px auto 0', maxWidth: 430 }}>{current.cue}</p>
+            </div>
+            {nextMovement ? <div className="card" style={{ boxShadow: 'none' }}><span className="tiny muted">Después</span><strong style={{ display: 'block', marginTop: 3 }}>{nextMovement.name}</strong></div> : null}
+            <div className="row ac" style={{ gap: 8 }}>
+              <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setPlaying((p) => !p)}><Icon name={playing ? 'pause' : 'play'} size={17} /> {playing ? 'Pausar' : 'Empezar'}</button>
+              <button className="btn ghost" onClick={() => setLeft((v) => v + 15)}><Icon name="plus" size={15} /> +15 s</button>
+              <button className="btn ghost" onClick={skip}>Saltar</button>
+            </div>
+            <div className="card" style={{ boxShadow: 'none', textAlign: 'center', background: 'var(--accent-soft)' }}>
+              <strong className="tiny">{routine.safety}</strong>
+              <p className="tiny muted" style={{ margin: '5px 0 0', lineHeight: 1.45 }}>{routine.selectionReason}</p>
+            </div>
+            <p className="tiny muted" style={{ margin: 0, textAlign: 'center' }}>{variant.equipment?.join(' · ') || 'Sin equipo'}</p>
+          </React.Fragment>
+        ) : null}
+      </div>
+    </div>
+  );
+  const createPortal = typeof window !== 'undefined' ? window.__createPortal : null;
+  return createPortal && document.body ? createPortal(overlay, document.body) : overlay;
 }
 
 function TrainSession() {
@@ -390,6 +481,7 @@ function TrainSession() {
   const [editingLog, setEditingLog] = useStateTr(false);
   // Sesión guiada real (overlay con temporizador). Estado efímero: no persiste entre pestañas.
   const [guidedOn, setGuidedOn] = React.useState(false);
+  const [mobilityOn, setMobilityOn] = React.useState(false);
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -630,6 +722,7 @@ function TrainSession() {
           onClose={() => setGuidedOn(false)}
         />
       ) : null}
+      {mobilityOn && s.guidedMobility ? <GuidedMobility routine={s.guidedMobility} onClose={() => setMobilityOn(false)} /> : null}
 
       {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
       {adjustVisible ? (
@@ -947,6 +1040,11 @@ function TrainSession() {
                     <div><strong style={{ fontSize: '0.9rem' }}>{w.step}</strong>{w.details ? <div className="tiny muted" style={{ lineHeight: 1.4 }}>{w.details}</div> : null}</div>
                   </div>
                 ))}
+                {s.guidedMobility ? (
+                  <button className="btn" style={{ justifyContent: 'center', marginTop: 4 }} onClick={() => setMobilityOn(true)}>
+                    <Icon name="play" size={16} /> Iniciar movilidad guiada · {s.guidedMobility.durationMinutes} min
+                  </button>
+                ) : null}
               </div>
             </SectionCard>
           ) : null}

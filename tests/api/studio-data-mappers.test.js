@@ -52,6 +52,26 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
     expect(mapTodaySession(noRest, '2026-06-17').list[0].restSec).toBeUndefined();
   });
 
+  it('recalcula calentamiento, enfriamiento y movilidad guiada desde las categorías reales', () => {
+    const plan = {
+      days: [{
+        date: '2026-06-17', isTrainingDay: true, sessionType: 'resistance', sessionFocus: 'upper',
+        workout: {
+          title: 'Empuje',
+          exercises: [{ id: 'press', name: 'Press', category: 'upper_push', prescription: { sets: 3, reps: 8 } }],
+          // Persistido deliberadamente incorrecto: el overlay en lectura debe reemplazarlo.
+          warmup: [{ step: 'Pierna genérica', durationMinutes: 4, details: 'sentadilla' }],
+          cooldown: [{ step: 'Pierna genérica', durationMinutes: 4, details: 'isquios' }],
+        },
+      }],
+    };
+    const out = mapTodaySession(plan, '2026-06-17', [], {});
+    expect(out.warmup.find((s) => s.step === 'Activación biomecánica').details).toMatch(/empuje/i);
+    expect(out.cooldown.find((s) => s.step === 'Estiramientos suaves').details).toMatch(/pecho, hombros y tríceps/i);
+    expect(out.guidedMobility.context).toMatch(/pecho, hombros y tríceps/i);
+    expect(out.guidedMobility.movements.map((m) => m.id)).toContain('doorway-pec');
+  });
+
   it('modo exact (registro retroactivo) sigue exigiendo día de entreno → null en recuperación', () => {
     expect(mapTodaySession(PLAN, '2026-06-19', [], null, { exact: true })).toBeNull();
     expect(mapTodaySession(PLAN, '2026-06-17', [], null, { exact: true })).not.toBeNull();

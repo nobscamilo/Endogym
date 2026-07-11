@@ -40,12 +40,46 @@
     readiness: 0, sleep: 0, restHr: 0,
   };
 
+  const demoMobilityMoves = [
+    { id: 'breathing-stand', name: 'Respiración de pie', side: null, equipment: 'Sin equipo', cue: 'Inhala por la nariz y alarga la exhalación mientras bajas hombros.' },
+    { id: 'doorway-pec', name: 'Pectoral en marco de puerta', side: '30 s por lado', equipment: 'Pared o puerta', cue: 'Gira el tronco poco a poco con el hombro lejos de la oreja.' },
+    { id: 'triceps-overhead', name: 'Tríceps por encima de la cabeza', side: '30 s por lado', equipment: 'Sin equipo', cue: 'Costillas recogidas; guía el codo sin empujar el cuello.' },
+    { id: 'posterior-shoulder', name: 'Hombro posterior cruzado', side: '30 s por lado', equipment: 'Sin equipo', cue: 'Brazo a la altura del pecho y escápula estable; presión suave.' },
+    { id: 'thoracic-open-book', name: 'Rotación torácica de lado', side: '30 s por lado', equipment: 'Esterilla', cue: 'Rodillas juntas y giro desde el tórax, sin arrastrar la lumbar.' },
+    { id: 'child-pose-lat', name: 'Dorsal en postura de descanso', side: null, equipment: 'Esterilla', cue: 'Lleva caderas atrás y manos al frente sin forzar hombros ni lumbar.' },
+    { id: 'wrist-flexor', name: 'Antebrazo y muñeca', side: '30 s por lado', equipment: 'Sin equipo', cue: 'Codo extendido sin bloquear; mueve la muñeca con suavidad.' },
+    { id: 'neck-side', name: 'Cuello y trapecio sin tracción', side: '20 s por lado', equipment: 'Sin equipo', cue: 'Inclina la cabeza por su propio peso; no tires con la mano.' },
+    { id: 'full-body-reach', name: 'Alcance global con respiración', side: null, equipment: 'Sin equipo', cue: 'Crece al inhalar y suelta tensión al exhalar, sin buscar rango máximo.' },
+    { id: 'lat-bench', name: 'Dorsal con apoyo', side: null, equipment: 'Banco o silla', cue: 'Cadera atrás, pecho entre brazos y abdomen activo.' },
+  ];
+  const demoMobilityVariant = (durationMinutes) => ({
+    id: `demo-push-${durationMinutes}`, durationMinutes,
+    equipment: ['Esterilla', 'Pared o puerta'],
+    movements: demoMobilityMoves.slice(0, Math.max(5, Math.min(10, durationMinutes))).map((m, _i, arr) => ({ ...m, seconds: Math.floor((durationMinutes * 60) / arr.length) })),
+  });
+
   /* ---- Hoy: sesión de empuje (con vídeo por ejercicio) ---- */
   const todaySession = {
     title: 'Empuje · Fuerza', focus: 'Pecho, hombro y tríceps',
     durationMin: 52, intensity: 'Moderada-alta', readiness: 82, kcal: 410,
     primaryMuscles: ['Pecho', 'Hombro', 'Tríceps'],
     secondaryMuscles: ['Core', 'Antebrazo', 'Espalda alta'],
+    warmup: [
+      { step: 'Calentamiento general', min: 4, details: 'Sube temperatura de forma progresiva sin fatigarte.' },
+      { step: 'Activación biomecánica', min: 3, details: 'Manguito rotador y escápulas para los patrones de empuje de hoy.' },
+    ],
+    cooldown: [
+      { step: 'Vuelta a la calma', min: 4, details: 'Reduce pulsaciones caminando hasta respirar con comodidad.' },
+      { step: 'Estiramientos suaves', min: 6, details: 'Pecho, hombros y tríceps: sin rebotes ni dolor.' },
+    ],
+    guidedMobility: {
+      id: 'demo-push-10', title: 'Movilidad guiada', context: 'Hoy trabajaste pecho, hombros y tríceps',
+      workedGroups: ['pecho, hombros y tríceps'], durationMinutes: 10, durationOptions: [5, 10, 15, 20],
+      equipment: ['Esterilla', 'Pared o puerta'], safety: 'Respira lento. Sin rebotes y sin dolor.',
+      selectionReason: 'La secuencia se seleccionó desde los ejercicios reales de esta sesión.',
+      movements: demoMobilityVariant(10).movements,
+      variants: [5, 10, 15, 20].map(demoMobilityVariant),
+    },
     list: [
       { id: 'gym-db-bench-press', name: 'Press banca con mancuernas', scheme: '4 × 8', load: '22 kg', tag: 'Principal', muscle: 'Pecho', hue: 55, done: true, yt: 'Y_7aHqXeCfQ',
         cues: ['Escápulas retraídas y pecho alto', 'Baja en 2s hasta rozar el pecho', 'Empuja sin bloquear del todo el codo'] },

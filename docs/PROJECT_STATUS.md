@@ -1,6 +1,23 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (encuesta de Perfil rediseñada como wizard de 6 pasos)**.
+Ultima actualizacion: **11 de julio de 2026 (movilidad guiada original y verificación warmup/cooldown)**.
+
+## Sesión del 11 de julio de 2026, parte 8 (movilidad guiada según lo trabajado)
+
+Implementada una experiencia original de movilidad/estiramiento guiado —sin copiar vídeos, guiones ni secuencias de Peloton— y auditado el enlace real entre ejercicios, calentamiento y enfriamiento. `src/core/guidedMobility.js` contiene 19 movimientos propios etiquetados por objetivo muscular/contexto y construye variantes exactas de **5/10/15/20 min**, con tiempo por movimiento, lado, material, cue, motivo de selección y guardarraíles para embarazo/osteoporosis. `studio-data` la expone como `todaySession.guidedMobility` y genera la secuencia desde `exercise.category` de los ejercicios REALES del día.
+
+- **Verificación del enlace real:** test de regresión con un plan que guarda warmup/cooldown incorrectos de pierna pero contiene ejercicios `upper_push`; `mapTodaySession` reemplaza en lectura esos bloques por calentamiento de empuje, enfriamiento de pecho/hombros/tríceps y movilidad guiada con pectoral. Se mantienen los tests previos de bisagra/empuje, carrera, lesiones, asma, embarazo, HTA y fatiga.
+- **Reproductor Studio:** selector 5/10/15/20 min, movimiento/lado, cuenta atrás, próximo movimiento, empezar/pausar, +15 s, saltar, progreso, material y mensaje de seguridad. Se abre desde la tarjeta Enfriamiento. El demo incluye un ejemplo honesto de empuje; una sesión autenticada lo reemplaza con datos reales.
+- **Fix compartido:** `GuidedSession` (fuerza) y `GuidedMobility` usan portal a `document.body`; antes un ancestro animado podía desplazar el overlay `fixed` fuera del viewport después de hacer scroll.
+- **Verificación:** 373 tests (48 archivos), `check:conflicts`, smoke, `npm audit` 0 y `npm run build` verdes. Bundle `f46954e1e1`. Browser local: flujo Entreno → Enfriamiento → movilidad, cambio a 5 min y temporizador (`00:59`/Pausar) verificados sin errores de consola; escritorio y viewport móvil sin overflow. `esbuild` actualizado a 0.28.1 para cerrar una vulnerabilidad baja detectada durante el audit. **No desplegado todavía.**
+
+## Sesión del 11 de julio de 2026, parte 7 (referencia Peloton para mejorar estiramientos)
+
+Auditoría de producto y legal, sin cambios de código. La página pública de Peloton muestra **151 clases de vista previa** organizadas por duración y propósito: cuerpo completo, tren superior/inferior/core, pre/post carrera, pre/post ciclismo, movilidad matinal y foam rolling; las fichas exponen duración, número de movimientos, material y distribución corporal, pero no la secuencia completa. El hueco real de Ignios no es solo de catálogo (ya tiene movilidad/yoga/Pilates), sino de **producto**: la vuelta a la calma actual es un bloque textual genérico de 6 min, no una clase guiada, temporizada y seleccionable por contexto. No se debe copiar vídeo, audio, guion, música, imágenes ni secuencias de Peloton: sus términos limitan el contenido a uso personal/no comercial y prohíben copiar, modificar y crear derivados sin permiso. Dirección recomendada: crear protocolos originales basados en fuentes clínicas/RAG, con clases propias de 5/10/15/20 min por región, momento y material, temporizador y adaptaciones médicas.
+
+## Sesión del 11 de julio de 2026, parte 6 (comparativa exploratoria Ignios vs FitAI Pro)
+
+Auditoría de solo lectura del catálogo: `buildExerciseCatalog()` devuelve **184 ejercicios actuales** (la mención histórica a 244 no describe el catálogo vigente). Se consultaron los 184 nombres, en lotes de 10, mediante el conector FitAI Pro. El conector no ofrece enumeración/exportación de sus 5.000+ registros y su búsqueda no tiene semántica fiable de “no encontrado”: solo **3/184** entradas volvieron como coincidencia exacta de la base curada (`Dead Bug`, `Bird Dog`, `Suitcase Carry`), **53/184** conservaron el nombre pero se etiquetaron `Custom / Any / AI generated`, y **128/184** fueron sustituidas silenciosamente por movimientos distintos. Por tanto, estos números miden el comportamiento del buscador con nombres españoles, **no la cobertura real del catálogo FitAI**; no deben usarse para afirmar que FitAI carece de los otros 181 ejercicios. No hubo cambios de producto ni tests/build necesarios.
 
 ## Sesión del 11 de julio de 2026, parte 5 (crítica de diseño + WIZARD multipaso de la encuesta)
 

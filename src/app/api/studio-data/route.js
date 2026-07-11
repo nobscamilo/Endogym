@@ -21,6 +21,7 @@ import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
 import { buildWarmupProtocol, buildCooldownProtocol } from '../../../core/warmupCooldown.js';
+import { buildGuidedMobilityRoutine } from '../../../core/guidedMobility.js';
 import { buildWaistAssessment, estimateBodyFatNavy } from '../../../core/waistRisk.js';
 import { isPrescriptionProfileComplete } from '../../../core/profileCompleteness.js';
 import { addDaysToDateKey, dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
@@ -434,6 +435,14 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   const cooldown = mapSteps(cooldownSource);
   if (warmup.length) out.warmup = warmup;
   if (cooldown.length) out.cooldown = cooldown;
+  if (ex.length) {
+    const mobility = buildGuidedMobilityRoutine({ exercises: ex, profile, durationMinutes: 10 });
+    mobility.variants = mobility.durationOptions.map((durationMinutes) => {
+      const variant = buildGuidedMobilityRoutine({ exercises: ex, profile, durationMinutes });
+      return { id: variant.id, durationMinutes, equipment: variant.equipment, movements: variant.movements };
+    });
+    out.guidedMobility = mobility;
+  }
   if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;
   // Circuito híbrido (fuerza + cardio en la misma sesión): metadatos para la tarjeta de la UI.
   if (day.workout?.hybridCircuit) out.hybridCircuit = day.workout.hybridCircuit;
