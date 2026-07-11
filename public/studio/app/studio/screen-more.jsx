@@ -642,6 +642,40 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const raceLabel = (RUN_GOALS.find(([v]) => v === raceGoal) || [null, 'Salud'])[1];
   const keyDate = usesRace && raceDate ? raceDate : (targetEnabled && goalDate ? goalDate : null);
 
+  // ---- WIZARD por pasos (rediseño de la encuesta): 6 pasos con validación propia. ----
+  // El paso de Salud es opcional (siempre válido). El resumen final concentra el "bloque
+  // resultante" y el guardado; save() sigue validando TODO como red de seguridad y salta
+  // al primer paso inválido en vez de listar 11 campos junto al botón.
+  const inRangeW = (v, min, max) => v !== '' && Number.isFinite(Number(v)) && Number(v) >= min && Number(v) <= max;
+  const WIZARD_STEPS = [
+    { id: 'goal', label: 'Objetivo' },
+    { id: 'modality', label: 'Modalidad' },
+    { id: 'level', label: 'Nivel' },
+    { id: 'health', label: 'Salud' },
+    { id: 'data', label: 'Datos' },
+    { id: 'summary', label: 'Resumen' },
+  ];
+  const stepValid = [
+    Boolean(goal),
+    Boolean(equip),
+    Boolean(trainingExperience && activityLevel),
+    true, // salud: opcional
+    Boolean(sex) && inRangeW(age, 12, 100) && inRangeW(weight, 30, 300) && inRangeW(height, 120, 230)
+      && inRangeW(meals, 3, 6) && inRangeW(mins, 20, 150) && inRangeW(days, 1, 7),
+    true, // resumen
+  ];
+  const stepHints = [
+    'Elige un objetivo para continuar.',
+    'Elige dónde entrenas para continuar.',
+    'Marca tu nivel y tu actividad cotidiana.',
+    '',
+    'Faltan datos: revisa sexo, edad, peso, altura, comidas, min/sesión y días/semana.',
+    '',
+  ];
+  const [step, setStep] = useStateP(0);
+  const firstInvalidStep = stepValid.findIndex((ok) => !ok);
+  const goStep = (i) => setStep(Math.max(0, Math.min(WIZARD_STEPS.length - 1, i)));
+
   async function save() {
     const inRange = (value, min, max) => value !== '' && Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max;
     const requiredComplete = goal && equip && trainingExperience && activityLevel && sex
@@ -653,6 +687,10 @@ function AvailabilitySurvey({ onSaved } = {}) {
       && inRange(days, 1, 7);
     if (!requiredComplete) {
       setStatus('invalid');
+      // Lleva al usuario al primer paso con campos pendientes (antes: lista de 11 campos
+      // junto al botón, con los culpables hasta 4 pantallas más arriba).
+      const bad = stepValid.findIndex((ok) => !ok);
+      if (bad >= 0) setStep(bad);
       return;
     }
     setStatus('saving');
@@ -715,6 +753,23 @@ function AvailabilitySurvey({ onSaved } = {}) {
   return (
     <SectionCard title="Tu perfil y disponibilidad" icon="settings" sub="Objetivo, modalidad y calendario del bloque. Al guardar, reajustamos tu plan y comidas.">
       <div className="availability-flow">
+        {/* Cabecera del wizard: progreso + navegación por pasos */}
+        <div>
+          <div className="row ac between" style={{ marginBottom: 8 }}>
+            <span className="mb-label" style={{ marginBottom: 0 }}>Paso {step + 1} de {WIZARD_STEPS.length} · {WIZARD_STEPS[step].label}</span>
+            {step === 3 ? <span className="tiny muted">Opcional</span> : null}
+          </div>
+          <div className="bar"><i style={{ width: `${Math.round(((step + 1) / WIZARD_STEPS.length) * 100)}%` }} /></div>
+          <div className="chips" style={{ marginTop: 10 }}>
+            {WIZARD_STEPS.map((w, i) => (
+              <button key={w.id} type="button" className={`pill tiny ${i === step ? 'accent' : ''}`}
+                aria-current={i === step ? 'step' : undefined}
+                onClick={() => goStep(i)}>{stepValid[i] && i !== step && i !== 3 && i !== 5 ? '✓ ' : ''}{w.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {step === 0 ? (<React.Fragment>
         {!u.profileComplete ? (
           <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)', marginBottom: 4 }}>
             <strong style={{ fontSize: '0.95rem' }}>Primeros pasos</strong>
@@ -751,7 +806,9 @@ function AvailabilitySurvey({ onSaved } = {}) {
             </div>
           ) : null}
         </section>
+        </React.Fragment>) : null}
 
+        {step === 1 ? (<React.Fragment>
         <section className="profile-step">
           <div className="profile-step-head">
             <div>
@@ -768,7 +825,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
               </button>
             ))}
           </div>
-          <div className="mb-label" style={{ marginTop: 14 }}>Material disponible <span className="tiny muted">(opcional — si marcas, solo elegimos ejercicios que puedas hacer)</span></div>
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Material disponible</div>
+          <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — si marcas algo, solo elegimos ejercicios que puedas hacer.</p>
           <div className="chips">
             {GEAR_OPTIONS.map((g) => (
               <button key={g.id} type="button" className={`pill ${gear.includes(g.id) ? 'accent' : ''}`} aria-pressed={gear.includes(g.id)} onClick={() => toggleGear(g.id)}>{g.label}</button>
@@ -777,7 +835,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
           {gear.length ? <p className="tiny muted" style={{ margin: '8px 0 0' }}>Si un ejercicio necesita algo que no marcaste, lo sustituimos por uno equivalente que sí puedas hacer.</p> : null}
           {equip !== 'hybrid_run_gym' ? (
             <>
-              <div className="mb-label" style={{ marginTop: 14 }}>Formato híbrido <span className="tiny muted">(fuerza en circuito, pulsaciones altas)</span></div>
+              <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Formato híbrido</div>
+              <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Fuerza en circuito con pulsaciones altas.</p>
               <div className="chips">
                 <button type="button" className={`pill ${hybridOn ? 'accent' : ''}`} aria-pressed={hybridOn} onClick={toggleHybrid}>Fuerza en circuito (híbrido)</button>
               </div>
@@ -790,24 +849,6 @@ function AvailabilitySurvey({ onSaved } = {}) {
               </p>
             </>
           ) : null}
-        </section>
-
-        <section className="profile-step">
-          <div className="profile-step-head">
-            <div>
-              <div className="mb-label">Nivel actual</div>
-              <h4>{(TRAINING_LEVELS.find((x) => x.value === trainingExperience) || {}).title || 'Sin seleccionar'}</h4>
-            </div>
-            <span className="pill tiny">Volumen</span>
-          </div>
-          <div className="profile-choice-grid experience">
-            {TRAINING_LEVELS.map((lvl) => (
-              <button key={lvl.value} type="button" className={`choice-tile ${trainingExperience === lvl.value ? 'on' : ''}`} aria-pressed={trainingExperience === lvl.value} onClick={() => setTrainingExperience(lvl.value)}>
-                <span className="choice-head"><span className="choice-icon"><Icon name={lvl.icon} size={16} /></span><strong>{lvl.title}</strong></span>
-                <span className="choice-detail">{lvl.detail}</span>
-              </button>
-            ))}
-          </div>
         </section>
 
         {usesRace ? (
@@ -836,30 +877,36 @@ function AvailabilitySurvey({ onSaved } = {}) {
             <p className="tiny muted">Con fecha se periodiza la carrera; con marca se calculan ritmos. Sin marca, el bloque usa zonas.</p>
           </section>
         ) : null}
+        </React.Fragment>) : null}
 
-        <section className="plan-summary-band">
-          <div className="plan-summary-main">
-            <div className="mb-label">Bloque resultante</div>
-            <strong>{selectedGoal?.title || 'Objetivo pendiente'} · {selectedModality?.title || 'Modalidad pendiente'}</strong>
+        {step === 2 ? (<React.Fragment>
+        <section className="profile-step">
+          <div className="profile-step-head">
+            <div>
+              <div className="mb-label">Nivel actual</div>
+              <h4>{(TRAINING_LEVELS.find((x) => x.value === trainingExperience) || {}).title || 'Sin seleccionar'}</h4>
+            </div>
+            <span className="pill tiny">Volumen</span>
           </div>
-          <div className="plan-summary-grid">
-            <span><b>Microciclo</b><em>{days || '—'} días/sem · {mins || '—'} min</em></span>
-            <span><b>Mesociclo</b><em>Bloque de 21 días</em></span>
-            <span><b>Revisión</b><em>{weeks ? `Cada ${weeks} sem` : 'Sin configurar'}</em></span>
-            <span><b>Fecha clave</b><em>{keyDate || 'Sin fecha'}</em></span>
+          <div className="profile-choice-grid experience">
+            {TRAINING_LEVELS.map((lvl) => (
+              <button key={lvl.value} type="button" className={`choice-tile ${trainingExperience === lvl.value ? 'on' : ''}`} aria-pressed={trainingExperience === lvl.value} onClick={() => setTrainingExperience(lvl.value)}>
+                <span className="choice-head"><span className="choice-icon"><Icon name={lvl.icon} size={16} /></span><strong>{lvl.title}</strong></span>
+                <span className="choice-detail">{lvl.detail}</span>
+              </button>
+            ))}
           </div>
-        </section>
-
-        <section className="profile-step compact">
-          <div className="mb-label">Datos necesarios para personalizar</div>
-          <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
-          <p className="tiny muted" style={{ margin: '7px 0 0' }}>Se usa en la fórmula energética; no se muestra como métrica de rendimiento.</p>
-
-          <div className="mb-label" style={{ marginTop: 14 }}>Actividad cotidiana</div>
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Actividad cotidiana</div>
+          <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Fuera del entreno: trabajo, desplazamientos, pasos. Afecta a tu gasto energético diario.</p>
           <div className="chips">{ACTIVITY_LEVELS.map((item) => <button key={item.value} type="button" className={`pill ${activityLevel === item.value ? 'accent' : ''}`} onClick={() => setActivityLevel(item.value)}>{item.title}</button>)}</div>
+        </section>
+        </React.Fragment>) : null}
 
-          <div style={{ marginTop: 14 }}>
-            <div className="mb-label">Salud (opcional — adapta tu plan con seguridad)</div>
+        {step === 3 ? (<React.Fragment>
+        <section className="profile-step compact">
+          <div style={{ marginTop: 2 }}>
+            <div className="mb-label" style={{ marginBottom: 4 }}>Salud</div>
+            <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — adapta tu plan con seguridad. Puedes saltarte este paso.</p>
           <div className="chips">
             {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis'], ['asthma', 'Asma'], ['pregnant', 'Embarazo']].map(([k, l]) => (
               <button key={k} type="button" className={`pill ${conds[k] ? 'accent' : ''}`} onClick={() => toggleCond(k)}>{l}</button>
@@ -878,6 +925,15 @@ function AvailabilitySurvey({ onSaved } = {}) {
           </div>
           <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis, calentamiento más largo con asma, sin Valsalva en el embarazo). Es educativo, no diagnóstico.</p>
           </div>
+        </section>
+        </React.Fragment>) : null}
+
+        {step === 4 ? (<React.Fragment>
+        <section className="profile-step compact">
+          <div className="mb-label" style={{ marginBottom: 4 }}>Datos necesarios para personalizar</div>
+          <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Con ellos estimamos tu energía diaria y las cargas iniciales. Sin inventar nada.</p>
+          <div className="chips">{[['male', 'Hombre'], ['female', 'Mujer']].map(([v, l]) => <button key={v} type="button" className={`pill ${sex === v ? 'accent' : ''}`} onClick={() => setSex(v)}>{l}</button>)}</div>
+          <p className="tiny muted" style={{ margin: '7px 0 0' }}>Se usa en la fórmula energética; no se muestra como métrica de rendimiento.</p>
 
           <div className="grid g-4" style={{ gap: 10, marginTop: 12 }}>
             <div className="field"><label>Edad</label><input className="text-input" type="number" min="12" max="100" placeholder="Años" value={age} onChange={(e) => setAge(e.target.value)} /></div>
@@ -888,10 +944,11 @@ function AvailabilitySurvey({ onSaved } = {}) {
           <div className="grid g-4" style={{ gap: 10, marginTop: 10 }}>
             <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" placeholder="20–150" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
             <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
-            <div className="field"><label>Re-encuesta (sem, opc.)</label><input className="text-input" type="number" min="1" max="26" placeholder="Sin indicar" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
+            <div className="field"><label>Revisión (semanas) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="1" max="26" placeholder="Sin indicar" title="Cada cuántas semanas te volvemos a preguntar por tu disponibilidad" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
             <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
           </div>
-          <div className="mb-label" style={{ marginTop: 14 }}>Biometría <span className="tiny muted">(opcional — para tu riesgo cardiometabólico y su evolución)</span></div>
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Biometría</div>
+          <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — para tu riesgo cardiometabólico y su evolución en Progreso.</p>
           <div className="grid g-4" style={{ gap: 10 }}>
             <div className="field"><label>Cintura (cm)</label><input className="text-input" type="number" min="40" max="200" step="0.5" placeholder="opcional" value={waistCm} onChange={(e) => setWaistCm(e.target.value)} /></div>
             <div className="field"><label>Cuello (cm) <span className="tiny muted">Navy</span></label><input className="text-input" type="number" min="20" max="80" step="0.5" placeholder="opcional" value={neckCm} onChange={(e) => setNeckCm(e.target.value)} /></div>
@@ -899,14 +956,60 @@ function AvailabilitySurvey({ onSaved } = {}) {
           </div>
           <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>La cintura te da el índice cintura/altura y tu banda de riesgo. Si añades el cuello{sex === 'female' ? ' y la cadera' : ''}, estimamos tu % grasa (método Navy, ±3-4%). Mídete relajado, a la altura del ombligo y sin apretar. Podrás seguir su evolución en Progreso.</p>
         </section>
+        </React.Fragment>) : null}
 
-        <div className="row ac wrap" style={{ gap: 12 }}>
-          <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando...' : 'Guardar cambios'}</button>
-          {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado.</span> : null}
-          {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
-          {status === 'invalid' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Completa los campos necesarios: objetivo, modalidad, nivel, actividad, sexo, edad, peso, altura, comidas, minutos y días.</span> : null}
-          {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
-        </div>
+        {step === 5 ? (<React.Fragment>
+        <section className="plan-summary-band">
+          <div className="plan-summary-main">
+            <div className="mb-label">Bloque resultante</div>
+            <strong>{selectedGoal?.title || 'Objetivo pendiente'} · {selectedModality?.title || 'Modalidad pendiente'}</strong>
+          </div>
+          <div className="plan-summary-grid">
+            <span><b>Microciclo</b><em>{days || '—'} días/sem · {mins || '—'} min</em></span>
+            <span><b>Mesociclo</b><em>Bloque de 21 días</em></span>
+            <span><b>Revisión</b><em>{weeks ? `Cada ${weeks} sem` : 'Sin configurar'}</em></span>
+            <span><b>Fecha clave</b><em>{keyDate || 'Sin fecha'}</em></span>
+          </div>
+        </section>
+        <section className="profile-step compact">
+          <div className="mb-label" style={{ marginBottom: 4 }}>Revisa antes de guardar</div>
+          <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Toca cualquier paso arriba para corregir. Al guardar reajustamos tu plan de 21 días y tus comidas.</p>
+          <div className="chips">
+            <button type="button" className="pill tiny" onClick={() => goStep(0)}>{selectedGoal?.title || '— objetivo'}</button>
+            <button type="button" className="pill tiny" onClick={() => goStep(1)}>{selectedModality?.title || '— modalidad'}</button>
+            <button type="button" className="pill tiny" onClick={() => goStep(2)}>{(TRAINING_LEVELS.find((x) => x.value === trainingExperience) || {}).title || '— nivel'}</button>
+            <button type="button" className="pill tiny" onClick={() => goStep(4)}>{sex && age && weight && height ? `${age} años · ${weight} kg · ${height} cm` : '— datos'}</button>
+          </div>
+          {firstInvalidStep >= 0 ? (
+            <p className="tiny" style={{ color: 'var(--glu-high)', margin: '10px 0 0' }}>
+              Falta el paso {firstInvalidStep + 1} ({WIZARD_STEPS[firstInvalidStep].label}). <button type="button" className="pill tiny" onClick={() => goStep(firstInvalidStep)}>Ir al paso</button>
+            </p>
+          ) : null}
+          <div className="row ac wrap" style={{ gap: 12, marginTop: 14 }}>
+            <button className="btn" onClick={save} disabled={status === 'saving'}><Icon name="check" size={16} /> {status === 'saving' ? 'Guardando y reajustando...' : 'Guardar cambios'}</button>
+            {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado.</span> : null}
+            {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
+            {status === 'invalid' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Faltan campos: te hemos llevado al paso pendiente.</span> : null}
+            {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
+          </div>
+        </section>
+        </React.Fragment>) : null}
+
+        {/* Pie de navegación del wizard */}
+        {step < 5 ? (
+          <div className="row ac between wrap" style={{ gap: 10 }}>
+            <button className="btn ghost sm" disabled={step === 0} onClick={() => goStep(step - 1)}>Atrás</button>
+            <div className="row ac wrap" style={{ gap: 10, justifyContent: 'flex-end' }}>
+              {!stepValid[step] && stepHints[step] ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{stepHints[step]}</span> : null}
+              <button className="btn" disabled={!stepValid[step]} onClick={() => goStep(step + 1)}>{step === 3 && !Object.values(conds).some((v) => v === true || (Array.isArray(v) && v.length)) ? 'Omitir' : 'Siguiente'} <Icon name="back" size={14} style={{ transform: 'rotate(180deg)' }} /></button>
+            </div>
+          </div>
+        ) : (
+          <div className="row ac between wrap" style={{ gap: 10 }}>
+            <button className="btn ghost sm" onClick={() => goStep(4)}>Atrás</button>
+            <span />
+          </div>
+        )}
       </div>
     </SectionCard>
   );

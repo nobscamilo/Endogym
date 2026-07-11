@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (sesión guiada real + descansos visibles + fix tildes)**.
+Ultima actualizacion: **11 de julio de 2026 (encuesta de Perfil rediseñada como wizard de 6 pasos)**.
+
+## Sesión del 11 de julio de 2026, parte 5 (crítica de diseño + WIZARD multipaso de la encuesta)
+
+Se ejecutó una crítica de diseño estructurada (skill design-critique) sobre la encuesta de Perfil con capturas reales de producción: **5,3 pantallas (4.161 px) de formulario continuo**, error de validación como lista de 11 campos junto al botón final (culpables hasta 4 pantallas arriba), y rótulos `.mb-label` (uppercase+monospace) tragándose los textos de ayuda entre paréntesis (3 líneas de mayúsculas). Decisión del usuario: **wizard completo multipantalla**. **367 tests verdes**, `build:studio` → `fe4a43957e`.
+
+- **Wizard de 6 pasos** (`AvailabilitySurvey`, `screen-more.jsx`): 1 Objetivo (+meta SMART) · 2 Modalidad (material, formato híbrido, panel de carrera) · 3 Nivel + actividad cotidiana · 4 Salud (opcional, botón "Omitir" si no marcas nada) · 5 Datos (sexo, edad/peso/altura/comidas, min/días/revisión/FCmáx, biometría) · 6 Resumen (bloque resultante + chips-recap clicables + Guardar). Cabecera con "Paso N de 6", barra de progreso y chips navegables con ✓ en pasos completos (sin ✓ prematuro en Salud/Resumen).
+- **Validación por paso:** "Siguiente" deshabilitado con pista en rojo hasta completar el paso; `save()` sigue validando TODO como red de seguridad y ahora **salta al primer paso inválido** (antes: lista de 11 campos). El Resumen muestra "Falta el paso N (X) · Ir al paso" si hay pendientes.
+- **Rótulos arreglados:** las ayudas largas salen del uppercase a `p.tiny.muted` (Material, Formato híbrido, Salud, Biometría, Datos); "Re-encuesta (sem, opc.)" → "Revisión (semanas)" con title explicativo; actividad cotidiana ganó texto de ayuda.
+- **Sin cambios de contrato/API:** el wizard es presentación; el payload de `save()` y `studio-availability` quedan intactos (0 tests tocados).
+- **Verificación visual (Playwright contra `next dev` local, modo demo):** flujo completo paso a paso sin errores de consola; capturas `output/playwright/wizard-step0..5.png` — el resumen detecta el paso Datos incompleto y ofrece el salto directo. Nota: `next dev` en la Mac SÍ sirve la app demo para Playwright (el `http.server` estático NO, le faltan las APIs).
 
 ## Sesión del 11 de julio de 2026, parte 4 (sesión GUIADA real, descansos por ejercicio y tildes del análisis)
 
