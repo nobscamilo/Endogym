@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (tarjeta visual del circuito híbrido en Sesión)**.
+Ultima actualizacion: **11 de julio de 2026 (sesión guiada real + descansos visibles + fix tildes)**.
+
+## Sesión del 11 de julio de 2026, parte 4 (sesión GUIADA real, descansos por ejercicio y tildes del análisis)
+
+Tres cambios pedidos por el usuario tras la revisión UX. **367 tests verdes** (47 archivos; +3), `build:studio` → `8ee1ec502c`, `npm run build` OK. Commit de código + push. **Desplegado en producción:** `endogym-k8zmpaa9f-…vercel.app`, alias manual `endogym.vercel.app`, index sirve `v=8ee1ec502c`. **Verificación visual Playwright contra producción (modo demo):** overlay guiado renderiza fase de trabajo (nombre, esquema, cues, CTA "Serie 1 hecha", botón Técnica) y descanso (countdown 74 s, barra, "Siguiente: … serie 2", +15 s, Saltar) sin errores de consola. Capturas: `output/playwright/guided-work-phase.png`, `guided-rest-timer.png`.
+
+- **Sesión guiada REAL (`GuidedSession` en `screen-train.jsx`):** antes "Iniciar guiada" solo abría el vídeo del primer ejercicio. Ahora es un overlay a pantalla completa que avanza ejercicio a ejercicio con temporizador de descanso (1 s/tick, vibración al terminar si el dispositivo lo soporta): modo ESTÁNDAR serie a serie con `restSec` del ejercicio (75 s por defecto) y modo CIRCUITO (si la sesión tiene `hybridCircuit`) por VUELTAS — 25 s entre ejercicios, 120 s entre vueltas, guía de FC visible. Controles: +15 s, saltar descanso, salir; al completar marca los ejercicios (progreso del banner) y dirige al check-in. Estado efímero con `React.useState` (no persiste entre pestañas, a propósito).
+- **Descansos por ejercicio visibles:** `mapTodaySession` expone `restSec` (guard explícito `!= null` antes de `Number.isFinite` — `Number(null)===0`); la lista lo muestra en la sublínea ("· descanso 90 s").
+- **FIX tildes en el análisis del coach:** Gemini con `responseMimeType: application/json` a veces DOBLE-escapa los no-ASCII dentro de los valores → tras `JSON.parse` el texto guardado/mostrado contenía escapes literales ("El último entreno"). `decodeUnicodeEscapes` decodifica en los sanitizadores (`sanitizeCoachReport`, `sanitizeWorkoutAnalysis`, generación) y `decodeReportStrings` decodifica EN LECTURA los informes ya guardados (GET de coach-analysis y caché de workout-analysis) SIN re-validar el shape (un informe legacy sin `goalAlignment` no debe volverse null).
+- **Nota demo:** en modo demo la píldora del esquema (4 × 8) y el contador de series (1/3) pueden discrepar porque el dataset demo no trae `sets` numérico; con datos reales el contrato lo incluye. Anotado por si se ve en una captura.
+- **Utilidad:** `scratch/guided-session-visual-check.mjs` (Playwright contra producción, modo demo). El estático local NO monta la app (necesita las APIs de Next); verificar siempre contra producción o `next dev`.
 
 ## Sesión del 11 de julio de 2026, parte 3 (tarjeta "Circuito híbrido" en la pantalla de Sesión)
 
