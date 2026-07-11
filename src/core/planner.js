@@ -1061,6 +1061,74 @@ function selectTrainingDayIndexesForAvailability(days, targetDays, context) {
   return keep;
 }
 
+// ============================================================================
+// MÉTODO HÍBRIDO (fuerza en circuito): sesiones de FUERZA reorganizadas como
+// circuito con descansos cortos para añadir estímulo cardiovascular (circuit
+// resistance training). NO es una modalidad: es un formato dentro de la modalidad
+// actual. Se activa por preferencia explícita del usuario (toggle de la encuesta,
+// `prefersHybridCircuit`) o como sesgo suave cuando el objetivo es recomposición.
+// Mantener alineado con la detección híbrida de guidelinesRetriever.js.
+// ============================================================================
+const HYBRID_CIRCUIT_ALLOWED_MODALITIES = new Set([
+  TrainingModality.FULL_GYM,
+  TrainingModality.HOME,
+  TrainingModality.TRX,
+  TrainingModality.CALISTHENICS,
+  TrainingModality.MIXED,
+]);
+
+const HYBRID_CIRCUIT_REST_BETWEEN_EXERCISES_SEC = 25; // 15-30 s: mantiene FC elevada
+const HYBRID_CIRCUIT_REST_BETWEEN_ROUNDS_SEC = 120;
+const HYBRID_CIRCUIT_LOAD_FACTOR = 0.85; // ~60-65% 1RM: sostenible con descansos cortos
+
+/**
+ * Nº de sesiones de fuerza a reorganizar como circuito híbrido esta semana.
+ * - Preferencia explícita true → hasta 2. Explícita false → 0 (aunque el objetivo
+ *   sea recomposición: el usuario manda).
+ * - Sin preferencia y objetivo recomposición → 1 (sesgo suave).
+ * - Modalidades de resistencia (correr/bici/hybrid_run_gym) y mindbody quedan fuera:
+ *   su fuerza es complementaria y debe conservar cargas tradicionales separadas
+ *   del estímulo aeróbico (interferencia).
+ */
+export function resolveHybridCircuitDays({ goal, modality, prefersHybridCircuit }) {
+  if (!HYBRID_CIRCUIT_ALLOWED_MODALITIES.has(modality)) return 0;
+  if (prefersHybridCircuit === false) return 0;
+  if (prefersHybridCircuit === true) return 2;
+  return goal === GoalType.RECOMPOSITION ? 1 : 0;
+}
+
+// Reorganiza una sesión de fuerza ya construida como circuito híbrido: mismos
+// ejercicios (ya filtrados por comorbilidad/equipo), carga ~15% menor, descansos
+// cortos entre ejercicios y RPE de sesión mixta. Las series de cada ejercicio son
+// las vueltas del circuito.
+function applyHybridCircuitFormatToDay(day) {
+  const workout = day?.workout;
+  if (!workout) return;
+  workout.title = `Circuito híbrido · ${workout.title}`;
+  workout.intensityRpe = 'RPE 6-7';
+  workout.hybridCircuit = {
+    method: 'circuit_resistance_training',
+    restBetweenExercisesSec: HYBRID_CIRCUIT_REST_BETWEEN_EXERCISES_SEC,
+    restBetweenRoundsSec: HYBRID_CIRCUIT_REST_BETWEEN_ROUNDS_SEC,
+    hrGuidance: 'Mantén la frecuencia cardiaca en 64-76% de tu FCmáx (intensidad moderada ACSM): '
+      + 'los descansos cortos entre ejercicios sostienen el estímulo cardiovascular.',
+    note: 'Encadena los ejercicios en circuito con 15-30 s entre ellos y ~2 min entre vueltas '
+      + '(las series de cada ejercicio son las vueltas). Si la técnica se degrada por fatiga, '
+      + 'alarga el descanso antes que seguir con mala ejecución.',
+  };
+  (workout.exercises || []).forEach((exercise) => {
+    const p = exercise?.prescription;
+    if (!p || p.format !== 'reps') return;
+    p.restSeconds = HYBRID_CIRCUIT_REST_BETWEEN_EXERCISES_SEC;
+    p.reps = '10-12';
+    if (p.loadKg != null && Number.isFinite(Number(p.loadKg))) {
+      p.loadKg = Math.max(1, Math.round(Number(p.loadKg) * HYBRID_CIRCUIT_LOAD_FACTOR * 2) / 2);
+    }
+    p.loadGuidance = 'Formato circuito: carga ~15% menor que en fuerza tradicional (~60-65% de tu máximo) '
+      + 'para sostener la técnica con descansos cortos. Termina cada vuelta con 3-4 reps en reserva.';
+  });
+}
+
 function computeUserSeed(profile, goal, userId) {
   const identity = userId
     || profile?.userId
@@ -1243,6 +1311,29 @@ export function generateWeeklyPlan({
     }
   }
 
+  // MÉTODO HÍBRIDO (fuerza en circuito): se aplica DESPUÉS del recorte por disponibilidad
+  // para convertir solo días que sobreviven. La PRIMERA sesión de fuerza de la semana se
+  // conserva tradicional (cargas altas = retención de masa muscular, clave en déficit);
+  // se convierten las últimas. Con una única sesión de fuerza, el sesgo automático de
+  // recomposición NO convierte nada (no sacrifica el único estímulo de cargas altas);
+  // la preferencia explícita del usuario sí.
+  const hybridCircuitTarget = resolveHybridCircuitDays({
+    goal,
+    modality,
+    prefersHybridCircuit: profile.prefersHybridCircuit,
+  });
+  let hybridCircuitDays = 0;
+  if (hybridCircuitTarget > 0) {
+    const resistanceDays = days.filter((d) => d.isTrainingDay && d.sessionType === 'resistance');
+    const convertible = resistanceDays.length > 1
+      ? resistanceDays.slice(1)
+      : (profile.prefersHybridCircuit === true ? resistanceDays : []);
+    convertible.slice(-hybridCircuitTarget).forEach((d) => {
+      applyHybridCircuitFormatToDay(d);
+      hybridCircuitDays += 1;
+    });
+  }
+
   const acsmPrescription = buildAcsmPrescription(goal, modality);
   const clinicalAuditTrail = buildClinicalAuditTrail({
     preparticipationScreening,
@@ -1267,6 +1358,8 @@ export function generateWeeklyPlan({
     metabolicProfile,
     mealsPerDay,
     baseTarget,
+    // Nº de sesiones de fuerza reorganizadas como circuito híbrido esta semana (0 si no aplica).
+    hybridCircuitDays,
     acsmPrescription,
     safetyNotes: buildSafetyNotes(metabolicProfile),
     exerciseLibrary: getExerciseLibrarySummary(),

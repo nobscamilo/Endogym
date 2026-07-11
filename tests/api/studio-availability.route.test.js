@@ -126,4 +126,15 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     await post({ reentryReason: 'hackeo' });
     expect(mocks.upsertUserProfile.mock.calls[0][1].reentry).toBeUndefined();
   });
+
+  it('prefersHybridCircuit se persiste solo si es booleano (true, false y no-booleano)', async () => {
+    await post(completeSurvey({ prefersHybridCircuit: true }));
+    expect(mocks.upsertUserProfile.mock.calls[0][1].prefersHybridCircuit).toBe(true);
+
+    await post(completeSurvey({ prefersHybridCircuit: false }));
+    expect(mocks.upsertUserProfile.mock.calls[1][1].prefersHybridCircuit).toBe(false);
+
+    await post(completeSurvey({ prefersHybridCircuit: 'yes' }));
+    expect('prefersHybridCircuit' in mocks.upsertUserProfile.mock.calls[2][1]).toBe(false);
+  });
 });

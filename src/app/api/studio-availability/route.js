@@ -48,6 +48,9 @@ export async function POST(request) {
     const weeks = Number(body?.resurveyWeeks);
     if (body?.resurveyWeeks != null && body.resurveyWeeks !== '' && Number.isFinite(weeks)) patch.resurveyWeeks = Math.min(26, Math.max(1, Math.round(weeks)));
     if (TRAINING_EXPERIENCE.has(body?.trainingExperience)) patch.trainingExperience = body.trainingExperience;
+    // Formato híbrido (fuerza en circuito): booleano explícito. true → hasta 2 sesiones de
+    // fuerza en circuito; false → nunca (anula el sesgo automático de recomposición).
+    if (typeof body?.prefersHybridCircuit === 'boolean') patch.prefersHybridCircuit = body.prefersHybridCircuit;
     if (ACTIVITY_LEVELS.has(body?.activityLevel)) patch.activityLevel = body.activityLevel;
     // #4 — inventario de equipo y preferencias (merge parcial; vacío = sin restricción).
     if (Array.isArray(body?.equipment)) patch.equipment = sanitizeEquipmentList(body.equipment);

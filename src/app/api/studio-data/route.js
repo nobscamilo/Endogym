@@ -244,6 +244,8 @@ function mapUser(profile, authUser) {
   if (num(p.daysPerWeek) !== undefined) out.daysPerWeek = num(p.daysPerWeek);
   if (num(p.resurveyWeeks) !== undefined) out.resurveyWeeks = num(p.resurveyWeeks);
   if (['novice', 'intermediate', 'advanced'].includes(p.trainingExperience)) out.trainingExperience = p.trainingExperience;
+  // Formato híbrido (fuerza en circuito): prefill del toggle de Perfil.
+  if (typeof p.prefersHybridCircuit === 'boolean') out.prefersHybridCircuit = p.prefersHybridCircuit;
   // #4 — inventario de equipo y preferencias (prefill).
   if (Array.isArray(p.equipment)) out.equipment = p.equipment;
   if (Array.isArray(p.excludedExercises)) out.excludedExercises = p.excludedExercises;

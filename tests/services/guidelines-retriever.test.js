@@ -235,4 +235,140 @@ describe('guidelines RAG retriever', () => {
     expect(mockDb.doc).toHaveBeenCalledWith('1');
     expect(context).toContain('General_Nutrition.pdf');
   });
+
+  // --------------------------------------------------------------------------
+  // HÍBRIDO (fuerza + cardio en formato circuito).
+  // --------------------------------------------------------------------------
+  function mockVectorDb() {
+    const vectorQuery = {
+      get: vi.fn().mockResolvedValue({
+        empty: false,
+        size: 1,
+        docs: [{
+          id: 'p1',
+          data: () => ({ parentId: 'docA', fileName: 'ACSM Guidelines.pdf', pageStart: 1, pageEnd: 2, text: 'Circuit resistance training guidance.', _distance: 0.1 }),
+        }],
+      }),
+    };
+    const findNearest = vi.fn().mockReturnValue(vectorQuery);
+    getAdminServices.mockResolvedValue({ db: { collection: vi.fn().mockReturnValue({ findNearest }) } });
+  }
+
+  it('HÍBRIDO chat: una pregunta sobre fuerza+cardio en circuito enriquece la query con terminología de circuito/concurrente', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    mockVectorDb();
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33, trainingModality: 'full_gym' },
+      weeklyPlan: { goal: 'recomposition' },
+      userQuery: 'Quiero un entrenamiento híbrido: fuerza en circuito para subir pulsaciones y que sea también cardio.',
+      traceId: 'test',
+    });
+
+    const embedded = requestGoogleEmbeddings.mock.calls[0][0].texts[0];
+    expect(embedded).toContain('circuit resistance training');
+    expect(embedded).toContain('entrenamiento concurrente');
+    expect(embedded).toContain('descansos cortos');
+  });
+
+  it('HÍBRIDO chat (negativo): una pregunta ajena (creatina) NO se contamina con el enriquecimiento de circuito aunque la modalidad sea mixed', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    mockVectorDb();
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33, trainingModality: 'mixed' },
+      weeklyPlan: { goal: 'hypertrophy' },
+      userQuery: '¿Cuánta creatina debería tomar al día?',
+      traceId: 'test',
+    });
+
+    const embedded = requestGoogleEmbeddings.mock.calls[0][0].texts[0];
+    expect(embedded).toContain('creatina');
+    expect(embedded).not.toContain('circuit resistance training');
+  });
+
+  it('HÍBRIDO weekly-plan: con modalidad mixed (sin userQuery) la query del perfil incluye circuito/concurrente', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    mockVectorDb();
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33 },
+      weeklyPlan: { goal: 'recomposition', trainingModality: 'mixed', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+
+    const embedded = requestGoogleEmbeddings.mock.calls[0][0].texts[0];
+    expect(embedded).toContain('circuit resistance training');
+    expect(embedded).toContain('FCmáx');
+  });
+
+  it('HÍBRIDO weekly-plan: prefersHybridCircuit=true activa el enriquecimiento aunque la modalidad sea full_gym', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    mockVectorDb();
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33, prefersHybridCircuit: true },
+      weeklyPlan: { goal: 'hypertrophy', trainingModality: 'full_gym', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+
+    const embedded = requestGoogleEmbeddings.mock.calls[0][0].texts[0];
+    expect(embedded).toContain('circuit resistance training');
+  });
+
+  it('HÍBRIDO weekly-plan: goal recomposition (sesgo) activa el enriquecimiento, y prefersHybridCircuit=false lo anula', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    mockVectorDb();
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33 },
+      weeklyPlan: { goal: 'recomposition', trainingModality: 'full_gym', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+    expect(requestGoogleEmbeddings.mock.calls[0][0].texts[0]).toContain('circuit resistance training');
+
+    mockVectorDb();
+    await retrieveGuidelinesContext({
+      profile: { age: 33, prefersHybridCircuit: false },
+      weeklyPlan: { goal: 'recomposition', trainingModality: 'full_gym', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+    expect(requestGoogleEmbeddings.mock.calls[1][0].texts[0]).not.toContain('circuit resistance training');
+  });
+
+  it('HÍBRIDO fallback léxico: la modalidad mixed añade keywords de circuito y de ambos dominios (fuerza y cardio)', async () => {
+    const mockFilesMetadata = [
+      { id: '1', data: () => ({ source: { fileName: 'ACSM_Guidelines.pdf' }, keywords: ['circuit training', 'aerobic', 'resistance training'] }) },
+      { id: '2', data: () => ({ source: { fileName: 'Pediatric_Care.pdf' }, keywords: ['pediatric'] }) },
+    ];
+    const mockGetDoc = vi.fn().mockImplementation((docId) => ({
+      exists: true,
+      data: () => ({
+        source: { fileName: docId === '1' ? 'ACSM_Guidelines.pdf' : 'Pediatric_Care.pdf' },
+        pages: [{ pageNumber: 1, text: 'Circuit training: short rest intervals keep heart rate elevated.' }],
+      }),
+    }));
+    const mockDb = {
+      collection: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ empty: false, docs: mockFilesMetadata }),
+      doc: vi.fn().mockImplementation((docId) => ({ get: async () => mockGetDoc(docId) })),
+    };
+    getAdminServices.mockResolvedValue({ db: mockDb });
+
+    const context = await retrieveGuidelinesContext({
+      profile: { age: 33, trainingModality: 'mixed' },
+      weeklyPlan: { goal: 'recomposition' },
+      traceId: 'test',
+    });
+
+    expect(mockDb.doc).toHaveBeenCalledWith('1');
+    expect(context).toContain('ACSM_Guidelines.pdf');
+    expect(context).toContain('Circuit training');
+  });
 });

@@ -608,6 +608,13 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [gear, setGear] = useStateP(Array.isArray(u.equipment) ? u.equipment : []);
   const toggleGear = (id) => setGear((g) => g.includes(id) ? g.filter((x) => x !== id) : [...g, id]);
   const [trainingExperience, setTrainingExperience] = useStateP(u.trainingExperience || '');
+  // Formato híbrido (fuerza en circuito). Tri-estado: null = sin decidir (con objetivo de
+  // recomposición el plan incluye 1 circuito automáticamente); true = hasta 2; false = nunca.
+  // Solo se envía al guardar si el usuario decidió (o ya había decidido antes), para no
+  // pisar el sesgo automático con un false que nunca eligió.
+  const [hybridPref, setHybridPref] = useStateP(typeof u.prefersHybridCircuit === 'boolean' ? u.prefersHybridCircuit : null);
+  const hybridOn = hybridPref === true || (hybridPref === null && goal === 'recomposition');
+  const toggleHybrid = () => setHybridPref(hybridOn ? false : true);
   const [activityLevel, setActivityLevel] = useStateP(u.activityLevel || '');
   const [raceGoal, setRaceGoal] = useStateP(u.runRaceGoal || 'health');
   const [refDist, setRefDist] = useStateP(u.runRefDistanceMeters != null ? String(u.runRefDistanceMeters) : '');
@@ -674,6 +681,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
         goalTargetDate: targetEnabled ? (goalDate || null) : null,
       };
+      if (hybridPref !== null) surveyPayload.prefersHybridCircuit = hybridPref;
       if (weeks !== '') surveyPayload.resurveyWeeks = Number(weeks);
       const r = await fetch('/api/studio-availability', {
         method: 'POST', headers,
@@ -767,6 +775,21 @@ function AvailabilitySurvey({ onSaved } = {}) {
             ))}
           </div>
           {gear.length ? <p className="tiny muted" style={{ margin: '8px 0 0' }}>Si un ejercicio necesita algo que no marcaste, lo sustituimos por uno equivalente que sí puedas hacer.</p> : null}
+          {equip !== 'hybrid_run_gym' ? (
+            <>
+              <div className="mb-label" style={{ marginTop: 14 }}>Formato híbrido <span className="tiny muted">(fuerza en circuito, pulsaciones altas)</span></div>
+              <div className="chips">
+                <button type="button" className={`pill ${hybridOn ? 'accent' : ''}`} aria-pressed={hybridOn} onClick={toggleHybrid}>Fuerza en circuito (híbrido)</button>
+              </div>
+              <p className="tiny muted" style={{ margin: '8px 0 0' }}>
+                {hybridOn
+                  ? (hybridPref === null
+                    ? 'Con objetivo de recomposición incluimos 1 circuito híbrido a la semana. Toca la píldora si prefieres desactivarlo; guardando así se queda en automático.'
+                    : 'Hasta 2 sesiones de fuerza a la semana se organizan en circuito con descansos cortos: estímulo de fuerza y cardiovascular a la vez. Tu primera sesión de fuerza semanal se mantiene con cargas tradicionales.')
+                  : 'Sesiones de fuerza encadenadas en circuito con descansos cortos (15-30 s) para sumar estímulo cardiovascular. Útil para recomposición o cuando falta tiempo.'}
+              </p>
+            </>
+          ) : null}
         </section>
 
         <section className="profile-step">

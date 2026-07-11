@@ -32,6 +32,70 @@ const NUTRITION_TERMS = new Set([
 ]);
 
 // ----------------------------------------------------------------------------
+// Intención HÍBRIDA (fuerza + cardio en formato circuito).
+//
+// El usuario puede pedir "ejercicio híbrido": sesiones de fuerza ejecutadas como
+// circuito (descansos cortos, FC elevada) para obtener estímulo cardiovascular y
+// de fuerza a la vez. Se detecta por la pregunta del chat, por el objetivo o por
+// la modalidad, y se enriquece la query semántica con la terminología que usa la
+// literatura (ACSM) para que los pasajes correctos queden cerca en el espacio de
+// embeddings: circuit resistance training, HIIT, concurrent training, etc.
+// ----------------------------------------------------------------------------
+const HYBRID_INTENT_RE = new RegExp(
+  [
+    'h[ií]brid\\w*',
+    'circuito',
+    'circuit\\s*training',
+    'hiit',
+    'metcon',
+    'acondicionamiento\\s+metab[óo]lico',
+    'metabolic\\s+conditioning',
+    'entrenamiento\\s+concurrente',
+    'concurrent\\s+training',
+    // "fuerza ... cardio" o "cardio ... fuerza" en la misma frase (hasta 5 palabras entre medias)
+    '(?:fuerza|strength)(?:\\W+\\w+){0,5}?\\W+(?:cardio\\w*|aer[óo]bic\\w*)',
+    '(?:cardio\\w*|aer[óo]bic\\w*)(?:\\W+\\w+){0,5}?\\W+(?:fuerza|strength)',
+  ].join('|'),
+  'i'
+);
+
+// hybrid_run_gym NO está aquí a propósito: ese perfil (corredor + gimnasio) prescribe
+// fuerza tradicional SEPARADA del rodaje y tiene su propio enriquecimiento de
+// interferencia; el circuito con FC elevada es para el híbrido general (mixed/hybrid).
+const HYBRID_MODALITIES = new Set(['mixed', 'hybrid']);
+
+// Texto de enriquecimiento con términos en español e inglés (los libros fuente
+// están en inglés; los embeddings multilingües aprovechan ambos anclajes).
+const HYBRID_CIRCUIT_ENRICHMENT = 'Prescripción de entrenamiento HÍBRIDO fuerza + cardio en formato circuito '
+  + '(circuit resistance training, high-intensity circuit training, metabolic conditioning, HIIT con cargas): '
+  + 'ejercicios de fuerza multiarticulares encadenados con descansos cortos (15-30 s) para mantener la frecuencia '
+  + 'cardiaca elevada; prescripción FITT-VP simultánea de fuerza (series, repeticiones, %1RM, RPE) y '
+  + 'cardiorrespiratoria (%FCmáx, %FCR, VO2R, RPE); entrenamiento concurrente (concurrent training) y efecto de '
+  + 'interferencia; seguridad, técnica bajo fatiga y progresión de volumen e intensidad.';
+
+// Solo texto (pregunta/objetivo). La modalidad se evalúa aparte en cada camino:
+// en el chat NO basta con que el usuario tenga modalidad híbrida — la pregunta
+// debe ir de híbrido/circuito para no contaminar preguntas ajenas (p. ej. creatina).
+function detectHybridIntentText(...texts) {
+  return texts.some((t) => HYBRID_INTENT_RE.test(String(t || '')));
+}
+
+// Espejo de resolveHybridCircuitDays (src/core/planner.js) — NO se importa el planner
+// aquí para no arrastrar el catálogo de ejercicios a este servicio. Si el plan del
+// usuario incluirá circuitos híbridos (preferencia explícita o sesgo de recomposición),
+// el contexto del weekly-plan debe traer las guías de circuito. Mantener alineado.
+const HYBRID_CIRCUIT_ALLOWED_MODALITIES = new Set(['full_gym', 'home', 'trx', 'calisthenics', 'mixed']);
+
+function planWillIncludeHybridCircuit(profile, goal, modality) {
+  if (modality && !HYBRID_CIRCUIT_ALLOWED_MODALITIES.has(String(modality)) && !HYBRID_MODALITIES.has(String(modality))) {
+    return false;
+  }
+  if (profile?.prefersHybridCircuit === true) return true;
+  if (profile?.prefersHybridCircuit === false) return false;
+  return String(goal || '').toLowerCase().includes('recomposition');
+}
+
+// ----------------------------------------------------------------------------
 // Construcción de la consulta semántica en lenguaje natural.
 // ----------------------------------------------------------------------------
 function buildQueryText(profileInput, weeklyPlanInput, userQuery) {
@@ -47,6 +111,12 @@ function buildQueryText(profileInput, weeklyPlanInput, userQuery) {
     if (qGoal) queryParts.push(`Objetivo de entrenamiento: ${qGoal}.`);
     const qModality = weeklyPlan.trainingModality || profile.trainingModality || profile.trainingMode || '';
     if (qModality) queryParts.push(`Modalidad: ${qModality}.`);
+    // HÍBRIDO (fuerza + cardio en circuito): si la PREGUNTA (u objetivo) va de eso,
+    // ancla la query en la terminología de la literatura para recuperar pasajes de
+    // fuerza, cardio y entrenamiento concurrente a la vez.
+    if (detectHybridIntentText(trimmedQuery, qGoal)) {
+      queryParts.push(HYBRID_CIRCUIT_ENRICHMENT);
+    }
     return queryParts.join(' ');
   }
 
@@ -58,12 +128,21 @@ function buildQueryText(profileInput, weeklyPlanInput, userQuery) {
   if (modality) parts.push(`Modalidad de entrenamiento: ${modality}.`);
   // Entrenamiento concurrente (correr + gimnasio): pide guías específicas de interferencia,
   // orden de sesiones y recuperación entre fuerza y resistencia.
-  if (modality === 'hybrid_run_gym' || modality === 'mixed') {
+  if (modality === 'hybrid_run_gym') {
     parts.push(
       'Entrenamiento concurrente de fuerza y resistencia (correr + gimnasio): minimizar el '
       + 'efecto de interferencia, ordenar sesiones (separar fuerza de piernas de tiradas largas), '
       + 'gestionar volumen e intensidad y recuperación entre estímulos.'
     );
+  }
+  // Modalidad híbrida general (fuerza + cardio, incluida la fuerza en circuito),
+  // objetivo que lo pida explícitamente, o plan que incluirá circuitos híbridos
+  // (preferencia del usuario / sesgo de recomposición): recuperar guías de
+  // circuito/concurrente.
+  if (HYBRID_MODALITIES.has(modality)
+    || detectHybridIntentText(goal)
+    || planWillIncludeHybridCircuit(profile, goal, modality)) {
+    parts.push(HYBRID_CIRCUIT_ENRICHMENT);
   }
 
   const age = Number(profile.age);
@@ -242,6 +321,24 @@ function deriveKeywords(profile, weeklyPlan) {
     keywords.add('caffeine');
     keywords.add('nitrate');
   }
+  // HÍBRIDO (fuerza + cardio / fuerza en circuito): el fallback léxico también debe
+  // traer documentos de AMBOS dominios y de circuito/concurrente, no solo del objetivo.
+  const modality = weeklyPlan.trainingModality || profile.trainingModality || profile.trainingMode || '';
+  if (HYBRID_MODALITIES.has(modality) || detectHybridIntentText(goal)
+    || planWillIncludeHybridCircuit(profile, goal, modality)) {
+    keywords.add('circuit training');
+    keywords.add('circuit');
+    keywords.add('high-intensity');
+    keywords.add('interval');
+    keywords.add('concurrent training');
+    keywords.add('resistance training');
+    keywords.add('strength');
+    keywords.add('aerobic');
+    keywords.add('cardiorespiratory');
+    keywords.add('cardio');
+    keywords.add('heart rate');
+  }
+
   if (goal.includes('glycemic') || goal.includes('control') || goal.includes('diabetes')) {
     keywords.add('diabetes');
     keywords.add('diabetic');
