@@ -4,7 +4,7 @@ Ultima actualizacion: **11 de julio de 2026 (tarjeta visual del circuito híbrid
 
 ## Sesión del 11 de julio de 2026, parte 3 (tarjeta "Circuito híbrido" en la pantalla de Sesión)
 
-Cierre de la deuda anotada en la parte 2: los metadatos `workout.hybridCircuit` no se pintaban en la UI. **364 tests verdes** (47 archivos; +1), `build:studio` → `6ae587adcc`, `npm run build` OK, `check:conflicts` limpio.
+Cierre de la deuda anotada en la parte 2: los metadatos `workout.hybridCircuit` no se pintaban en la UI. **364 tests verdes** (47 archivos; +1), `build:studio` → `6ae587adcc`, `npm run build` OK, `check:conflicts` limpio. Commit `b7215b3`. **Desplegado en producción:** `endogym-c00dxfu69-juan-camilo-sarmientos-projects.vercel.app`, alias manual `endogym.vercel.app`. Sondas: `/` 200, `/api/health` 200, index sirve `v=6ae587adcc` y el bundle contiene `hybridCircuit`.
 
 - **Contrato (`studio-data.mapTodaySession`):** expone `out.hybridCircuit` solo si el día lo tiene (contrato limpio, test de omisión incluido).
 - **UI (`screen-train.jsx`):** nueva `SectionCard` "Circuito híbrido · Fuerza + cardio en la misma sesión" entre la prescripción de carrera y la lista de ejercicios: píldoras de descansos (25 s entre ejercicios, ~2 min entre vueltas), guía de FC (64-76% FCmáx) y nota de ejecución. Mismo patrón visual que la tarjeta de carrera.
