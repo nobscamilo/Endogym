@@ -136,14 +136,14 @@ function TrainScreen({ initialTab }) {
           <h1>Entreno</h1>
           <p className="sub">Tu sesión guiada, el plan de la semana y vídeos para perfeccionar la técnica.</p>
         </div>
-        <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
+        {(['missing', 'stale'].includes(D.planStatus) || tab === 'semana') ? <div className="stack" style={{ alignItems: 'flex-end', gap: 6 }}>
           <button className="btn" onClick={regenerate} disabled={genStatus === 'loading'}>
             <Icon name="sparkles" size={16} /> {genStatus === 'loading' ? 'Creando bloque…' : 'Nuevo bloque (21 días)'}
           </button>
           {genStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo regenerar. Reintenta.</span> : null}
           {genStatus === 'noauth' ? <span className="tiny muted">Inicia sesión para regenerar.</span> : null}
           {genStatus === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Plan actualizado ✨</span> : null}
-        </div>
+        </div> : null}
       </div>
       <SegTabs tabs={TABS} value={tab} onChange={setTab} />
       {D.dataStatus === 'error' ? <div className="empty">No pudimos cargar tus datos de entrenamiento. Recarga para reintentar.</div> : null}
@@ -344,7 +344,8 @@ function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinis
 }
 
 /* ---- Movilidad GUIADA original: secuencia elegida por categorías musculares reales ---- */
-function GuidedMobility({ routine, onClose }) {
+function GuidedRoutine({ routine, onClose }) {
+  const isWarmup = routine?.kind === 'warmup';
   const variants = Array.isArray(routine?.variants) && routine.variants.length
     ? routine.variants : [{ durationMinutes: routine?.durationMinutes || 10, movements: routine?.movements || [], equipment: routine?.equipment || [] }];
   const [duration, setDuration] = React.useState(routine?.durationMinutes || 10);
@@ -386,7 +387,7 @@ function GuidedMobility({ routine, onClose }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 320, background: 'var(--bg)', overflowY: 'auto', padding: '18px 16px calc(28px + env(safe-area-inset-bottom))' }}>
       <div style={{ maxWidth: 560, margin: '0 auto' }} className="stack">
         <div className="row ac between" style={{ gap: 12 }}>
-          <button className="btn ghost sm" onClick={onClose} aria-label="Cerrar movilidad"><Icon name="close" size={16} /> Cerrar</button>
+          <button className="btn ghost sm" onClick={onClose} aria-label={isWarmup ? 'Cerrar calentamiento' : 'Cerrar movilidad'}><Icon name="close" size={16} /> Cerrar</button>
           <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{routine.title || 'Movilidad guiada'}</h2>
           <span style={{ width: 76 }} aria-hidden="true" />
         </div>
@@ -398,8 +399,8 @@ function GuidedMobility({ routine, onClose }) {
         {done ? (
           <div className="card lg" style={{ textAlign: 'center', marginTop: 8 }}>
             <Icon name="check" size={38} />
-            <h3 style={{ margin: '10px 0 5px' }}>Movilidad completada</h3>
-            <p className="tiny muted" style={{ lineHeight: 1.5 }}>Has trabajado la recuperación de los grupos usados hoy, sin añadir carga.</p>
+            <h3 style={{ margin: '10px 0 5px' }}>{isWarmup ? 'Calentamiento completado' : 'Movilidad completada'}</h3>
+            <p className="tiny muted" style={{ lineHeight: 1.5 }}>{isWarmup ? 'Ya has preparado los patrones de la sesión. Empieza la primera serie de forma progresiva.' : 'Has trabajado la recuperación de los grupos usados hoy, sin añadir carga.'}</p>
             <button className="btn" onClick={onClose}><Icon name="check" size={15} /> Terminar</button>
           </div>
         ) : current ? (
@@ -470,7 +471,9 @@ function TrainSession() {
   const [autoAnalysis, setAutoAnalysis] = useStateTr(null); // { analysis, source }
   // Check-in UNIFICADO de la sesión (sustituye a la antigua tarjeta CheckinCard + el bloque
   // de RPE duplicado): completada + cargas + RPE + fatiga + sueño + síntomas en un solo guardado.
-  const [completedSession, setCompletedSession] = useStateTr(true);
+  // Desconocido hasta que el usuario responda. Antes empezaba en true y parecía que la sesión
+  // ya estaba completada aunque todavía no se hubiera hecho el check-in.
+  const [completedSession, setCompletedSession] = useStateTr(null);
   const [fatigue, setFatigue] = useStateTr(null);
   const [sleepHours, setSleepHours] = useStateTr('');
   const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
@@ -481,7 +484,9 @@ function TrainSession() {
   const [editingLog, setEditingLog] = useStateTr(false);
   // Sesión guiada real (overlay con temporizador). Estado efímero: no persiste entre pestañas.
   const [guidedOn, setGuidedOn] = React.useState(false);
+  const [warmupOn, setWarmupOn] = React.useState(false);
   const [mobilityOn, setMobilityOn] = React.useState(false);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -578,6 +583,7 @@ function TrainSession() {
   // withCheckin=false → un-tap "Hecho según plan" (solo cargas prescritas).
   // withCheckin=true  → guardado unificado: cargas + RPE + fatiga + sueño + síntomas.
   async function logSession(withCheckin = false) {
+    if (withCheckin && completedSession == null) { setLogStatus('choice'); return; }
     setLogStatus('saving');
     try {
       const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
@@ -722,7 +728,8 @@ function TrainSession() {
           onClose={() => setGuidedOn(false)}
         />
       ) : null}
-      {mobilityOn && s.guidedMobility ? <GuidedMobility routine={s.guidedMobility} onClose={() => setMobilityOn(false)} /> : null}
+      {warmupOn && s.guidedWarmup ? <GuidedRoutine routine={s.guidedWarmup} onClose={() => setWarmupOn(false)} /> : null}
+      {mobilityOn && s.guidedMobility ? <GuidedRoutine routine={s.guidedMobility} onClose={() => setMobilityOn(false)} /> : null}
 
       {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
       {adjustVisible ? (
@@ -769,7 +776,11 @@ function TrainSession() {
         <div className="bar" style={{ background: 'rgba(255,255,255,0.25)' }}><i style={{ width: pct + '%', background: '#fff' }} /></div>
       </div>
 
-      {canChangeSessionFocus ? (
+      <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setDetailsOpen((open) => !open)}>
+        <Icon name={detailsOpen ? 'close' : 'settings'} size={14} /> {detailsOpen ? 'Ocultar ajustes y detalles' : 'Ajustes y detalles'}
+      </button>
+
+      {detailsOpen && canChangeSessionFocus ? (
         <div className="card focus-switch-card">
           <div className="focus-switch-copy">
             <span className="ico"><Icon name="target" size={18} /></span>
@@ -882,9 +893,30 @@ function TrainSession() {
         );
       })() : null}
 
+      {/* Preparación accionable antes de la lista: el resumen completo queda disponible,
+          pero la acción principal es abrir el calentamiento guiado. */}
+      {Array.isArray(s.warmup) && s.warmup.length ? (
+        <SectionCard title="Antes de empezar" icon="bolt" sub="Calentamiento específico para los ejercicios de hoy">
+          <div className="row ac between wrap" style={{ gap: 10 }}>
+            <div>
+              <strong>{s.guidedWarmup ? `${s.guidedWarmup.durationMinutes} min guiados` : `${s.warmup.reduce((sum, w) => sum + (Number(w.min) || 0), 0)} min`}</strong>
+              <div className="tiny muted" style={{ marginTop: 3 }}>{s.guidedWarmup?.context || s.warmup.map((w) => w.step).join(' · ')}</div>
+            </div>
+            {s.guidedWarmup ? (
+              <button className="btn" onClick={() => setWarmupOn(true)}><Icon name="play" size={16} /> Iniciar calentamiento</button>
+            ) : null}
+          </div>
+          {detailsOpen ? (
+            <div className="stack" style={{ gap: 8, marginTop: 12 }}>
+              {s.warmup.map((w, i) => <div key={i} className="tiny"><strong>{w.min ? `${w.min}' · ` : ''}{w.step}</strong>{w.details ? ` — ${w.details}` : ''}</div>)}
+            </div>
+          ) : null}
+        </SectionCard>
+      ) : null}
+
       {/* Lista de ejercicios con vídeo */}
       <SectionCard title="Ejercicios" icon="list" sub="Toca el vídeo para ver la técnica · marca cada serie al terminar"
-        action={(
+        action={detailsOpen ? (
           <div className="row ac wrap" style={{ gap: 6 }}>
             <select className="reason-select" value={reason} onChange={(e) => setReason(e.target.value)} title="Motivo del cambio">
               <option value="variety">Variar</option>
@@ -907,7 +939,7 @@ function TrainSession() {
               </button>
             )}
           </div>
-        )}>
+        ) : null}>
         <div className="ex-list">
           {list.map((ex, i) => {
             const detailed = ex.id && setMode[ex.id];
@@ -980,7 +1012,7 @@ function TrainSession() {
       </SectionCard>
 
       {/* #6 — Por qué de tu sesión (explicación determinista; base científica vía coach) */}
-      {s.rationale ? (
+      {detailsOpen && s.rationale ? (
         <SectionCard title="Por qué de tu sesión" icon="sparkles" sub="Cómo decidimos volumen, carga y selección con tus datos">
           <div className="stack" style={{ gap: 8 }}>
             <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="pill tiny" style={{ flexShrink: 0 }}>Volumen</span><span className="tiny" style={{ lineHeight: 1.5 }}>{s.rationale.volume}</span></div>
@@ -993,7 +1025,7 @@ function TrainSession() {
       ) : null}
 
       {/* Recomendaciones pre/post entreno (deterministas, con límites clínicos) */}
-      {s.nutritionAround ? (
+      {detailsOpen && s.nutritionAround ? (
         <SectionCard title="Antes y después de entrenar" icon="nutrition" sub="Cómo alimentarte alrededor de la sesión">
           <div className="grid g-2" style={{ alignItems: 'start', gap: 12 }}>
             <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
@@ -1015,23 +1047,9 @@ function TrainSession() {
         </SectionCard>
       ) : null}
 
-      {/* Calentamiento y enfriamiento */}
-      {(Array.isArray(s.warmup) && s.warmup.length) || (Array.isArray(s.cooldown) && s.cooldown.length) ? (
+      {/* Enfriamiento: aparece después de los ejercicios; el calentamiento vive antes. */}
+      {Array.isArray(s.cooldown) && s.cooldown.length ? (
         <div className="grid g-2" style={{ alignItems: 'start' }}>
-          {Array.isArray(s.warmup) && s.warmup.length ? (
-            <SectionCard title="Calentamiento y movilidad" icon="bolt" sub="Antes de empezar — prepara articulaciones y activa">
-              <div className="stack" style={{ gap: 10 }}>
-                {s.warmup.map((w, i) => (
-                  <div key={i} className="row ac" style={{ gap: 10, alignItems: 'flex-start' }}>
-                    <span className="cue-n">{w.min ? `${w.min}'` : '·'}</span>
-                    <div><strong style={{ fontSize: '0.9rem' }}>{w.step}</strong>{w.details ? <div className="tiny muted" style={{ lineHeight: 1.4 }}>{w.details}</div> : null}</div>
-                  </div>
-                ))}
-                <p className="tiny muted" style={{ margin: '2px 0 0', lineHeight: 1.5 }}>El calentamiento ya incluye una activación cardiovascular ligera; para un objetivo de fuerza no necesitas cardio adicional salvo que el coach lo indique.</p>
-              </div>
-            </SectionCard>
-          ) : null}
-          {Array.isArray(s.cooldown) && s.cooldown.length ? (
             <SectionCard title="Enfriamiento" icon="heart" sub="Al terminar — baja pulsaciones y estira">
               <div className="stack" style={{ gap: 10 }}>
                 {s.cooldown.map((w, i) => (
@@ -1047,12 +1065,11 @@ function TrainSession() {
                 ) : null}
               </div>
             </SectionCard>
-          ) : null}
         </div>
       ) : null}
 
       {/* Activación muscular */}
-      <SectionCard title="Activación muscular" icon="target" sub="Qué trabaja la sesión de hoy">
+      {detailsOpen ? <SectionCard title="Activación muscular" icon="target" sub="Qué trabaja la sesión de hoy">
         <div className="stack" style={{ gap: 14 }}>
           <MuscleMap primary={s.primaryMuscles} secondary={s.secondaryMuscles} />
           <div className="muscle-map-legend-inline" style={{ justifyContent: 'center' }}>
@@ -1069,7 +1086,7 @@ function TrainSession() {
           </div>
           <CoachBanner screen="train_session" />
         </div>
-      </SectionCard>
+      </SectionCard> : null}
 
       {/* Check-in UNIFICADO de la sesión: 1 solo check-in (sustituye a la antigua CheckinCard
           + el bloque de RPE duplicado). Si hoy ya está registrada, muestra el resumen. */}
@@ -1106,10 +1123,11 @@ function TrainSession() {
             <div>
               <div className="mb-label">¿Completaste la sesión?</div>
               <div className="segc" style={{ alignSelf: 'flex-start', maxWidth: 240 }}>
-                <div className="segc-thumb" style={{ left: `calc(4px + ${completedSession ? 0 : 1} * (100% - 8px) / 2)`, width: 'calc((100% - 8px) / 2)' }} />
+                {completedSession != null ? <div className="segc-thumb" style={{ left: `calc(4px + ${completedSession ? 0 : 1} * (100% - 8px) / 2)`, width: 'calc((100% - 8px) / 2)' }} /> : null}
                 <button className={completedSession ? 'on' : ''} onClick={() => setCompletedSession(true)}>Sí</button>
-                <button className={!completedSession ? 'on' : ''} onClick={() => setCompletedSession(false)}>No</button>
+                <button className={completedSession === false ? 'on' : ''} onClick={() => setCompletedSession(false)}>No</button>
               </div>
+              {completedSession == null ? <p className="tiny muted" style={{ margin: '7px 0 0' }}>Elige una opción para guardar el check-in.</p> : null}
             </div>
             {completedSession && (
               <React.Fragment>
@@ -1134,10 +1152,11 @@ function TrainSession() {
               {Object.values(symptoms).some(Boolean) ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0' }}>El coach limitará la intensidad y recomendará valoración médica.</p> : null}
             </div>
             <div className="row ac wrap" style={{ gap: 12 }}>
-              <button className="btn" onClick={() => logSession(true)} disabled={logStatus === 'saving'}>
+              <button className="btn" onClick={() => logSession(true)} disabled={logStatus === 'saving' || completedSession == null}>
                 <Icon name="check" size={16} /> {logStatus === 'saving' ? 'Guardando…' : 'Guardar sesión'}
               </button>
               {logStatus === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
+              {logStatus === 'choice' ? <span className="tiny muted">Indica primero si completaste la sesión.</span> : null}
             </div>
             {autoStatus === 'analyzing' ? (
               <div className="row ac" style={{ gap: 8 }}>
@@ -1153,7 +1172,7 @@ function TrainSession() {
 
       {/* Registro retroactivo: registrar/editar la sesión de un día previo (hasta 14 días),
           partiendo del plan prescrito de ese día. Independiente de Strava. */}
-      <PastSessionLogger />
+      {detailsOpen ? <PastSessionLogger /> : null}
     </React.Fragment>
   );
 }
@@ -1457,10 +1476,10 @@ function TrainWeek() {
     <React.Fragment>
       {review && Array.isArray(review.reasons) && review.reasons.length ? <MesocycleReviewCard review={review} /> : null}
       <div className="grid g-4">
-        <div className="card"><Stat num={progress.sessionsPlan ?? 0} label="Sesiones" /></div>
+        <div className="card"><Stat num={progress.sessionsPlan ?? 0} label="Planificadas esta semana" /></div>
         <div className="card"><Stat num={volLabel} unit="h" label="Volumen semanal" /></div>
-        <div className="card"><Stat num={`${progress.sessionsDone ?? 0}/${progress.sessionsPlan ?? 0}`} label="Completadas" /></div>
-        <div className="card"><Stat num={progress.adherence != null ? `${progress.adherence}%` : '—'} label="Adherencia" color="var(--glu-good)" /></div>
+        <div className="card"><Stat num={`${progress.sessionsDone ?? 0}/${progress.sessionsDue ?? 0}`} label="Registradas de las vencidas" /></div>
+        <div className="card"><Stat num={progress.adherence != null ? `${progress.adherence}%` : '—'} label={progress.sessionsDue ? 'Adherencia hasta hoy' : 'Adherencia · aún sin muestra'} color="var(--glu-good)" /></div>
       </div>
 
       <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día · toca un día para ver lo que hiciste">

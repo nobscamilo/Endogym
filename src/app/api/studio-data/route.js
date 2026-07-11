@@ -15,16 +15,16 @@ import {
 } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
-import { collapseWorkoutsByDay, countDoneSessions, findDaySession } from '../../../core/sessionHistory.js';
+import { collapseWorkoutsByDay, findDaySession } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
 import { buildWarmupProtocol, buildCooldownProtocol } from '../../../core/warmupCooldown.js';
-import { buildGuidedMobilityRoutine } from '../../../core/guidedMobility.js';
+import { buildGuidedMobilityRoutine, buildGuidedWarmupRoutine } from '../../../core/guidedMobility.js';
 import { buildWaistAssessment, estimateBodyFatNavy } from '../../../core/waistRisk.js';
 import { isPrescriptionProfileComplete } from '../../../core/profileCompleteness.js';
-import { addDaysToDateKey, dateKeyBoundsIso, dateKeyInTimeZone } from '../../../lib/appTime.js';
+import { addDaysToDateKey, dateKeyBoundsIso, dateKeyInTimeZone, mondayDateKeyFor } from '../../../lib/appTime.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
@@ -436,6 +436,12 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   if (warmup.length) out.warmup = warmup;
   if (cooldown.length) out.cooldown = cooldown;
   if (ex.length) {
+    const guidedWarmup = buildGuidedWarmupRoutine({ exercises: ex, profile, sessionType: day.sessionType, durationMinutes: 10 });
+    guidedWarmup.variants = guidedWarmup.durationOptions.map((durationMinutes) => {
+      const variant = buildGuidedWarmupRoutine({ exercises: ex, profile, sessionType: day.sessionType, durationMinutes });
+      return { id: variant.id, durationMinutes, equipment: variant.equipment, movements: variant.movements };
+    });
+    out.guidedWarmup = guidedWarmup;
     const mobility = buildGuidedMobilityRoutine({ exercises: ex, profile, durationMinutes: 10 });
     mobility.variants = mobility.durationOptions.map((durationMinutes) => {
       const variant = buildGuidedMobilityRoutine({ exercises: ex, profile, durationMinutes });
@@ -710,15 +716,22 @@ export function mapProgress(metrics, workouts, plan, profile = null, todayKey = 
     };
   }
 
-  // Sesiones / adherencia / volumen (plan + entrenos)
+  // Sesiones / adherencia / volumen de la SEMANA CIVIL ACTUAL.
+  // La adherencia solo compara sesiones planificadas ya vencidas con registros de ESAS fechas.
+  // Antes se dividían todos los workouts de 60 días entre las sesiones del bloque actual: datos
+  // antiguos podían saturar el resultado en 100% aunque el usuario no hubiese registrado nada.
   const planDays = Array.isArray(plan?.days) ? plan.days : [];
-  const sessionsPlan = planDays.filter((d) => d.isTrainingDay).length;
-  if (sessionsPlan) out.sessionsPlan = sessionsPlan;
-  // 1 sesión por día: fusiona check-in + manual + Strava para no inflar adherencia.
-  const done = countDoneSessions(wlist);
+  const weekStart = mondayDateKeyFor(todayKey);
+  const weekEnd = addDaysToDateKey(weekStart, 6);
+  const weekPlanDays = planDays.filter((d) => d.isTrainingDay && d.date >= weekStart && d.date <= weekEnd);
+  const duePlanDays = weekPlanDays.filter((d) => d.date <= todayKey);
+  const doneDayKeys = new Set(collapseWorkoutsByDay(wlist).map((w) => String(w.performedAt || '').slice(0, 10)));
+  const done = duePlanDays.filter((d) => doneDayKeys.has(d.date)).length;
+  out.sessionsPlan = weekPlanDays.length;
+  out.sessionsDue = duePlanDays.length;
   out.sessionsDone = done;
-  if (sessionsPlan) out.adherence = Math.min(100, Math.round((done / sessionsPlan) * 100));
-  const planVolMin = planDays.reduce((a, d) => a + (d.isTrainingDay ? Number(d.workout?.durationMinutes) || 0 : 0), 0);
+  out.adherence = duePlanDays.length ? Math.round((done / duePlanDays.length) * 100) : null;
+  const planVolMin = weekPlanDays.reduce((a, d) => a + (Number(d.workout?.durationMinutes) || 0), 0);
   if (planVolMin) out.volumeWk = Number((planVolMin / 60).toFixed(1));
 
   // Strain (últimos 7 días) desde check-ins/entrenos: RPE del día (0-10).

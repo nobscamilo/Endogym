@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (movilidad guiada original y verificación warmup/cooldown)**.
+Ultima actualizacion: **11 de julio de 2026 (calentamiento guiado, Entreno simplificado y adherencia real)**.
+
+## Sesión del 11 de julio de 2026, parte 9 (calentamiento guiado + menos ruido + adherencia corregida)
+
+Corrección motivada por revisión directa del usuario: el enfriamiento guiado estaba bien, pero el calentamiento seguía siendo texto; Entreno resultaba sobrecargado y la app podía mostrar 100% de adherencia sin registros del bloque actual. **379 tests verdes** (48 archivos), `check:conflicts`, smoke, `npm audit` 0 y `npm run build` OK. Bundle `b6ed5014cf`. **No commiteado ni desplegado todavía.**
+
+- **Causa raíz de adherencia falsa:** `mapProgress` contaba TODOS los workouts de los últimos 60 días y los dividía por las sesiones del plan visible; registros previos al bloque o entrenos extra podían saturar el numerador en 100%. Ahora trabaja con la semana civil local: `sessionsPlan` = sesiones planificadas de la semana, `sessionsDue` = las ya vencidas, `sessionsDone` = intersección entre fechas vencidas y registros fusionados de esas fechas; `adherence = done/due` y es `null` antes de la primera sesión vencida. El volumen también es semanal, no la suma de las tres semanas del bloque. Tests cubren historial antiguo, entreno extra, cero registros y ausencia de muestra.
+- **No se presupone una sesión hecha:** el check-in empezaba con `completedSession=true`, resaltando “Sí” antes de responder. Ahora nace `null`, no selecciona Sí/No y el guardado permanece deshabilitado hasta elegir. El demo también parte de 0 ejercicios hechos, 0 sesiones y adherencia/recuperación desconocidas, evitando una falsa impresión durante la carga.
+- **Calentamiento guiado original:** `buildGuidedWarmupRoutine` ensambla 5/10/15 min con movimientos dinámicos por categorías reales (hombro/escápula en empuje-tracción, tobillo/sentadilla/bisagra en pierna, core, carrera/bici) y series de aproximación solo en fuerza/mixto; filtra movimientos no adecuados para embarazo/artrosis. `todaySession.guidedWarmup` incluye variantes, cues, lado, material, seguridad y motivo, y usa el mismo reproductor temporizado que la movilidad.
+- **Entreno simplificado:** auditoría visual de producción: 3.099 px de scroll, 45 botones y 8 bloques. Estado local nuevo: 1.942 px, 16 botones y 6 bloques visibles. El orden prioriza sesión → calentamiento → ejercicios → enfriamiento → check-in. Cambio de grupo, explicación, nutrición, atlas y registro retroactivo viven en “Ajustes y detalles” (siguen accesibles: al abrirlo reaparecen 43 botones/8 bloques). “Nuevo bloque” se oculta durante una sesión activa y queda en Semana o cuando el bloque falta/caduca.
+- **Browser local:** calentamiento Entreno → “Iniciar calentamiento” → temporizador verificado (`01:24`, Pausar), selector/overlay sin errores; check-in sin selección (`class=''` en Sí/No), CTA de guardado deshabilitada y pista visible; detalles se abren/cierran sin perder contenido.
 
 ## Sesión del 11 de julio de 2026, parte 8 (movilidad guiada según lo trabajado)
 

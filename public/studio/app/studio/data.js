@@ -57,6 +57,19 @@
     equipment: ['Esterilla', 'Pared o puerta'],
     movements: demoMobilityMoves.slice(0, Math.max(5, Math.min(10, durationMinutes))).map((m, _i, arr) => ({ ...m, seconds: Math.floor((durationMinutes * 60) / arr.length) })),
   });
+  const demoWarmupMoves = [
+    { id: 'march-progressive', name: 'Marcha progresiva', side: null, equipment: 'Sin equipo', cue: 'Empieza suave y aumenta el ritmo hasta notar calor, sin jadear.' },
+    { id: 'shoulder-circles', name: 'Círculos de hombro controlados', side: null, equipment: 'Sin equipo', cue: 'Recorrido cómodo hacia delante y atrás, sin elevar hombros.' },
+    { id: 'wall-slides', name: 'Deslizamientos escapulares en pared', side: null, equipment: 'Pared', cue: 'Costillas recogidas y movimiento sin forzar rango.' },
+    { id: 'band-external-rotation', name: 'Rotación externa con banda', side: null, equipment: 'Banda ligera', cue: 'Codos junto al cuerpo y tensión muy ligera.' },
+    { id: 'thoracic-rotation-stand', name: 'Rotación torácica de pie', side: 'Alterna lados', equipment: 'Sin equipo', cue: 'Pelvis estable y giro desde el tórax.' },
+    { id: 'dead-bug-primer', name: 'Dead bug de activación', side: 'Alterna lados', equipment: 'Esterilla', cue: 'Mantén costillas y pelvis estables.' },
+    { id: 'ramp-sets', name: 'Series de aproximación', side: null, equipment: 'Mancuernas', cue: 'Haz 2-3 series con carga creciente antes de la primera serie efectiva.' },
+  ];
+  const demoWarmupVariant = (durationMinutes) => ({
+    id: `demo-warmup-push-${durationMinutes}`, durationMinutes, equipment: ['Pared', 'Banda ligera', 'Esterilla'],
+    movements: demoWarmupMoves.slice(0, Math.max(5, Math.min(7, durationMinutes))).map((m, _i, arr) => ({ ...m, seconds: Math.floor((durationMinutes * 60) / arr.length) })),
+  });
 
   /* ---- Hoy: sesión de empuje (con vídeo por ejercicio) ---- */
   const todaySession = {
@@ -68,6 +81,13 @@
       { step: 'Calentamiento general', min: 4, details: 'Sube temperatura de forma progresiva sin fatigarte.' },
       { step: 'Activación biomecánica', min: 3, details: 'Manguito rotador y escápulas para los patrones de empuje de hoy.' },
     ],
+    guidedWarmup: {
+      id: 'demo-warmup-push-10', kind: 'warmup', title: 'Calentamiento guiado', context: 'Prepara pecho, hombros y tríceps',
+      workedGroups: ['pecho, hombros y tríceps'], durationMinutes: 10, durationOptions: [5, 10, 15],
+      equipment: ['Pared', 'Banda ligera', 'Esterilla'], safety: 'Muévete de forma progresiva. Sin dolor, mareo ni falta de aire anormal.',
+      selectionReason: 'La secuencia prepara los patrones de los ejercicios reales de hoy.',
+      movements: demoWarmupVariant(10).movements, variants: [5, 10, 15].map(demoWarmupVariant),
+    },
     cooldown: [
       { step: 'Vuelta a la calma', min: 4, details: 'Reduce pulsaciones caminando hasta respirar con comodidad.' },
       { step: 'Estiramientos suaves', min: 6, details: 'Pecho, hombros y tríceps: sin rebotes ni dolor.' },
@@ -81,9 +101,9 @@
       variants: [5, 10, 15, 20].map(demoMobilityVariant),
     },
     list: [
-      { id: 'gym-db-bench-press', name: 'Press banca con mancuernas', scheme: '4 × 8', load: '22 kg', tag: 'Principal', muscle: 'Pecho', hue: 55, done: true, yt: 'Y_7aHqXeCfQ',
+      { id: 'gym-db-bench-press', name: 'Press banca con mancuernas', scheme: '4 × 8', load: '22 kg', tag: 'Principal', muscle: 'Pecho', hue: 55, done: false, yt: 'Y_7aHqXeCfQ',
         cues: ['Escápulas retraídas y pecho alto', 'Baja en 2s hasta rozar el pecho', 'Empuja sin bloquear del todo el codo'] },
-      { id: 'gym-overhead-press', name: 'Press militar de pie', scheme: '4 × 10', load: '14 kg', tag: 'Principal', muscle: 'Hombro', hue: 232, done: true, yt: '4LBVP2Oe7fg',
+      { id: 'gym-overhead-press', name: 'Press militar de pie', scheme: '4 × 10', load: '14 kg', tag: 'Principal', muscle: 'Hombro', hue: 232, done: false, yt: '4LBVP2Oe7fg',
         cues: ['Glúteos y core firmes', 'Barra/mancuernas sobre la coronilla', 'No arquees la zona lumbar'] },
       { name: 'Press inclinado en máquina', scheme: '3 × 12', load: 'Selecciona', tag: 'Accesorio', muscle: 'Pecho alto', hue: 18, done: false,
         videoUrl: 'https://www.youtube.com/results?search_query=press+inclinado+en+maquina+tecnica+de+ejecucion',
@@ -186,9 +206,9 @@
   const progress = {
     weightSeries: [76.4, 76.1, 75.8, 75.9, 75.4, 75.1, 74.8],
     weightNow: 74.8, weightDelta6w: -1.6, weightDeltaWk: -0.3,
-    adherence: 82, volumeWk: 3.8, sessionsDone: 2, sessionsPlan: 5,
+    adherence: null, volumeWk: 3.8, sessionsDone: 0, sessionsPlan: 5, sessionsDue: 0,
     strain: [6.2, 8.4, 3.1, 7.8, 7.0, 2.4, 0],
-    recovery: 74,
+    recovery: null,
     muscleVolume: [
       { m: 'Pecho', v: 0.86 }, { m: 'Espalda', v: 0.72 }, { m: 'Pierna', v: 0.91 },
       { m: 'Hombro', v: 0.64 }, { m: 'Brazo', v: 0.55 }, { m: 'Core', v: 0.7 },

@@ -68,6 +68,8 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
     const out = mapTodaySession(plan, '2026-06-17', [], {});
     expect(out.warmup.find((s) => s.step === 'Activación biomecánica').details).toMatch(/empuje/i);
     expect(out.cooldown.find((s) => s.step === 'Estiramientos suaves').details).toMatch(/pecho, hombros y tríceps/i);
+    expect(out.guidedWarmup.context).toMatch(/pecho, hombros y tríceps/i);
+    expect(out.guidedWarmup.movements.map((m) => m.id)).toContain('band-external-rotation');
     expect(out.guidedMobility.context).toMatch(/pecho, hombros y tríceps/i);
     expect(out.guidedMobility.movements.map((m) => m.id)).toContain('doorway-pec');
   });
@@ -205,6 +207,33 @@ describe('mappers de verdad — vacío no equivale a muestra', () => {
   it('la serie de strain termina en la fecha civil recibida, no en el día UTC del proceso', () => {
     const out = mapProgress([], [{ performedAt: '2026-06-20T12:00:00.000Z', sessionRpe: 8 }], null, null, '2026-06-20');
     expect(out.strain).toEqual([0, 0, 0, 0, 0, 0, 8]);
+  });
+
+  it('la adherencia ignora entrenos antiguos y solo cuenta fechas planificadas ya vencidas de esta semana', () => {
+    const plan = { days: [
+      { date: '2026-06-15', isTrainingDay: true, workout: { durationMinutes: 60 } },
+      { date: '2026-06-17', isTrainingDay: true, workout: { durationMinutes: 50 } },
+      { date: '2026-06-19', isTrainingDay: true, workout: { durationMinutes: 40 } },
+      { date: '2026-06-22', isTrainingDay: true, workout: { durationMinutes: 70 } },
+    ] };
+    const workouts = [
+      { performedAt: '2026-05-20T12:00:00.000Z', source: 'manual', completed: true },
+      { performedAt: '2026-06-15T12:00:00.000Z', source: 'manual', completed: true },
+      { performedAt: '2026-06-16T12:00:00.000Z', source: 'manual', completed: true }, // extra no planificado
+    ];
+    const out = mapProgress([], workouts, plan, null, '2026-06-17');
+    expect(out).toMatchObject({ sessionsPlan: 3, sessionsDue: 2, sessionsDone: 1, adherence: 50, volumeWk: 2.5 });
+  });
+
+  it('sin registros de las sesiones vencidas muestra 0%, nunca 100% por historial previo', () => {
+    const plan = { days: [{ date: '2026-06-17', isTrainingDay: true, workout: { durationMinutes: 45 } }] };
+    const out = mapProgress([], [{ performedAt: '2026-05-20T12:00:00.000Z', completed: true }], plan, null, '2026-06-17');
+    expect(out).toMatchObject({ sessionsDue: 1, sessionsDone: 0, adherence: 0 });
+  });
+
+  it('antes de la primera sesión vencida la adherencia es desconocida', () => {
+    const plan = { days: [{ date: '2026-06-19', isTrainingDay: true, workout: { durationMinutes: 45 } }] };
+    expect(mapProgress([], [], plan, null, '2026-06-17').adherence).toBeNull();
   });
 });
 

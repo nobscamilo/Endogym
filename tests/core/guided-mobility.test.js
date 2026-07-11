@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGuidedMobilityRoutine } from '../../src/core/guidedMobility.js';
+import { buildGuidedMobilityRoutine, buildGuidedWarmupRoutine } from '../../src/core/guidedMobility.js';
 
 describe('buildGuidedMobilityRoutine — secuencia original ligada a lo trabajado', () => {
   it('pierna selecciona movilidad de cadera/isquios y explica los grupos reales', () => {
@@ -38,5 +38,27 @@ describe('buildGuidedMobilityRoutine — secuencia original ligada a lo trabajad
     expect(buildGuidedMobilityRoutine({ durationMinutes: 15 }).durationMinutes).toBe(15);
     expect(buildGuidedMobilityRoutine({ durationMinutes: 7 }).durationMinutes).toBe(10);
     expect(buildGuidedMobilityRoutine().durationOptions).toEqual([5, 10, 15, 20]);
+  });
+});
+
+describe('buildGuidedWarmupRoutine — preparación dinámica ligada a la sesión', () => {
+  it('empuje prepara hombro y escápulas e incluye aproximación en fuerza', () => {
+    const routine = buildGuidedWarmupRoutine({ exercises: [{ category: 'upper_push' }], sessionType: 'resistance' });
+    const ids = routine.movements.map((m) => m.id);
+    expect(ids).toEqual(expect.arrayContaining(['band-external-rotation', 'wall-slides', 'ramp-sets']));
+    expect(ids).not.toContain('bodyweight-squat-rehearsal');
+    expect(routine.context).toMatch(/pecho, hombros y tríceps/i);
+    expect(routine.movements.reduce((sum, m) => sum + m.seconds, 0)).toBe(600);
+  });
+
+  it('pierna prepara tobillo, sentadilla y bisagra según categorías reales', () => {
+    const routine = buildGuidedWarmupRoutine({ exercises: [{ category: 'lower_body_strength' }, { category: 'posterior_chain' }], durationMinutes: 5 });
+    expect(routine.movements.map((m) => m.id)).toEqual(expect.arrayContaining(['ankle-rocks', 'bodyweight-squat-rehearsal', 'hip-hinge-rehearsal']));
+    expect(routine.movements.reduce((sum, m) => sum + m.seconds, 0)).toBe(300);
+  });
+
+  it('embarazo evita el dead bug supino y mantiene una alternativa de core', () => {
+    const routine = buildGuidedWarmupRoutine({ exercises: [{ category: 'core' }], profile: { conditions: { pregnant: true } } });
+    expect(routine.movements.map((m) => m.id)).not.toContain('dead-bug-primer');
   });
 });
