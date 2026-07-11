@@ -1,6 +1,14 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (método híbrido fuerza-en-circuito: RAG + planner + encuesta)**.
+Ultima actualizacion: **11 de julio de 2026 (tarjeta visual del circuito híbrido en Sesión)**.
+
+## Sesión del 11 de julio de 2026, parte 3 (tarjeta "Circuito híbrido" en la pantalla de Sesión)
+
+Cierre de la deuda anotada en la parte 2: los metadatos `workout.hybridCircuit` no se pintaban en la UI. **364 tests verdes** (47 archivos; +1), `build:studio` → `6ae587adcc`, `npm run build` OK, `check:conflicts` limpio.
+
+- **Contrato (`studio-data.mapTodaySession`):** expone `out.hybridCircuit` solo si el día lo tiene (contrato limpio, test de omisión incluido).
+- **UI (`screen-train.jsx`):** nueva `SectionCard` "Circuito híbrido · Fuerza + cardio en la misma sesión" entre la prescripción de carrera y la lista de ejercicios: píldoras de descansos (25 s entre ejercicios, ~2 min entre vueltas), guía de FC (64-76% FCmáx) y nota de ejecución. Mismo patrón visual que la tarjeta de carrera.
+- **Revisión UX realizada** (ver conclusiones en la conversación): hallazgos priorizados pendientes de decisión del usuario — destacan: descansos por ejercicio invisibles en la lista, "Iniciar guiada" solo abre el vídeo del primer ejercicio (no hay flujo guiado real con temporizador de descanso), y la encuesta de Perfil es un formulario largo de una sola página.
 
 ## Sesión del 11 de julio de 2026, parte 2 (MÉTODO híbrido seleccionable: planner + encuesta + RAG)
 

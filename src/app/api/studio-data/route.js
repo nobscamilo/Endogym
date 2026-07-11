@@ -430,6 +430,8 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   if (warmup.length) out.warmup = warmup;
   if (cooldown.length) out.cooldown = cooldown;
   if (day.workout?.runPrescription) out.runPrescription = day.workout.runPrescription;
+  // Circuito híbrido (fuerza + cardio en la misma sesión): metadatos para la tarjeta de la UI.
+  if (day.workout?.hybridCircuit) out.hybridCircuit = day.workout.hybridCircuit;
   out.sessionType = day.sessionType || '';
   out.isRestDay = isRestDay;
   // #1 — matriz de opciones de grupo muscular disponibles/bloqueadas (con motivo), para que la

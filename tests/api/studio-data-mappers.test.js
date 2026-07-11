@@ -50,6 +50,30 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
     expect(mapTodaySession(PLAN, '2026-06-17', [], null, { exact: true })).not.toBeNull();
   });
 
+  it('expone workout.hybridCircuit al contrato (tarjeta de circuito híbrido) y lo omite si no existe', () => {
+    const hybridPlan = {
+      days: [{
+        ...PLAN.days[0],
+        workout: {
+          ...PLAN.days[0].workout,
+          title: 'Circuito híbrido · Gym · Torso',
+          hybridCircuit: {
+            method: 'circuit_resistance_training',
+            restBetweenExercisesSec: 25,
+            restBetweenRoundsSec: 120,
+            hrGuidance: 'Mantén la frecuencia cardiaca en 64-76% de tu FCmáx.',
+            note: 'Encadena los ejercicios en circuito.',
+          },
+        },
+      }],
+    };
+    const out = mapTodaySession(hybridPlan, '2026-06-17');
+    expect(out.hybridCircuit).toMatchObject({ restBetweenExercisesSec: 25, restBetweenRoundsSec: 120 });
+    expect(out.hybridCircuit.hrGuidance).toContain('64-76%');
+    // Sin metadatos, el campo no aparece (contrato limpio).
+    expect(mapTodaySession(PLAN, '2026-06-17').hybridCircuit).toBeUndefined();
+  });
+
   it('fuera de las fechas del bloque devuelve null en vez de reciclar el primer entreno', () => {
     expect(mapTodaySession(PLAN, '2026-07-01')).toBeNull();
   });

@@ -635,6 +635,26 @@ function TrainSession() {
         );
       })() : null}
 
+      {/* Circuito híbrido: fuerza en circuito con FC elevada (metadatos del planner) */}
+      {s.hybridCircuit ? (() => {
+        const hc = s.hybridCircuit;
+        const roundsMin = Number.isFinite(Number(hc.restBetweenRoundsSec)) ? Math.round(Number(hc.restBetweenRoundsSec) / 60) : null;
+        return (
+          <SectionCard title="Circuito híbrido" icon="heart" sub="Fuerza + cardio en la misma sesión">
+            <div className="stack" style={{ gap: 12 }}>
+              <div className="row ac wrap" style={{ gap: 8 }}>
+                {Number.isFinite(Number(hc.restBetweenExercisesSec)) ? (
+                  <span className="pill accent"><Icon name="clock" size={13} /> {hc.restBetweenExercisesSec} s entre ejercicios</span>
+                ) : null}
+                {roundsMin ? <span className="pill tiny">~{roundsMin} min entre vueltas</span> : null}
+              </div>
+              {hc.hrGuidance ? <p style={{ margin: 0, lineHeight: 1.5, fontWeight: 600 }}>{hc.hrGuidance}</p> : null}
+              {hc.note ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>{hc.note}</p> : null}
+            </div>
+          </SectionCard>
+        );
+      })() : null}
+
       {/* Lista de ejercicios con vídeo */}
       <SectionCard title="Ejercicios" icon="list" sub="Toca el vídeo para ver la técnica · marca cada serie al terminar"
         action={(
