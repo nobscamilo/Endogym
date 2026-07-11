@@ -765,9 +765,33 @@ export function buildHeuristicWorkoutAnalysis(digest) {
   return { session, progression, tips, warning: '' };
 }
 
+// Gemini con responseMimeType JSON a veces DOBLE-escapa los caracteres no ASCII dentro de
+// los valores del JSON ("El \\u00faltimo entreno"): tras JSON.parse queda el escape literal
+// "último" y la UI muestra eso en vez de "último". Decodifica esos escapes residuales
+// (y "\n" literales). Un texto legítimo en español no contiene secuencias \uXXXX.
+export function decodeUnicodeEscapes(value) {
+  if (typeof value !== 'string' || value.indexOf('\\') === -1) return value;
+  return value
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\n/g, '\n');
+}
+
+// Decodifica todos los strings de un informe YA GUARDADO (legacy) sin re-validar su shape
+// (un informe antiguo sin goalAlignment no debe volverse null al leerlo).
+export function decodeReportStrings(report) {
+  if (!report || typeof report !== 'object') return report;
+  const out = Array.isArray(report) ? [] : {};
+  for (const [key, value] of Object.entries(report)) {
+    if (typeof value === 'string') out[key] = decodeUnicodeEscapes(value);
+    else if (value && typeof value === 'object') out[key] = decodeReportStrings(value);
+    else out[key] = value;
+  }
+  return out;
+}
+
 export function sanitizeWorkoutAnalysis(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const str = (v, max) => (typeof v === 'string' ? decodeUnicodeEscapes(v).trim().slice(0, max) : '');
   const session = str(raw.session, 1200);
   const tips = (Array.isArray(raw.tips) ? raw.tips : []).map((t) => str(t, 300)).filter(Boolean).slice(0, 4);
   if (!session || !tips.length) return null;
@@ -776,7 +800,7 @@ export function sanitizeWorkoutAnalysis(raw) {
 
 export function sanitizeCoachReport(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const str = (v, max) => (typeof v === 'string' ? decodeUnicodeEscapes(v).trim().slice(0, max) : '');
   const lastSession = str(raw.lastSession, 1200);
   const history = str(raw.history, 1200);
   const goalAlignment = str(raw.goalAlignment, 1200);

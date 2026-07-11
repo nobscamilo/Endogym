@@ -13,6 +13,7 @@ import {
   buildCoachAnalysisDigest,
   buildCoachAnalysisPrompt,
   buildHeuristicCoachReport,
+  decodeReportStrings,
   sanitizeCoachReport,
 } from '../../../services/coachAnalysis.js';
 import {
@@ -44,7 +45,10 @@ export async function GET(request) {
       // También incluye una versión de contrato para invalidar informes legacy.
       const digest = await buildCoachAnalysisDigest(user.uid);
       const stale = digest.signature !== saved.signature;
-      return jsonResponse({ ok: true, report: saved.report, source: saved.source || 'ai', generatedAt: saved.updatedAt || null, stale });
+      // decodeReportStrings: los informes YA GUARDADOS con escapes \uXXXX literales (Gemini
+      // doble-escapó los acentos dentro del JSON) se decodifican en lectura, sin re-validar
+      // el shape (un informe legacy no debe volverse null).
+      return jsonResponse({ ok: true, report: decodeReportStrings(saved.report), source: saved.source || 'ai', generatedAt: saved.updatedAt || null, stale });
     } catch (error) {
       logError('coach_analysis_get_failed', error, { traceId, userId: user.uid });
       return jsonResponse({ ok: true, empty: true });

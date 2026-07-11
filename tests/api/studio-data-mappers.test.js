@@ -25,7 +25,7 @@ const { GET, mapGlycemic, mapLibrary, mapMacroEaten, mapProgress, mapTodaySessio
 
 const PLAN = {
   days: [
-    { date: '2026-06-17', dayName: 'Miércoles', isTrainingDay: true, sessionType: 'resistance', sessionFocus: 'upper', workout: { title: 'Gym · Torso', durationMinutes: 75, intensityRpe: 'RPE 7-8', exercises: [{ id: 'bench', name: 'Press banca', prescription: { loadKg: 40, sets: 3, reps: 8 } }] } },
+    { date: '2026-06-17', dayName: 'Miércoles', isTrainingDay: true, sessionType: 'resistance', sessionFocus: 'upper', workout: { title: 'Gym · Torso', durationMinutes: 75, intensityRpe: 'RPE 7-8', exercises: [{ id: 'bench', name: 'Press banca', prescription: { loadKg: 40, sets: 3, reps: 8, restSeconds: 90 } }] } },
     { date: '2026-06-19', dayName: 'Viernes', isTrainingDay: false, sessionType: 'recovery', sessionFocus: 'recovery', workout: { title: 'Recuperación activa', durationMinutes: 30, exercises: [{ name: 'Movilidad' }] } },
     { date: '2026-06-20', dayName: 'Sábado', isTrainingDay: true, sessionType: 'aerobic', sessionFocus: 'long_run', workout: { title: 'Tirada larga', durationMinutes: 65, exercises: [{ name: 'Carrera continua' }] } },
   ],
@@ -43,6 +43,13 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
     const out = mapTodaySession(PLAN, '2026-06-17');
     expect(out.title).toBe('Gym · Torso');
     expect(out.isRestDay).toBe(false);
+  });
+
+  it('expone el descanso prescrito por ejercicio (restSec) y lo omite si no existe', () => {
+    const out = mapTodaySession(PLAN, '2026-06-17');
+    expect(out.list[0].restSec).toBe(90);
+    const noRest = { days: [{ ...PLAN.days[0], workout: { ...PLAN.days[0].workout, exercises: [{ id: 'x', name: 'X', prescription: { loadKg: 20, sets: 3, reps: 8, restSeconds: null } }] } }] };
+    expect(mapTodaySession(noRest, '2026-06-17').list[0].restSec).toBeUndefined();
   });
 
   it('modo exact (registro retroactivo) sigue exigiendo día de entreno → null en recuperación', () => {

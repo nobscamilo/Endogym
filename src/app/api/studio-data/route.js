@@ -389,6 +389,11 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
     if (e.prescription?.loadKg != null) item.loadKg = e.prescription.loadKg;
     if (e.prescription?.sets != null) item.sets = e.prescription.sets;
     if (e.prescription?.reps != null) item.reps = e.prescription.reps;
+    // Descanso prescrito entre series: dato clave que antes no llegaba a la UI.
+    // (guard != null primero: Number(null) === 0 y pasaría isFinite)
+    if (e.prescription?.restSeconds != null && Number.isFinite(Number(e.prescription.restSeconds))) {
+      item.restSec = Number(e.prescription.restSeconds);
+    }
     if (e.prescription?.loadSource) item.loadSource = e.prescription.loadSource;
     return item;
   });

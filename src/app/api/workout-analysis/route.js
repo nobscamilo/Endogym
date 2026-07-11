@@ -12,6 +12,7 @@ import {
   buildWorkoutAnalysisDigest,
   buildWorkoutAnalysisPrompt,
   buildHeuristicWorkoutAnalysis,
+  decodeReportStrings,
   sanitizeWorkoutAnalysis,
 } from '../../../services/coachAnalysis.js';
 import {
@@ -48,7 +49,9 @@ export async function POST(request) {
       // Caché primero: no consume rate limit ni IA.
       const cached = await getWorkoutAnalysis(user.uid, workoutId);
       if (cached?.analysis) {
-        return jsonResponse({ ok: true, analysis: cached.analysis, source: cached.source || 'ai', cached: true });
+        // decodeReportStrings: análisis YA GUARDADOS con escapes \uXXXX literales (Gemini
+        // doble-escapó acentos dentro del JSON) se decodifican en lectura.
+        return jsonResponse({ ok: true, analysis: decodeReportStrings(cached.analysis), source: cached.source || 'ai', cached: true });
       }
 
       const rateLimit = await enforceUserRateLimit({

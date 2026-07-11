@@ -12,6 +12,7 @@ import {
   buildWorkoutAnalysisPrompt,
   buildHeuristicWorkoutAnalysis,
   sanitizeWorkoutAnalysis,
+  decodeReportStrings,
   epley1Rm,
   buildLiftProgression,
   describeLiftProgression,
@@ -281,6 +282,32 @@ describe('coachAnalysis service', () => {
     expect(rep.goalAlignment).toBe('alineado con la meta');
     expect(rep.adjustments).toEqual(['a', 'b', 'c', 'd', 'e']);
     expect(rep.warning).toBe('w');
+  });
+
+  it('sanitizeCoachReport: decodifica escapes \\uXXXX literales que Gemini doble-escapa (tildes rotas)', () => {
+    const rep = sanitizeCoachReport({
+      lastSession: 'El \\u00faltimo entreno fue s\\u00f3lido',
+      history: 'Progresi\\u00f3n estable',
+      goalAlignment: 'En l\\u00ednea con tu meta',
+      adjustments: ['Sube 2,5 kg la pr\\u00f3xima semana'],
+      warning: '',
+    });
+    expect(rep.lastSession).toBe('El último entreno fue sólido');
+    expect(rep.history).toBe('Progresión estable');
+    expect(rep.goalAlignment).toBe('En línea con tu meta');
+    expect(rep.adjustments[0]).toBe('Sube 2,5 kg la próxima semana');
+  });
+
+  it('decodeReportStrings: decodifica informes guardados legacy sin re-validar el shape', () => {
+    const legacy = { lastSession: 'El \\u00faltimo entreno', adjustments: ['ajuste con acci\\u00f3n'], nested: { note: 'ma\\u00f1ana' } };
+    const out = decodeReportStrings(legacy);
+    expect(out.lastSession).toBe('El último entreno');
+    expect(out.adjustments[0]).toBe('ajuste con acción');
+    expect(out.nested.note).toBe('mañana');
+    // Un informe legacy sin goalAlignment NO se vuelve null (a diferencia de sanitize).
+    expect(out.goalAlignment).toBeUndefined();
+    // Texto sano pasa intacto.
+    expect(decodeReportStrings({ a: 'ya está bien' }).a).toBe('ya está bien');
   });
 
   it.each([

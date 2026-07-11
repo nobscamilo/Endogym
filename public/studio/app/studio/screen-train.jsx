@@ -221,6 +221,126 @@ function sessionFocusLabel(value) {
 }
 
 /* ---------- SESIÓN ---------- */
+/* ---- Sesión GUIADA real: avance ejercicio a ejercicio con temporizador de descanso ----
+   Modo estándar: por ejercicio, serie a serie, descansando `restSec` (o 75 s) entre series.
+   Modo circuito (hybridCircuit): recorre los ejercicios por VUELTAS — descanso corto entre
+   ejercicios (25 s) y largo entre vueltas (120 s), como prescribe el planner. */
+function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinishAll, onClose }) {
+  const circuit = Boolean(hybridCircuit);
+  const exercises = Array.isArray(list) ? list : [];
+  const restBetweenEx = Number(hybridCircuit?.restBetweenExercisesSec) || 25;
+  const restBetweenRounds = Number(hybridCircuit?.restBetweenRoundsSec) || 120;
+  const rounds = circuit ? Math.max(1, ...exercises.map((e) => Number(e.sets) || 3)) : 1;
+  const [st, setSt] = React.useState({ phase: 'work', exIdx: 0, setNum: 1, round: 1, restLeft: 0, restTotal: 0, next: null });
+
+  // Temporizador de descanso: 1 tick/segundo; al llegar a 0 avanza a la fase preparada en `next`.
+  React.useEffect(() => {
+    if (st.phase !== 'rest') return undefined;
+    const t = setInterval(() => {
+      setSt((p) => {
+        if (p.phase !== 'rest') return p;
+        if (p.restLeft <= 1) {
+          try { if (navigator.vibrate) navigator.vibrate(250); } catch (e) { /* noop */ }
+          return { ...p, ...(p.next || {}), phase: 'work', restLeft: 0, restTotal: 0, next: null };
+        }
+        return { ...p, restLeft: p.restLeft - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [st.phase]);
+
+  if (!exercises.length) return null;
+  const ex = exercises[Math.min(st.exIdx, exercises.length - 1)];
+  const exSets = Number(ex.sets) || 3;
+  const isLastEx = st.exIdx >= exercises.length - 1;
+
+  const startRest = (seconds, next) => setSt((p) => ({ ...p, phase: 'rest', restLeft: seconds, restTotal: seconds, next }));
+
+  function completeWork() {
+    if (circuit) {
+      if (!isLastEx) { startRest(restBetweenEx, { exIdx: st.exIdx + 1 }); return; }
+      if (st.round < rounds) { startRest(restBetweenRounds, { exIdx: 0, round: st.round + 1 }); return; }
+      onFinishAll(); setSt((p) => ({ ...p, phase: 'done' })); return;
+    }
+    const restSec = Number(ex.restSec) || 75;
+    if (st.setNum < exSets) { startRest(restSec, { setNum: st.setNum + 1 }); return; }
+    onExerciseDone(st.exIdx);
+    if (!isLastEx) { startRest(restSec, { exIdx: st.exIdx + 1, setNum: 1 }); return; }
+    setSt((p) => ({ ...p, phase: 'done' }));
+  }
+
+  const nextEx = st.phase === 'rest' && st.next
+    ? exercises[Math.min(st.next.exIdx ?? st.exIdx, exercises.length - 1)]
+    : null;
+  const progressLabel = circuit
+    ? `Vuelta ${st.round}/${rounds} · Ejercicio ${st.exIdx + 1}/${exercises.length}`
+    : `Ejercicio ${st.exIdx + 1}/${exercises.length} · Serie ${st.setNum}/${exSets}`;
+  const restPct = st.restTotal ? Math.round(((st.restTotal - st.restLeft) / st.restTotal) * 100) : 0;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', overflowY: 'auto', padding: '18px 16px calc(24px + env(safe-area-inset-bottom))' }}>
+      <div style={{ maxWidth: 560, margin: '0 auto' }} className="stack">
+        <div className="row ac between">
+          <div>
+            <p className="eyebrow" style={{ margin: 0 }}>{circuit ? 'Circuito híbrido guiado' : 'Sesión guiada'}</p>
+            <strong className="tiny">{progressLabel}</strong>
+          </div>
+          <button className="btn ghost sm" onClick={onClose}><Icon name="close" size={15} /> Salir</button>
+        </div>
+
+        {st.phase === 'done' ? (
+          <div className="card lg" style={{ textAlign: 'center' }}>
+            <Icon name="check" size={34} />
+            <h3 style={{ margin: '10px 0 4px' }}>¡Sesión completada!</h3>
+            <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5 }}>Todos los ejercicios quedaron marcados. Cierra y registra abajo el RPE y las cargas reales para que el coach ajuste tu progresión.</p>
+            <button className="btn" style={{ marginTop: 14 }} onClick={onClose}><Icon name="check" size={15} /> Cerrar y registrar</button>
+          </div>
+        ) : st.phase === 'rest' ? (
+          <div className="card lg" style={{ textAlign: 'center' }}>
+            <p className="eyebrow" style={{ margin: 0 }}>Descanso</p>
+            <div className="num" style={{ fontSize: '3.4rem', fontWeight: 800, lineHeight: 1.15 }}>{st.restLeft}<span style={{ fontSize: '1.1rem', fontWeight: 700 }}> s</span></div>
+            <div className="bar" style={{ margin: '10px 0 14px' }}><i style={{ width: `${restPct}%` }} /></div>
+            {nextEx ? <p style={{ margin: '0 0 12px', lineHeight: 1.4 }}>Siguiente: <strong>{nextEx.name}</strong>{circuit ? '' : (st.next?.setNum ? ` · serie ${st.next.setNum}` : '')}</p> : null}
+            <div className="row ac wrap" style={{ gap: 8, justifyContent: 'center' }}>
+              <button className="btn ghost sm" onClick={() => setSt((p) => ({ ...p, restLeft: p.restLeft + 15, restTotal: p.restTotal + 15 }))}><Icon name="plus" size={14} /> +15 s</button>
+              <button className="btn sm" onClick={() => setSt((p) => ({ ...p, ...(p.next || {}), phase: 'work', restLeft: 0, restTotal: 0, next: null }))}><Icon name="bolt" size={14} /> Saltar descanso</button>
+            </div>
+            {circuit && st.next && st.next.round ? <p className="tiny muted" style={{ margin: '10px 0 0' }}>Fin de la vuelta {st.round}: descanso largo antes de la vuelta {st.next.round}.</p> : null}
+          </div>
+        ) : (
+          <div className="card lg">
+            <p className="eyebrow" style={{ margin: 0 }}>{ex.muscle || ex.tag || 'Ejercicio'}</p>
+            <h3 style={{ margin: '4px 0 8px', fontSize: '1.5rem' }}>{ex.name}</h3>
+            <div className="row ac wrap" style={{ gap: 8 }}>
+              {ex.scheme ? <span className="pill accent">{circuit ? `${ex.reps || ex.scheme} reps` : ex.scheme}</span> : null}
+              {ex.loadKg != null ? <span className="pill tiny">{ex.loadKg} kg</span> : null}
+              {circuit ? <span className="pill tiny"><Icon name="clock" size={12} /> {restBetweenEx} s tras el ejercicio</span>
+                : (ex.restSec != null ? <span className="pill tiny"><Icon name="clock" size={12} /> descanso {ex.restSec} s</span> : null)}
+            </div>
+            {Array.isArray(ex.cues) && ex.cues.length ? (
+              <ul className="step-list" style={{ margin: '12px 0 0' }}>
+                {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            ) : null}
+            <div className="row ac wrap" style={{ gap: 8, marginTop: 16 }}>
+              <button className="btn" style={{ flex: '1 1 auto', justifyContent: 'center' }} onClick={completeWork}>
+                <Icon name="check" size={16} /> {circuit ? (isLastEx && st.round >= rounds ? 'Terminar circuito' : 'Hecho · siguiente') : (st.setNum < exSets ? `Serie ${st.setNum} hecha` : (isLastEx ? 'Terminar sesión' : 'Última serie hecha'))}
+              </button>
+              {(ex.yt || ex.videoUrl) ? (
+                <button className="btn ghost sm" onClick={() => openVideo(ex)}><Icon name="play" size={14} /> Técnica</button>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {circuit && hybridCircuit.hrGuidance && st.phase !== 'done' ? (
+          <p className="tiny muted" style={{ margin: 0, lineHeight: 1.5, textAlign: 'center' }}>{hybridCircuit.hrGuidance}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function TrainSession() {
   const D = window.STUDIO;
   const s = D.todaySession;
@@ -268,6 +388,8 @@ function TrainSession() {
   const [loggedLocal, setLoggedLocal] = useStateTr(Boolean(s.logged));
   const [loggedSummary, setLoggedSummary] = useStateTr(s.loggedSummary || null);
   const [editingLog, setEditingLog] = useStateTr(false);
+  // Sesión guiada real (overlay con temporizador). Estado efímero: no persiste entre pestañas.
+  const [guidedOn, setGuidedOn] = React.useState(false);
   const done = list.filter((x) => x.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const toggle = (i) => setList((p) => p.map((x, idx) => idx === i ? { ...x, done: !x.done } : x));
@@ -497,6 +619,18 @@ function TrainSession() {
   const selectedReschedule = Boolean(selectedFocusOpt && !selectedFocusOpt.current && selectedFocusOpt.available === false && selectedFocusOpt.canReschedule);
   return (
     <React.Fragment>
+      {/* Sesión guiada real: overlay con temporizador de descanso (estándar o circuito) */}
+      {guidedOn && Array.isArray(list) && list.length ? (
+        <GuidedSession
+          list={list}
+          hybridCircuit={s.hybridCircuit || null}
+          openVideo={(ex) => open(ex, null)}
+          onExerciseDone={(i) => setList((p) => p.map((x, idx) => (idx === i ? { ...x, done: true } : x)))}
+          onFinishAll={() => setList((p) => p.map((x) => ({ ...x, done: true })))}
+          onClose={() => setGuidedOn(false)}
+        />
+      ) : null}
+
       {/* Ajuste del coach: por qué cambió la carga (FC, fatiga, adherencia…) */}
       {adjustVisible ? (
         <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}>
@@ -521,7 +655,7 @@ function TrainSession() {
           <div className="row ac wrap" style={{ gap: 8 }}>
             {Array.isArray(s.list) && s.list.length ? (
               <button className="btn" style={{ background: '#fff', color: 'var(--accent-deep)', boxShadow: 'none', whiteSpace: 'nowrap' }}
-                onClick={() => open(s.list[0], null)}><Icon name="play" size={17} /> Iniciar guiada</button>
+                onClick={() => setGuidedOn(true)}><Icon name="play" size={17} /> Iniciar guiada</button>
             ) : null}
             {/* FASE 3.1 — registro con UN TAP: crea el workout con los valores PRESCRITOS
                 (kg/reps/duración del plan vigente); abajo solo se editan desviaciones. */}
@@ -693,7 +827,7 @@ function TrainSession() {
               </button>
               <div className="ex-main" onClick={() => open(ex, null)} style={{ cursor: 'pointer' }}>
                 <strong>{ex.name}</strong>
-                <div className="ex-sub">{ex.muscle} · {ex.load}</div>
+                <div className="ex-sub">{ex.muscle} · {ex.load}{ex.restSec != null ? ` · descanso ${ex.restSec} s` : ''}</div>
               </div>
               <div className="ex-sets">
                 <span className="ex-scheme">{ex.scheme}</span>
