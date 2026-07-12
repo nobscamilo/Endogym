@@ -5,7 +5,7 @@ import { withTrace, logError, logInfo } from '../../../lib/logger.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
-import { currentWeekKey as currentAppWeekKey } from '../../../lib/appTime.js';
+import { currentWeekKey as currentAppWeekKey, addDaysToDateKey } from '../../../lib/appTime.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -218,11 +218,23 @@ export async function POST(request) {
 
     // Contexto de entrenamiento por día (para "fuel for the work required"): tipo de sesión,
     // nivel de carbohidratos, timing y objetivos de macros específicos de cada día.
+    //
+    // BUG corregido (12 jul 2026): antes se recorrían TODOS los días del bloque (21) indexando
+    // por dayName — cada día de la semana aparece 3 veces y ganaba la ÚLTIMA ocurrencia, así que
+    // la dieta se contextualizaba con sesiones de OTRA semana del bloque. Peor aún: con un bloque
+    // VENCIDO (p. ej. terminó el 10 jul y hoy es 12), la dieta "semanal" se generaba con las
+    // sesiones y fechas del bloque viejo. Ahora: SOLO los días del bloque cuya fecha cae en la
+    // semana civil ACTUAL (lunes→domingo, Europe/Madrid); si el bloque no cubre la semana (plan
+    // vencido), dayCtx queda vacío → objetivos genéricos del perfil y aviso en meta.
     const RACE_LABELS = { health: 'salud/forma', race_5k: '5K', race_10k: '10K', race_21k: 'media maratón', race_42k: 'maratón' };
     const DOW_FULL = { lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', miercoles: 'Mié', jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', sabado: 'Sáb', domingo: 'Dom' };
+    const weekStartKey = currentWeekKey();
+    const weekEndKey = addDaysToDateKey(weekStartKey, 6);
     const dayCtx = {};
     if (Array.isArray(plan?.days)) {
       for (const d of plan.days) {
+        const date = String(d.date || '');
+        if (date < weekStartKey || date > weekEndKey) continue; // fuera de la semana actual
         const key = DOW_FULL[String(d.dayName || '').toLowerCase()];
         if (!key) continue;
         const nt = d.nutritionTarget || {};
@@ -237,6 +249,12 @@ export async function POST(request) {
           fat: Math.round(Number(nt.fatGrams) || t.fat),
         };
       }
+    }
+    // Plan de entrenamiento vencido (no cubre la semana actual): la dieta se genera con los
+    // objetivos base del perfil y se avisa para que el usuario regenere su bloque.
+    const trainingPlanCoversWeek = Object.keys(dayCtx).length > 0;
+    if (!trainingPlanCoversWeek && Array.isArray(plan?.days) && plan.days.length) {
+      logInfo('studio_nutrition_stale_training_plan', { traceId, userId: user.uid, planEnd: plan.days[plan.days.length - 1]?.date || null, weekStartKey });
     }
     const raceLabel = RACE_LABELS[plan?.raceGoal] || null;
     const phaseLabel = plan?.phaseLabel || null;
@@ -544,6 +562,9 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
           planId: plan?.id || null,
           planSignature: planNutritionSignature(plan),
           generatedAt: new Date().toISOString(),
+          // true si la dieta se generó SIN contexto de entrenamiento por día porque el bloque
+          // de entrenamiento no cubre la semana actual (vencido): la UI debe sugerir regenerar.
+          staleTrainingPlan: !trainingPlanCoversWeek,
         },
       };
       if (days.length >= 7) {

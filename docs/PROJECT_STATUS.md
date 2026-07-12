@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **12 de julio de 2026 (RAG solución de fondo: bibliografía etiquetada en los DATOS)**.
+Ultima actualizacion: **12 de julio de 2026 (FIX: la dieta semanal se generaba con el bloque de entrenamiento vencido)**.
+
+## Sesión del 12 de julio de 2026, parte 3 (BUG "hoy es 10 de julio" en nutrición: dieta generada con bloque vencido)
+
+Reporte del usuario: el generador de nutrición "afirma que hoy es 10 de julio" siendo 12. Sonda contra Firestore real (`scratch/nutrition-date-probe.mjs`, solo lectura): la cuenta afectada tiene su **bloque de entrenamiento VENCIDO — terminó exactamente el 2026-07-10** (20 jun → 10 jul) — y `studio-nutrition` lo usaba igualmente. **392 tests verdes** (+3), `build:studio` → `b5f7bd22fd`.
+
+- **Causa raíz doble en `studio-nutrition` (`dayCtx`):** (1) recorría TODOS los días del bloque de 21 indexando por `dayName` — cada día de la semana aparece 3 veces y ganaba la ÚLTIMA ocurrencia (contexto de la semana 3, no de la actual); (2) con bloque VENCIDO, la dieta "semanal" se contextualizaba con sesiones y fechas del bloque viejo (de ahí que el generador "viviera" en la semana que terminó el 10 de julio).
+- **FIX:** `dayCtx` solo admite días del bloque cuya `date` cae en la semana civil ACTUAL (lunes→domingo, `currentWeekKey`/`addDaysToDateKey`). Si el bloque no cubre la semana → `dayCtx` vacío → objetivos base del perfil + `meta.staleTrainingPlan: true` + log `studio_nutrition_stale_training_plan`.
+- **FIX 2 (`studio-data.mapMacroTargets`, ahora exportada):** con bloque vencido caía a `days[0]` — mostraba los macros del PRIMER día del bloque viejo (p. ej. 20 de junio) como los de hoy. Ahora: día exacto o `baseTarget` (sin fecha, honesto).
+- **UI (`screen-nutrition.jsx`):** banner "Tu bloque de entrenamiento terminó" cuando `meta.staleTrainingPlan` — explica que la dieta usa objetivos base y pide regenerar el plan en Entreno.
+- **Tests (+3):** bloque de 21 días → el prompt usa la sesión/kcal de ESTA semana (no la última ocurrencia); bloque vencido → `staleTrainingPlan: true` y prompt sin sesiones del bloque viejo; `mapMacroTargets` vencido → `baseTarget`. El fixture `weeklyPlan()` ahora lleva fechas reales de la semana en curso.
+- **Acción pendiente del USUARIO:** su bloque real venció el 10 jul — debe regenerar el plan de entrenamiento (Entreno) y volver a generar la dieta. **Deuda de producto anotada:** los bloques caducan en silencio; valorar auto-regeneración (o aviso más agresivo) al expirar — decisión de producto, no se implementó.
 
 ## Sesión del 12 de julio de 2026, parte 2 (RAG: solución de fondo — etiquetado en datos e ingesta)
 

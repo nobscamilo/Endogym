@@ -21,7 +21,7 @@ vi.mock('../../src/lib/logger.js', () => ({
   logInfo: vi.fn(),
 }));
 
-const { GET, mapGlycemic, mapLibrary, mapMacroEaten, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
+const { GET, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
 
 const PLAN = {
   days: [
@@ -105,6 +105,19 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
 
   it('fuera de las fechas del bloque devuelve null en vez de reciclar el primer entreno', () => {
     expect(mapTodaySession(PLAN, '2026-07-01')).toBeNull();
+  });
+
+  it('mapMacroTargets: con bloque VENCIDO no recicla los macros del primer día — cae a baseTarget', () => {
+    const plan = {
+      baseTarget: { targetCalories: 2200, proteinGrams: 150, carbsGrams: 210, fatGrams: 70 },
+      days: [{ date: '2026-06-20', nutritionTarget: { calories: 1500, proteinGrams: 90, carbsGrams: 120, fatGrams: 50 } }],
+    };
+    // Hoy NO está en el bloque → antes devolvía los 1500 kcal del 20 de junio como si fueran de hoy.
+    const out = mapMacroTargets(plan, '2026-07-12');
+    expect(out.kcal).toBe(2200);
+    expect(out.protein).toBe(150);
+    // Con el día exacto sí usa el target diario.
+    expect(mapMacroTargets(plan, '2026-06-20').kcal).toBe(1500);
   });
 
   it('reemplaza el vídeo persistido obsoleto por la asociación curada actual', () => {

@@ -310,6 +310,8 @@ function NutritionScreen({ layout }) {
     }
     if (Array.isArray(n.shopping) && n.shopping.length) D.shopping = n.shopping.map((c) => ({ icon: '🛒', ...c }));
     if (Array.isArray(n.batch) && n.batch.length) D.batch = n.batch.map((b) => ({ emoji: '🍳', ...b }));
+    // La dieta se generó sin contexto de entrenamiento por día (bloque vencido): avisar.
+    D.nutritionStaleTraining = Boolean(n.meta?.staleTrainingPlan);
     setGen((g) => g + 1);
     return true;
   }
@@ -380,7 +382,14 @@ function NutritionScreen({ layout }) {
           <div className="empty">{genStatus === 'loading' || genStatus === 'idle' ? 'Cargando tu plan real…' : genStatus === 'err' ? 'No pudimos cargar ni generar tu plan. No mostraremos un menú de muestra.' : 'Aún no hay un plan nutricional guardado.'}</div>
           <AddFood />
         </SectionCard>
-      ) : <React.Fragment><div className="day-rail">
+      ) : <React.Fragment>
+      {D.nutritionStaleTraining ? (
+        <div className="card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}>
+          <strong style={{ fontSize: '0.9rem' }}>Tu bloque de entrenamiento terminó</strong>
+          <p className="tiny" style={{ margin: '4px 0 0', lineHeight: 1.5 }}>Esta dieta usa tus objetivos base (sin el ajuste de carbohidratos por sesión). Regenera tu plan en Entreno y vuelve a generar la dieta para sincronizarla con tus entrenos de esta semana.</p>
+        </div>
+      ) : null}
+      <div className="day-rail">
         {D.nutritionDays.map((d, i) => (
           <button key={i} className={`day-pill ${dayIdx === i ? 'active' : ''}`} onClick={() => showDay(i)}>
             <div className="dp-day">{d.day}</div>

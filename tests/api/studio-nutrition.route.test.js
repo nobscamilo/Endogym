@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentWeekKey, addDaysToDateKey } from '../../src/lib/appTime.js';
 
 const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
@@ -114,12 +115,16 @@ function enqueueGeminiChunks(chunks) {
   });
 }
 
-function weeklyPlan() {
+// Fixture con FECHAS de la semana civil actual: el dayCtx de la ruta solo usa los días del
+// bloque cuya fecha cae en la semana en curso (fix del 12 jul 2026).
+function weeklyPlan({ weekOffsetDays = 0 } = {}) {
+  const monday = currentWeekKey();
   return {
     baseTarget: { targetCalories: 1000, proteinGrams: 100, carbsGrams: 100, fatGrams: 40 },
     raceGoal: 'health',
     phaseLabel: 'Base',
-    days: DAY_NAMES.map(([dayName]) => ({
+    days: DAY_NAMES.map(([dayName], i) => ({
+      date: addDaysToDateKey(monday, i + weekOffsetDays),
       dayName,
       sessionType: 'resistance',
       workout: { title: 'Fuerza' },
@@ -195,6 +200,59 @@ describe('/api/studio-nutrition route', () => {
       userId: 'user-1',
       targetedChunks: [0],
     }));
+  });
+
+  it('dayCtx usa SOLO la semana civil actual: en un bloque de 21 días, la sesión del prompt es la de ESTA semana (no la última ocurrencia)', async () => {
+    // Bloque de 21 días: esta semana "Fuerza actual" 1000 kcal; las semanas 2-3 tienen otra
+    // sesión y 2000 kcal. Antes ganaba la ÚLTIMA ocurrencia (semana 3).
+    const monday = currentWeekKey();
+    const block = {
+      baseTarget: { targetCalories: 1000, proteinGrams: 100, carbsGrams: 100, fatGrams: 40 },
+      days: [0, 1, 2].flatMap((week) => DAY_NAMES.map(([dayName], i) => ({
+        date: addDaysToDateKey(monday, week * 7 + i),
+        dayName,
+        sessionType: 'resistance',
+        workout: { title: week === 0 ? 'Fuerza actual' : 'Fuerza futura' },
+        nutritionTarget: { calories: week === 0 ? 1000 : 2000, proteinGrams: 100, carbsGrams: 100, fatGrams: 40, carbLevel: 'medio' },
+      }))),
+    };
+    mocks.getLatestWeeklyPlan.mockResolvedValue(block);
+    enqueueGeminiChunks([
+      chunk(['Lun', 'Mar'], 1000, 100),
+      chunk(['Mié', 'Jue'], 1000, 100),
+      chunk(['Vie', 'Sáb'], 1000, 100),
+      chunk(['Dom'], 1000, 100),
+      consolidationChunk(),
+    ]);
+
+    const response = await POST(new Request('http://localhost/api/studio-nutrition', { method: 'POST', body: JSON.stringify({}) }));
+    const json = await readJson(response);
+    expect(response.status).toBe(200);
+    expect(json.nutrition.meta.staleTrainingPlan).toBe(false);
+    const prompts = mocks.requestGoogleGenerateContent.mock.calls.map((c) => c[0].parts[0].text).join('\n');
+    expect(prompts).toContain('Fuerza actual');
+    expect(prompts).not.toContain('Fuerza futura');
+    expect(prompts).not.toContain('2000 kcal');
+  });
+
+  it('bloque VENCIDO (no cubre la semana actual): dieta con objetivos base + meta.staleTrainingPlan=true', async () => {
+    // Bloque que terminó la semana pasada (como el bug real: "dice que hoy es 10 de julio").
+    mocks.getLatestWeeklyPlan.mockResolvedValue(weeklyPlan({ weekOffsetDays: -21 }));
+    enqueueGeminiChunks([
+      chunk(['Lun', 'Mar'], 1000, 100),
+      chunk(['Mié', 'Jue'], 1000, 100),
+      chunk(['Vie', 'Sáb'], 1000, 100),
+      chunk(['Dom'], 1000, 100),
+      consolidationChunk(),
+    ]);
+
+    const response = await POST(new Request('http://localhost/api/studio-nutrition', { method: 'POST', body: JSON.stringify({}) }));
+    const json = await readJson(response);
+    expect(response.status).toBe(200);
+    expect(json.nutrition.meta.staleTrainingPlan).toBe(true);
+    // El prompt no debe citar sesiones del bloque viejo: cae a objetivos genéricos.
+    const prompts = mocks.requestGoogleGenerateContent.mock.calls.map((c) => c[0].parts[0].text).join('\n');
+    expect(prompts).not.toContain('sesión "Fuerza"');
   });
 
   it('tolerancias flexibilizadas: un día al 92% de kcal (drift con el antiguo ±7%) ya NO dispara reintento', async () => {

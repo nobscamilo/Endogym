@@ -589,10 +589,13 @@ export function mapLibrary(plan) {
   return lib.length ? lib : null;
 }
 
-function mapMacroTargets(plan, today) {
+export function mapMacroTargets(plan, today) {
   const days = plan?.days;
+  // Solo el día EXACTO de hoy: caer a days[0] mostraba los macros del PRIMER día de un
+  // bloque vencido (p. ej. del 20 de junio) como si fueran los de hoy. Sin día exacto,
+  // baseTarget (objetivo del perfil, sin fecha) es lo honesto.
   const dayTarget = Array.isArray(days)
-    ? (days.find((d) => d.date === today) || days[0])?.nutritionTarget
+    ? days.find((d) => d.date === today)?.nutritionTarget
     : null;
   const t = dayTarget || plan?.baseTarget;
   if (!t) return null;
