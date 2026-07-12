@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { retrieveGuidelinesContext, retrieveGuidelinesContextWithCitations } from '../../src/services/guidelinesRetriever.js';
+import {
+  retrieveGuidelinesContext,
+  retrieveGuidelinesContextWithCitations,
+  referenceScore,
+  isBibliographyPassage,
+} from '../../src/services/guidelinesRetriever.js';
 import { getAdminServices } from '../../src/lib/firebaseAdmin.js';
 import { requestGoogleEmbeddings } from '../../src/services/googleGenAiTransport.js';
 
@@ -370,5 +375,78 @@ describe('guidelines RAG retriever', () => {
     expect(mockDb.doc).toHaveBeenCalledWith('1');
     expect(context).toContain('ACSM_Guidelines.pdf');
     expect(context).toContain('Circuit training');
+  });
+
+  // --------------------------------------------------------------------------
+  // Filtro de BIBLIOGRAFÍA (calibrado contra Firestore real) y MULTI-QUERY híbrido.
+  // --------------------------------------------------------------------------
+  it('referenceScore/isBibliographyPassage: distingue contenido prescriptivo de listas de referencias', () => {
+    const prescriptive = 'Perform multiple-joint exercises involving the major muscle groups; 1 set of 10-15 repetitions '
+      + 'at a moderate intensity keeps heart rate elevated during circuit training. Rest 15-30 s between stations.';
+    const bibliography = 'Cheung K, Hume PA, Maxwell L. Delayed Onset Muscle Soreness. Sports Med. 2003;33(2):145-164. '
+      + 'https://doi.org/10.2165/00007256. 90. Deschenes MR. Effects of aging. Med Sci Sports Exerc. 2010;42(3):413-421. [CrossRef]';
+    expect(isBibliographyPassage(prescriptive)).toBe(false);
+    expect(isBibliographyPassage(bibliography)).toBe(true);
+    expect(referenceScore(bibliography)).toBeGreaterThan(referenceScore(prescriptive));
+    // Texto muy corto no se clasifica como bibliografía (evita falsos positivos por ruido).
+    expect(isBibliographyPassage('Rest 60 s.')).toBe(false);
+  });
+
+  it('descarta pasajes de bibliografía en la recuperación vectorial y conserva el contenido real', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    const docs = [
+      { id: 'ref1', data: () => ({ parentId: 'dR', fileName: 'Paper.pdf', pageStart: 8, pageEnd: 9, _distance: 0.10,
+        text: 'Nunes, J. P., Schoenfeld, B. J. 2020. https://doi.org/10.1111/bjhp.12282. 90. Deschenes MR. Sports Med. 2010;42(3):413-421. [CrossRef] [PubMed] et al.' }) },
+      { id: 'good1', data: () => ({ parentId: 'dG', fileName: 'Therapeutic Exercise.pdf', pageStart: 21, pageEnd: 21, _distance: 0.12,
+        text: 'Perform multiple-joint exercises involving the major muscle groups; 1 set of 10-15 repetitions at moderate intensity for circuit training.' }) },
+    ];
+    const vectorQuery = { get: vi.fn().mockResolvedValue({ empty: false, size: 2, docs }) };
+    getAdminServices.mockResolvedValue({ db: { collection: vi.fn().mockReturnValue({ findNearest: vi.fn().mockReturnValue(vectorQuery) }) } });
+
+    const { contextText, citations } = await retrieveGuidelinesContextWithCitations({
+      profile: { age: 30 },
+      weeklyPlan: { goal: 'hypertrophy', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+    expect(contextText).toContain('Therapeutic Exercise.pdf');
+    expect(contextText).toContain('multiple-joint exercises');
+    // La bibliografía no entra al contexto ni a las citas.
+    expect(contextText).not.toContain('Paper.pdf');
+    expect(citations.map((c) => c.fileName)).not.toContain('Paper.pdf');
+  });
+
+  it('MULTI-QUERY: el weekly-plan híbrido lanza sub-consultas de fuerza/cardio/concurrente además de la principal', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    const docs = [{ id: 'g', data: () => ({ parentId: 'd', fileName: 'ACSM.pdf', pageStart: 1, pageEnd: 1, _distance: 0.2, text: 'Circuit training prescription with short rest and elevated heart rate.' }) }];
+    getAdminServices.mockResolvedValue({ db: { collection: vi.fn().mockReturnValue({ findNearest: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue({ empty: false, size: 1, docs }) }) }) } });
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33 },
+      weeklyPlan: { goal: 'recomposition', trainingModality: 'mixed', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+    // 1 query principal + 3 sub-consultas de dominio = 4 embeddings.
+    expect(requestGoogleEmbeddings).toHaveBeenCalledTimes(4);
+    const allTexts = requestGoogleEmbeddings.mock.calls.map((c) => c[0].texts[0]).join(' ');
+    expect(allTexts).toMatch(/circuit resistance training|fuerza en circuito/i);
+    expect(allTexts).toMatch(/HIIT|intervalos/i);
+    expect(allTexts).toMatch(/concurrente|interferencia/i);
+  });
+
+  it('MULTI-QUERY: el CHAT NO multiplica embeddings (una sola query aunque la pregunta sea híbrida)', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    const docs = [{ id: 'g', data: () => ({ parentId: 'd', fileName: 'ACSM.pdf', pageStart: 1, pageEnd: 1, _distance: 0.2, text: 'Circuit training prescription content.' }) }];
+    getAdminServices.mockResolvedValue({ db: { collection: vi.fn().mockReturnValue({ findNearest: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue({ empty: false, size: 1, docs }) }) }) } });
+
+    await retrieveGuidelinesContext({
+      profile: { age: 33, trainingModality: 'mixed' },
+      weeklyPlan: { goal: 'recomposition' },
+      userQuery: 'Dame un circuito híbrido de fuerza y cardio.',
+      traceId: 'test',
+    });
+    expect(requestGoogleEmbeddings).toHaveBeenCalledTimes(1);
   });
 });

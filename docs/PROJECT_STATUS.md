@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (integración revisada de la rama fix-nutrition-and-rag-macros)**.
+Ultima actualizacion: **12 de julio de 2026 (RAG: filtro de bibliografía + multi-query híbrido, verificado contra Firestore real)**.
+
+## Sesión del 12 de julio de 2026 (RAG: verificación contra Firestore real + dos arreglos de calidad)
+
+El usuario pidió dejar el RAG "perfecto". Se sondeó la recuperación contra Firestore REAL (no mocks) y se encontraron dos problemas serios, ya corregidos. **388 tests verdes** (49 archivos; +5 nuevos). Herramientas de diagnóstico en `scratch/rag-probe.mjs`, `rag-diagnose.mjs`, `rag-reffilter-test.mjs` (uso: `node --env-file=.env.local scratch/rag-probe.mjs`).
+
+- **Inventario real:** `guideline_passages` tiene **7.128 pasajes en 226 documentos** (biblioteca rica: Braddom's, DeLee/Drez, ACSM, FUNDAMENTOS-DE-FISIOLOGIA, papers de nutrición/EJSC/fphys). Índice vectorial operativo (findNearest 550-1900 ms, 768 dims). El fallback léxico (`guidelines`, libros completos) sigue disponible.
+- **PROBLEMA #1 (grave) — bibliografía contaminaba la recuperación:** la ingesta (`parse_pdf_improved.py`) NO separó las secciones de referencias. **~23% de la biblioteca son pasajes de bibliografía** (DOIs, "et al.", rangos de página, "90. Apellido AB..."). En la query híbrida, **~10 de 12 pasajes recuperados eran bibliografía** — el coach prescribía circuito con contexto de ruido. La query de creatina se salvaba por suerte.
+- **FIX #1 — filtro de bibliografía en LECTURA (`referenceScore`/`isBibliographyPassage`):** se sobre-recupera (`PASSAGE_FETCH_LIMIT=40` en vez de 12) y se descartan los pasajes-bibliografía, quedando `PASSAGE_LIMIT=12` ÚTILES. Detector calibrado contra Firestore real (0 falsos positivos en 16 pasajes de contenido clínico). Beneficia a TODAS las queries, no solo híbrido. Sin re-ingesta ni re-embeber. Sonda antes/después: la query híbrida pasó de 6/8 bibliografía a **0/8** (ahora recupera "multiple-joint exercises", "1 set of 10-15", HIIT, umbral de lactato, componentes de fitness).
+- **PROBLEMA #2 — query única sesgada a un dominio.**
+- **FIX #2 — MULTI-QUERY híbrido (solo weekly-plan, NO chat por latencia):** cuando el plan incluirá circuito, además de la query principal se lanzan 3 sub-consultas (fuerza en circuito / HIIT-cardio / concurrente-interferencia), se fusionan deduplicando por id de pasaje y conservando la menor distancia coseno. Log `mode: vector_multiquery` con `candidates`/`droppedReferences`/`passages`. Latencia real ~1.070 ms (4 embeddings + 4 findNearest en paralelo).
+- **Tests (+5):** `referenceScore`/`isBibliographyPassage` (prescriptivo vs referencias, guard de texto corto), descarte de bibliografía en recuperación vectorial, multi-query dispara 4 embeddings en weekly-plan y **solo 1 en chat** (protege la latencia conversacional).
 
 ## Sesión del 11 de julio de 2026, parte 10 (revisión e integración de la rama del compañero)
 

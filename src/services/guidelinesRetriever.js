@@ -18,8 +18,41 @@ import { requestGoogleEmbeddings, EMBEDDING_DIMENSIONS } from './googleGenAiTran
 // ============================================================================
 
 const PASSAGES_COLLECTION = 'guideline_passages';
-const PASSAGE_LIMIT = 12; // pasajes a recuperar por findNearest
+const PASSAGE_LIMIT = 12; // pasajes ÚTILES objetivo tras filtrar bibliografía
+// Sobre-recuperación: pedimos más candidatos a findNearest para poder descartar los pasajes
+// que son secciones de referencias/bibliografía (≈23% de la biblioteca no se separó en la
+// ingesta) y quedarnos aun así con PASSAGE_LIMIT pasajes de contenido real.
+const PASSAGE_FETCH_LIMIT = 40;
 const CONTEXT_CHAR_BUDGET = 20000; // tope de caracteres de contexto inyectado
+
+// ----------------------------------------------------------------------------
+// Detector de pasajes que son BIBLIOGRAFÍA (listas de referencias), no contenido
+// prescriptivo. La ingesta (parse_pdf_improved.py) no separó las secciones de
+// referencias de los libros/papers, así que ~1 de cada 4 pasajes es una lista de
+// citas (DOIs, "et al.", rangos de página, "90. Apellido AB..."). Cuando la query
+// semántica cae cerca de esos pasajes, el contexto del coach se llena de ruido.
+// Calibrado contra Firestore real (scratch/rag-reffilter-test.mjs): 0 falsos
+// positivos en 16 pasajes de contenido clínico; recupera contenido prescriptivo
+// real en la query híbrida (antes 6/8 eran bibliografía, después 0/8).
+// ----------------------------------------------------------------------------
+export function referenceScore(text) {
+  const t = String(text || '');
+  if (t.length < 60) return 0;
+  const per500 = t.length / 500;
+  let s = 0;
+  s += (t.match(/https?:\/\/|doi[:.]|\[CrossRef\]|\[PubMed\]|\[Google Scholar\]/gi) || []).length * 2;
+  s += (t.match(/\bet al\.?/gi) || []).length;
+  s += (t.match(/\b\d{1,4}\s*[–-]\s*\d{1,4}\b/g) || []).length; // rangos de página "821–834"
+  s += (t.match(/\b\d{1,3}\.\s+[A-ZÁÉÍÓÚ][a-zà-ÿ]+/g) || []).length * 1.5; // cita numerada "90. Deschenes"
+  s += (t.match(/;\s*\d{1,4}\s*[:(]/g) || []).length * 1.5; // ref de revista ";107:1470" ";42("
+  s += (t.match(/\(\d{4}\)/g) || []).length * 0.5; // año entre paréntesis
+  s += (t.match(/[A-ZÁ][a-zà-ÿ]+,\s+[A-Z]\.(\s*[A-Z]\.)?/g) || []).length; // "Nunes, J. P."
+  return s / per500;
+}
+const REFERENCE_SCORE_THRESHOLD = 6;
+export function isBibliographyPassage(text) {
+  return referenceScore(text) >= REFERENCE_SCORE_THRESHOLD;
+}
 
 // Términos que identifican a un documento como de nutrición/nutrición deportiva.
 // Debe mantenerse alineado con las keywords de nutrición del parser (parse_pdf_improved.py).
@@ -169,63 +202,110 @@ function buildQueryText(profileInput, weeklyPlanInput, userQuery) {
 }
 
 // ----------------------------------------------------------------------------
-// Modo principal: búsqueda vectorial.
+// Sub-consultas para MULTI-QUERY híbrido. Una sola query de embedding para "fuerza
+// en circuito + cardio + concurrente" tiende a recuperar de un solo dominio; lanzar
+// consultas separadas por dominio y fusionar da cobertura equilibrada de los tres.
+// Solo se activa en el weekly-plan (no en el chat: 3× embeddings/latencia no compensan
+// en una respuesta conversacional). Ver retrieveByVector.
+// ----------------------------------------------------------------------------
+const HYBRID_SUBQUERIES = [
+  'Circuit resistance training / entrenamiento de fuerza en circuito: ejercicios multiarticulares '
+  + 'encadenados, series, repeticiones, %1RM, RPE, descansos cortos entre estaciones.',
+  'Acondicionamiento cardiovascular por intervalos e HIIT: %FCmáx, %FCR, VO2R, duración de '
+  + 'intervalos y recuperación, respuesta cardiorrespiratoria al ejercicio a intervalos.',
+  'Entrenamiento concurrente de fuerza y resistencia: efecto de interferencia, orden de estímulos, '
+  + 'gestión de volumen e intensidad y recuperación entre sesiones de fuerza y cardio.',
+];
+
+async function embedQuery(text, traceId) {
+  try {
+    const [vec] = await requestGoogleEmbeddings({ texts: [text], taskType: 'RETRIEVAL_QUERY', traceId, timeoutMs: 8000 });
+    return (vec && vec.length === EMBEDDING_DIMENSIONS) ? vec : null;
+  } catch (error) {
+    logError('guidelines_vector_embed_failed', error, { traceId });
+    return null;
+  }
+}
+
+async function nearestDocs(db, vector, limit) {
+  const vq = db.collection(PASSAGES_COLLECTION).findNearest({
+    vectorField: 'embedding',
+    queryVector: FieldValue.vector(vector),
+    limit,
+    distanceMeasure: 'COSINE',
+    distanceResultField: '_distance',
+  });
+  const snap = await vq.get();
+  return (snap && !snap.empty) ? snap.docs : [];
+}
+
+// ----------------------------------------------------------------------------
+// Modo principal: búsqueda vectorial (con filtro de bibliografía y multi-query híbrido).
 // ----------------------------------------------------------------------------
 async function retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId }) {
   if (!process.env.GEMINI_API_KEY) {
     return null; // sin key no se puede embeber; usar fallback
   }
 
-  const queryText = buildQueryText(profile, weeklyPlan, userQuery);
-  let queryVector;
-  try {
-    const [vec] = await requestGoogleEmbeddings({
-      texts: [queryText],
-      taskType: 'RETRIEVAL_QUERY',
-      traceId,
-      timeoutMs: 8000,
-    });
-    if (!vec || vec.length !== EMBEDDING_DIMENSIONS) return null;
-    queryVector = vec;
-  } catch (error) {
-    logError('guidelines_vector_embed_failed', error, { traceId });
-    return null;
-  }
+  // Multi-query solo en el weekly-plan (sin userQuery) cuando el plan incluirá circuito
+  // híbrido: reparte la recuperación entre fuerza, cardio y concurrente.
+  const isPlanRequest = !(typeof userQuery === 'string' && userQuery.trim());
+  const goalForHybrid = weeklyPlan?.goal || profile?.goal || '';
+  const modalityForHybrid = weeklyPlan?.trainingModality || profile?.trainingModality || profile?.trainingMode || '';
+  const useMultiQuery = isPlanRequest
+    && (HYBRID_MODALITIES.has(modalityForHybrid)
+      || detectHybridIntentText(goalForHybrid)
+      || planWillIncludeHybridCircuit(profile, goalForHybrid, modalityForHybrid));
 
-  let snap;
+  const queryTexts = useMultiQuery
+    ? [buildQueryText(profile, weeklyPlan, userQuery), ...HYBRID_SUBQUERIES]
+    : [buildQueryText(profile, weeklyPlan, userQuery)];
+
+  let docs;
   try {
-    const vq = db.collection(PASSAGES_COLLECTION).findNearest({
-      vectorField: 'embedding',
-      queryVector: FieldValue.vector(queryVector),
-      limit: PASSAGE_LIMIT,
-      distanceMeasure: 'COSINE',
-      distanceResultField: '_distance',
-    });
-    snap = await vq.get();
+    const vectors = (await Promise.all(queryTexts.map((t) => embedQuery(t, traceId)))).filter(Boolean);
+    if (!vectors.length) return null;
+    // Sobre-recuperar por query; en multi-query cada sub-consulta aporta su cuota.
+    const perQuery = useMultiQuery ? Math.ceil(PASSAGE_FETCH_LIMIT / vectors.length) : PASSAGE_FETCH_LIMIT;
+    const docLists = await Promise.all(vectors.map((v) => nearestDocs(db, v, perQuery)));
+    // Fusionar deduplicando por id de pasaje, conservando la menor distancia.
+    const merged = new Map();
+    for (const list of docLists) {
+      for (const d of list) {
+        const prev = merged.get(d.id);
+        const dist = typeof d.data()._distance === 'number' ? d.data()._distance : null;
+        if (!prev || (dist !== null && dist < prev.dist)) merged.set(d.id, { doc: d, dist: dist ?? Infinity });
+      }
+    }
+    docs = [...merged.values()].sort((a, b) => a.dist - b.dist).map((x) => x.doc);
   } catch (error) {
     // Causa típica: índice vectorial aún no creado. Degradar a keywords.
     logError('guidelines_vector_findnearest_failed', error, { traceId });
     return null;
   }
 
-  if (!snap || snap.empty) {
+  if (!docs.length) {
     logInfo('guidelines_vector_empty', { traceId });
     return null;
   }
 
-  // Agrupar pasajes por documento fuente, respetando el orden de cercanía.
+  // Agrupar pasajes por documento fuente, respetando el orden de cercanía, DESCARTANDO
+  // los pasajes que son bibliografía (referencias) y topando en PASSAGE_LIMIT útiles.
   const blocks = [];
   const citationsMap = new Map();
   let charCount = 0;
+  let droppedRefs = 0;
 
-  for (const doc of snap.docs) {
+  for (const doc of docs) {
+    if (blocks.length >= PASSAGE_LIMIT) break;
     const p = doc.data();
+    const text = String(p.text || '');
+    if (isBibliographyPassage(text)) { droppedRefs += 1; continue; }
     const fileName = p.fileName || p.originalFileName || 'Documento sin nombre';
     const distance = typeof p._distance === 'number' ? p._distance : null;
     const pageRange = p.pageStart && p.pageEnd && p.pageStart !== p.pageEnd
       ? `pp. ${p.pageStart}-${p.pageEnd}`
       : (p.pageStart ? `p. ${p.pageStart}` : '');
-    const text = String(p.text || '');
 
     if (charCount + text.length > CONTEXT_CHAR_BUDGET && blocks.length > 0) {
       continue; // ya tenemos suficiente contexto
@@ -265,8 +345,10 @@ ${text}`);
 
   logInfo('guidelines_vector_matches', {
     traceId,
-    mode: 'vector',
-    passages: snap.size,
+    mode: useMultiQuery ? 'vector_multiquery' : 'vector',
+    candidates: docs.length,
+    droppedReferences: droppedRefs,
+    passages: blocks.length,
     sources: citations.map((c) => ({ fileName: c.fileName, bestDistance: c.bestDistance })),
   });
 
