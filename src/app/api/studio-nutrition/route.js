@@ -252,7 +252,7 @@ PRINCIPIO "fuel for the work required": ajusta los carbohidratos a la demanda de
       return `- ${day}: sesión "${c.title}" (${c.type}); carbohidratos ${c.carbLevel}; objetivo ${c.kcal} kcal (C ${c.carbs} g / P ${c.protein} g / F ${c.fat} g).${c.timing ? ` Timing: ${c.timing}` : ''}`;
     }
 
-    function buildPrompt(daysList, withShoppingBatch, styleHint) {
+    function buildPrompt(daysList, styleHint) {
       return `${baseRules}
 Genera el menú para ESTOS días: ${daysList.join(', ')}.
 Contexto de entrenamiento y objetivo por día (ajusta las comidas y el timing a esto):
@@ -265,10 +265,33 @@ Requisitos:
 - Refleja el TIMING de carbohidratos del día en los slots y en el campo "serving" (p. ej. en día de fuerza, carbos lentos en la comida previa/posterior; en tirada larga, desayuno alto en carbos y recarga después).
 - Varía las recetas entre días: NO repitas el mismo plato y NO uses la misma proteína principal en días consecutivos. Comida real, práctica y apetecible; respeta condiciones/restricciones.${styleHint ? `
 - ${styleHint}` : ''}
-- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).${withShoppingBatch ? `
-- shopping: lista de la compra para TODA LA SEMANA (7 días), NO para estos días sueltos. 4-6 categorías (cat, icon emoji, items con name y qty), con cantidades agregadas para 7 días (p. ej. "Pollo 1,4 kg", "Huevos 18 ud", "Arroz 1 kg").
-- batch: 3-4 tareas de batch cooking del fin de semana (title, desc, time, day, emoji).` : ''}
+- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).
 Devuelve SOLO el JSON del esquema.`;
+    }
+
+    // El esquema de consolidación solo requiere 'shopping' y 'batch'.
+    const CONSOLIDATION_SCHEMA = {
+      type: 'object',
+      required: ['shopping', 'batch'],
+      properties: { shopping: SHOPPING_PROP, batch: BATCH_PROP },
+    };
+
+    function buildConsolidationPrompt(generatedDays) {
+      const menusText = generatedDays.map(d =>
+        `Día ${d.day}:\n` + d.meals.map(m => `- ${m.dish} (${m.ingredients.join(', ')})`).join('\n')
+      ).join('\n\n');
+
+      return `${baseRules}
+Se ha generado el menú para toda la semana.
+A continuación te presento las recetas de los 7 días:
+
+${menusText}
+
+Requisitos:
+1. "shopping": Genera una lista de la compra que incluya TODOS los ingredientes listados arriba y las cantidades agregadas para prepararlos durante la semana (por ejemplo, suma todos los huevos, suma toda la pechuga de pollo, etc.). Usa de 4 a 6 categorías lógicas (carnes, lácteos, vegetales, etc.) con sus íconos correspondientes.
+2. "batch": Sugiere 3 o 4 tareas de batch cooking u organización de fin de semana que faciliten preparar estas recetas específicas (por ejemplo, cocer todo el arroz, preparar las salsas base, picar la verdura).
+
+Devuelve SOLO el JSON.`;
     }
 
     // ---- Cambio de UNA comida del plan guardado (swapMeal) ----
@@ -333,18 +356,18 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
     const genDeadline = Date.now() + 50000;
     const remainingBudget = () => Math.max(8000, genDeadline - Date.now());
 
-    async function genChunk(daysList, withShoppingBatch, styleHint) {
+    async function genChunk(daysList, styleHint) {
       const { response } = await requestGoogleGenerateContent({
         model,
         traceId,
         timeoutMs: remainingBudget(),
-        parts: [{ text: buildPrompt(daysList, withShoppingBatch, styleHint) }],
+        parts: [{ text: buildPrompt(daysList, styleHint) }],
         generationConfig: {
           temperature: 0.7,
           topP: 0.9,
-          maxOutputTokens: withShoppingBatch ? 12000 : 9000,
+          maxOutputTokens: 9000,
           responseMimeType: 'application/json',
-          responseJsonSchema: withShoppingBatch ? FULL_CHUNK_SCHEMA : DAYS_CHUNK_SCHEMA,
+          responseJsonSchema: DAYS_CHUNK_SCHEMA,
           thinkingConfig: { thinkingBudget: 0 },
         },
       });
@@ -358,30 +381,59 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
 
     // Un reintento por trozo: cubre truncaciones puntuales o errores transitorios de Gemini.
     // Solo reintenta si queda presupuesto suficiente (si no, propaga el error sin colgar la función).
-    async function genChunkSafe(daysList, withShoppingBatch, styleHint) {
+    async function genChunkSafe(daysList, styleHint) {
       try {
-        return await genChunk(daysList, withShoppingBatch, styleHint);
+        return await genChunk(daysList, styleHint);
       } catch (e1) {
         if (Date.now() > genDeadline - 9000) throw e1;
-        return genChunk(daysList, withShoppingBatch, styleHint);
+        return genChunk(daysList, styleHint);
       }
     }
 
-    // Genera la semana completa (trozos en paralelo) una vez.
+    // Genera la semana completa (trozos en paralelo) y luego consolida compra/batch.
     async function generateAll() {
       const results = await Promise.allSettled(
-        DAY_CHUNKS.map((days, i) => genChunkSafe(days, i === 0, CHUNK_STYLE_HINTS[i] || '')),
+        DAY_CHUNKS.map((days, i) => genChunkSafe(days, CHUNK_STYLE_HINTS[i] || '')),
       );
-      const days = [];
+      let days = [];
       let shopping = [];
       let batch = [];
       results.forEach((r) => {
         if (r.status !== 'fulfilled') return;
         if (Array.isArray(r.value.days)) days.push(...r.value.days);
-        if (Array.isArray(r.value.shopping) && r.value.shopping.length) shopping = r.value.shopping;
-        if (Array.isArray(r.value.batch) && r.value.batch.length) batch = r.value.batch;
       });
+
       const failed = results.filter((r) => r.status === 'rejected').length;
+
+      // Consolidar compras solo si tenemos días, para no mandar contexto vacío.
+      if (days.length > 0 && Date.now() < genDeadline - 6000) {
+        try {
+          const { response } = await requestGoogleGenerateContent({
+            model,
+            traceId,
+            timeoutMs: remainingBudget(),
+            parts: [{ text: buildConsolidationPrompt(days) }],
+            generationConfig: {
+              temperature: 0.5,
+              topP: 0.9,
+              maxOutputTokens: 6000,
+              responseMimeType: 'application/json',
+              responseJsonSchema: CONSOLIDATION_SCHEMA,
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          });
+          if (response.ok) {
+             const data = await response.json();
+             const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
+             const parsed = JSON.parse(text);
+             if (Array.isArray(parsed.shopping)) shopping = parsed.shopping;
+             if (Array.isArray(parsed.batch)) batch = parsed.batch;
+          }
+        } catch (e2) {
+          logError('studio_nutrition_consolidation_failed', e2, { traceId, userId: user.uid });
+        }
+      }
+
       return { days, shopping, batch, failed };
     }
 
@@ -409,9 +461,10 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
           proteinTarget: ctx.protein,
           kcalRatio: Math.round(kcalRatio * 100) / 100,
           proteinRatio: Math.round(proteinRatio * 100) / 100,
-          kcalOutOfRange: kcalRatio < 0.93 || kcalRatio > 1.07,
-          proteinOutOfRange: proteinRatio < 0.90 || proteinRatio > 1.15,
-          severeDrift: kcalRatio < 0.85 || kcalRatio > 1.15 || proteinRatio < 0.75,
+          // Flexibilización de rangos: AI tiene dificultad clavando <7%, lo subimos a 10% y el severo a 18% para evitar fallos persistentes.
+          kcalOutOfRange: kcalRatio < 0.90 || kcalRatio > 1.10,
+          proteinOutOfRange: proteinRatio < 0.85 || proteinRatio > 1.20,
+          severeDrift: kcalRatio < 0.82 || kcalRatio > 1.18 || proteinRatio < 0.70,
         });
       }
       const proteinRatio = pTgt ? pAct / pTgt : 1;
@@ -441,7 +494,7 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
             .filter((i) => i >= 0),
         )];
         const retries = await Promise.allSettled(
-          failingChunks.map((i) => genChunkSafe(DAY_CHUNKS[i], false, CHUNK_STYLE_HINTS[i] || '')),
+          failingChunks.map((i) => genChunkSafe(DAY_CHUNKS[i], CHUNK_STYLE_HINTS[i] || '')),
         );
         const replaced = new Map();
         retries.forEach((r) => {
