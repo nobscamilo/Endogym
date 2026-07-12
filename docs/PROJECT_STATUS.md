@@ -4,7 +4,7 @@ Ultima actualizacion: **12 de julio de 2026 (RAG solución de fondo: bibliograf�
 
 ## Sesión del 12 de julio de 2026, parte 2 (RAG: solución de fondo — etiquetado en datos e ingesta)
 
-Cierre de la deuda de la parte 1: el filtro de bibliografía dejó de ser una heurística por request y pasó a los DATOS. **389 tests verdes** (+1).
+Cierre de la deuda de la parte 1: el filtro de bibliografía dejó de ser una heurística por request y pasó a los DATOS. **389 tests verdes** (+1). **Desplegado en producción:** `endogym-11mnffqcz-…vercel.app`, alias manual `endogym.vercel.app`; sondas `/` 200, `/api/health` 200.
 
 - **Backfill ejecutado en Firestore real (`scripts/backfill_reference_flags.mjs`):** los **7.128 pasajes** de `guideline_passages` quedaron etiquetados con `isReference` (booleano) y `refScore` (auditable): **1.592 son bibliografía (22%)**. Idempotente y resumable (verificado: segunda pasada = 0 re-etiquetados); `--force` re-etiqueta si se recalibra el detector; `--dry-run` disponible. Merge parcial: no toca `embedding` ni `text`.
 - **Ingesta corregida (`scripts/embed_guidelines.mjs`):** los pasajes de futuros libros NACEN etiquetados (mismo detector `referenceScore` importado del retriever — una sola fuente de verdad).
