@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **12 de julio de 2026 (RAG: filtro de bibliografía + multi-query híbrido, verificado contra Firestore real)**.
+Ultima actualizacion: **12 de julio de 2026 (RAG solución de fondo: bibliografía etiquetada en los DATOS)**.
+
+## Sesión del 12 de julio de 2026, parte 2 (RAG: solución de fondo — etiquetado en datos e ingesta)
+
+Cierre de la deuda de la parte 1: el filtro de bibliografía dejó de ser una heurística por request y pasó a los DATOS. **389 tests verdes** (+1).
+
+- **Backfill ejecutado en Firestore real (`scripts/backfill_reference_flags.mjs`):** los **7.128 pasajes** de `guideline_passages` quedaron etiquetados con `isReference` (booleano) y `refScore` (auditable): **1.592 son bibliografía (22%)**. Idempotente y resumable (verificado: segunda pasada = 0 re-etiquetados); `--force` re-etiqueta si se recalibra el detector; `--dry-run` disponible. Merge parcial: no toca `embedding` ni `text`.
+- **Ingesta corregida (`scripts/embed_guidelines.mjs`):** los pasajes de futuros libros NACEN etiquetados (mismo detector `referenceScore` importado del retriever — una sola fuente de verdad).
+- **Retriever:** usa el flag de los datos (`typeof p.isReference === 'boolean' ? p.isReference : heurística`); la heurística en lectura queda solo como fallback para pasajes sin etiquetar. Test: el flag manda en AMBOS sentidos (texto inocuo flaggeado se descarta; texto con pinta de refs flaggeado como contenido se conserva).
+- **Sonda real post-backfill:** `droppedReferences` 11-17 por consulta (desde flags), `mode: vector_multiquery` operativo en weekly-plan, control de creatina intacto, latencias 800-1.190 ms.
+- **Deuda anotada (menor):** los pasajes descartados podrían excluirse a nivel de findNearest con un prefiltro `where('isReference','==',false)`, pero requiere recrear el índice vectorial compuesto (gcloud); con la sobre-recuperación 40→12 el beneficio es marginal. Valorar solo si la biblioteca crece mucho.
 
 ## Sesión del 12 de julio de 2026 (RAG: verificación contra Firestore real + dos arreglos de calidad)
 

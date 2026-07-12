@@ -435,6 +435,29 @@ describe('guidelines RAG retriever', () => {
     expect(allTexts).toMatch(/concurrente|interferencia/i);
   });
 
+  it('el flag isReference de los DATOS manda sobre la heurística (en ambos sentidos)', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);
+    const docs = [
+      // Texto inocuo pero etiquetado como bibliografía en la ingesta → se descarta.
+      { id: 'a', data: () => ({ parentId: 'dA', fileName: 'Flagged.pdf', pageStart: 1, pageEnd: 1, _distance: 0.10, isReference: true,
+        text: 'Texto aparentemente normal sobre entrenamiento que la ingesta marcó como sección de referencias.' }) },
+      // Texto con pinta de referencias pero etiquetado como contenido → se conserva (el flag manda).
+      { id: 'b', data: () => ({ parentId: 'dB', fileName: 'Kept.pdf', pageStart: 2, pageEnd: 2, _distance: 0.12, isReference: false,
+        text: 'Tabla de dosis: 2003;33(2):145-164 y 2010;42(3):413-421 según los ensayos citados et al. https://doi.org/x [CrossRef]' }) },
+    ];
+    const vectorQuery = { get: vi.fn().mockResolvedValue({ empty: false, size: 2, docs }) };
+    getAdminServices.mockResolvedValue({ db: { collection: vi.fn().mockReturnValue({ findNearest: vi.fn().mockReturnValue(vectorQuery) }) } });
+
+    const { contextText } = await retrieveGuidelinesContextWithCitations({
+      profile: { age: 30 },
+      weeklyPlan: { goal: 'hypertrophy', preparticipationScreening: { input: {} } },
+      traceId: 'test',
+    });
+    expect(contextText).not.toContain('Flagged.pdf');
+    expect(contextText).toContain('Kept.pdf');
+  });
+
   it('MULTI-QUERY: el CHAT NO multiplica embeddings (una sola query aunque la pregunta sea híbrida)', async () => {
     process.env.GEMINI_API_KEY = 'test-key';
     requestGoogleEmbeddings.mockResolvedValue([new Array(768).fill(0.1)]);

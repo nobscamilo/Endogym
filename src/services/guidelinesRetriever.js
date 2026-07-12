@@ -300,7 +300,11 @@ async function retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId })
     if (blocks.length >= PASSAGE_LIMIT) break;
     const p = doc.data();
     const text = String(p.text || '');
-    if (isBibliographyPassage(text)) { droppedRefs += 1; continue; }
+    // Solución de fondo: el flag `isReference` viene etiquetado en los DATOS (ingesta +
+    // backfill_reference_flags.mjs). La heurística en lectura queda solo como fallback
+    // para pasajes aún sin etiquetar (p. ej. ingestas antiguas interrumpidas).
+    const isRef = typeof p.isReference === 'boolean' ? p.isReference : isBibliographyPassage(text);
+    if (isRef) { droppedRefs += 1; continue; }
     const fileName = p.fileName || p.originalFileName || 'Documento sin nombre';
     const distance = typeof p._distance === 'number' ? p._distance : null;
     const pageRange = p.pageStart && p.pageEnd && p.pageStart !== p.pageEnd

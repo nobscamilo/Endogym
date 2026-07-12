@@ -18,6 +18,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAdminServices } from '../src/lib/firebaseAdmin.js';
 import { requestGoogleEmbeddings, EMBEDDING_DIMENSIONS } from '../src/services/googleGenAiTransport.js';
+import { referenceScore, isBibliographyPassage } from '../src/services/guidelinesRetriever.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -164,6 +165,11 @@ async function main() {
         pageStart: p.pageStart,
         pageEnd: p.pageEnd,
         text: p.text,
+        // Etiquetado en ORIGEN (solución de fondo, 12 jul 2026): los pasajes que son
+        // listas de referencias/bibliografía nacen marcados para que el retriever los
+        // excluya sin heurística en lectura. Ver referenceScore en guidelinesRetriever.
+        isReference: isBibliographyPassage(p.text),
+        refScore: Math.round(referenceScore(p.text) * 10) / 10,
         embedding: FieldValue.vector(v),
       });
     });
