@@ -390,51 +390,55 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
       }
     }
 
-    // Genera la semana completa (trozos en paralelo) y luego consolida compra/batch.
+    // Genera la semana completa (trozos en paralelo). La consolidación de compra/batch se
+    // hace DESPUÉS del reintento de drift, sobre los menús FINALES: si consolidáramos aquí y
+    // el reintento reemplazara un día, la lista de la compra no correspondería a las recetas.
     async function generateAll() {
       const results = await Promise.allSettled(
         DAY_CHUNKS.map((days, i) => genChunkSafe(days, CHUNK_STYLE_HINTS[i] || '')),
       );
-      let days = [];
-      let shopping = [];
-      let batch = [];
+      const days = [];
       results.forEach((r) => {
         if (r.status !== 'fulfilled') return;
         if (Array.isArray(r.value.days)) days.push(...r.value.days);
       });
-
       const failed = results.filter((r) => r.status === 'rejected').length;
+      return { days, shopping: [], batch: [], failed };
+    }
 
-      // Consolidar compras solo si tenemos días, para no mandar contexto vacío.
-      if (days.length > 0 && Date.now() < genDeadline - 6000) {
-        try {
-          const { response } = await requestGoogleGenerateContent({
-            model,
-            traceId,
-            timeoutMs: remainingBudget(),
-            parts: [{ text: buildConsolidationPrompt(days) }],
-            generationConfig: {
-              temperature: 0.5,
-              topP: 0.9,
-              maxOutputTokens: 6000,
-              responseMimeType: 'application/json',
-              responseJsonSchema: CONSOLIDATION_SCHEMA,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          });
-          if (response.ok) {
-             const data = await response.json();
-             const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
-             const parsed = JSON.parse(text);
-             if (Array.isArray(parsed.shopping)) shopping = parsed.shopping;
-             if (Array.isArray(parsed.batch)) batch = parsed.batch;
-          }
-        } catch (e2) {
-          logError('studio_nutrition_consolidation_failed', e2, { traceId, userId: user.uid });
+    // Consolidación final: lista de la compra y batch cooking generados VIENDO las recetas
+    // reales de los 7 días (antes las generaba el primer trozo, que solo veía Mié-Jue).
+    // Nunca bloquea el plan: ante error devuelve listas vacías y se registra el fallo.
+    async function consolidateShoppingBatch(days) {
+      if (!days.length || Date.now() > genDeadline - 6000) return { shopping: [], batch: [] };
+      try {
+        const { response } = await requestGoogleGenerateContent({
+          model,
+          traceId,
+          timeoutMs: remainingBudget(),
+          parts: [{ text: buildConsolidationPrompt(days) }],
+          generationConfig: {
+            temperature: 0.5,
+            topP: 0.9,
+            maxOutputTokens: 6000,
+            responseMimeType: 'application/json',
+            responseJsonSchema: CONSOLIDATION_SCHEMA,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
+          const parsed = JSON.parse(text);
+          return {
+            shopping: Array.isArray(parsed.shopping) ? parsed.shopping : [],
+            batch: Array.isArray(parsed.batch) ? parsed.batch : [],
+          };
         }
+      } catch (e2) {
+        logError('studio_nutrition_consolidation_failed', e2, { traceId, userId: user.uid });
       }
-
-      return { days, shopping, batch, failed };
+      return { shopping: [], batch: [] };
     }
 
     // Verificación de macros en servidor: compara los totales reales por día con el objetivo.
@@ -516,7 +520,7 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
         });
       }
 
-      const { days, shopping, batch, failed } = best;
+      const { days, failed } = best;
       if (!days.length) return errorResponse('No se pudo generar el plan ahora mismo.', 502);
       if (days.length >= 7 && check.severeDriftDays.length > 0) {
         logError('studio_nutrition_macro_invalid', new Error('Macro drift severo en plan IA'), {
@@ -526,6 +530,9 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
         });
         return errorResponse('El plan generado no cumplió los objetivos nutricionales. Inténtalo de nuevo.', 502, { macroCheck: check });
       }
+
+      // Compra + batch sobre los menús FINALES (tras el reintento de drift si lo hubo).
+      const { shopping, batch } = await consolidateShoppingBatch(days);
 
       const nutrition = {
         days,

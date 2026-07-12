@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **11 de julio de 2026 (calentamiento guiado, Entreno simplificado y adherencia real)**.
+Ultima actualizacion: **11 de julio de 2026 (integración revisada de la rama fix-nutrition-and-rag-macros)**.
+
+## Sesión del 11 de julio de 2026, parte 10 (revisión e integración de la rama del compañero)
+
+Revisión crítica de `fix-nutrition-and-rag-macros-34099896921467172` (1 commit, 6 archivos) a petición del usuario, con decisión explícita: **salvar lo bueno, descartar lo conflictivo, aceptar las 2 decisiones de producto con tests**. La rama llegaba con su propia suite en ROJO (1 test 502). **384 tests verdes** (49 archivos; +6 nuevos) tras la integración.
+
+- **ACEPTADO — consolidación de la lista de compra:** fix real (antes la compra "semanal" la generaba el trozo que solo veía Mié-Jue). **Mejorado en la integración:** la consolidación se movió a DESPUÉS del reintento de drift, sobre los menús FINALES (la implementación original consolidaba dentro de `generateAll`, antes del reintento — la compra podía no corresponder a las recetas definitivas, y era la causa de su test rojo: sus propios tests asumían consolidación al final). `consolidateShoppingBatch()` nunca bloquea el plan (try/catch + presupuesto de tiempo).
+- **ACEPTADO — refactor `RACE_GOAL_METERS` → `RACE_GOAL_META.distanceMeters` + `resolveRaceGoal`** en coach-chat, coach-analysis y studio-data (verificado equivalente; `distanceMeters` existe en el META).
+- **ACEPTADO (decisión de producto del usuario) — `workoutFactor` en el TDEE:** ×1.04 normal, ×1.08 con ≥4 días/sem o >60 min/sesión. Sube las calorías de TODOS los usuarios un 4-8%; cubierto con tests exactos (Mifflin-St Jeor, tolerancia ±2 kcal por redondeos internos).
+- **ACEPTADO (decisión de producto del usuario) — tolerancias de macros flexibilizadas:** kcal ±7%→±10%, proteína −10/+15→−15/+20, severo ±18%/suelo proteico 0.70. Test de frontera: un día al 92% de kcal ya no dispara reintento (ahorra llamadas a Gemini).
+- **DESCARTADO — `adaptedTemplate` del planner:** convertía días de fuerza a "mixed · en Circuito" sin tope y SOLO en las plantillas sin día mixto (hybrid_run_gym/running/cycling) — exactamente las modalidades excluidas a propósito del circuito híbrido (un corredor en recomposición perdía su fuerza pesada). Además duplicaba `resolveHybridCircuitDays`/`applyHybridCircuitFormatToDay` sin la prescripción real (ni rest 25 s, ni carga ×0.85, ni metadatos para la tarjeta de la UI) y rompía la contabilidad `hybridCircuitDays`. Queda una NOTA en `planner.js` explicando el descarte + **tests de regresión** (hybrid_run_gym y running en recomposición conservan su fuerza tradicional; sin títulos "en Circuito").
+- **Arreglado el test rojo de la rama** (`studio-nutrition` drift 502→200): consecuencia del orden de consolidación, no del mock. Nuevo `tests/core/tdee-and-branch-integration.test.js` + test de tolerancias en `studio-nutrition.route.test.js`.
+- **Nota para el compañero:** antes de crear mecanismos nuevos en `planner.js`, revisar `resolveHybridCircuitDays`/`applyHybridCircuitFormatToDay` (parte 2 de esta fecha) y las exclusiones de modalidad documentadas en ARCHITECTURE.md; y correr la suite antes de subir la rama.
 
 ## Sesión del 11 de julio de 2026, parte 9 (calentamiento guiado + menos ruido + adherencia corregida)
 

@@ -197,6 +197,30 @@ describe('/api/studio-nutrition route', () => {
     }));
   });
 
+  it('tolerancias flexibilizadas: un día al 92% de kcal (drift con el antiguo ±7%) ya NO dispara reintento', async () => {
+    enqueueGeminiChunks([
+      chunk(['Lun', 'Mar'], 920, 100), // 92% de 1000 kcal: fuera del antiguo ±7%, dentro del nuevo ±10%
+      chunk(['Mié', 'Jue'], 1000, 100),
+      chunk(['Vie', 'Sáb'], 1000, 100),
+      chunk(['Dom'], 1000, 100),
+      consolidationChunk(),
+    ]);
+
+    const response = await POST(new Request('http://localhost/api/studio-nutrition', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    // 4 trozos + 1 consolidación, SIN reintento de drift.
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(5);
+    expect(json.macroCheck.driftDays).toEqual([]);
+    // La compra/batch consolidadas llegan al plan final.
+    expect(json.nutrition.shopping.length).toBeGreaterThan(0);
+    expect(json.nutrition.batch.length).toBeGreaterThan(0);
+  });
+
   it('does not save a complete plan when severe macro drift remains after retry', async () => {
     enqueueGeminiChunks([
       chunk(['Lun', 'Mar'], 600, 55),

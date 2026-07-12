@@ -1166,20 +1166,13 @@ export function generateWeeklyPlan({
 
   const baseTemplate = MODALITY_TEMPLATES[modality] || MODALITY_TEMPLATES[TrainingModality.MIXED];
 
-  // Adaptación dinámica de la plantilla según perfil y RAG (Circuit/Hybrid):
-  // Si tiene prefersHybridCircuit true o el objetivo requiere circuito metabólico pero
-  // su plantilla original no incluía días mixtos, modificamos los días de 'resistance'
-  // (hasta 2) a 'mixed' o 'circuit'.
-  const adaptedTemplate = baseTemplate.map((day) => {
-    if (
-      day.sessionType === 'resistance' &&
-      (profile?.prefersHybridCircuit === true || String(goal || '').toLowerCase().includes('recomposition')) &&
-      !baseTemplate.some(d => d.sessionType === 'mixed')
-    ) {
-       return { ...day, sessionType: 'mixed', title: day.title + ' en Circuito' };
-    }
-    return day;
-  });
+  // NOTA (revisión 11 jul 2026): se descartó aquí un "adaptedTemplate" que convertía días de
+  // fuerza a 'mixed · en Circuito'. Motivos: (1) solo afectaba a las plantillas SIN día mixto
+  // (hybrid_run_gym/running/cycling), exactamente las modalidades excluidas a propósito del
+  // circuito híbrido (su fuerza complementaria conserva cargas tradicionales separadas del
+  // estímulo aeróbico); (2) duplicaba resolveHybridCircuitDays/applyHybridCircuitFormatToDay
+  // (más abajo), que ya convierten con la prescripción completa (rest 25 s, carga ×0.85,
+  // metadatos hybridCircuit para la tarjeta de la UI) y con tope de 2 sesiones.
 
   const baseTarget = buildMacroTargetFromProfile({ ...profile, goal }, adaptiveTuning);
   const mealsPerDay = clamp(toNumber(profile.mealsPerDay, 4), 3, 6);
@@ -1190,7 +1183,7 @@ export function generateWeeklyPlan({
     throw new Error('startDate inválido para el plan semanal.');
   }
   start.setUTCHours(0, 0, 0, 0);
-  const template = rotateTemplateToDate(adaptedTemplate, start);
+  const template = rotateTemplateToDate(baseTemplate, start);
   const userSeed = computeUserSeed(profile, goal, userId) + Number(seedOffset || 0);
 
   // Objetivo de carrera + ritmos derivados de una marca reciente (si la hay).
