@@ -547,7 +547,16 @@ function estimateCaloriesFromProfile(profile) {
   const bmr = sex === 'female'
     ? 10 * weightKg + 6.25 * heightCm - 5 * age - 161
     : 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-  const maintenanceCalories = Math.round(bmr * ACTIVITY_FACTORS[activityLevel]);
+
+  // Refactor: el multiplicador basal NO DEBE abarcar el ejercicio de forma ciega si
+  // la app ya planifica. Elevamos ligeramente la base para contemplar TEA/NEAT, pero
+  // ACTIVITY_FACTORS asume que el usuario es sedentario o no, más un margen por la prescripción de gimnasio.
+  // Incrementamos un ~5-10% el TDEE (Thermic effect of activity + ejercicio per se) que suele subestimarse
+  // en los cálculos simples para usuarios que entrenan de 3 a 5 días con la app.
+  const isHighVolume = Number(profile.daysPerWeek) >= 4 || Number(profile.preferredDurationMinutes) > 60;
+  const workoutFactor = isHighVolume ? 1.08 : 1.04;
+
+  const maintenanceCalories = Math.round(bmr * ACTIVITY_FACTORS[activityLevel] * workoutFactor);
   return maintenanceCalories + GOAL_CALORIE_DELTA[goal];
 }
 
@@ -1156,6 +1165,22 @@ export function generateWeeklyPlan({
   const metabolicProfile = resolveMetabolicProfile(profile.metabolicProfile);
 
   const baseTemplate = MODALITY_TEMPLATES[modality] || MODALITY_TEMPLATES[TrainingModality.MIXED];
+
+  // Adaptación dinámica de la plantilla según perfil y RAG (Circuit/Hybrid):
+  // Si tiene prefersHybridCircuit true o el objetivo requiere circuito metabólico pero
+  // su plantilla original no incluía días mixtos, modificamos los días de 'resistance'
+  // (hasta 2) a 'mixed' o 'circuit'.
+  const adaptedTemplate = baseTemplate.map((day) => {
+    if (
+      day.sessionType === 'resistance' &&
+      (profile?.prefersHybridCircuit === true || String(goal || '').toLowerCase().includes('recomposition')) &&
+      !baseTemplate.some(d => d.sessionType === 'mixed')
+    ) {
+       return { ...day, sessionType: 'mixed', title: day.title + ' en Circuito' };
+    }
+    return day;
+  });
+
   const baseTarget = buildMacroTargetFromProfile({ ...profile, goal }, adaptiveTuning);
   const mealsPerDay = clamp(toNumber(profile.mealsPerDay, 4), 3, 6);
   const workoutVolumeFactor = clamp(toNumber(adaptiveTuning?.workout?.volumeFactor, 1), 0.7, 1.2);
@@ -1165,7 +1190,7 @@ export function generateWeeklyPlan({
     throw new Error('startDate inválido para el plan semanal.');
   }
   start.setUTCHours(0, 0, 0, 0);
-  const template = rotateTemplateToDate(baseTemplate, start);
+  const template = rotateTemplateToDate(adaptedTemplate, start);
   const userSeed = computeUserSeed(profile, goal, userId) + Number(seedOffset || 0);
 
   // Objetivo de carrera + ritmos derivados de una marca reciente (si la hay).

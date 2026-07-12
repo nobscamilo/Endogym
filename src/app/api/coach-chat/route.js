@@ -13,7 +13,7 @@ import { recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
-import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
+import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { buildCoachChatPrompt } from '../../../services/coachPersona.js';
 import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFlags.js';
@@ -128,8 +128,9 @@ async function buildUserContext(uid) {
       if (efTrend) {
         parts.push(`Eficiencia aeróbica (m/min por ppm): reciente ${efTrend.recentEf} vs base ${efTrend.baselineEf} (${efTrend.trendPct >= 0 ? '+' : ''}${efTrend.trendPct}%).`);
       }
-      const targetMeters = RACE_GOAL_METERS[profile?.runRaceGoal] || null;
-      if (targetMeters) {
+      const resolvedGoal = resolveRaceGoal(profile?.runRaceGoal);
+      const targetMeters = RACE_GOAL_META[resolvedGoal]?.distanceMeters || null;
+      if (targetMeters && resolvedGoal !== 'health') {
         const pred = predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs });
         if (pred) parts.push(`Predicción actual para su objetivo (${profile.runRaceGoal.replace('race_', '').toUpperCase()}, Riegel sobre su mejor esfuerzo real del ${pred.basedOn.date}): ~${formatRaceTime(pred.seconds)}.`);
       }

@@ -86,6 +86,11 @@ function dayPlan(day, kcal = 1000, protein = 100) {
 function chunk(days, kcal = 1000, protein = 100) {
   return {
     days: days.map((day) => dayPlan(day, kcal, protein)),
+  };
+}
+
+function consolidationChunk() {
+  return {
     shopping: [{ cat: 'Proteínas', items: [{ name: 'Pollo', qty: '1 kg' }] }],
     batch: [{ title: 'Cocinar base', desc: 'Preparar proteínas', time: '45 min', day: 'Dom' }],
   };
@@ -170,9 +175,7 @@ describe('/api/studio-nutrition route', () => {
       chunk(['Vie', 'Sáb'], 1000, 100),
       chunk(['Dom'], 1000, 100),
       chunk(['Lun', 'Mar'], 1000, 100),
-      chunk(['Mié', 'Jue'], 1000, 100),
-      chunk(['Vie', 'Sáb'], 1000, 100),
-      chunk(['Dom'], 1000, 100),
+      consolidationChunk(),
     ]);
 
     const response = await POST(new Request('http://localhost/api/studio-nutrition', {
@@ -182,8 +185,8 @@ describe('/api/studio-nutrition route', () => {
     const json = await readJson(response);
 
     expect(response.status).toBe(200);
-    // Reintento DIRIGIDO: solo se regenera el trozo con drift (Lun-Mar) → 4 iniciales + 1.
-    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(5);
+    // Reintento DIRIGIDO: solo se regenera el trozo con drift (Lun-Mar) → 4 iniciales + 1, y al final 1 de consolidación.
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(6);
     expect(json.macroCheck.driftDays).toEqual([]);
     expect(json.nutrition.meta.planSignature).toMatch(/^[a-f0-9]{16}$/);
     expect(mocks.saveStudioNutritionPlan).toHaveBeenCalledTimes(1);
@@ -204,6 +207,7 @@ describe('/api/studio-nutrition route', () => {
       chunk(['Mié', 'Jue'], 600, 55),
       chunk(['Vie', 'Sáb'], 600, 55),
       chunk(['Dom'], 600, 55),
+      consolidationChunk(),
     ]);
 
     const response = await POST(new Request('http://localhost/api/studio-nutrition', {

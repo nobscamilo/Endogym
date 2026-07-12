@@ -16,7 +16,8 @@ import {
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../core/wellnessDigest.js';
 import { COACH_ANALYST_PERSONA } from './coachPersona.js';
 import {
-  RACE_GOAL_METERS,
+  RACE_GOAL_META,
+  resolveRaceGoal,
   buildEfficiencyTrend,
   formatRaceTime,
   hrMaxFromAge,
@@ -396,8 +397,9 @@ export function buildRunGoalSignals({ profile, plan, workouts, now = new Date() 
   } : null;
 
   const efficiency = buildEfficiencyTrend(runs);
-  const targetMeters = RACE_GOAL_METERS[raceGoal] || null;
-  const predicted = targetMeters ? predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs }) : null;
+  const resolvedGoal = resolveRaceGoal(raceGoal);
+  const targetMeters = RACE_GOAL_META[resolvedGoal]?.distanceMeters || null;
+  const predicted = (targetMeters && resolvedGoal !== 'health') ? predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs }) : null;
   const label = raceGoalLabel(raceGoal);
 
   return {

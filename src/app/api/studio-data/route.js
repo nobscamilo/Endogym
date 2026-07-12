@@ -13,7 +13,7 @@ import {
   getLastDoneWorkoutAt,
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
-import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, RACE_GOAL_METERS } from '../../../core/running.js';
+import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, findDaySession } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
@@ -139,8 +139,9 @@ function mapRunFitness(workouts, profile) {
       runsUsed: trend.points.length,
     };
   }
-  const targetMeters = RACE_GOAL_METERS[profile?.runRaceGoal] || null;
-  if (targetMeters) {
+  const resolvedGoal = resolveRaceGoal(profile?.runRaceGoal);
+  const targetMeters = RACE_GOAL_META[resolvedGoal]?.distanceMeters || null;
+  if (targetMeters && resolvedGoal !== 'health') {
     const pred = predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs });
     if (pred) {
       out.prediction = {
