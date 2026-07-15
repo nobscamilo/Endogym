@@ -115,6 +115,56 @@ describe('GET /api/session-for-date', () => {
     expect(json.logged).toBeNull();
   });
 
+  it('devuelve un día de DESCANSO del bloque con isRestDay (editor flexible), isTrainingDay=false', async () => {
+    const date = ymd(-1);
+    mocks.getLatestWeeklyPlan.mockResolvedValue({
+      id: 'plan-1',
+      days: [
+        { date, dayName: 'Ayer', isTrainingDay: false, sessionType: 'recovery', sessionFocus: 'recovery', workout: { title: 'Recuperación', exercises: [] } },
+        { date: ymd(0), dayName: 'Hoy', isTrainingDay: true, sessionType: 'resistance', sessionFocus: 'upper', workout: { title: 'Torso', exercises: [{ id: 'x', name: 'Press banca', category: 'upper_push' }] } },
+      ],
+    });
+    const res = await get(date);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.isTrainingDay).toBe(false);
+    expect(json.session).not.toBeNull();
+    expect(json.session.isRestDay).toBe(true);
+  });
+
+  it('expone el implemento (equip) de cada ejercicio prescrito para el desglose de cargas', async () => {
+    const date = ymd(-1);
+    mocks.getLatestWeeklyPlan.mockResolvedValue({
+      id: 'plan-1',
+      days: [
+        {
+          date,
+          dayName: 'Ayer',
+          isTrainingDay: true,
+          sessionType: 'resistance',
+          sessionFocus: 'lower',
+          workout: {
+            title: 'Pierna',
+            exercises: [{
+              id: 'gym-barbell-back-squat',
+              name: 'Sentadilla trasera con barra',
+              category: 'lower_body_strength',
+              equipment: 'Barbell + Rack',
+              prescription: { format: 'reps', sets: 4, reps: '6-8', loadKg: 50 },
+            }],
+          },
+        },
+      ],
+    });
+    const res = await get(date);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.isTrainingDay).toBe(true);
+    expect(json.session.list[0].equip).toBe('Barbell + Rack');
+    expect(json.session.list[0].loadKg).toBe(50);
+  });
+
   it('expone el resumen de un día ya registrado para poder editarlo', async () => {
     const date = ymd(-2);
     mocks.listWorkoutsSince.mockResolvedValue([

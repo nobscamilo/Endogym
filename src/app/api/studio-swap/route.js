@@ -7,6 +7,7 @@ import { suggestExerciseAlternatives } from '../../../core/exerciseLibrary.js';
 import { buildSessionFocusChange, buildSessionFocusReschedule } from '../../../core/planner.js';
 import { resolveRaceGoal, estimate5kPaceSecPerKm, deriveRunPaces, buildRunPrescription } from '../../../core/running.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
+import { validateBacklogDate } from '../session-for-date/route.js';
 
 // Swap de ejercicios del Studio (fase 2). Cambia un ejercicio (scope 'one') o toda la sesión
 // de hoy (scope 'all'), eligiendo alternativas con la lógica del coach (suggestExerciseAlternatives)
@@ -42,6 +43,12 @@ export async function POST(request) {
     const scope = isFocusSwap ? 'focus' : ((body?.scope === 'all' || reason === 'more_time') ? 'all' : 'one');
     const exerciseId = typeof body?.exerciseId === 'string' ? body.exerciseId : null;
     if (scope === 'one' && !exerciseId) return errorResponse('Falta exerciseId.', 400);
+    // Edición retroactiva (15 jul 2026, decisión del usuario: el cambio de grupo de un día
+    // pasado también reescribe ese día en el bloque para que Semana/adherencia/coach sean
+    // coherentes con lo realmente hecho). Solo se admite para `scope:'focus'` SIN reschedule:
+    // reprogramar intercambiaría el foco con un día vecino (posiblemente futuro) y el registro
+    // de ejercicios reales no necesita tocar el plan (va por POST /api/workouts).
+    const requestedDate = typeof body?.date === 'string' ? body.date : null;
     // #3 — zonas con molestias/agujetas marcadas antes de cambiar de grupo.
     const SORE_AREA_KEYS = ['leg', 'torso', 'shoulder', 'lumbar'];
     const soreAreas = Array.isArray(body?.soreAreas)
@@ -58,10 +65,26 @@ export async function POST(request) {
       }
 
       const today = todayStrUTC();
-      // Día EXACTO de hoy (aunque sea recuperación/descanso). Un bloque vencido nunca debe mutar
-      // su primer día como sustituto de "hoy".
-      const exactIdx = plan.days.findIndex((d) => d.date === today);
-      if (exactIdx < 0) return errorResponse('Tu bloque no contiene el día de hoy. Regenera el plan antes de ajustarlo.', 409);
+      // Fecha objetivo: hoy por defecto; con `date` (edición retroactiva) un día pasado ≤14 días.
+      let targetDate = today;
+      if (requestedDate && requestedDate !== today) {
+        if (scope !== 'focus') return errorResponse('La edición de un día pasado solo admite el cambio de grupo muscular.', 400);
+        if (body?.action === 'reschedule') return errorResponse('Un día pasado no se puede reprogramar por intercambio; cambia el grupo directamente.', 400);
+        const check = validateBacklogDate(requestedDate, today);
+        if (check.error) return errorResponse(check.error, 400);
+        targetDate = requestedDate;
+      }
+      // Día EXACTO (aunque sea recuperación/descanso). Un bloque vencido nunca debe mutar
+      // su primer día como sustituto de "hoy"/la fecha pedida.
+      const exactIdx = plan.days.findIndex((d) => d.date === targetDate);
+      if (exactIdx < 0) {
+        return errorResponse(
+          targetDate === today
+            ? 'Tu bloque no contiene el día de hoy. Regenera el plan antes de ajustarlo.'
+            : 'Tu bloque de entrenamiento no contiene ese día; solo puedes editar días dentro del bloque activo.',
+          409
+        );
+      }
       const idx = exactIdx;
       const day = plan.days[idx];
       const exercises = Array.isArray(day.workout?.exercises) ? day.workout.exercises : [];

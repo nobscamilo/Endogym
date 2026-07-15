@@ -103,7 +103,12 @@ export async function GET(request) {
         }).plan;
       }
 
-      const session = mapTodaySession(planForStudio, date, workouts, profile, { exact: true });
+      // Modo NO exacto (editor retroactivo flexible, 15 jul 2026): devuelve el día por fecha
+      // EXACTA aunque sea descanso/recuperación (isRestDay + focusOptions/focusConversion),
+      // para poder cambiar el grupo muscular o registrar fuerza en un día que no era de fuerza.
+      // No hay riesgo de fallback: mapTodaySession no-exacto también resuelve por fecha exacta
+      // (el fallback al primer día de fuerza se eliminó el 20 jun 2026).
+      const session = mapTodaySession(planForStudio, date, workouts, profile);
       const logged = findDaySession(workouts, date);
       const loggedSummary = logged
         ? {
@@ -131,7 +136,8 @@ export async function GET(request) {
         ok: true,
         date,
         today,
-        isTrainingDay: Boolean(session),
+        // Día de ENTRENO prescrito (un día de descanso devuelto para editar no lo es).
+        isTrainingDay: Boolean(session && !session.isRestDay && Array.isArray(session.list) && session.list.length),
         session,
         logged: loggedSummary,
       });

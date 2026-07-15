@@ -625,6 +625,9 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [weight, setWeight] = useStateP(u.weightKg != null ? String(u.weightKg) : '');
   const [height, setHeight] = useStateP(u.heightCm != null ? String(u.heightCm) : '');
   const [hrMax, setHrMax] = useStateP(u.hrMaxBpm != null ? String(u.hrMaxBpm) : '');
+  // Peso de la barra del gym (opcional): solo afecta al DESGLOSE visual de cargas
+  // ("barra 20 kg + X por lado"). Vacío = barra olímpica de 20 kg.
+  const [barKg, setBarKg] = useStateP(u.barbellKg != null ? String(u.barbellKg) : '');
   // Biometría inicial (opcional): cintura + Navy (cuello, y cadera en mujeres). Se guardan como
   // primera medición en /api/metrics (serie de Progreso), no en el perfil.
   const [waistCm, setWaistCm] = useStateP('');
@@ -714,6 +717,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         runRefTimeSeconds: usesRace ? mmssToSecs(refTime) : null,
         raceDate: usesRace ? (raceDate || null) : null,
         hrMaxBpm: hrMax ? Number(hrMax) : null,
+        barbellKg: barKg ? Number(barKg) : null,
         conditions: conds,
         equipment: gear,
         goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
@@ -946,6 +950,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
             <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
             <div className="field"><label>Revisión (semanas) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="1" max="26" placeholder="Sin indicar" title="Cada cuántas semanas te volvemos a preguntar por tu disponibilidad" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
             <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
+            <div className="field"><label>Barra (kg) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="5" max="35" step="0.5" placeholder="20" title="Peso de la barra de tu gym. Solo afecta al desglose visual de cargas: «barra + discos por lado». Vacío = olímpica de 20 kg" value={barKg} onChange={(e) => setBarKg(e.target.value)} /></div>
           </div>
           <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Biometría</div>
           <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — para tu riesgo cardiometabólico y su evolución en Progreso.</p>

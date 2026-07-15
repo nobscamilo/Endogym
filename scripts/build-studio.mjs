@@ -42,6 +42,7 @@ const outFile = path.join(repoRoot, 'public', 'studio', 'app', 'studio.bundle.js
 // Orden idéntico al de los <script> del prototipo (importa por las refs const cross-file).
 const FILES = [
   'data.js',
+  'load-format.js',
   'icons.jsx',
   'ui.jsx',
   'coach.jsx',
@@ -240,6 +241,12 @@ function readStudioFile(name) {
   if (name === 'app.jsx') {
     // El render lo hace el POSTAMBLE (tras fusionar datos reales).
     code = code.replace(/ReactDOM\.createRoot\([^;]*\);?/s, '');
+  }
+  if (name === 'load-format.js') {
+    // load-format.js es un módulo ESM puro (lo testea vitest con imports); aquí se concatena
+    // como script plano, así que se retiran los `export` (las const/function quedan en el scope
+    // compartido del bundle, igual que el resto de refs cross-file).
+    code = code.replace(/^export (const|function)/gm, '$1');
   }
   return `\n/* ===== ${name} ===== */\n${code}\n`;
 }

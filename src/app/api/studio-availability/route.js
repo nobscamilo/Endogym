@@ -83,6 +83,11 @@ export async function POST(request) {
     const hrMax = Number(body?.hrMaxBpm);
     if (Number.isFinite(hrMax) && hrMax >= 120 && hrMax <= 230) patch.hrMaxBpm = Math.round(hrMax);
     else if (body?.hrMaxBpm === null) patch.hrMaxBpm = null;
+    // Peso de la barra del gym (opcional, solo presentación del desglose de cargas).
+    // Rango real de barras comerciales: 5-35 kg; redondeo a 0,5 kg. null = volver al default (20 kg).
+    const barbell = Number(body?.barbellKg);
+    if (Number.isFinite(barbell) && barbell >= 5 && barbell <= 35) patch.barbellKg = Math.round(barbell * 2) / 2;
+    else if (body?.barbellKg === null) patch.barbellKg = null;
 
     // Comorbilidades ESTRUCTURADAS (checkboxes de Perfil): fuente principal de
     // detectComorbidities (calentamiento/retorno, restricciones de selección).

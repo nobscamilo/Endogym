@@ -258,6 +258,9 @@ function mapUser(profile, authUser) {
   if (num(p.runRefTimeSeconds) !== undefined) out.runRefTimeSeconds = num(p.runRefTimeSeconds);
   if (p.raceDate) out.raceDate = p.raceDate;
   if (num(p.hrMaxBpm) !== undefined) out.hrMaxBpm = num(p.hrMaxBpm);
+  // Peso de la barra del gym del usuario (para el desglose "barra + discos por lado").
+  // Default de presentación: 20 kg (olímpica) — se aplica en el cliente si no hay valor.
+  if (num(p.barbellKg) !== undefined) out.barbellKg = num(p.barbellKg);
   return out;
 }
 
@@ -397,6 +400,9 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
       item.restSec = Number(e.prescription.restSeconds);
     }
     if (e.prescription?.loadSource) item.loadSource = e.prescription.loadSource;
+    // Implemento del ejercicio: la UI lo usa para el DESGLOSE de la carga (barra incluida +
+    // discos por lado, kg por mancuerna, placa de máquina). Ver load-format.js en el Studio.
+    if (e.equipment) item.equip = e.equipment;
     return item;
   });
   // Un día de entreno sin ejercicios sí es null; un día de descanso/recuperación se devuelve igual

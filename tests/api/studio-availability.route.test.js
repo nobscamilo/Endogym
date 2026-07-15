@@ -137,4 +137,21 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     await post(completeSurvey({ prefersHybridCircuit: 'yes' }));
     expect('prefersHybridCircuit' in mocks.upsertUserProfile.mock.calls[2][1]).toBe(false);
   });
+
+  it('barbellKg se persiste acotado (5-35, paso 0,5), null lo borra y valores inválidos se ignoran', async () => {
+    await post(completeSurvey({ barbellKg: 15 }));
+    expect(mocks.upsertUserProfile.mock.calls[0][1].barbellKg).toBe(15);
+
+    await post(completeSurvey({ barbellKg: 20.3 }));
+    expect(mocks.upsertUserProfile.mock.calls[1][1].barbellKg).toBe(20.5);
+
+    await post(completeSurvey({ barbellKg: null }));
+    expect(mocks.upsertUserProfile.mock.calls[2][1].barbellKg).toBeNull();
+
+    await post(completeSurvey({ barbellKg: 80 }));
+    expect('barbellKg' in mocks.upsertUserProfile.mock.calls[3][1]).toBe(false);
+
+    await post(completeSurvey({ barbellKg: 'veinte' }));
+    expect('barbellKg' in mocks.upsertUserProfile.mock.calls[4][1]).toBe(false);
+  });
 });

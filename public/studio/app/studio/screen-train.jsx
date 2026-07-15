@@ -317,6 +317,7 @@ function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinis
               {circuit ? <span className="pill tiny"><Icon name="clock" size={12} /> {restBetweenEx} s tras el ejercicio</span>
                 : (ex.restSec != null ? <span className="pill tiny"><Icon name="clock" size={12} /> descanso {ex.restSec} s</span> : null)}
             </div>
+            <LoadBreakdown kg={ex.loadKg} equip={ex.equip} style={{ marginTop: 6 }} />
             {Array.isArray(ex.cues) && ex.cues.length ? (
               <ul className="step-list" style={{ margin: '12px 0 0' }}>
                 {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
@@ -953,6 +954,9 @@ function TrainSession() {
               <div className="ex-main" onClick={() => open(ex, null)} style={{ cursor: 'pointer' }}>
                 <strong>{ex.name}</strong>
                 <div className="ex-sub">{ex.muscle} · {ex.load}{ex.restSec != null ? ` · descanso ${ex.restSec} s` : ''}</div>
+                {/* Desglose del montaje: barra incluida + discos por lado / por mancuerna / placa.
+                    Si el usuario teclea otra carga, el desglose sigue a la carga tecleada. */}
+                <LoadBreakdown kg={(logKg[ex.id] !== undefined && logKg[ex.id] !== '') ? logKg[ex.id] : ex.loadKg} equip={ex.equip} />
               </div>
               <div className="ex-sets">
                 <span className="ex-scheme">{ex.scheme}</span>
@@ -1197,6 +1201,28 @@ function backlogDateOptions(maxBack = PAST_MAX_BACK_DAYS) {
   return opts;
 }
 
+// Desglose de la carga por implemento (barra incluida + discos por lado, kg por mancuerna,
+// placa de máquina). Presentación pura: usa describeLoad (load-format.js) + barra del perfil.
+function LoadBreakdown({ kg, equip, style }) {
+  const D = window.STUDIO;
+  const barKg = Number(D && D.user && D.user.barbellKg) > 0 ? Number(D.user.barbellKg) : DEFAULT_BAR_KG;
+  const d = describeLoad({ loadKg: Number(kg), equipment: equip, barKg });
+  if (!d) return null;
+  return <span className="tiny muted" style={{ display: 'block', lineHeight: 1.35, ...(style || {}) }}>{d.text}</span>;
+}
+
+// Catálogo compacto de ejercicios para el editor retroactivo (se pide UNA vez por sesión de uso).
+async function fetchExerciseCatalog() {
+  if (window.__exCatalog) return window.__exCatalog;
+  const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+  if (!token) return null;
+  const r = await fetch('/api/exercise-catalog', { headers: { authorization: 'Bearer ' + token } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok || !Array.isArray(j.exercises)) return null;
+  window.__exCatalog = j.exercises;
+  return j.exercises;
+}
+
 function PastSessionLogger() {
   const [open, setOpen] = useStateTr(false);
   const [dateOpts] = useStateTr(() => backlogDateOptions());
@@ -1205,7 +1231,7 @@ function PastSessionLogger() {
   const [session, setSession] = useStateTr(null);
   const [isTraining, setIsTraining] = useStateTr(false);
   const [existing, setExisting] = useStateTr(null);
-  const [rows, setRows] = useStateTr([]); // [{id,name,sets,loadKg,kg,reps}]
+  const [rows, setRows] = useStateTr([]); // [{id,name,sets,kg,reps,equip,added}]
   const [completed, setCompleted] = useStateTr(true);
   const [rpe, setRpe] = useStateTr(null);
   const [fatigue, setFatigue] = useStateTr(null);
@@ -1213,8 +1239,19 @@ function PastSessionLogger() {
   const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
   const [save, setSave] = useStateTr('idle'); // idle|saving|ok|err
   const [err, setErr] = useStateTr('');
+  // Editor flexible (colapsado, solo se despliega si el usuario lo pide): cambiar grupo
+  // muscular del día pasado (reescribe ese día del bloque vía studio-swap con `date`) y
+  // añadir/quitar ejercicios del registro.
+  const [editOpen, setEditOpen] = useStateTr(false);
+  const [catalog, setCatalog] = useStateTr(null); // null|'loading'|'err'|Array
+  const [q, setQ] = useStateTr('');
+  const [focusSel, setFocusSel] = useStateTr('');
+  const [focusBusy, setFocusBusy] = useStateTr(false);
+  const [focusMsg, setFocusMsg] = useStateTr('');
+  const [focusErr, setFocusErr] = useStateTr('');
   const toggleSym = (k) => setSymptoms((p) => ({ ...p, [k]: !p[k] }));
   const updateRow = (i, field, val) => setRows((p) => p.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
+  const removeRow = (i) => setRows((p) => p.filter((_, idx) => idx !== i));
 
   async function loadDate(d) {
     setLoad('loading'); setErr(''); setSave('idle');
@@ -1231,15 +1268,17 @@ function PastSessionLogger() {
       const newRows = planEx.map((it) => {
         const lg = findLog(it);
         return {
-          id: it.id || null, name: it.name, sets: it.sets ?? null, loadKg: it.loadKg ?? null,
+          id: it.id || null, name: it.name, equip: it.equip || null,
+          sets: lg && lg.sets != null ? String(lg.sets) : (it.sets != null ? String(it.sets) : ''),
           kg: lg && lg.kg != null ? String(lg.kg) : (it.loadKg != null ? String(it.loadKg) : ''),
           reps: lg && lg.reps != null ? String(lg.reps) : (it.reps != null ? String(it.reps) : ''),
         };
       });
-      // Cargas registradas que no estén en el plan de ese día (p. ej. ejercicios libres) → se conservan.
+      // Cargas registradas que no estén en el plan de ese día (p. ej. ejercicios libres) → se
+      // conservan como filas "añadidas" (editables/quitables; se guardan aunque solo tengan reps).
       loggedLifts.forEach((l) => {
         if (!newRows.some((rw) => (l.id && rw.id === l.id) || rw.name === l.name)) {
-          newRows.push({ id: l.id || null, name: l.name, sets: l.sets ?? null, loadKg: null, kg: l.kg != null ? String(l.kg) : '', reps: l.reps != null ? String(l.reps) : '' });
+          newRows.push({ id: l.id || null, name: l.name, equip: null, added: true, sets: l.sets != null ? String(l.sets) : '', kg: l.kg != null ? String(l.kg) : '', reps: l.reps != null ? String(l.reps) : '' });
         }
       });
       setSession(sess); setIsTraining(Boolean(j.isTrainingDay)); setExisting(j.logged || null); setRows(newRows);
@@ -1271,11 +1310,14 @@ function PastSessionLogger() {
       const title = (session && session.title) || 'Sesión';
       const exercises = rows
         .map((rw) => {
-          const ex = { name: rw.name, weightKg: Number(rw.kg) || null, reps: Number(rw.reps) || null, sets: rw.sets ?? null };
+          const ex = { name: rw.name, weightKg: Number(rw.kg) || null, reps: Number(rw.reps) || null, sets: Number(rw.sets) || null, __added: Boolean(rw.added) };
           if (rw.id) ex.id = rw.id;
           return ex;
         })
-        .filter((e) => e.name && e.weightKg);
+        // Filas del plan: solo si tienen kg (no registrar como hecho lo no tocado).
+        // Filas AÑADIDAS por el usuario: basta kg o reps (p. ej. dominadas sin lastre).
+        .filter((e) => e.name && (e.weightKg || (e.__added && e.reps)))
+        .map(({ __added, ...e }) => e);
       // 1) Cargas (manual idempotente por día) — solo si completada y con cargas.
       let okManual = true;
       if (completed && exercises.length) {
@@ -1299,6 +1341,66 @@ function PastSessionLogger() {
       else { setSave('err'); setErr('No se pudo guardar. Reintenta.'); }
     } catch (e) { setSave('err'); setErr('No se pudo guardar. Reintenta.'); }
   }
+
+  // Cambiar el grupo muscular del día PASADO: reescribe ese día del bloque (decisión del
+  // usuario, 15 jul 2026) vía studio-swap con `date`; luego recarga el plan de esa fecha.
+  async function changePastFocus() {
+    if (!focusSel) return;
+    setFocusBusy(true); setFocusMsg(''); setFocusErr('');
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (!token) { setFocusErr('Inicia sesión para cambiar el grupo.'); return; }
+      const r = await fetch('/api/studio-swap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ scope: 'focus', sessionFocus: focusSel, date }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setFocusSel('');
+        setFocusMsg(j.warning || 'Grupo cambiado; el plan de ese día se actualizó.');
+        await loadDate(date);
+      } else {
+        setFocusErr(j.error || 'No se pudo cambiar el grupo de ese día.');
+      }
+    } catch (e) { setFocusErr('No se pudo cambiar el grupo de ese día.'); }
+    finally { setFocusBusy(false); }
+  }
+
+  function toggleEditor() {
+    const next = !editOpen;
+    setEditOpen(next);
+    if (next && catalog == null) {
+      setCatalog('loading');
+      fetchExerciseCatalog().then((c) => setCatalog(c || 'err')).catch(() => setCatalog('err'));
+    }
+  }
+
+  function addExercise(e) {
+    setRows((p) => [...p, { id: e.id || null, name: e.name, equip: e.equip || null, added: true, sets: '3', kg: '', reps: '' }]);
+    setQ('');
+  }
+
+  const catalogMatches = (() => {
+    if (!Array.isArray(catalog)) return [];
+    const nq = String(q || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    if (nq.length < 2) return [];
+    const inRows = new Set(rows.map((rw) => rw.id).filter(Boolean));
+    return catalog
+      .filter((e) => !inRows.has(e.id))
+      .filter((e) => {
+        const hay = `${e.name} ${e.muscle || ''} ${e.category || ''} ${e.equip || ''}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        return nq.split(/\s+/).every((w) => hay.includes(w));
+      })
+      .slice(0, 8);
+  })();
+
+  // Opciones de grupo del día pasado: matriz del backend si existe; si no, las básicas.
+  const pastFocusOpts = (session && Array.isArray(session.focusOptions) && session.focusOptions.length)
+    ? session.focusOptions
+    : SESSION_FOCUS_CHOICES.map((c) => ({ id: c.id, label: c.label, current: session ? c.id === session.focus : false, available: true }));
+  const pastIsConversion = Boolean(session && (session.isRestDay || session.focusConversion
+    || (session.sessionType && !['resistance', 'mixed'].includes(session.sessionType))));
 
   const selectedLabel = (dateOpts.find((o) => o.value === date) || {}).label || date;
 
@@ -1332,16 +1434,97 @@ function PastSessionLogger() {
               {rows.length ? (
                 <div className="stack" style={{ gap: 10 }}>
                   {rows.map((rw, i) => (
-                    <div key={(rw.id || rw.name) + i} className="row ac between wrap" style={{ gap: 8 }}>
-                      <strong style={{ fontSize: '0.9rem', flex: '1 1 140px' }}>{rw.name}</strong>
-                      <div className="row ac" style={{ gap: 6 }}>
-                        <input type="number" min="0" step="0.5" className="num-input" style={{ width: 78 }} placeholder="kg" value={rw.kg} onChange={(e) => updateRow(i, 'kg', e.target.value)} />
-                        <span className="tiny muted">kg</span>
-                        <input type="number" min="0" step="1" className="num-input" style={{ width: 64 }} placeholder="reps" value={rw.reps} onChange={(e) => updateRow(i, 'reps', e.target.value)} />
-                        <span className="tiny muted">reps</span>
+                    <div key={(rw.id || rw.name) + i} className="stack" style={{ gap: 2 }}>
+                      <div className="row ac between wrap" style={{ gap: 8 }}>
+                        <strong style={{ fontSize: '0.9rem', flex: '1 1 140px' }}>{rw.name}{rw.added ? <span className="tiny muted"> · añadido</span> : null}</strong>
+                        <div className="row ac" style={{ gap: 6 }}>
+                          <input type="number" min="0" step="1" className="num-input" style={{ width: 56 }} placeholder="ser." title="Series" value={rw.sets} onChange={(e) => updateRow(i, 'sets', e.target.value)} />
+                          <span className="tiny muted">×</span>
+                          <input type="number" min="0" step="1" className="num-input" style={{ width: 64 }} placeholder="reps" value={rw.reps} onChange={(e) => updateRow(i, 'reps', e.target.value)} />
+                          <span className="tiny muted">·</span>
+                          <input type="number" min="0" step="0.5" className="num-input" style={{ width: 78 }} placeholder="kg" value={rw.kg} onChange={(e) => updateRow(i, 'kg', e.target.value)} />
+                          <span className="tiny muted">kg</span>
+                          {editOpen ? (
+                            <button type="button" className="btn ghost sm" title="Quitar del registro" style={{ padding: '4px 8px' }} onClick={() => removeRow(i)}>
+                              <Icon name="close" size={13} />
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
+                      <LoadBreakdown kg={rw.kg} equip={rw.equip} />
                     </div>
                   ))}
+                </div>
+              ) : null}
+
+              {/* Editor flexible: SOLO se despliega si el usuario lo pide. */}
+              <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={toggleEditor}>
+                <Icon name={editOpen ? 'close' : 'edit'} size={14} /> {editOpen ? 'Cerrar edición' : 'Editar sesión de ese día (grupo y ejercicios)'}
+              </button>
+              {editOpen ? (
+                <div className="stack" style={{ gap: 14, padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 14 }}>
+                  {session ? (
+                    <div>
+                      <div className="mb-label">Grupo muscular de ese día</div>
+                      {pastIsConversion ? (
+                        <p className="tiny" style={{ margin: '0 0 8px', color: 'var(--accent)', lineHeight: 1.45 }}>
+                          Ese día no era de fuerza. Elegir un grupo <strong>convertirá ese día en fuerza dentro de tu plan</strong> (quedará registrado como lo que realmente hiciste).
+                        </p>
+                      ) : null}
+                      <div className="chips">
+                        {pastFocusOpts.map((opt) => {
+                          const blocked = !opt.current && opt.available === false;
+                          return (
+                            <button key={opt.id} type="button"
+                              className={`pill ${focusSel === opt.id ? 'accent' : ''}`}
+                              disabled={opt.current || blocked}
+                              style={opt.current || blocked ? { opacity: 0.5, cursor: 'not-allowed' } : null}
+                              title={opt.reason || ''}
+                              onClick={() => setFocusSel(opt.id)}>
+                              {opt.label}{opt.current ? ' · actual' : (blocked ? ' 🔒' : '')}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="row ac wrap" style={{ gap: 10, marginTop: 8 }}>
+                        <button className="btn ghost sm" disabled={!focusSel || focusBusy} onClick={changePastFocus}>
+                          <Icon name="target" size={14} /> {focusBusy ? 'Cambiando…' : 'Cambiar grupo de ese día'}
+                        </button>
+                        {focusMsg ? <span className="tiny muted">{focusMsg}</span> : null}
+                        {focusErr ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>{focusErr}</span> : null}
+                      </div>
+                      <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.4 }}>
+                        Al cambiar el grupo se reescribe ese día del bloque y las cargas se prefijan del plan nuevo; ajusta abajo lo que hiciste de verdad.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="tiny muted" style={{ margin: 0 }}>Ese día no está dentro de tu bloque actual, así que no hay grupo que cambiar; puedes añadir abajo los ejercicios que hiciste.</p>
+                  )}
+
+                  <div>
+                    <div className="mb-label">Añadir ejercicio</div>
+                    {catalog === 'loading' ? <span className="tiny muted">Cargando catálogo…</span> : null}
+                    {catalog === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo cargar el catálogo. Puedes añadirlo como ejercicio libre abajo.</span> : null}
+                    <input className="num-input" style={{ width: '100%', maxWidth: 360 }} placeholder="Busca por nombre, músculo o material…" value={q} onChange={(e) => setQ(e.target.value)} />
+                    {catalogMatches.length ? (
+                      <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+                        {catalogMatches.map((e) => (
+                          <button key={e.id} type="button" className="row ac between" style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 10px', cursor: 'pointer', textAlign: 'left', gap: 8 }} onClick={() => addExercise(e)}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{e.name}</span>
+                            <span className="tiny muted">{[e.muscle, e.equip].filter(Boolean).join(' · ')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {Array.isArray(catalog) && q.trim().length >= 2 && !catalogMatches.length ? (
+                      <div className="row ac wrap" style={{ gap: 8, marginTop: 8 }}>
+                        <span className="tiny muted">Sin coincidencias en el catálogo.</span>
+                        <button type="button" className="btn ghost sm" onClick={() => addExercise({ id: null, name: q.trim().slice(0, 120), equip: null })}>
+                          <Icon name="plus" size={13} /> Añadir “{q.trim().slice(0, 40)}” como ejercicio libre
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
 

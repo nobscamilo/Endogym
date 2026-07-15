@@ -271,6 +271,82 @@ describe('/api/studio-swap route', () => {
     expect(mocks.updatePlan).not.toHaveBeenCalled();
   });
 
+  // ---- Edición retroactiva (cambio de grupo de un día PASADO dentro del bloque) ----
+  it('cambia el grupo de un día pasado dentro del bloque (date ≤14 días)', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-14', 'lower', 'Pierna de ayer'),
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', date: '2026-06-14' }),
+    }));
+    const json = await response.json();
+    const patch = mocks.updatePlan.mock.calls[0]?.[0];
+    expect(response.status).toBe(200);
+    expect(json.sessionFocus).toBe('upper');
+    // Se reescribe el día PASADO (índice 0), no el de hoy.
+    expect(patch.days[0].sessionFocus).toBe('upper');
+    expect(patch.days[1].sessionFocus).toBe('lower');
+  });
+
+  it('rechaza date futura o fuera de la ventana de 14 días', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+    ]));
+    const future = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', date: '2026-06-16' }),
+    }));
+    expect(future.status).toBe(400);
+    const tooOld = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', date: '2026-05-01' }),
+    }));
+    expect(tooOld.status).toBe(400);
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
+
+  it('rechaza reprogramar por intercambio un día pasado', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-14', 'lower', 'Pierna de ayer'),
+      trainingDay('2026-06-15', 'upper', 'Torso actual'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', action: 'reschedule', date: '2026-06-14' }),
+    }));
+    expect(response.status).toBe(400);
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
+
+  it('rechaza date en swaps que no sean de grupo muscular', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-14', 'lower', 'Pierna de ayer'),
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'one', exerciseId: 'gym-barbell-back-squat', date: '2026-06-14' }),
+    }));
+    expect(response.status).toBe(400);
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un date que el bloque no contiene (sin mutar otro día)', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
+      trainingDay('2026-06-15', 'lower', 'Pierna actual'),
+    ]));
+    const response = await POST(new Request('http://localhost/api/studio-swap', {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'focus', sessionFocus: 'upper', date: '2026-06-13' }),
+    }));
+    const json = await response.json();
+    expect(response.status).toBe(409);
+    expect(json.error).toMatch(/no contiene ese día/i);
+    expect(mocks.updatePlan).not.toHaveBeenCalled();
+  });
+
   it('rechaza un bloque vencido en vez de modificar su primer día', async () => {
     mocks.getLatestWeeklyPlan.mockResolvedValue(planWith([
       trainingDay('2026-05-01', 'upper', 'Sesión antigua'),
