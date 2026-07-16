@@ -108,7 +108,10 @@ export async function GET(request) {
       // para poder cambiar el grupo muscular o registrar fuerza en un día que no era de fuerza.
       // No hay riesgo de fallback: mapTodaySession no-exacto también resuelve por fecha exacta
       // (el fallback al primer día de fuerza se eliminó el 20 jun 2026).
-      const session = mapTodaySession(planForStudio, date, workouts, profile);
+      // La fecha pedida está validada como ≤ hoy (no futura). Si es un día PASADO, marcamos
+      // `retroactive` para que la matriz de grupos no bloquee por equilibrio semanal/adyacencia:
+      // se está registrando lo que realmente se hizo, no planificando.
+      const session = mapTodaySession(planForStudio, date, workouts, profile, { retroactive: date !== today });
       const logged = findDaySession(workouts, date);
       const loggedSummary = logged
         ? {

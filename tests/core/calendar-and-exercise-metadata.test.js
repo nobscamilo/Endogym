@@ -402,6 +402,54 @@ describe('exercise muscle metadata', () => {
     expect(upper.reason).toContain('siguiente');
   });
 
+  it('retroactive edit unlocks a focus change blocked by weekly balance (past day = fact, not plan)', () => {
+    // Jueves de recuperación con torso el día siguiente: para HOY/futuro chocaría (dos torso
+    // seguidos), pero si ese día YA PASÓ y el usuario hizo torso, debe poder registrarlo.
+    const days = [
+      { date: '2026-04-06', sessionType: 'resistance', sessionFocus: 'lower', workout: { title: 'Pierna', durationMinutes: 60, exercises: [] } },
+      { date: '2026-04-07', sessionType: 'recovery', sessionFocus: 'recovery', workout: { title: 'Recuperación activa', durationMinutes: 35, exercises: [{ name: 'Caminata' }] } },
+      { date: '2026-04-08', sessionType: 'resistance', sessionFocus: 'upper', workout: { title: 'Torso mañana', durationMinutes: 60, exercises: [] } },
+    ];
+
+    const blocked = listSessionFocusChangeOptions({ days, dayIndex: 1 }).find((o) => o.id === 'upper');
+    expect(blocked.available).toBe(false); // planificación futura: sigue bloqueado
+
+    const retro = listSessionFocusChangeOptions({ days, dayIndex: 1, retroactive: true }).find((o) => o.id === 'upper');
+    expect(retro.available).toBe(true); // día pasado: se registra la realidad
+    expect(retro.reason).toBeNull();
+    expect(retro.compatibilityNote).toContain('día pasado');
+  });
+
+  it('buildSessionFocusChange honors the retroactive flag: past guardrails inform, do not block', () => {
+    const days = [
+      { date: '2026-04-06', sessionType: 'resistance', sessionFocus: 'lower', workout: { title: 'Pierna', durationMinutes: 60, exercises: [] } },
+      { date: '2026-04-07', sessionType: 'recovery', sessionFocus: 'recovery', workout: { title: 'Recuperación activa', durationMinutes: 35, exercises: [{ name: 'Caminata' }] } },
+      { date: '2026-04-08', sessionType: 'resistance', sessionFocus: 'upper', workout: { title: 'Torso mañana', durationMinutes: 60, exercises: [] } },
+    ];
+    const base = {
+      days,
+      dayIndex: 1,
+      targetFocus: 'upper',
+      profile: { goal: GoalType.RECOMPOSITION, trainingMode: 'gym', trainingModality: TrainingModality.FULL_GYM, weightKg: 84 },
+      trainingModality: TrainingModality.FULL_GYM,
+      goal: GoalType.RECOMPOSITION,
+    };
+
+    // Sin el flag (semántica de hoy/futuro): rechazado por adyacencia.
+    const blocked = buildSessionFocusChange(base);
+    expect(blocked.ok).toBe(false);
+    expect(blocked.status).toBe(409);
+
+    // Con retroactive: convierte el día de recuperación en torso, conservando el aviso clínico.
+    const change = buildSessionFocusChange({ ...base, retroactive: true });
+    expect(change.ok).toBe(true);
+    expect(change.retroactive).toBe(true);
+    expect(change.converted).toBe(true);
+    expect(change.day.sessionFocus).toBe('upper');
+    expect(change.day.workout.exercises.length).toBeGreaterThan(0);
+    expect(change.warning).toContain('recuperación');
+  });
+
   it('builds a safe muscle-group focus change with compatible exercises and dynamic warmup', () => {
     const days = [
       {

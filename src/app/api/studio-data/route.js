@@ -358,7 +358,7 @@ function buildSessionRationale(day, profile) {
 // `exact` (registro retroactivo): cuando es true, solo se devuelve la sesión si la fecha
 // pedida es EXACTAMENTE un día de entrenamiento del plan; sin fallback al primer día de
 // entreno (que falsearía la prescripción de un día de descanso o fuera de bloque).
-export function mapTodaySession(plan, today, workouts = [], profile = null, { exact = false } = {}) {
+export function mapTodaySession(plan, today, workouts = [], profile = null, { exact = false, retroactive = false } = {}) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
   // Resolución de "hoy": para el dashboard se usa SIEMPRE el día EXACTO por fecha (aunque sea
@@ -467,7 +467,9 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   // fuerza); por eso la matriz de opciones se calcula también para cardio/recuperación/mindbody.
   if (day.workout && Array.isArray(day.workout.exercises) && day.workout.exercises.length) {
     const dayIndex = days.indexOf(day);
-    const focusOptions = listSessionFocusChangeOptions({ days, dayIndex });
+    // En edición retroactiva (un día ya pasado, vía session-for-date) los guardarraíles de
+    // equilibrio no bloquean los chips: se registra lo que realmente se hizo.
+    const focusOptions = listSessionFocusChangeOptions({ days, dayIndex, retroactive });
     if (focusOptions.length) out.focusOptions = focusOptions;
     if (!['resistance', 'mixed'].includes(day.sessionType)) out.focusConversion = true;
   }

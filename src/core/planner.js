@@ -1601,6 +1601,7 @@ export function suggestSessionAlternatives({
 export function listSessionFocusChangeOptions({
   days = [],
   dayIndex = -1,
+  retroactive = false,
 } = {}) {
   const targetDay = Array.isArray(days) ? days[dayIndex] : null;
   // Antes solo se permitía en días de fuerza/mixto. Ahora también en días NO de fuerza
@@ -1619,8 +1620,9 @@ export function listSessionFocusChangeOptions({
 
   return STRENGTH_FOCUS_CHANGE_OPTIONS.map((meta) => {
     const current = meta.id === currentFocus;
-    const blockReason = current
-      ? 'Foco actual.'
+    // Motivo de desequilibrio semanal/adyacencia (guardarraíl de PLANIFICACIÓN futura).
+    const balanceReason = current
+      ? null
       : (focusChangeBlockReason({
         targetFocus: meta.id,
         targetType: effectiveType,
@@ -1628,10 +1630,13 @@ export function listSessionFocusChangeOptions({
         nextDay,
       }) || weeklyFocusOverloadReason(meta.id, effectiveType, days, dayIndex));
 
-    // #2 — si está bloqueado por adyacencia y el intercambio con el vecino lo resuelve,
-    // la UI puede ofrecer "reprogramar" en vez de solo rechazar. Solo para días de fuerza/mixto
-    // reales: la reprogramación por intercambio no aplica a la conversión de un día no-fuerza.
-    const reschedule = (!current && blockReason && ['resistance', 'mixed'].includes(targetDay.sessionType))
+    // Edición RETROACTIVA (día ya ocurrido): registrar lo que realmente se hizo NO es planificar.
+    // Los guardarraíles de equilibrio dejan de BLOQUEAR (se informan como nota, no impiden). El
+    // foco actual sigue sin ser un "cambio". Para hoy/futuro el guardarraíl sigue intacto.
+    const blockReason = current ? 'Foco actual.' : (retroactive ? null : balanceReason);
+
+    // #2 — reprogramación por intercambio: solo tiene sentido planificando (no en pasado).
+    const reschedule = (!current && balanceReason && !retroactive && ['resistance', 'mixed'].includes(targetDay.sessionType))
       ? proposeFocusReschedule({ days, dayIndex, targetFocus: meta.id, targetType: targetDay.sessionType })
       : null;
 
@@ -1641,7 +1646,8 @@ export function listSessionFocusChangeOptions({
       current,
       available: !blockReason,
       reason: blockReason,
-      compatibilityNote: blockReason || buildSessionCompatibilityNote(meta.id, previousDay, nextDay),
+      compatibilityNote: blockReason
+        || (retroactive && balanceReason ? `Registro de un día pasado — ${balanceReason}` : buildSessionCompatibilityNote(meta.id, previousDay, nextDay)),
       canReschedule: Boolean(reschedule),
       rescheduleWith: reschedule ? (reschedule.neighborName || reschedule.neighborDate || 'la sesión vecina') : null,
     };
@@ -1712,6 +1718,7 @@ export function buildSessionFocusChange({
   goal: planGoal = null,
   phase = null,
   soreAreas = [],
+  retroactive = false,
 } = {}) {
   const targetDay = Array.isArray(days) ? days[dayIndex] : null;
   if (!targetDay?.workout) {
@@ -1725,7 +1732,7 @@ export function buildSessionFocusChange({
 
   const normalizedFocus = String(targetFocus || '').trim();
   const meta = focusChangeMeta(normalizedFocus);
-  const options = listSessionFocusChangeOptions({ days, dayIndex });
+  const options = listSessionFocusChangeOptions({ days, dayIndex, retroactive });
   if (!meta) {
     return {
       ok: false,
@@ -1798,6 +1805,7 @@ export function buildSessionFocusChange({
     options,
     converted,
     warning,
+    retroactive: Boolean(retroactive),
     soreApplied: composed.soreMatched,
     soreNote: composed.soreNote,
   };

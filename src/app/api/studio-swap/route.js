@@ -125,6 +125,10 @@ export async function POST(request) {
             soreApplied: Boolean(resched.soreApplied),
           });
         }
+        // Edición retroactiva: si la fecha objetivo es un día PASADO (no hoy), los guardarraíles
+        // de equilibrio semanal/adyacencia NO deben bloquear — el usuario registra lo que REALMENTE
+        // hizo, no planifica el futuro. Para "hoy" el guardarraíl sigue intacto.
+        const retroactive = targetDate !== today;
         const change = buildSessionFocusChange({
           days: plan.days,
           dayIndex: idx,
@@ -136,6 +140,7 @@ export async function POST(request) {
           goal: plan.goal,
           phase: plan.phase,
           soreAreas,
+          retroactive,
         });
         if (!change.ok) {
           return errorResponse(change.error, change.status || 400, change.details);
@@ -144,7 +149,7 @@ export async function POST(request) {
         const { db } = await getAdminServices();
         await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
           .update({ days: plan.days, updatedAt: new Date().toISOString() });
-        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options, converted: Boolean(change.converted), warning: change.warning || null, soreNote: change.soreNote || null, soreApplied: Boolean(change.soreApplied) });
+        return jsonResponse({ ok: true, sessionFocus: change.day.sessionFocus, options: change.options, converted: Boolean(change.converted), warning: change.warning || null, retroactive: Boolean(change.retroactive), soreNote: change.soreNote || null, soreApplied: Boolean(change.soreApplied) });
       }
 
       if (!exercises.length) return errorResponse('La sesión no tiene ejercicios.', 409);
