@@ -74,6 +74,13 @@ describe('/api/coach-analysis route — alineación con objetivos', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // El digest del coach filtra los entrenos a los últimos COACH_ANALYSIS_LOOKBACK_DAYS (28)
+    // vía Date.now(). Con fixtures de fecha fija, el test se PUDRE al avanzar el reloj real
+    // (un entreno del 18-jun quedaba fuera de la ventana a partir de mediados de julio → la ruta
+    // respondía no_workouts). Congelamos "hoy" a un instante fijo cercano a los fixtures (solo
+    // Date, sin tocar timers reales) para que la ventana sea determinista.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-19T08:00:00.000Z'));
     process.env.GEMINI_API_KEY = 'test-key';
     mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1' });
     mocks.getUserProfile.mockResolvedValue({
@@ -109,6 +116,7 @@ describe('/api/coach-analysis route — alineación con objetivos', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = originalKey;
   });
