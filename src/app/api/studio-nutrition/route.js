@@ -76,11 +76,16 @@ function planNutritionSignature(plan) {
 
 // Pistas de estilo de desayuno por bloque, para diversificar entre días (los bloques se
 // generan en paralelo y no se ven entre sí, así que el reparto lo fijamos aquí).
+// Cada trozo se genera en una llamada INDEPENDIENTE: aunque vea el contexto de toda la
+// semana, no puede saber qué platos generaron los otros trozos (verificado con sonda real
+// 20-jul-2026: salmón y el mismo revuelto se repetían entre trozos). Los hints reparten
+// además la PROTEÍNA principal de comida/cena para que la variedad semanal no dependa
+// de una coordinación imposible entre llamadas paralelas.
 const CHUNK_STYLE_HINTS = [
-  'Desayunos de estilo salado (huevos, tortillas, tostadas saladas con proteína).',
-  'Desayunos dulces a base de avena (porridge, tortitas de avena, overnight oats).',
-  'Desayunos a base de lácteos y fruta (yogur con toppings, bowls de fruta, batidos proteicos). OJO: este estilo tiende a quedarse CORTO de calorías; añade densidad energética (frutos secos, granola, avena, yogur griego entero, aceite de oliva, aguacate) y porciones suficientes hasta CUMPLIR las kcal objetivo de cada día — no entregues días por debajo del objetivo.',
-  'Desayunos con pan integral + proteína o repostería fitness casera.',
+  'Desayunos de estilo salado (huevos, tortillas, tostadas saladas con proteína). En comida/cena de estos días prioriza AVES (pollo, pavo) como proteína principal.',
+  'Desayunos dulces a base de avena (porridge, tortitas de avena, overnight oats). En comida/cena de estos días prioriza PESCADO (blanco o azul) como proteína principal.',
+  'Desayunos a base de lácteos y fruta (yogur con toppings, bowls de fruta, batidos proteicos). OJO: este estilo tiende a quedarse CORTO de calorías; añade densidad energética (frutos secos, granola, avena, yogur griego entero, aceite de oliva, aguacate) y porciones suficientes hasta CUMPLIR las kcal objetivo de cada día — no entregues días por debajo del objetivo. En comida/cena de estos días prioriza TERNERA magra o cerdo magro como proteína principal.',
+  'Desayunos con pan integral + proteína o repostería fitness casera. En comida/cena de este día prioriza LEGUMBRES o huevo como plato principal.',
 ];
 
 const MEAL_ITEM_SCHEMA = {
@@ -270,20 +275,33 @@ PRINCIPIO "fuel for the work required": ajusta los carbohidratos a la demanda de
       return `- ${day}: sesión "${c.title}" (${c.type}); carbohidratos ${c.carbLevel}; objetivo ${c.kcal} kcal (C ${c.carbs} g / P ${c.protein} g / F ${c.fat} g).${c.timing ? ` Timing: ${c.timing}` : ''}`;
     }
 
-    function buildPrompt(daysList, styleHint) {
-      return `${baseRules}
-Genera el menú para ESTOS días: ${daysList.join(', ')}.
-Contexto de entrenamiento y objetivo por día (ajusta las comidas y el timing a esto):
-${daysList.map(dayLine).join('\n')}
+    // CACHÉ/CALIDAD 20-jul-2026: el prompt se divide en un PREFIJO ESTÁTICO compartido
+    // por los 4 trozos (reglas + contexto de la SEMANA COMPLETA + requisitos + formato)
+    // y una COLA DINÁMICA mínima (días a generar + styleHint). Dos motivos:
+    // (1) el caché implícito de Gemini 2.5 solo descuenta tokens de entrada si el
+    //     PREFIJO del prompt se repite entre llamadas (antes lo dinámico iba segundo y
+    //     rompía el prefijo a los ~200 tokens); beneficia a reintentos de drift y
+    //     regeneraciones — los 4 trozos en paralelo pueden no aprovecharlo entre sí.
+    // (2) cada trozo ahora VE la semana entera: "no repetir platos/proteína entre días"
+    //     pasa a ser cumplible ENTRE trozos (antes cada trozo solo veía sus 2 días y la
+    //     variedad dependía solo de los styleHints de desayuno).
+    const ALL_WEEK_DAYS = DAY_CHUNKS.flat();
+    const sharedPromptPrefix = `${baseRules}
+Contexto de entrenamiento y objetivo de TODA la semana (al final se te pedirá generar SOLO algunos días; usa el resto como contexto para variar platos y proteínas y para el timing):
+${ALL_WEEK_DAYS.map(dayLine).join('\n')}
 Requisitos:
-- days: EXACTAMENTE estos ${daysList.length} días (campo "day" con el valor correspondiente: ${daysList.join(', ')}).
 - Cada día tiene EXACTAMENTE 4 comidas con slot: "Desayuno", "Comida", "Merienda", "Cena".
 - IMPORTANTE: la suma de kcal de CADA día debe quedar dentro de ±7% del objetivo de ESE día (ver arriba). Ajusta las porciones (gramos); revisa que p·4 + c·4 + f·9 ≈ kcal del día.
 - PRIORIDAD PROTEÍNA: alcanza la proteína (P) objetivo de cada día (±5%) aunque tengas que ajustar carbohidratos/grasa. Reparte la proteína entre las comidas (≥25-30 g por comida principal).
 - Refleja el TIMING de carbohidratos del día en los slots y en el campo "serving" (p. ej. en día de fuerza, carbos lentos en la comida previa/posterior; en tirada larga, desayuno alto en carbos y recarga después).
-- Varía las recetas entre días: NO repitas el mismo plato y NO uses la misma proteína principal en días consecutivos. Comida real, práctica y apetecible; respeta condiciones/restricciones.${styleHint ? `
+- Varía las recetas entre días: NO repitas el mismo plato y NO uses la misma proteína principal en días consecutivos, considerando TODA la semana (también los días que no generes en esta llamada). Comida real, práctica y apetecible; respeta condiciones/restricciones.
+- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).`;
+
+    function buildPrompt(daysList, styleHint) {
+      return `${sharedPromptPrefix}
+Genera el menú SOLO para ESTOS días: ${daysList.join(', ')}.
+- days: EXACTAMENTE estos ${daysList.length} días (campo "day" con el valor correspondiente: ${daysList.join(', ')}).${styleHint ? `
 - ${styleHint}` : ''}
-- Cada comida: dish (nombre apetecible), emoji, time (HH:MM), mins (prep), kcal, p, c, f (gramos enteros), gl (carga glucémica 0-40), ii (índice insulínico 0-100), glClass ('good' baja, 'mid' media, 'high' alta), ingredients (con cantidades), steps (2-3 pasos concisos), serving (consejo breve).
 Devuelve SOLO el JSON del esquema.`;
     }
 

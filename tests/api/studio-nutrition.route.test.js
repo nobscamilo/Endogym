@@ -235,6 +235,35 @@ describe('/api/studio-nutrition route', () => {
     expect(prompts).not.toContain('2000 kcal');
   });
 
+  it('prompt de trozo: prefijo estático con la SEMANA COMPLETA primero y la petición de días al FINAL (caché implícito + variedad entre trozos)', async () => {
+    mocks.getLatestWeeklyPlan.mockResolvedValue(weeklyPlan());
+    enqueueGeminiChunks([
+      chunk(['Lun', 'Mar'], 1000, 100),
+      chunk(['Mié', 'Jue'], 1000, 100),
+      chunk(['Vie', 'Sáb'], 1000, 100),
+      chunk(['Dom'], 1000, 100),
+      consolidationChunk(),
+    ]);
+
+    const response = await POST(new Request('http://localhost/api/studio-nutrition', { method: 'POST', body: JSON.stringify({}) }));
+    expect(response.status).toBe(200);
+
+    // El trozo de Lun-Mar debe VER el contexto de toda la semana (p. ej. Dom) aunque solo genere 2 días.
+    const chunkPrompts = mocks.requestGoogleGenerateContent.mock.calls
+      .map((c) => c[0].parts[0].text)
+      .filter((p) => p.includes('Genera el menú SOLO'));
+    expect(chunkPrompts.length).toBe(4);
+    const lunMar = chunkPrompts.find((p) => p.includes('SOLO para ESTOS días: Lun, Mar'));
+    expect(lunMar).toBeTruthy();
+    expect(lunMar).toContain('- Dom:');
+
+    // Orden prefijo→cola: los requisitos estáticos van ANTES de la petición dinámica de días,
+    // y los 4 trozos comparten EXACTAMENTE el mismo prefijo (condición del caché implícito).
+    expect(lunMar.indexOf('Requisitos:')).toBeLessThan(lunMar.indexOf('Genera el menú SOLO'));
+    const prefixes = chunkPrompts.map((p) => p.slice(0, p.indexOf('Genera el menú SOLO')));
+    expect(new Set(prefixes).size).toBe(1);
+  });
+
   it('bloque VENCIDO (no cubre la semana actual): dieta con objetivos base + meta.staleTrainingPlan=true', async () => {
     // Bloque que terminó la semana pasada (como el bug real: "dice que hoy es 10 de julio").
     mocks.getLatestWeeklyPlan.mockResolvedValue(weeklyPlan({ weekOffsetDays: -21 }));

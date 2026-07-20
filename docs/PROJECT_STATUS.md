@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 2 (análisis de costes Gemini: fix del desperdicio de weekly-plan + hallazgos de observabilidad)**.
+Ultima actualizacion: **20 de julio de 2026, parte 3 (reorden del prompt de nutrición: prefijo estático + semana completa + proteínas repartidas por trozo)**.
+
+## Sesión del 20 de julio de 2026, parte 3 (prompt de nutrición reordenado, validado con sonda real)
+
+Aprobado por el usuario tras el análisis de costes de la parte 2. **Suite 423/423 verde** (+1 test).
+
+- **Reorden (`studio-nutrition/route.js`):** cada trozo ahora lleva un PREFIJO ESTÁTICO idéntico (baseRules + contexto de la SEMANA COMPLETA (7 `dayLine`) + todos los requisitos estáticos + formato de comida) y una COLA DINÁMICA mínima ("Genera el menú SOLO para ESTOS días" + nº de días + styleHint + "Devuelve SOLO el JSON"). Antes lo dinámico iba en segundo lugar y rompía el prefijo común a los ~200 tokens.
+- **Caché implícito de Gemini — medido, honesto:** con el prefijo compartido, una ronda de sonda registró `cachedContentTokenCount: 598` (~65% de la entrada con descuento) en la 4ª llamada secuencial; otra ronda dio 0 en todas. Conclusión: el caché implícito EXISTE y puede aplicar (beneficia reintentos de drift/regeneraciones cercanas en el tiempo), pero es best-effort y NO aplica entre los 4 trozos paralelos (el caché se puebla con retardo de segundos). El ahorro es de céntimos a esta escala: el motivo principal del cambio es calidad.
+- **Hallazgo de la sonda (corrige la hipótesis inicial):** ver la semana completa NO evita repeticiones entre trozos — cada llamada es independiente y no sabe qué platos generó otra (sonda: salmón como principal en los 4 trozos y 3 platos duplicados). **Mitigación:** `CHUNK_STYLE_HINTS` ahora reparte también la PROTEÍNA principal de comida/cena por trozo (aves / pescado / ternera-cerdo magro / legumbres-huevo). Segunda sonda: principales variados, queda 1 merienda repetida ("yogur griego con frutos rojos") — límite conocido, los hints no cubren meriendas.
+- **Test (+1, `studio-nutrition.route.test.js`):** el trozo Lun-Mar ve el contexto de Dom; requisitos ANTES de la petición dinámica; los 4 trozos comparten prefijo EXACTO (condición del caché).
+- **Sonda:** `scratch/nutrition-prompt-probe.mjs` (local Mac, git-ignored; ESPEJO del prompt del route — actualizarla si cambia el prompt). Coste de la validación: ~8 llamadas reales a 2.5-flash.
+- **Nota:** la sonda mostró a temp 0.7 algún `dish` con contexto de día pegado ("Batido Tropical Proteico \nDía de Torso B") — artefacto puntual; los sanitizadores de lectura de producción recortan/normalizan, vigilar si aparece en la UI.
 
 ## Sesión del 20 de julio de 2026, parte 2 (aumento de costes GCP/Gemini desde el 11 jul, pico el 15: diagnóstico + fix weekly-plan)
 
