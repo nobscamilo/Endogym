@@ -225,7 +225,15 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
   const prompt = buildExerciseCoachPrompt({ profile, weeklyPlan, clinicalGuidelinesContext });
   const maxRetries = toPositiveInteger(process.env.GEMINI_COACH_MAX_RETRIES, 1, 0, 2);
   const retryBaseMs = toPositiveInteger(process.env.GEMINI_COACH_RETRY_BASE_MS, 350, 100, 5_000);
-  const timeoutMs = toPositiveInteger(process.env.GEMINI_COACH_TIMEOUT_MS, 10_000, 1_000, 12_000);
+  // COSTE 20-jul-2026: el briefing real tarda ~9-10 s (sonda con perfil real) y el timeout
+  // por intento era 10 s (tope 12 s) → ~la mitad de las llamadas se abortaban DESPUÉS de
+  // pagar los tokens y el plan caía al heurístico (aiMetrics: 50-70% fallbacks desde junio).
+  // Timeout por intento realista + presupuesto GLOBAL entre intentos (mismo patrón que
+  // studio-nutrition) para respetar el maxDuration de 30 s de Vercel: nunca reintentar
+  // si no queda presupuesto útil.
+  const timeoutMs = toPositiveInteger(process.env.GEMINI_COACH_TIMEOUT_MS, 18_000, 1_000, 22_000);
+  const totalBudgetMs = toPositiveInteger(process.env.GEMINI_COACH_TOTAL_BUDGET_MS, 24_000, 2_000, 26_000);
+  const budgetDeadline = Date.now() + totalBudgetMs;
   const maxAttempts = maxRetries + 1;
   let lastError = null;
 
@@ -241,7 +249,8 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
       const { backend, response } = await requestGoogleGenerateContent({
         model,
         traceId,
-        timeoutMs,
+        // Cada intento respeta el presupuesto global restante (min 4 s útiles).
+        timeoutMs: Math.min(timeoutMs, Math.max(4_000, budgetDeadline - Date.now())),
         parts: [{ text: prompt }],
         generationConfig: {
           temperature: 0.2,
@@ -250,8 +259,11 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
           maxOutputTokens: 3072,
           responseMimeType: 'application/json',
           responseJsonSchema: COACH_SCHEMA,
+          // Anti-degeneración (mismo bug que coach-analysis, 20-jul-2026): el reintento
+          // usa un budget de pensamiento para romper posibles bucles de la decodificación
+          // restringida por esquema a temperatura baja.
           thinkingConfig: {
-            thinkingBudget: 0,
+            thinkingBudget: attempt === 1 ? 0 : 512,
           },
         },
       });
@@ -329,7 +341,9 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
         || normalizedError.code === 'GEMINI_COACH_PARSE_ERROR'
         || normalizedError.code === 'GEMINI_COACH_RUNTIME_ERROR';
 
-      if (attempt < maxAttempts && retriableByCode) {
+      // No reintentar si no queda presupuesto útil: un segundo intento truncado por el
+      // maxDuration de Vercel se pagaría en tokens y se tiraría igualmente.
+      if (attempt < maxAttempts && retriableByCode && Date.now() < budgetDeadline - 4_000) {
         lastError = normalizedError;
         await wait(retryBaseMs * 2 ** (attempt - 1));
         continue;

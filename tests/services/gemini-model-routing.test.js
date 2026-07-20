@@ -262,6 +262,14 @@ describe('gemini model routing', () => {
     expect(coach.coachSummary).toBe('Resumen final');
     expect(coach.diagnostics.attempts).toBe(2);
     expect(coach.diagnostics.modelResolved).toBe('gemini-2.5-pro');
+
+    // Anti-degeneración (20-jul-2026): el primer intento va sin thinking (rápido);
+    // el reintento activa thinkingBudget 512 para romper bucles de la decodificación
+    // restringida por esquema (mismo bug que coach-analysis).
+    const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const retryBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(firstBody.generationConfig.thinkingConfig.thinkingBudget).toBe(0);
+    expect(retryBody.generationConfig.thinkingConfig.thinkingBudget).toBe(512);
   });
 
   it('rejects Vertex AI because runtime only supports Gemini Developer API', () => {
