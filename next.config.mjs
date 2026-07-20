@@ -4,7 +4,8 @@ const contentSecurityPolicy = [
   `script-src 'self' 'unsafe-inline' https://apis.google.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://*.googleusercontent.com",
+  // storage.googleapis.com: fotos de técnica de ejercicios (bucket público dedicado).
+  "img-src 'self' data: blob: https://*.googleusercontent.com https://storage.googleapis.com",
   "media-src 'self' blob:",
   "connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://accounts.google.com",
   "frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com",
@@ -33,7 +34,8 @@ const studioContentSecurityPolicy = [
   `script-src 'self' 'unsafe-inline' https://apis.google.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://i.ytimg.com https://*.googleusercontent.com",
+  // storage.googleapis.com: fotos de técnica (guías visuales y Biblioteca del Studio).
+  "img-src 'self' data: blob: https://i.ytimg.com https://*.googleusercontent.com https://storage.googleapis.com",
   "media-src 'self' blob:",
   "connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://accounts.google.com",
   "frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com",

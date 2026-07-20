@@ -1,6 +1,13 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 6 (FASE 3 lote 1: +30 ejercicios de gimnasio en el catálogo prescribible, 184→214)**.
+Ultima actualizacion: **20 de julio de 2026, parte 7 (HOTFIX: la CSP bloqueaba TODAS las fotos de técnica + vulnerabilidad crítica del CI + matriz Node)**.
+
+## Sesión del 20 de julio de 2026, parte 7 (dos bugs reportados por el usuario con captura)
+
+- **BUG 1 — TODAS las fotos de técnica salían rotas en producción:** la CSP (`next.config.mjs`, global y del Studio) no incluía `https://storage.googleapis.com` en `img-src` → el navegador bloqueaba las fotos del bucket dedicado en Sesión, sesión guiada y Biblioteca. FIX: añadido a ambas CSP. **Lección de verificación:** mis sondas comprobaron la URL del bucket directamente (200) pero NUNCA la imagen renderizada DENTRO de la página con CSP — las verificaciones de assets deben hacerse a través de la app real (browser), no contra el recurso aislado.
+- **BUG 2 — CI de GitHub Actions en rojo ("build (22.x)" cancelado en `npm run audit`):** vulnerabilidad CRÍTICA en `websocket-driver@0.7.4` (GHSA-mp7j-qc5w-4988 y GHSA-xv26-6w52-cph6) vía `firebase → @firebase/database → faye-websocket`. FIX: `npm audit fix` → `websocket-driver@0.7.5` (solo package-lock), `npm audit --audit-level=moderate` en 0. Esto era lo que el usuario veía como "error con Node 22": el JOB llamado "build (22.x)" fallaba por el audit, no por Node.
+- **Matriz del CI actualizada:** `[20.x, 22.x]` → `[22.x, 24.x]` (Vercel deprecia Node 20 el 1-oct-2026; 22.x es el runtime actual del proyecto; 24 LTS da señal temprana). El proyecto endogym en Vercel corre Node 22.x SIN avisos en build logs (verificado); el banner del dashboard es por proyectos viejos del equipo (p. ej. `nutrica`, deploy en ERROR desde nov-2025).
+- **Suite 434/434 verde.** Pendientes de decisión del usuario (opinión dada en conversación): subir el runtime de Vercel a Node 24 (bajo riesgo, sin urgencia), actualización de Next.js (ya en ^16.2.6, sin motivo para major), y posible rediseño del frontend (recomendado: pulido dirigido por pantalla con design-critique, no rediseño total).
 
 ## Sesión del 20 de julio de 2026, parte 6 (Fase 3 lote 1 — expansión curada del catálogo prescribible)
 

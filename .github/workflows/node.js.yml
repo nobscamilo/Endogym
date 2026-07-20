@@ -16,7 +16,9 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x, 22.x]
+        # 20.x fuera: Vercel lo deprecia el 1-oct-2026. 22.x es el runtime actual del
+        # proyecto en Vercel; 24.x (LTS) da la señal temprana para la futura subida.
+        node-version: [22.x, 24.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
