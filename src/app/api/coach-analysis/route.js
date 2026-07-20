@@ -86,30 +86,50 @@ export async function POST(request) {
       let source = 'ai';
       const model = resolveGeminiCoachModel();
       if (process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
-        try {
-          const { response } = await requestGoogleGenerateContent({
-            model,
-            traceId,
-            timeoutMs: 20000,
-            parts: [{ text: buildCoachAnalysisPrompt(digest) }],
-            generationConfig: {
-              temperature: 0.4,
-              topP: 0.9,
-              maxOutputTokens: 1500,
-              responseMimeType: 'application/json',
-              responseJsonSchema: COACH_ANALYSIS_REPORT_SCHEMA,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
-            report = sanitizeCoachReport(JSON.parse(text));
-          } else {
-            logError('coach_analysis_http_error', new Error(`HTTP ${response.status}`), { traceId, userId: user.uid });
+        // BUG 20-jul-2026: gemini-2.5-flash con salida restringida por esquema
+        // (responseSchema) + temperatura baja + thinkingBudget 0 entraba en un bucle
+        // degenerado ('{"lastSession": "Tu \n\t\t\t…' hasta MAX_TOKENS) → JSON truncado →
+        // JSON.parse lanzaba y el informe caía SIEMPRE al heurístico ("Resumen automático
+        // (sin IA)"). Verificado con sonda real (scratch/coach-analysis-ai-probe.mjs):
+        // temperatura 1.0 (3/3 STOP) o thinkingBudget>0 rompen el bucle. Se intenta la
+        // config rápida y, si aún degenera, un reintento con budget de pensamiento.
+        const generationAttempts = [
+          { label: 'primary', thinkingConfig: { thinkingBudget: 0 } },
+          { label: 'retry_thinking', thinkingConfig: { thinkingBudget: 512 } },
+        ];
+        for (const attempt of generationAttempts) {
+          try {
+            const { response } = await requestGoogleGenerateContent({
+              model,
+              traceId,
+              timeoutMs: 20000,
+              parts: [{ text: buildCoachAnalysisPrompt(digest) }],
+              generationConfig: {
+                temperature: 1.0,
+                topP: 0.95,
+                maxOutputTokens: 2500,
+                responseMimeType: 'application/json',
+                responseJsonSchema: COACH_ANALYSIS_REPORT_SCHEMA,
+                thinkingConfig: attempt.thinkingConfig,
+              },
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const candidate = data?.candidates?.[0];
+              const text = (candidate?.content?.parts || []).map((p) => p?.text || '').join('').trim();
+              report = sanitizeCoachReport(JSON.parse(text));
+              if (!report) {
+                logError('coach_analysis_ai_invalid_shape', new Error('sanitizeCoachReport devolvió null'), {
+                  traceId, userId: user.uid, attempt: attempt.label, finishReason: candidate?.finishReason || null, textChars: text.length,
+                });
+              }
+            } else {
+              logError('coach_analysis_http_error', new Error(`HTTP ${response.status}`), { traceId, userId: user.uid, attempt: attempt.label });
+            }
+          } catch (error) {
+            logError('coach_analysis_ai_failed', error, { traceId, userId: user.uid, attempt: attempt.label });
           }
-        } catch (error) {
-          logError('coach_analysis_ai_failed', error, { traceId, userId: user.uid });
+          if (report) break;
         }
       }
 

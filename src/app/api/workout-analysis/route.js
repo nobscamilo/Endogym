@@ -73,30 +73,47 @@ export async function POST(request) {
       let source = 'ai';
       const model = resolveGeminiCoachModel();
       if (process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
-        try {
-          const { response } = await requestGoogleGenerateContent({
-            model,
-            traceId,
-            timeoutMs: 20000,
-            parts: [{ text: buildWorkoutAnalysisPrompt(digest) }],
-            generationConfig: {
-              temperature: 0.4,
-              topP: 0.9,
-              maxOutputTokens: 1200,
-              responseMimeType: 'application/json',
-              responseJsonSchema: WORKOUT_ANALYSIS_SCHEMA,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
-            analysis = sanitizeWorkoutAnalysis(JSON.parse(text));
-          } else {
-            logError('workout_analysis_http_error', new Error(`HTTP ${response.status}`), { traceId, userId: user.uid });
+        // Mismo fix que coach-analysis (20-jul-2026): con esquema + temperatura baja +
+        // thinkingBudget 0, gemini-2.5-flash puede degenerar en bucles de \t hasta
+        // MAX_TOKENS → JSON truncado → fallback heurístico permanente. Temperatura 1.0
+        // y reintento con budget de pensamiento rompen el bucle.
+        const generationAttempts = [
+          { label: 'primary', thinkingConfig: { thinkingBudget: 0 } },
+          { label: 'retry_thinking', thinkingConfig: { thinkingBudget: 512 } },
+        ];
+        for (const attempt of generationAttempts) {
+          try {
+            const { response } = await requestGoogleGenerateContent({
+              model,
+              traceId,
+              timeoutMs: 20000,
+              parts: [{ text: buildWorkoutAnalysisPrompt(digest) }],
+              generationConfig: {
+                temperature: 1.0,
+                topP: 0.95,
+                maxOutputTokens: 2500,
+                responseMimeType: 'application/json',
+                responseJsonSchema: WORKOUT_ANALYSIS_SCHEMA,
+                thinkingConfig: attempt.thinkingConfig,
+              },
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const candidate = data?.candidates?.[0];
+              const text = (candidate?.content?.parts || []).map((p) => p?.text || '').join('').trim();
+              analysis = sanitizeWorkoutAnalysis(JSON.parse(text));
+              if (!analysis) {
+                logError('workout_analysis_ai_invalid_shape', new Error('sanitizeWorkoutAnalysis devolvió null'), {
+                  traceId, userId: user.uid, attempt: attempt.label, finishReason: candidate?.finishReason || null, textChars: text.length,
+                });
+              }
+            } else {
+              logError('workout_analysis_http_error', new Error(`HTTP ${response.status}`), { traceId, userId: user.uid, attempt: attempt.label });
+            }
+          } catch (error) {
+            logError('workout_analysis_ai_failed', error, { traceId, userId: user.uid, attempt: attempt.label });
           }
-        } catch (error) {
-          logError('workout_analysis_ai_failed', error, { traceId, userId: user.uid });
+          if (analysis) break;
         }
       }
 

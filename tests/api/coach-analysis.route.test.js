@@ -167,6 +167,54 @@ describe('/api/coach-analysis route — alineación con objetivos', () => {
     expect(mocks.requestGoogleGenerateContent).not.toHaveBeenCalled();
   });
 
+  it('reintenta con thinkingBudget cuando la primera respuesta degenera en JSON truncado (bucle \\t) y aún devuelve source ai', async () => {
+    // Reproduce el bug del 20-jul-2026: gemini-2.5-flash con responseSchema + temperatura
+    // baja devolvía '{"lastSession": "Tu \n\t\t\t…' hasta MAX_TOKENS. El primer intento
+    // falla el JSON.parse; el reintento (thinkingBudget 512) debe salvar el informe.
+    const degenerate = '{"lastSession": "Tu \\n' + '\\t'.repeat(200);
+    mocks.requestGoogleGenerateContent
+      .mockResolvedValueOnce({
+        response: { ok: true, json: async () => ({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: degenerate }] } }] }) },
+      })
+      .mockResolvedValueOnce({
+        response: { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({
+          lastSession: 'Sesión recuperada en el reintento.',
+          history: 'Tendencia.',
+          goalAlignment: 'Avanza hacia 80 kg.',
+          adjustments: ['Mantener plan.'],
+          warning: '',
+        }) }] } }] }) },
+      });
+
+    const response = await POST(new Request('http://localhost/api/coach-analysis', { method: 'POST' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.source).toBe('ai');
+    expect(json.report.lastSession).toContain('reintento');
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(2);
+    const firstCfg = mocks.requestGoogleGenerateContent.mock.calls[0][0].generationConfig;
+    const retryCfg = mocks.requestGoogleGenerateContent.mock.calls[1][0].generationConfig;
+    expect(firstCfg.thinkingConfig.thinkingBudget).toBe(0);
+    expect(retryCfg.thinkingConfig.thinkingBudget).toBe(512);
+    expect(firstCfg.temperature).toBe(1.0);
+  });
+
+  it('si ambos intentos de IA degeneran cae al heurístico (source heuristic), no a un 5xx', async () => {
+    const degenerate = '{"lastSession": "Tu \\n' + '\\t'.repeat(200);
+    mocks.requestGoogleGenerateContent.mockResolvedValue({
+      response: { ok: true, json: async () => ({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: degenerate }] } }] }) },
+    });
+
+    const response = await POST(new Request('http://localhost/api/coach-analysis', { method: 'POST' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.source).toBe('heuristic');
+    expect(json.report.lastSession).toBeTruthy();
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(2);
+  });
+
   it('GET marca stale un informe legacy cuando cambia el contrato/contexto aunque no haya workout nuevo', async () => {
     mocks.getCoachAnalysis.mockResolvedValue({
       signature: '1-firma-legacy', source: 'ai', updatedAt: '2026-06-18T10:00:00Z',
