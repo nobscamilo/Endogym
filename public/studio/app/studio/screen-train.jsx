@@ -1,5 +1,5 @@
 /* ENDOGYM STUDIO — Pantalla ENTRENO (sesión · semana · vídeos) */
-const { useState: useStateTr } = React;
+const { useState: useStateTr, useEffect: useEffectTr } = React;
 
 /* ---- Mapa muscular (atlas Endogym): base limpia + spots con pulso magenta/índigo ---- */
 function __normMuscle(s) {
@@ -103,7 +103,7 @@ function TrainScreen({ initialTab }) {
   const [tab, setTab] = useStateTr(initialTab || 'sesion');
   const [gen, setGen] = useStateTr(0);
   const [genStatus, setGenStatus] = useStateTr('idle'); // idle|loading|ok|err|noauth
-  const TABS = [{ id: 'sesion', label: 'Sesión' }, { id: 'semana', label: 'Semana' }, { id: 'videos', label: 'Vídeos' }];
+  const TABS = [{ id: 'sesion', label: 'Sesión' }, { id: 'semana', label: 'Semana' }, { id: 'videos', label: 'Vídeos' }, { id: 'biblioteca', label: 'Biblioteca' }];
 
   async function regenerate() {
     // El bloque de 21 días es estable. Rehacerlo entero requiere confirmación explícita;
@@ -150,6 +150,7 @@ function TrainScreen({ initialTab }) {
       {tab === 'sesion' && (D.todaySession ? <TrainSession key={`s-${gen}`} /> : <div className="empty">{D.planStatus === 'stale' ? 'Tu bloque terminó. Crea un bloque nuevo para planificar hoy.' : 'Aún no hay una sesión para hoy. Completa tu perfil o crea un bloque nuevo.'}</div>)}
       {tab === 'semana' && (Array.isArray(D.week) && D.week.length ? <TrainWeek key={`w-${gen}`} /> : <div className="empty">No hay una semana activa que mostrar.</div>)}
       {tab === 'videos' && <TrainVideos key={`v-${gen}`} />}
+      {tab === 'biblioteca' && <TrainLibrary />}
     </div>
   );
 }
@@ -1760,6 +1761,172 @@ function TrainVideos() {
           {!lib.length ? <div className="empty">Sin resultados para «{q}».</div> : null}
         </div>
       </SectionCard>
+    </React.Fragment>
+  );
+}
+
+/* ---- Biblioteca navegable (Fase 2 guías visuales) ----
+   873 ejercicios de free-exercise-db (dominio público) traducidos, con fotos propias.
+   Contenido de CONSULTA: el planner NO prescribe desde aquí (eso es la Fase 3 curada). */
+const LIB_ES = {
+  muscles: {
+    abdominals: 'Abdominales', abductors: 'Abductores', adductors: 'Aductores', biceps: 'Bíceps',
+    calves: 'Gemelos', chest: 'Pecho', forearms: 'Antebrazos', glutes: 'Glúteos',
+    hamstrings: 'Isquiotibiales', lats: 'Dorsales', 'lower back': 'Lumbar', 'middle back': 'Espalda media',
+    neck: 'Cuello', quadriceps: 'Cuádriceps', shoulders: 'Hombros', traps: 'Trapecios', triceps: 'Tríceps',
+  },
+  equipment: {
+    bands: 'Bandas', barbell: 'Barra', 'body only': 'Peso corporal', cable: 'Polea', dumbbell: 'Mancuernas',
+    'e-z curl bar': 'Barra EZ', 'exercise ball': 'Fitball', 'foam roll': 'Rodillo', kettlebells: 'Kettlebell',
+    machine: 'Máquina', 'medicine ball': 'Balón medicinal', other: 'Otro',
+  },
+  levels: { beginner: 'Principiante', intermediate: 'Intermedio', expert: 'Avanzado' },
+};
+const libEs = (dict, key) => (key ? (LIB_ES[dict][key] || key) : '');
+const libNorm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+async function fetchExerciseLibrary() {
+  if (window.__exLib) return window.__exLib;
+  const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+  if (!token) return null;
+  const r = await fetch('/api/exercise-library', { headers: { authorization: 'Bearer ' + token } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok || !Array.isArray(j.exercises)) return null;
+  window.__exLib = { mediaBase: j.mediaBase, exercises: j.exercises };
+  return window.__exLib;
+}
+
+function LibraryDetail({ id, name, onClose }) {
+  const [entry, setEntry] = useStateTr(null);
+  const [status, setStatus] = useStateTr('loading');
+  useEffectTr(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+        const r = await fetch(`/api/exercise-library?id=${encodeURIComponent(id)}`, { headers: { authorization: 'Bearer ' + token } });
+        const j = await r.json().catch(() => ({}));
+        if (!alive) return;
+        if (r.ok && j.ok) { setEntry(j.exercise); setStatus('ok'); } else setStatus('err');
+      } catch { if (alive) setStatus('err'); }
+    })();
+    return () => { alive = false; };
+  }, [id]);
+  const overlay = (
+    <div className="player-scrim" onClick={onClose}>
+      <div className="player-card" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '88vh', overflowY: 'auto' }}>
+        <div className="player-body">
+          <div className="row ac" style={{ justifyContent: 'space-between', gap: 8 }}>
+            <h3 style={{ margin: 0 }}>{entry?.name || name}</h3>
+            <button className="btn ghost sm" onClick={onClose}><Icon name="close" size={16} /></button>
+          </div>
+          {status === 'loading' ? <p className="muted" style={{ marginTop: 12 }}>Cargando ficha…</p> : null}
+          {status === 'err' ? <p className="muted" style={{ marginTop: 12 }}>No se pudo cargar la ficha. Reintenta.</p> : null}
+          {entry ? (
+            <React.Fragment>
+              <TechniquePhotos media={entry.images} name={entry.name} style={{ marginTop: 12 }} />
+              <div className="row ac wrap" style={{ gap: 6, marginTop: 12 }}>
+                {(entry.primaryMuscles || []).map((m) => <span key={m} className="pill accent tiny">{libEs('muscles', m)}</span>)}
+                {(entry.secondaryMuscles || []).map((m) => <span key={m} className="pill tiny">{libEs('muscles', m)}</span>)}
+                {entry.equipment ? <span className="pill tiny">{libEs('equipment', entry.equipment)}</span> : null}
+                {entry.level ? <span className="pill tiny">{libEs('levels', entry.level)}</span> : null}
+                {entry.mechanic ? <span className="pill tiny">{entry.mechanic === 'compound' ? 'Multiarticular' : 'Aislamiento'}</span> : null}
+              </div>
+              {Array.isArray(entry.steps) && entry.steps.length ? (
+                <div style={{ marginTop: 14 }}>
+                  <div className="mb-label">Cómo se hace</div>
+                  <ul className="cue-list">{entry.steps.map((s, i) => <li key={i}><span className="cue-n">{i + 1}</span>{s}</li>)}</ul>
+                </div>
+              ) : null}
+              {entry.nameEn && entry.nameEn !== entry.name ? <p className="tiny muted" style={{ marginTop: 10 }}>También conocido como: {entry.nameEn}</p> : null}
+              <p className="tiny muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
+                Ejercicio de consulta de la biblioteca. Tu plan lo prescribe el coach desde su catálogo curado según tu perfil y condiciones.
+              </p>
+            </React.Fragment>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+  const createPortal = typeof window !== 'undefined' ? window.__createPortal : null;
+  return createPortal && document.body ? createPortal(overlay, document.body) : overlay;
+}
+
+function TrainLibrary() {
+  const [lib, setLib] = useStateTr(null);
+  const [status, setStatus] = useStateTr('loading'); // loading|ok|noauth|err
+  const [q, setQ] = useStateTr('');
+  const [muscle, setMuscle] = useStateTr('');
+  const [equip, setEquip] = useStateTr('');
+  const [level, setLevel] = useStateTr('');
+  const [cap, setCap] = useStateTr(60);
+  const [sel, setSel] = useStateTr(null);
+  useEffectTr(() => {
+    let alive = true;
+    (async () => {
+      const data = await fetchExerciseLibrary();
+      if (!alive) return;
+      if (data) { setLib(data); setStatus('ok'); } else setStatus(window.__getIdToken ? 'err' : 'noauth');
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (status === 'loading') return <div className="empty">Cargando biblioteca…</div>;
+  if (status === 'noauth') return <div className="empty">Inicia sesión para explorar la biblioteca de ejercicios.</div>;
+  if (status === 'err' || !lib) return <div className="empty">No se pudo cargar la biblioteca. Recarga para reintentar.</div>;
+
+  const nq = libNorm(q);
+  const filtered = lib.exercises.filter((e) => (
+    (!nq || libNorm(e.n).includes(nq) || libNorm(e.en).includes(nq))
+    && (!muscle || e.m === muscle)
+    && (!equip || e.eq === equip)
+    && (!level || e.lvl === level)
+  ));
+  const shown = filtered.slice(0, cap);
+  const selStyle = { minWidth: 0, flex: '1 1 30%' };
+
+  return (
+    <React.Fragment>
+      <SectionCard title="Biblioteca de ejercicios" icon="library"
+        sub={`${lib.exercises.length} ejercicios con guía visual y pasos en español (fuente de dominio público). Para consultar y aprender: tu plan sigue prescrito por el coach.`}>
+        <div className="search-field" style={{ marginBottom: 10 }}>
+          <span className="s-ico"><Icon name="search" size={18} /></span>
+          <input value={q} onChange={(e) => { setQ(e.target.value); setCap(60); }} placeholder="Buscar entre 873 ejercicios…" />
+        </div>
+        <div className="row ac wrap" style={{ gap: 8, marginBottom: 14 }}>
+          <select className="text-input" style={selStyle} value={muscle} onChange={(e) => { setMuscle(e.target.value); setCap(60); }}>
+            <option value="">Músculo (todos)</option>
+            {Object.keys(LIB_ES.muscles).map((m) => <option key={m} value={m}>{LIB_ES.muscles[m]}</option>)}
+          </select>
+          <select className="text-input" style={selStyle} value={equip} onChange={(e) => { setEquip(e.target.value); setCap(60); }}>
+            <option value="">Equipo (todo)</option>
+            {Object.keys(LIB_ES.equipment).map((m) => <option key={m} value={m}>{LIB_ES.equipment[m]}</option>)}
+          </select>
+          <select className="text-input" style={selStyle} value={level} onChange={(e) => { setLevel(e.target.value); setCap(60); }}>
+            <option value="">Nivel (todos)</option>
+            {Object.keys(LIB_ES.levels).map((m) => <option key={m} value={m}>{LIB_ES.levels[m]}</option>)}
+          </select>
+        </div>
+        <div className="ex-list">
+          {shown.map((e) => (
+            <div key={e.id} className="ex-row" style={{ cursor: 'pointer' }} onClick={() => setSel(e)}>
+              <span className="ex-thumb" style={{ background: `linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.25)), url(${lib.mediaBase}/${e.id}/0.jpg) center/cover no-repeat` }} />
+              <div className="ex-main">
+                <strong>{e.n}</strong>
+                <div className="ex-sub">{[libEs('muscles', e.m), libEs('equipment', e.eq), libEs('levels', e.lvl)].filter(Boolean).join(' · ')}</div>
+              </div>
+              <Icon name="chevronRight" size={18} style={{ color: 'var(--ink-3)', flex: 'none' }} />
+            </div>
+          ))}
+          {!filtered.length ? <div className="empty">Sin resultados{q ? ` para «${q}»` : ''} con esos filtros.</div> : null}
+        </div>
+        {filtered.length > cap ? (
+          <button className="btn ghost sm" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }} onClick={() => setCap((c) => c + 60)}>
+            Mostrar más ({filtered.length - cap} restantes)
+          </button>
+        ) : null}
+      </SectionCard>
+      {sel ? <LibraryDetail id={sel.id} name={sel.n} onClose={() => setSel(null)} /> : null}
     </React.Fragment>
   );
 }

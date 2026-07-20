@@ -1,6 +1,15 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 4 (FASE 1 de guías visuales de ejercicios: free-exercise-db ingerido + fotos de técnica en Sesión, sin YouTube)**.
+Ultima actualizacion: **20 de julio de 2026, parte 5 (FASE 2: Biblioteca navegable de 873 ejercicios en la pestaña Entreno)**.
+
+## Sesión del 20 de julio de 2026, parte 5 (Fase 2 — Biblioteca navegable)
+
+Continuación aprobada de la Fase 1. Ingesta verificada completa antes de construir: **873/873 docs en `exerciseLibrary`, 873 con imágenes, 873 traducidos** (1 rezagado rematado con una pasada extra del script resumable). **Suite 427/427 verde** (+3). Bundle `08aea44ddb`.
+
+- **`src/services/exerciseLibraryStore.js`:** acceso a la colección con caché en módulo (TTL 1 h — contenido estático tras la ingesta, evita releer 873 docs por petición; best-effort por instancia serverless). `listExerciseLibraryIndex()` (índice compacto: id, nombre ES, músculo, equipo, nivel, categoría; solo docs con imágenes) y `getExerciseLibraryEntry(id)` (ficha: pasos ES con fallback EN, músculos, mecánica, fotos; id saneado).
+- **`GET /api/exercise-library`:** sin params → índice + `mediaBase` con `Cache-Control: private, max-age=3600` (override consciente del no-store global); `?id=` → ficha completa; 401 sin token; 404 si no existe. Tests (3).
+- **UI (pestaña "Biblioteca" en Entreno, `TrainLibrary`):** buscador con normalización de acentos (busca en nombre ES y EN), 3 selects de filtro (17 músculos / 12 equipos / 3 niveles, etiquetas en español via `LIB_ES`), lista con miniatura de foto real, paginación por tramos de 60 ("Mostrar más"), y ficha (`LibraryDetail`) con `TechniquePhotos` (animación inicio/final), píldoras de músculos/equipo/nivel/mecánica, pasos numerados en español y nota explícita de que es contenido de CONSULTA (el plan lo prescribe el catálogo curado). El índice se cachea en cliente (`window.__exLib`). Sin sesión → estado vacío honesto. Fix de paso: `screen-train.jsx` no tenía alias de `useEffect` (solo `useState`); añadido `useEffectTr`.
+- **PENDIENTE (Fase 3, no implementada):** expansión curada del catálogo prescribible por lotes (loadRatio + comorbilidad + modalidades + tests por lote, con revisión del usuario).
 
 ## Sesión del 20 de julio de 2026, parte 4 (guías visuales de ejercicios — Fase 1 de 3 aprobadas por el usuario)
 
