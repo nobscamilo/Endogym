@@ -58,7 +58,9 @@ export const RESTRICTION_RULES = [
     appliesWhen: (c) => c.injuries.includes('hombro'),
     label: 'Hombro sensible',
     reason: 'Empuje vertical pesado, fondos y remo al mentón estresan el espacio subacromial: se priorizan empujes neutros.',
-    pattern: /(overhead-press|press militar|military|behind-?neck|upright-?row|remo al menton|\bdips?\b|fondos)/,
+    // FASE 3 lote 1 (20-jul-2026): ampliado con shoulder-press/arnold para cazar las nuevas
+    // variantes de press vertical (press de hombros con mancuernas, press Arnold).
+    pattern: /(overhead-press|press militar|military|behind-?neck|upright-?row|remo al menton|\bdips?\b|fondos|shoulder-press|arnold)/,
   },
 ];
 

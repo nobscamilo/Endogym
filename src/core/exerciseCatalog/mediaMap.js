@@ -3,6 +3,38 @@
 // verificación par a par (scratch/build-media-map.mjs) el 2026-07-20;
 // REVISAR a mano al añadir entradas. Los ejercicios sin entrada simplemente no muestran fotos.
 export const EXERCISE_MEDIA_MAP = {
+  // --- FASE 3 lote 1 (20-jul-2026): expansión del catálogo prescribible ---
+  'gym-ab-rollout-knees': 'Barbell_Ab_Rollout_-_On_Knees', // Rueda abdominal de rodillas (FASE 3 lote 1)
+  'gym-arnold-press': 'Arnold_Dumbbell_Press', // Press Arnold (FASE 3 lote 1)
+  'gym-back-extension': 'Hyperextensions_Back_Extensions', // Extensión lumbar en banco (FASE 3 lote 1)
+  'gym-barbell-curl': 'Barbell_Curl', // Curl de bíceps con barra (FASE 3 lote 1)
+  'gym-cable-glute-kickback': 'One-Legged_Cable_Kickback', // Patada de glúteo en polea (FASE 3 lote 1)
+  'gym-cable-pull-through': 'Pull_Through', // Pull-through en polea (FASE 3 lote 1)
+  'gym-chin-up': 'Chin-Up', // Dominadas supinas (FASE 3 lote 1)
+  'gym-db-bench-press': 'Dumbbell_Bench_Press', // Press de banca con mancuernas (FASE 3 lote 1)
+  'gym-db-fly': 'Dumbbell_Flyes', // Aperturas con mancuernas (FASE 3 lote 1)
+  'gym-db-lunge': 'Dumbbell_Lunges', // Zancada con mancuernas (FASE 3 lote 1)
+  'gym-db-pullover': 'Bent-Arm_Dumbbell_Pullover', // Pullover con mancuerna (FASE 3 lote 1)
+  'gym-db-shoulder-press': 'Dumbbell_Shoulder_Press', // Press de hombros con mancuernas (FASE 3 lote 1)
+  'gym-db-split-squat': 'Split_Squat_with_Dumbbells', // Sentadilla split con mancuernas (FASE 3 lote 1)
+  'gym-db-triceps-kickback': 'Tricep_Dumbbell_Kickback', // Patada de tríceps con mancuerna (FASE 3 lote 1)
+  'gym-decline-bench-press': 'Decline_Barbell_Bench_Press', // Press declinado con barra (FASE 3 lote 1)
+  'gym-ez-skullcrusher': 'EZ-Bar_Skullcrusher', // Press francés con barra EZ (FASE 3 lote 1)
+  'gym-goblet-squat': 'Goblet_Squat', // Sentadilla goblet (FASE 3 lote 1)
+  'gym-hammer-curl': 'Hammer_Curls', // Curl martillo (FASE 3 lote 1)
+  'gym-leg-extension': 'Leg_Extensions', // Extensión de cuádriceps (FASE 3 lote 1)
+  'gym-machine-chest-press': 'Leverage_Chest_Press', // Press de pecho en máquina (FASE 3 lote 1)
+  'gym-one-arm-db-row': 'One-Arm_Dumbbell_Row', // Remo a un brazo con mancuerna (FASE 3 lote 1)
+  'gym-pallof-press': 'Pallof_Press', // Press Pallof en polea (FASE 3 lote 1)
+  'gym-pec-deck': 'Butterfly', // Aperturas en máquina (FASE 3 lote 1)
+  'gym-preacher-curl': 'Preacher_Curl', // Curl en banco Scott (FASE 3 lote 1)
+  'gym-pull-up': 'Pullups', // Dominadas (FASE 3 lote 1)
+  'gym-seated-calf-raise': 'Seated_Calf_Raise', // Elevación de talones sentado (FASE 3 lote 1)
+  'gym-straight-arm-pulldown': 'Straight-Arm_Pulldown', // Pullover en polea (FASE 3 lote 1)
+  'gym-sumo-deadlift': 'Sumo_Deadlift', // Peso muerto sumo (FASE 3 lote 1)
+  'gym-tbar-row-supported': 'Lying_T-Bar_Row', // Remo en T con apoyo de pecho (FASE 3 lote 1)
+  'gym-wide-grip-pulldown': 'Wide-Grip_Lat_Pulldown', // Jalón al pecho agarre ancho (FASE 3 lote 1)
+  // --- mapeo original de los 184 (43 pares verificados) ---
   'calis-bench-dip': 'Bench_Dips', // Fondos en banco → Bench Dips
   'calis-inverted-row': 'Inverted_Row', // Remo invertido → Inverted Row
   'gym-barbell-back-squat': 'Barbell_Full_Squat', // Sentadilla trasera con barra → Barbell Full Squat

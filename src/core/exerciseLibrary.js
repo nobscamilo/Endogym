@@ -258,6 +258,82 @@ const CATEGORY_MUSCLE_PROFILES = {
 };
 
 const EXERCISE_MUSCLE_OVERRIDES = {
+  // --- FASE 3 lote 1 (20-jul-2026): overrides donde el perfil por categoría engaña ---
+  'gym-leg-extension': {
+    primaryMuscles: ['Cuadriceps'],
+    secondaryMuscles: [],
+    anatomyRegions: { front: ['quadriceps'], back: [] },
+  },
+  'gym-db-shoulder-press': {
+    primaryMuscles: ['Deltoides', 'Triceps'],
+    secondaryMuscles: ['Trapecio superior', 'Core'],
+    anatomyRegions: { front: ['front_shoulders'], back: ['triceps', 'upper_back'] },
+  },
+  'gym-arnold-press': {
+    primaryMuscles: ['Deltoides', 'Triceps'],
+    secondaryMuscles: ['Trapecio superior'],
+    anatomyRegions: { front: ['front_shoulders'], back: ['triceps'] },
+  },
+  'gym-ez-skullcrusher': {
+    primaryMuscles: ['Triceps'],
+    secondaryMuscles: ['Antebrazo'],
+    anatomyRegions: { front: ['forearms'], back: ['triceps'] },
+  },
+  'gym-db-triceps-kickback': {
+    primaryMuscles: ['Triceps'],
+    secondaryMuscles: [],
+    anatomyRegions: { front: [], back: ['triceps'] },
+  },
+  'gym-db-fly': {
+    primaryMuscles: ['Pectoral mayor'],
+    secondaryMuscles: ['Deltoides anterior'],
+    anatomyRegions: { front: ['chest', 'front_shoulders'], back: [] },
+  },
+  'gym-pec-deck': {
+    primaryMuscles: ['Pectoral mayor'],
+    secondaryMuscles: ['Deltoides anterior'],
+    anatomyRegions: { front: ['chest', 'front_shoulders'], back: [] },
+  },
+  'gym-barbell-curl': {
+    primaryMuscles: ['Biceps'],
+    secondaryMuscles: ['Antebrazo'],
+    anatomyRegions: { front: ['biceps', 'forearms'], back: [] },
+  },
+  'gym-hammer-curl': {
+    primaryMuscles: ['Biceps', 'Braquiorradial'],
+    secondaryMuscles: ['Antebrazo'],
+    anatomyRegions: { front: ['biceps', 'forearms'], back: [] },
+  },
+  'gym-preacher-curl': {
+    primaryMuscles: ['Biceps'],
+    secondaryMuscles: ['Antebrazo'],
+    anatomyRegions: { front: ['biceps', 'forearms'], back: [] },
+  },
+  'gym-cable-glute-kickback': {
+    primaryMuscles: ['Gluteos'],
+    secondaryMuscles: ['Isquiotibiales'],
+    anatomyRegions: { front: [], back: ['glutes', 'hamstrings'] },
+  },
+  'gym-back-extension': {
+    primaryMuscles: ['Lumbar', 'Gluteos'],
+    secondaryMuscles: ['Isquiotibiales'],
+    anatomyRegions: { front: [], back: ['lower_back', 'glutes', 'hamstrings'] },
+  },
+  'gym-pallof-press': {
+    primaryMuscles: ['Oblicuos', 'Transverso'],
+    secondaryMuscles: ['Recto abdominal'],
+    anatomyRegions: { front: ['obliques', 'abs'], back: [] },
+  },
+  'gym-db-pullover': {
+    primaryMuscles: ['Dorsal ancho', 'Pectoral'],
+    secondaryMuscles: ['Triceps', 'Serrato'],
+    anatomyRegions: { front: ['chest'], back: ['lats', 'triceps'] },
+  },
+  'gym-straight-arm-pulldown': {
+    primaryMuscles: ['Dorsal ancho'],
+    secondaryMuscles: ['Triceps', 'Core'],
+    anatomyRegions: { front: [], back: ['lats', 'triceps'] },
+  },
   'gym-bench-press': {
     primaryMuscles: ['Pectoral mayor', 'Triceps'],
     secondaryMuscles: ['Deltoides anterior'],

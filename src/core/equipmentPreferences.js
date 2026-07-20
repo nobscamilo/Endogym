@@ -25,6 +25,9 @@ const EQUIPMENT_IDS = new Set(EQUIPMENT_OPTIONS.map((o) => o.id));
 // esos no imponen requisito y por tanto siempre están disponibles.
 function partCategory(part) {
   const p = part.toLowerCase();
+  // "Barra de dominadas" / paralelas ANTES que la barra olímpica: contienen la palabra
+  // "barra" pero son material distinto (FASE 3 lote 1, 20-jul-2026).
+  if (/dominad|paralel/.test(p)) return 'pullup';
   if (/barbell|barra/.test(p)) return 'barbell';
   if (/dumbbell|mancuern/.test(p)) return 'dumbbells';
   if (/polea|cable/.test(p)) return 'cable';

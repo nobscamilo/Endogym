@@ -1,4 +1,5 @@
 import { strengthCatalog } from './strengthCatalog.js';
+import { strengthCatalogExpansion } from './strengthCatalogExpansion.js';
 import { trxYogaCatalog } from './trxYogaCatalog.js';
 import { conditioningCatalog } from './conditioningCatalog.js';
 import { pilatesRecoveryCatalog } from './pilatesRecoveryCatalog.js';
@@ -12,6 +13,8 @@ import {
 
 const BUILT_IN_CATALOG = [
   ...strengthCatalog,
+  // FASE 3 lote 1 (20-jul-2026): 30 variantes clásicas de gimnasio con fotos garantizadas.
+  ...strengthCatalogExpansion,
   ...trxYogaCatalog,
   ...conditioningCatalog,
   ...pilatesRecoveryCatalog,

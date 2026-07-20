@@ -1,6 +1,18 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 5 (FASE 2: Biblioteca navegable de 873 ejercicios en la pestaña Entreno)**.
+Ultima actualizacion: **20 de julio de 2026, parte 6 (FASE 3 lote 1: +30 ejercicios de gimnasio en el catálogo prescribible, 184→214)**.
+
+## Sesión del 20 de julio de 2026, parte 6 (Fase 3 lote 1 — expansión curada del catálogo prescribible)
+
+30 variantes clásicas de gimnasio promovidas desde `exerciseLibrary` al catálogo del PLANNER (nuevo `src/core/exerciseCatalog/strengthCatalogExpansion.js`, integrado en `index.js`). Todas con fotos garantizadas (mediaMap +30). **Suite 434/434 verde** (+7, `tests/core/catalog-expansion.test.js`). Verificación funcional: en 8 semanas simuladas de plan full_gym el planner seleccionó los 30 (304 prescripciones).
+
+- **Curación aplicada:** `loadRatio` anclado a los básicos existentes (test de anclas relativas: goblet<sentadilla, press db<press barra, sumo≤convencional); equipment con tokens clasificables por `equipmentPreferences` (filtro por material del usuario, con test); cues es-ES escritas a mano (3 por ejercicio); dificultad foundation/build/performance; dominadas también en modalidad calistenia.
+- **Decisiones clínicas documentadas y TESTEADAS:** (1) patrón `SHOULDER_SENSITIVE` AMPLIADO con `shoulder-press|arnold` — hombro sensible excluye los press verticales nuevos pero conserva los empujes horizontales; (2) peso muerto SUMO permitido con lumbar sensible (torso más vertical, menos cizalla; el convencional sigue bloqueado); (3) core nuevo osteoporosis-safe por diseño (Pallof anti-rotación, rueda anti-extensión — sin flexión espinal cargada; osteoporosis y artrosis no bloquean nada del lote); (4) remos con apoyo (T con pecho apoyado, un brazo en banco) elegidos a propósito como alternativas lumbar-friendly al remo con barra.
+- **FIX de clasificador (`equipmentPreferences.partCategory`):** "Barra de dominadas" clasificaba como `barbell` (el token 'barra' se evaluaba antes); ahora `dominad|paralel → pullup` se evalúa primero.
+- **Atlas muscular:** +15 overrides en `EXERCISE_MUSCLE_OVERRIDES` (`exerciseLibrary.js`) donde el perfil por categoría engañaba (p. ej. leg extension heredaba "Gemelos" del perfil de accesorios; curls/tríceps/pec-deck/pallof/pullover con músculos y regiones correctos).
+- **Detalle del lote:** pierna (goblet, extensión cuádriceps, gemelo sentado, zancada db, split db) · cadena posterior (sumo, pull-through, extensión lumbar, patada glúteo polea) · empuje (press db banca/declinado/hombros/Arnold, aperturas db, press y aperturas en máquina, francés EZ, patada tríceps) · tracción (dominadas prono/supino, remo un brazo, remo T apoyado, jalón ancho, pullover polea y db, curl barra/martillo/Scott) · core (Pallof, rueda de rodillas).
+- **Nota anti-colisión de patrones:** los shrugs ("encogimiento de hombros") quedaron FUERA del lote a propósito: el patrón de osteoporosis incluye `encogimiento` (por los crunches) y los bloquearía por falso positivo. Si algún día se añaden, usar naming en inglés o refinar el patrón.
+- **Regla para próximos lotes:** todo ejercicio nuevo con estrés de hombro/lumbar/rodilla/impacto debe llevar tokens canónicos en id o nombre que los patrones de `comorbidityRestrictions.js` cacen; validar SIEMPRE contra los 5 filtros + equipamiento + anclas de loadRatio y añadir su test.
 
 ## Sesión del 20 de julio de 2026, parte 5 (Fase 2 — Biblioteca navegable)
 
