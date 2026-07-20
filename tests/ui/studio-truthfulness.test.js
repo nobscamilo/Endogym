@@ -48,7 +48,10 @@ describe('Studio — barreras contra datos simulados en sesiones reales', () => 
     expect(data).not.toContain('Ignios Coaches');
     expect(data).not.toContain("views: '");
     expect(today).not.toContain('D.discover');
-    expect(today).toContain("s.list.filter((exercise) => exercise?.yt)");
+    // 20-jul-2026: la sección "Sigue aprendiendo" se ELIMINÓ por completo de Hoy (petición
+    // del usuario) — la barrera anti-feed-ficticio se cumple por ausencia de la sección.
+    expect(today).not.toContain('Sigue aprendiendo');
+    expect(today).not.toContain('learningVideos');
     expect(train).not.toContain('D.discover');
     expect(ui).not.toContain('playback simulado');
     expect(ui).not.toContain('Reproducción guiada');

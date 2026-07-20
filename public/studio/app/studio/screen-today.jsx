@@ -73,11 +73,6 @@ function TodayHub({ go, variant }) {
   const saludo = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
   const rec = Number.isFinite(progress.recovery) ? progress.recovery : null;
   const ws = Array.isArray(progress.weightSeries) ? progress.weightSeries : [];
-  // Contenido real y contextual: solo ejercicios de la sesión actual con embed verificado.
-  // No usar un feed editorial ficticio ni fabricar autores, vistas o duraciones.
-  const learningVideos = Array.isArray(s?.list)
-    ? s.list.filter((exercise) => exercise?.yt).slice(0, 3)
-    : [];
   return (
     <div className="page stagger screen-enter">
       <div className="page-head">
@@ -148,13 +143,8 @@ function TodayHub({ go, variant }) {
         </SectionCard>
       </div>
 
-      {/* Técnica real de la sesión: nunca feed editorial de muestra. */}
-      {learningVideos.length ? <SectionCard title="Sigue aprendiendo" icon="play"
-        sub="Vídeos de técnica verificados para los ejercicios de hoy">
-        <div className="vid-rail">
-          {learningVideos.map((exercise, i) => <VideoThumb key={exercise.id || i} item={exercise} />)}
-        </div>
-      </SectionCard> : null}
+      {/* Sección de vídeos de técnica ELIMINADA de Hoy (petición del usuario, 20-jul-2026):
+          la técnica vive en la sesión (fotos guiadas + botón Técnica) y en la pestaña Biblioteca. */}
     </div>
   );
 }

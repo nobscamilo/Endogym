@@ -85,7 +85,7 @@ const CHUNK_STYLE_HINTS = [
   'Desayunos de estilo salado (huevos, tortillas, tostadas saladas con proteína). En comida/cena de estos días prioriza AVES (pollo, pavo) como proteína principal.',
   'Desayunos dulces a base de avena (porridge, tortitas de avena, overnight oats). En comida/cena de estos días prioriza PESCADO (blanco o azul) como proteína principal.',
   'Desayunos a base de lácteos y fruta (yogur con toppings, bowls de fruta, batidos proteicos). OJO: este estilo tiende a quedarse CORTO de calorías; añade densidad energética (frutos secos, granola, avena, yogur griego entero, aceite de oliva, aguacate) y porciones suficientes hasta CUMPLIR las kcal objetivo de cada día — no entregues días por debajo del objetivo. En comida/cena de estos días prioriza TERNERA magra o cerdo magro como proteína principal.',
-  'Desayunos con pan integral + proteína o repostería fitness casera. En comida/cena de este día prioriza LEGUMBRES o huevo como plato principal.',
+  'Desayunos con pan integral + proteína o repostería fitness casera. En comida/cena de este día prioriza LEGUMBRES o huevo como plato principal. OJO: legumbres y huevo tienden a quedarse CORTOS de calorías — añade densidad energética (aceite de oliva, arroz o pan integral, frutos secos, aguacate, queso) y porciones suficientes hasta CUMPLIR las kcal objetivo del día; no entregues el día por debajo del objetivo.',
 ];
 
 const MEAL_ITEM_SCHEMA = {

@@ -144,14 +144,30 @@ function RecentWorkoutsCard() {
     setItems((p) => p.map((w) => (w.workoutId === workoutId ? { ...w, analysis, analysisSource: source } : w)));
   }
 
+  // REDISEÑO 20-jul-2026: colapsado por defecto (últimos 3); el resto se despliega.
+  const [showAll, setShowAll] = useStateP(false);
+  const COLLAPSED_COUNT = 3;
+  const visible = showAll ? items : items.slice(0, COLLAPSED_COUNT);
+  const hiddenCount = items.length - COLLAPSED_COUNT;
+
   return (
-    <SectionCard title="Historial de entrenos" icon="train" sub="Todas tus sesiones guardadas. Toca una para ver el detalle y pedir análisis del coach.">
+    <SectionCard title="Historial de entrenos" icon="train" sub="Tus últimas sesiones. Toca una para ver el detalle y pedir análisis del coach.">
       {items.length ? (
         <div className="stack" style={{ gap: 0 }}>
-          {items.map((w, i) => <HistoryItem key={w.workoutId || `${w.date}-${i}`} w={w} onAnalyzed={onAnalyzed} />)}
-          {hasMore ? (
+          {visible.map((w, i) => <HistoryItem key={w.workoutId || `${w.date}-${i}`} w={w} onAnalyzed={onAnalyzed} />)}
+          {!showAll && (hiddenCount > 0 || hasMore) ? (
+            <button className="btn ghost sm" style={{ alignSelf: 'center', marginTop: 10 }} onClick={() => setShowAll(true)}>
+              <Icon name="chevronRight" size={14} /> Ver todo el historial{hiddenCount > 0 ? ` (${hiddenCount}+ más)` : ''}
+            </button>
+          ) : null}
+          {showAll && hasMore ? (
             <button className="btn ghost sm" style={{ alignSelf: 'center', marginTop: 10 }} onClick={loadMore} disabled={loading}>
               {loading ? 'Cargando…' : 'Cargar más'}
+            </button>
+          ) : null}
+          {showAll && !hasMore ? (
+            <button className="btn ghost sm" style={{ alignSelf: 'center', marginTop: 10 }} onClick={() => setShowAll(false)}>
+              Mostrar menos
             </button>
           ) : null}
         </div>
@@ -162,10 +178,13 @@ function RecentWorkoutsCard() {
   );
 }
 
-/* ---- Análisis del coach: último entreno, tendencia y próximos ajustes ---- */
+/* ---- Análisis del coach: último entreno, tendencia y próximos ajustes ----
+   REDISEÑO 20-jul-2026: por defecto solo lo ACCIONABLE (ajustes + alerta); el texto largo
+   (último entreno, tendencia, objetivo) se despliega con "Ver análisis completo". */
 function CoachAnalysisCard() {
   const [state, setState] = useStateP({ phase: 'loading', report: null, source: null, stale: false, generatedAt: null });
   const [busy, setBusy] = useStateP(false);
+  const [expanded, setExpanded] = useStateP(false);
 
   async function token() { return window.__getIdToken ? window.__getIdToken() : Promise.resolve(null); }
 
@@ -218,22 +237,7 @@ function CoachAnalysisCard() {
               <button className="btn soft sm" onClick={generate} disabled={busy}><Icon name="sparkles" size={14} /> {busy ? 'Analizando…' : 'Actualizar análisis'}</button>
             </div>
           ) : null}
-          <div>
-            <div className="mb-label">Tu último entreno</div>
-            <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.lastSession}</p>
-          </div>
-          {rep.history ? (
-            <div>
-              <div className="mb-label">Cómo vas (últimas semanas)</div>
-              <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.history}</p>
-            </div>
-          ) : null}
-          {rep.goalAlignment ? (
-            <div>
-              <div className="mb-label">Consonancia con tu objetivo</div>
-              <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.goalAlignment}</p>
-            </div>
-          ) : null}
+          {/* SIEMPRE visible: lo accionable (ajustes) y la alerta si la hay. */}
           {Array.isArray(rep.adjustments) && rep.adjustments.length ? (
             <div>
               <div className="mb-label">Próximas sesiones: qué voy a ajustar</div>
@@ -250,6 +254,34 @@ function CoachAnalysisCard() {
           {rep.warning ? (
             <p className="tiny" style={{ margin: 0, color: 'var(--glu-high)', lineHeight: 1.5 }}>{rep.warning}</p>
           ) : null}
+          {/* Texto completo del análisis: desplegable. */}
+          {!expanded ? (
+            <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setExpanded(true)}>
+              <Icon name="chevronRight" size={14} /> Ver análisis completo
+            </button>
+          ) : (
+            <React.Fragment>
+              <div>
+                <div className="mb-label">Tu último entreno</div>
+                <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.lastSession}</p>
+              </div>
+              {rep.history ? (
+                <div>
+                  <div className="mb-label">Cómo vas (últimas semanas)</div>
+                  <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.history}</p>
+                </div>
+              ) : null}
+              {rep.goalAlignment ? (
+                <div>
+                  <div className="mb-label">Consonancia con tu objetivo</div>
+                  <p style={{ margin: 0, lineHeight: 1.55, fontSize: '0.92rem' }}>{rep.goalAlignment}</p>
+                </div>
+              ) : null}
+              <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setExpanded(false)}>
+                Ocultar análisis completo
+              </button>
+            </React.Fragment>
+          )}
           <div className="row ac wrap between" style={{ gap: 10 }}>
             <span className="tiny muted">{state.generatedAt ? `Generado: ${String(state.generatedAt).slice(0, 16).replace('T', ' ')}` : ''}</span>
             <span className="row ac" style={{ gap: 8 }}>
@@ -402,14 +434,11 @@ function ProgressScreen() {
 
       <CoachBanner screen="progress" ask onAsk={() => setAsk(true)} />
 
+      {/* REDISEÑO 20-jul-2026 (petición del usuario): lo VISUAL primero (objetivo, gráficas,
+          récords) y el texto largo (análisis del coach, historial) al final y COLAPSADO. */}
+
       {/* Objetivo SMART: meta, actual, tendencia y predicción */}
       <GoalProgressCard />
-
-      {/* Análisis del coach: último entreno, tendencia y próximos ajustes */}
-      <CoachAnalysisCard />
-
-      {/* Historial visible de entrenos realizados */}
-      <RecentWorkoutsCard />
 
       {/* Forma aeróbica (corredores): eficiencia ritmo/FC y predicción de carrera */}
       {D.runFitness ? (
@@ -539,6 +568,12 @@ function ProgressScreen() {
           )}
         </SectionCard>
       </div>
+
+      {/* Análisis del coach: resumen accionable + texto completo desplegable */}
+      <CoachAnalysisCard />
+
+      {/* Historial de entrenos: colapsado (últimos 3) con despliegue completo */}
+      <RecentWorkoutsCard />
 
       <AskCoach open={ask} onClose={() => setAsk(false)} />
     </div>);

@@ -1,6 +1,15 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 7 (HOTFIX: la CSP bloqueaba TODAS las fotos de técnica + vulnerabilidad crítica del CI + matriz Node)**.
+Ultima actualizacion: **20 de julio de 2026, parte 8 (UX de Progreso rediseñada + fix nutrición Dom + fuera "Sigue aprendiendo")**.
+
+## Sesión del 20 de julio de 2026, parte 8 (reporte del usuario con capturas: nutrición 502, UX de Progreso, sección sobrante en Hoy)
+
+**Suite 434/434 verde.** Bundle `2977aad797`.
+
+- **FIX nutrición (REGRESIÓN de la parte 3, disculpas):** `POST /api/studio-nutrition` devolvía 502 SIEMPRE con "Macro drift severo" en **Dom** (logs de Vercel). Causa: el hint nuevo del trozo Dom ("legumbres o huevo como principal") produce menús cortos de kcal en día de descanso bajo en carbos, y el reintento repite el mismo sesgo. FIX: el hint de Dom lleva ahora el mismo aviso de densidad energética que ya tenía el de lácteos. Validado con sonda real 3/3: desvío 0%, −1%, 0% (antes −11% o peor). Lección: al añadir hints de estilo, incluir SIEMPRE la contra-instrucción de kcal si el estilo tiende a quedarse corto.
+- **Imágenes de técnica: VERIFICADO EN NAVEGADOR REAL (Chrome MCP, sesión del usuario):** tras el fix de CSP de la parte 7 las fotos cargan con 200 y sin errores de consola — las capturas del usuario eran anteriores al deploy; basta recarga forzada. Regla nueva de verificación: los assets se comprueban RENDERIZADOS en la página real, no contra el recurso aislado.
+- **Hoy:** eliminada la sección "Sigue aprendiendo" (petición del usuario): la técnica vive en la sesión (fotos guiadas + botón Técnica) y en Biblioteca. El test de veracidad (`studio-truthfulness`) se adaptó: ahora exige la AUSENCIA de la sección y de `learningVideos`.
+- **Progreso REDISEÑADA (petición del usuario: "mucho texto, cero amigable, gráficas al final"):** nuevo orden — objetivo y TODAS las gráficas/datos primero (forma aeróbica, zonas, carga semanal, peso, perímetro, volumen, récords) y el texto al FINAL y COLAPSADO: `CoachAnalysisCard` muestra por defecto solo lo accionable (ajustes + alerta) con "Ver análisis completo" desplegable (último entreno / tendencia / objetivo); `RecentWorkoutsCard` muestra los últimos 3 con "Ver todo el historial" (paginación solo desplegado, "Mostrar menos" para recoger).
 
 ## Sesión del 20 de julio de 2026, parte 7 (dos bugs reportados por el usuario con captura)
 
