@@ -39,6 +39,27 @@ describe('mapTodaySession — resolución de "hoy" (discrepancia)', () => {
     expect(out.isRestDay).toBe(true);
   });
 
+  it('guías visuales: un ejercicio del mediaMap expone item.media con 2 URLs públicas; uno sin mapa no lleva media', () => {
+    const plan = {
+      days: [{
+        date: '2026-06-17', dayName: 'Miércoles', isTrainingDay: true, sessionType: 'resistance',
+        workout: {
+          title: 'Gym · Torso',
+          exercises: [
+            { id: 'gym-bench-press', name: 'Press de banca con barra', prescription: { loadKg: 60, sets: 3, reps: 8 } },
+            { id: 'ejercicio-sin-mapa', name: 'Inventado', prescription: { sets: 3, reps: 10 } },
+          ],
+        },
+      }],
+    };
+    const out = mapTodaySession(plan, '2026-06-17');
+    const [bench, sinMapa] = out.list;
+    expect(Array.isArray(bench.media)).toBe(true);
+    expect(bench.media).toHaveLength(2);
+    expect(bench.media[0]).toBe('https://storage.googleapis.com/endogym-vtety8-exercise-media/exercise-media/Barbell_Bench_Press_-_Medium_Grip/0.jpg');
+    expect(sinMapa.media).toBeUndefined();
+  });
+
   it('en un día de fuerza devuelve ese día con isRestDay=false', () => {
     const out = mapTodaySession(PLAN, '2026-06-17');
     expect(out.title).toBe('Gym · Torso');

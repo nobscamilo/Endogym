@@ -17,6 +17,7 @@ import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRac
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, findDaySession } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
+import { exerciseMediaUrls } from '../../../core/exerciseCatalog/mediaMap.js';
 import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import { buildMesocycleReview } from '../../../core/mesocycleReview.js';
 import { buildPrePostNutrition } from '../../../core/prePostNutrition.js';
@@ -403,6 +404,10 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
     // Implemento del ejercicio: la UI lo usa para el DESGLOSE de la carga (barra incluida +
     // discos por lado, kg por mancuerna, placa de máquina). Ver load-format.js en el Studio.
     if (e.equipment) item.equip = e.equipment;
+    // Guías visuales (Fase 1, 20-jul-2026): fotos inicio/fin de free-exercise-db (dominio
+    // público) para los ejercicios mapeados en mediaMap. La UI las alterna como animación.
+    const mediaUrls = exerciseMediaUrls(e.id);
+    if (mediaUrls) item.media = mediaUrls;
     return item;
   });
   // Un día de entreno sin ejercicios sí es null; un día de descanso/recuperación se devuelve igual

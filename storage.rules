@@ -5,5 +5,11 @@ service firebase.storage {
     match /plates/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // NOTA (20-jul-2026): las guías visuales de ejercicios NO viven aquí. El proyecto no
+    // tiene Firebase Storage activado (estas reglas no están desplegadas); los buckets son
+    // GCS puros. Las fotos de técnica van en el bucket PÚBLICO dedicado
+    // gs://endogym-vtety8-exercise-media (IAM allUsers objectViewer, uniform access),
+    // separado a propósito del bucket de platos (fotos personales, privadas vía Admin SDK).
   }
 }

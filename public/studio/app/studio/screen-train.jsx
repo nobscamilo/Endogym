@@ -318,6 +318,10 @@ function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinis
                 : (ex.restSec != null ? <span className="pill tiny"><Icon name="clock" size={12} /> descanso {ex.restSec} s</span> : null)}
             </div>
             <LoadBreakdown kg={ex.loadKg} equip={ex.equip} style={{ marginTop: 6 }} />
+            {/* Guía visual propia (fotos inicio/fin alternando): técnica sin salir a YouTube. */}
+            {Array.isArray(ex.media) && ex.media.length ? (
+              <TechniquePhotos media={ex.media} name={ex.name} style={{ marginTop: 12 }} />
+            ) : null}
             {Array.isArray(ex.cues) && ex.cues.length ? (
               <ul className="step-list" style={{ margin: '12px 0 0' }}>
                 {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
@@ -327,7 +331,7 @@ function GuidedSession({ list, hybridCircuit, openVideo, onExerciseDone, onFinis
               <button className="btn" style={{ flex: '1 1 auto', justifyContent: 'center' }} onClick={completeWork}>
                 <Icon name="check" size={16} /> {circuit ? (isLastEx && st.round >= rounds ? 'Terminar circuito' : 'Hecho · siguiente') : (st.setNum < exSets ? `Serie ${st.setNum} hecha` : (isLastEx ? 'Terminar sesión' : 'Última serie hecha'))}
               </button>
-              {(ex.yt || ex.videoUrl) ? (
+              {(ex.yt || ex.videoUrl || (Array.isArray(ex.media) && ex.media.length)) ? (
                 <button className="btn ghost sm" onClick={() => openVideo(ex)}><Icon name="play" size={14} /> Técnica</button>
               ) : null}
             </div>

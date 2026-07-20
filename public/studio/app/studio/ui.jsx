@@ -47,12 +47,38 @@ function videoGrad(hue) {
   return `linear-gradient(140deg, oklch(0.62 0.16 ${hue}), oklch(0.42 0.13 ${(hue + 30) % 360}))`;
 }
 
-/* Fondo de miniatura: imagen real de YouTube si hay vídeo, si no el gradiente. */
+/* Fondo de miniatura: foto propia de técnica si existe (guías visuales, dominio público),
+   si no la imagen de YouTube, y como último recurso el gradiente. */
 function thumbBg(item) {
+  if (item && Array.isArray(item.media) && item.media[0]) {
+    return `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.35)), url(${item.media[0]}) center/cover no-repeat`;
+  }
   if (item && item.yt) {
     return `linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.42)), url(https://i.ytimg.com/vi/${item.yt}/hqdefault.jpg) center/cover no-repeat`;
   }
   return videoGrad(item && item.hue);
+}
+
+/* Guía visual propia: alterna la foto de posición inicial y final (efecto animación).
+   Tocar la imagen pausa/reanuda. Fotos de free-exercise-db (dominio público). */
+function TechniquePhotos({ media, name, style }) {
+  const [frame, setFrame] = useStateU(0);
+  const [paused, setPaused] = useStateU(false);
+  useEffectU(() => {
+    if (paused || !Array.isArray(media) || media.length < 2) return undefined;
+    const t = setInterval(() => setFrame((f) => (f + 1) % 2), 1100);
+    return () => clearInterval(t);
+  }, [paused, media]);
+  if (!Array.isArray(media) || !media.length) return null;
+  return (
+    <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', background: 'var(--surface-2, rgba(0,0,0,0.2))', ...style }}
+      onClick={() => setPaused((p) => !p)} role="img" aria-label={`Técnica de ${name || 'ejercicio'}: posición ${frame === 0 ? 'inicial' : 'final'}`}>
+      <img src={media[frame] || media[0]} alt="" style={{ display: 'block', width: '100%', aspectRatio: '3 / 2', objectFit: 'cover' }} loading="lazy" />
+      <span className="pill tiny" style={{ position: 'absolute', left: 8, bottom: 8, background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
+        {paused ? 'Pausado · toca para animar' : (frame === 0 ? 'Posición inicial' : 'Posición final')}
+      </span>
+    </div>
+  );
 }
 
 /* Vídeo verificado → reproductor real. Sin embed exacto → enlace de búsqueda honesto.
@@ -60,7 +86,8 @@ function thumbBg(item) {
 function VideoThumb({ item, variant = 'card' }) {
   const { open } = useVideo();
   const ref = useRefU(null);
-  const hasVideo = Boolean(item?.yt);
+  const hasMedia = Array.isArray(item?.media) && item.media.length > 0;
+  const hasVideo = Boolean(item?.yt) || hasMedia;
   const searchUrl = !hasVideo && item?.videoUrl ? item.videoUrl : null;
   const Container = hasVideo ? 'button' : searchUrl ? 'a' : 'div';
   const interactionProps = hasVideo
@@ -68,7 +95,7 @@ function VideoThumb({ item, variant = 'card' }) {
     : searchUrl
       ? { href: searchUrl, target: '_blank', rel: 'noreferrer noopener' }
       : { 'aria-disabled': true };
-  const detail = item?.author || item?.muscle || (hasVideo ? 'YouTube' : searchUrl ? 'Buscar técnica en YouTube' : 'Sin vídeo verificado');
+  const detail = item?.author || item?.muscle || (hasMedia ? 'Guía visual' : hasVideo ? 'YouTube' : searchUrl ? 'Buscar técnica en YouTube' : 'Sin vídeo verificado');
   const duration = item?.len || item?.dur;
   if (variant === 'row') {
     return (
@@ -195,15 +222,21 @@ function VideoPlayer({ state, onClose }) {
     setTimeout(onClose, 380);
   };
 
-  if (!state?.item?.yt) return null;
+  const hasMedia = Array.isArray(state?.item?.media) && state.item.media.length > 0;
+  if (!state?.item?.yt && !hasMedia) return null;
   const it = state.item;
   const cues = it.cues || [];
   return (
     <div className={`player-scrim ${closing ? 'out' : ''}`} onClick={doClose}>
       <div className="player-card" ref={cardRef} onClick={(e) => e.stopPropagation()}>
         <div className="player-stage" style={{ background: videoGrad(it.hue) }}>
-          <iframe className="player-iframe" src={`https://www.youtube-nocookie.com/embed/${it.yt}?autoplay=1&rel=0&modestbranding=1`}
-            title={it.title || it.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+          {hasMedia ? (
+            /* Guía visual PROPIA como reproductor primario: sin depender de YouTube. */
+            <TechniquePhotos media={it.media} name={it.name} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
+          ) : (
+            <iframe className="player-iframe" src={`https://www.youtube-nocookie.com/embed/${it.yt}?autoplay=1&rel=0&modestbranding=1`}
+              title={it.title || it.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+          )}
           <button className="player-close" onClick={doClose}><Icon name="close" size={20} /></button>
         </div>
         <div className="player-body">
@@ -226,9 +259,11 @@ function VideoPlayer({ state, onClose }) {
           )}
           <div className="row wrap" style={{ gap: 8, marginTop: 16 }}>
             <ExercisePrefActions item={it} />
-            <a className="btn ghost sm" href={`https://www.youtube.com/watch?v=${it.yt}`} target="_blank" rel="noreferrer noopener">
-              <Icon name="externalLink" size={15} /> Abrir en YouTube
-            </a>
+            {it.yt ? (
+              <a className="btn ghost sm" href={`https://www.youtube.com/watch?v=${it.yt}`} target="_blank" rel="noreferrer noopener">
+                <Icon name="externalLink" size={15} /> {hasMedia ? 'Ver vídeo en YouTube' : 'Abrir en YouTube'}
+              </a>
+            ) : null}
           </div>
         </div>
       </div>
@@ -240,7 +275,8 @@ function VideoPlayer({ state, onClose }) {
 function VideoProvider({ children }) {
   const [state, setState] = useStateU(null);
   const open = useCallback((item, el) => {
-    if (!item?.yt) return;
+    // Se abre con guía visual propia (media) O con vídeo verificado (yt).
+    if (!item?.yt && !(Array.isArray(item?.media) && item.media.length)) return;
     const rect = el ? el.getBoundingClientRect() : null;
     setState({ item, rect });
   }, []);
@@ -271,4 +307,4 @@ function Sheet({ open, onClose, children, title }) {
   );
 }
 
-Object.assign(window, { SectionCard, MacroLine, Stat, VideoThumb, VideoPlayer, VideoProvider, VideoCtx, useVideo, videoGrad, thumbBg, Sheet });
+Object.assign(window, { SectionCard, MacroLine, Stat, VideoThumb, VideoPlayer, VideoProvider, VideoCtx, useVideo, videoGrad, thumbBg, TechniquePhotos, Sheet });
