@@ -1,6 +1,17 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **19 de junio de 2026, noche (auditoría de alineación del Análisis del coach con objetivos)**.
+Ultima actualizacion: **20 de julio de 2026 (revisión de arquitectura: observabilidad hecha; deuda priorizada)**.
+
+## P1 - Deuda de arquitectura (revisión del 20 jul 2026)
+
+Valoración: la arquitectura (Vercel serverless + Firebase Auth/Firestore + buckets GCS + Gemini) es la correcta para un MVP con pocos usuarios; NO rehacer cimientos. Lo que falta son "ventanas para ver dentro" y un patio de pruebas que no sea producción.
+
+- [x] **Observabilidad de IA (punto 1 — HECHO 20 jul).** Tokens (in/out/pensamiento/cacheado) en TODOS los flujos; `recordAiMetric` con mapas anidados; `scripts/ai_cost_report.mjs` estima el coste por flujo/día desde `aiMetrics`. El gasto de GCP queda atribuible.
+- [ ] **Staging / emulador de Firestore (punto 2 — el más valioso a continuación).** Hoy TODAS las sondas, tests con Firestore real y regeneraciones de prueba van contra la base de datos de los usuarios reales (tolerable con 2 usuarios, imprudente con 50). Opción barata: emulador de Firestore para sondas destructivas; opción robusta: 2º proyecto Firebase como staging. Hacerlo ANTES de abrir la app a más gente.
+- [ ] **Generación asíncrona si los timeouts vuelven a doler (punto 3).** Nutrición y weekly-plan viven con presupuestos de tiempo al milímetro contra el límite de 30 s de Vercel. Patrón robusto: encolar → polling. Solo si reaparecen 504/timeouts; añade complejidad real.
+- [ ] **Fricción operativa (punto 4).** (a) El alias `endogym.vercel.app` NO promociona solo tras cada deploy (se reasigna a mano en cada release) — investigar por qué de una vez. (b) Verificar qué cubre exactamente el cron de backup semanal (`/api/backup`) y RESTAURARLO una vez: un backup no probado es una hipótesis.
+- [ ] **Alerta de gasto de IA (deuda menor del punto 1).** Correr `ai_cost_report.mjs` semanalmente (scheduled task) y avisar si el gasto diario supera un umbral. Aprovecha las métricas ya instrumentadas.
+
 
 ## P0 - Recuperacion y seguridad inmediata
 
