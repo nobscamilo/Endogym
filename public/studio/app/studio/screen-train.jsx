@@ -414,6 +414,11 @@ function GuidedRoutine({ routine, onClose }) {
             <div className="card lg" style={{ textAlign: 'center', borderColor: 'var(--accent)', background: 'var(--surface-2)' }}>
               <p className="eyebrow" style={{ margin: 0 }}>{current.side || 'Movimiento bilateral'}</p>
               <h3 style={{ margin: '8px 0 14px', fontSize: '1.55rem' }}>{current.name}</h3>
+              {/* Guía visual del estiramiento (20-jul-2026): fotos inicio/fin alternando.
+                  Solo los movimientos con equivalente verificado la tienen. */}
+              {Array.isArray(current.media) && current.media.length ? (
+                <TechniquePhotos media={current.media} name={current.name} style={{ maxWidth: 360, margin: '0 auto 14px' }} />
+              ) : null}
               <div className="num" style={{ fontSize: '4rem', fontWeight: 800, lineHeight: 1 }}>{fmt(left)}</div>
               <div className="bar" style={{ margin: '18px 0 12px' }}><i style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} /></div>
               <p className="tiny muted" style={{ margin: 0 }}>{index + 1} de {movements.length}</p>

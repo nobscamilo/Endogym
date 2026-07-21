@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 9 (OBSERVABILIDAD de IA completa: tokens en todos los flujos + fix del bug de claves planas)**.
+Ultima actualizacion: **20 de julio de 2026, parte 10 (guías visuales en calentamiento/enfriamiento/movilidad)**.
+
+## Sesión del 20 de julio de 2026, parte 10 (fotos de técnica en el reproductor de calentamiento y movilidad)
+
+Petición del usuario: hacer más interactivos calentamiento y enfriamiento con imágenes del dataset ya ingerido. **Suite 440/440 verde** (+1). Bundle `e1a9fce918`.
+
+- **Cruce verificado:** los 34 movimientos de `guidedMobility.js` (WARMUP_MOVEMENTS + estiramientos) contra free-exercise-db (123 stretching + el resto) con triple mapeo + verificación par a par (`scratch/build-warmup-media-map.mjs`). Resultado: **16 estiramientos estáticos con foto verificada** (gemelo, isquios, cuádriceps, flexor de cadera, glúteo figura-4, aductores, pectoral, hombro posterior, dorsal ×2, cuello, rodillas al pecho, dead bug, rotación con banda, retracción escapular, alcance global). Los 18 DINÁMICOS (marcha, círculos de hombro, wall slides, pedaleo, series de aproximación, A-march…) quedan SIN foto a propósito: no hay imagen estática que los represente.
+- **`src/core/guidedMedia.js` (generado):** `WARMUP_MEDIA_MAP` (movimiento-id → fedId) + `warmupMovementMedia(id)` → 2 URLs públicas. `guidedMobility.js` añade `media` a cada movimiento con equivalente (helper `withMedia`) tanto en movilidad como en calentamiento; los que no tienen se devuelven sin `media`.
+- **UI (`GuidedRoutine` en `screen-train.jsx`):** el reproductor guiado (mismo componente para calentamiento y movilidad) muestra `TechniquePhotos` (fotos inicio/fin alternando) sobre el temporizador cuando el movimiento tiene `media`. Sin foto → solo temporizador + cue, como antes.
+- **Verificado:** las 16 imágenes sirven 200 desde el bucket público. Test nuevo en `guided-mobility.test.js` (estiramiento con media de 2 URLs; dinámico sin media).
+- **Ampliable:** algunos movimientos con foto potencial (tríceps overhead, cobra, ensayo de sentadilla, puente de glúteos) los rechazó el verificador por prudencia; se pueden añadir a mano a `WARMUP_MEDIA_MAP` si se quiere más cobertura.
 
 ## Sesión del 20 de julio de 2026, parte 9 (punto 1 de la revisión de arquitectura: observabilidad de IA)
 

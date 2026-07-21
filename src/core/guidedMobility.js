@@ -1,4 +1,13 @@
 import { deriveWorkedGroups, detectComorbidities } from './warmupCooldown.js';
+import { warmupMovementMedia } from './guidedMedia.js';
+
+// Guías visuales (20-jul-2026): añade `media` (2 fotos inicio/fin, dominio público) a los
+// movimientos que tienen equivalente verificado en free-exercise-db. Los dinámicos sin foto
+// (marcha, círculos, pedaleo…) se devuelven sin `media` y la UI no muestra imagen.
+function withMedia(movement) {
+  const media = warmupMovementMedia(movement.id);
+  return media ? { ...movement, media } : movement;
+}
 
 const ALLOWED_DURATIONS = Object.freeze([5, 10, 15, 20]);
 const WARMUP_DURATIONS = Object.freeze([5, 10, 15]);
@@ -105,7 +114,7 @@ export function buildGuidedMobilityRoutine({ exercises = [], profile = null, dur
   const duration = ALLOWED_DURATIONS.includes(Number(durationMinutes)) ? Number(durationMinutes) : 10;
   const targets = targetsFromExercises(exercises);
   const workedGroups = deriveWorkedGroups(exercises);
-  const movements = takeForDuration(safeCandidates(profile), targets, duration);
+  const movements = takeForDuration(safeCandidates(profile), targets, duration).map(withMedia);
   const equipment = [...new Set(movements.map((m) => m.equipment).filter((e) => e && e !== 'Sin equipo'))];
   return {
     id: `post-workout-${targets.join('-')}-${duration}`,
@@ -148,7 +157,7 @@ function buildWarmupMovements({ exercises, profile, sessionType, durationMinutes
   const totalSeconds = durationMinutes * 60;
   const base = Math.floor(totalSeconds / selected.length);
   let remaining = totalSeconds - (base * selected.length);
-  return selected.map((movement) => ({ ...movement, seconds: base + (remaining-- > 0 ? 1 : 0) }));
+  return selected.map((movement) => withMedia({ ...movement, seconds: base + (remaining-- > 0 ? 1 : 0) }));
 }
 
 export function buildGuidedWarmupRoutine({ exercises = [], profile = null, sessionType = 'resistance', durationMinutes = 10 } = {}) {

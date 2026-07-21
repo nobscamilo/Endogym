@@ -61,4 +61,18 @@ describe('buildGuidedWarmupRoutine — preparación dinámica ligada a la sesió
     const routine = buildGuidedWarmupRoutine({ exercises: [{ category: 'core' }], profile: { conditions: { pregnant: true } } });
     expect(routine.movements.map((m) => m.id)).not.toContain('dead-bug-primer');
   });
+
+  it('guías visuales (20-jul-2026): los estiramientos con foto exponen media (2 URLs); los dinámicos sin equivalente no', () => {
+    // Movilidad de pierna: hip-flexor e isquios tienen foto verificada; ankle-rocks (dinámico) no.
+    const routine = buildGuidedMobilityRoutine({ exercises: [{ category: 'lower_body_strength' }, { category: 'posterior_chain' }], durationMinutes: 10 });
+    const byId = Object.fromEntries(routine.movements.map((m) => [m.id, m]));
+    expect(Array.isArray(byId['hip-flexor-half-kneel'].media)).toBe(true);
+    expect(byId['hip-flexor-half-kneel'].media).toHaveLength(2);
+    expect(byId['hip-flexor-half-kneel'].media[0]).toContain('storage.googleapis.com');
+    expect(byId['hamstring-hinge'].media[0]).toContain('exercise-media/Hamstring_Stretch/0.jpg');
+    // Calentamiento dinámico: la marcha progresiva NO tiene foto estática equivalente.
+    const warm = buildGuidedWarmupRoutine({ exercises: [{ category: 'lower_body_strength' }], durationMinutes: 5 });
+    const march = warm.movements.find((m) => m.id === 'march-progressive');
+    if (march) expect(march.media).toBeUndefined();
+  });
 });
