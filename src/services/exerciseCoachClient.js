@@ -323,6 +323,13 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
           attempts: attempt,
           candidateCount: Array.isArray(data?.candidates) ? data.candidates.length : 0,
           generatedAt: new Date().toISOString(),
+          // Observabilidad (20-jul-2026): tokens reales para que la ruta los registre.
+          usage: {
+            tokensIn: Number(data?.usageMetadata?.promptTokenCount) || 0,
+            tokensOut: Number(data?.usageMetadata?.candidatesTokenCount) || 0,
+            tokensThink: Number(data?.usageMetadata?.thoughtsTokenCount) || 0,
+            tokensCached: Number(data?.usageMetadata?.cachedContentTokenCount) || 0,
+          },
         },
       };
     } catch (error) {

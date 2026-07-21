@@ -1,6 +1,7 @@
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { logError, logInfo, withTrace } from '../../../lib/logger.js';
+import { addTokenUsage, recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import {
   isValidGoogleAiModelName,
@@ -71,6 +72,8 @@ export async function POST(request) {
 
       let analysis = null;
       let source = 'ai';
+      let aiCalls = 0;
+      let aiTokens = {};
       const model = resolveGeminiCoachModel();
       if (process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
         // Mismo fix que coach-analysis (20-jul-2026): con esquema + temperatura baja +
@@ -97,8 +100,10 @@ export async function POST(request) {
                 thinkingConfig: attempt.thinkingConfig,
               },
             });
+            aiCalls += 1;
             if (response.ok) {
               const data = await response.json();
+              aiTokens = addTokenUsage(aiTokens, tokensFromGeminiResponse(data));
               const candidate = data?.candidates?.[0];
               const text = (candidate?.content?.parts || []).map((p) => p?.text || '').join('').trim();
               analysis = sanitizeWorkoutAnalysis(JSON.parse(text));
@@ -122,11 +127,14 @@ export async function POST(request) {
         source = 'heuristic';
       }
 
+      // OBSERVABILIDAD (20-jul-2026): este flujo no registraba ninguna métrica de IA.
+      await recordAiMetric('workout-analysis', { calls: Math.max(1, aiCalls), fallbacks: source === 'heuristic' ? 1 : 0, ...aiTokens }).catch(() => {});
       await saveWorkoutAnalysis(user.uid, workoutId, { analysis, source });
       logInfo('workout_analysis_result', { traceId, userId: user.uid, workoutId, source, comparables: digest.comparables.length });
       return jsonResponse({ ok: true, analysis, source, cached: false }, 200, rateLimitHeaders);
     } catch (error) {
       logError('workout_analysis_failed', error, { traceId, userId: user.uid });
+      await recordAiMetric('workout-analysis', { errors: 1 }).catch(() => {});
       return errorResponse('No se pudo analizar la sesión ahora mismo.', 502);
     }
   });

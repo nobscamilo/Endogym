@@ -7,7 +7,7 @@ import {
   requestGoogleGenerateContent,
 } from '../../../services/googleGenAiTransport.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
-import { recordAiMetric } from '../../../lib/aiMetrics.js';
+import { addTokenUsage, recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
 import {
   COACH_ANALYSIS_REPORT_SCHEMA,
   buildCoachAnalysisDigest,
@@ -84,6 +84,8 @@ export async function POST(request) {
 
       let report = null;
       let source = 'ai';
+      let aiCalls = 0;
+      let aiTokens = {};
       const model = resolveGeminiCoachModel();
       if (process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
         // BUG 20-jul-2026: gemini-2.5-flash con salida restringida por esquema
@@ -113,8 +115,10 @@ export async function POST(request) {
                 thinkingConfig: attempt.thinkingConfig,
               },
             });
+            aiCalls += 1;
             if (response.ok) {
               const data = await response.json();
+              aiTokens = addTokenUsage(aiTokens, tokensFromGeminiResponse(data));
               const candidate = data?.candidates?.[0];
               const text = (candidate?.content?.parts || []).map((p) => p?.text || '').join('').trim();
               report = sanitizeCoachReport(JSON.parse(text));
@@ -138,8 +142,8 @@ export async function POST(request) {
         source = 'heuristic';
       }
 
-      // FASE 3.6 — métricas: llamada + fallback heurístico si aplica.
-      await recordAiMetric('coach-analysis', { calls: 1, fallbacks: source === 'heuristic' ? 1 : 0 });
+      // FASE 3.6 — métricas: llamadas reales + tokens + fallback heurístico si aplica.
+      await recordAiMetric('coach-analysis', { calls: Math.max(1, aiCalls), fallbacks: source === 'heuristic' ? 1 : 0, ...aiTokens });
       const record = await saveCoachAnalysis(user.uid, { report, source, signature: digest.signature });
       // FASE 2.2 — persistir las recomendaciones emitidas + snapshot de e1RM para
       // comparar su cumplimiento de forma determinista en el siguiente análisis.

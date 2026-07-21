@@ -614,7 +614,12 @@ export async function POST(request) {
         coachFailureCode: coachMeta.failureCode || null,
         fallbackApplied: Boolean(coachMeta.fallbackApplied),
       });
-      await recordAiMetric('weekly-plan', { calls: 1, fallbacks: coachMeta?.fallbackApplied ? 1 : 0 }).catch(() => {});
+      // Observabilidad (20-jul-2026): llamadas reales (con reintentos) + tokens del coach IA.
+      await recordAiMetric('weekly-plan', {
+        calls: Math.max(1, Number(coachMeta?.attempts) || 1),
+        fallbacks: coachMeta?.fallbackApplied ? 1 : 0,
+        ...(coachMeta?.usage || {}),
+      }).catch(() => {});
 
       if (profile.onboardingCompleted !== true && profile.preparticipationUpdatedAt) {
         await upsertUserProfile(user.uid, {

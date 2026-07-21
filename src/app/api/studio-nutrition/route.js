@@ -4,6 +4,7 @@ import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js'
 import { withTrace, logError, logInfo } from '../../../lib/logger.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../../services/googleGenAiTransport.js';
+import { addTokenUsage, recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { currentWeekKey as currentAppWeekKey, addDaysToDateKey } from '../../../lib/appTime.js';
 import {
@@ -372,6 +373,7 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
+        await recordAiMetric('studio-nutrition', { calls: 1, ...tokensFromGeminiResponse(data) }).catch(() => {});
         const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
         const meal = JSON.parse(text);
         if (!meal || !meal.dish || !Number(meal.kcal)) throw new Error('comida inválida');
@@ -382,6 +384,7 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
         return jsonResponse({ ok: true, day, slot, meal, nutrition: saved }, 200, getRateLimitHeaders(rateLimit));
       } catch (error) {
         logError('studio_nutrition_meal_swap_failed', error, { traceId, userId: user.uid, day, slot });
+        await recordAiMetric('studio-nutrition', { calls: 1, errors: 1 }).catch(() => {});
         return errorResponse('No se pudo cambiar esa comida ahora mismo.', 502);
       }
     }
@@ -391,6 +394,14 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
     // 60s (maxDuration). Antes, 2 rondas con timeouts de 50s + reintento interno superaban 60s → 504.
     const genDeadline = Date.now() + 50000;
     const remainingBudget = () => Math.max(8000, genDeadline - Date.now());
+
+    // OBSERVABILIDAD (20-jul-2026): antes este flujo (el MÁS caro en Gemini) no registraba
+    // NINGUNA métrica — el gasto era inatribuible. Acumulamos llamadas y tokens de TODAS
+    // las llamadas de la operación (trozos + reintentos + consolidación) y se registra una
+    // vez al final (éxito o error). Best-effort: nunca bloquea la respuesta.
+    const aiUsage = { calls: 0, tokens: {} };
+    const trackUsage = (data) => { aiUsage.tokens = addTokenUsage(aiUsage.tokens, tokensFromGeminiResponse(data)); };
+    const flushUsage = (extra = {}) => recordAiMetric('studio-nutrition', { calls: aiUsage.calls, ...aiUsage.tokens, ...extra }).catch(() => {});
 
     async function genChunk(daysList, styleHint) {
       const { response } = await requestGoogleGenerateContent({
@@ -407,8 +418,10 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
           thinkingConfig: { thinkingBudget: 0 },
         },
       });
+      aiUsage.calls += 1;
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      trackUsage(data);
       const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
       const parsed = JSON.parse(text);
       if (!parsed || !Array.isArray(parsed.days) || !parsed.days.length) throw new Error('chunk sin days');
@@ -462,8 +475,10 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
             thinkingConfig: { thinkingBudget: 0 },
           },
         });
+        aiUsage.calls += 1;
         if (response.ok) {
           const data = await response.json();
+          trackUsage(data);
           const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
           const parsed = JSON.parse(text);
           return {
@@ -564,6 +579,7 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
           userId: user.uid,
           severeDriftDays: check.severeDriftDays,
         });
+        await flushUsage({ errors: 1, fallbacks: 1 });
         return errorResponse('El plan generado no cumplió los objetivos nutricionales. Inténtalo de nuevo.', 502, { macroCheck: check });
       }
 
@@ -588,9 +604,11 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
       if (days.length >= 7) {
         await saveStudioNutritionPlan(user.uid, currentWeekKey(), nutrition).catch(() => null);
       }
+      await flushUsage();
       return jsonResponse({ ok: true, nutrition, partial: failed > 0, macroCheck: check });
     } catch (error) {
       logError('studio_nutrition_failed', error, { traceId, userId: user.uid });
+      await flushUsage({ errors: 1 });
       return errorResponse('No se pudo generar el plan ahora mismo.', 502);
     }
   });

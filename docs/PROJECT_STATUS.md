@@ -1,6 +1,21 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 8 (UX de Progreso rediseñada + fix nutrición Dom + fuera "Sigue aprendiendo")**.
+Ultima actualizacion: **20 de julio de 2026, parte 9 (OBSERVABILIDAD de IA completa: tokens en todos los flujos + fix del bug de claves planas)**.
+
+## Sesión del 20 de julio de 2026, parte 9 (punto 1 de la revisión de arquitectura: observabilidad de IA)
+
+Aprobado por el usuario tras la revisión de arquitectura. **Suite 439/439 verde** (+5, `tests/lib/ai-metrics.test.js`). Sin cambio de bundle.
+
+- **`recordAiMetric` ARREGLADO (bug de claves planas):** `set(..., {merge:true})` trata "endpoint.campo" como nombre LITERAL (a diferencia de `update()`) — los docs históricos de `aiMetrics` quedaron con campos planos. Ahora: `update()` con rutas anidadas + fallback a `set` anidado si el doc del día no existe (verificado contra Firestore real: mapa `{calls, tokensIn, tokensThink}` correcto). Los docs históricos planos se dejan como histórico.
+- **Contrato de métricas ampliado:** campos nuevos `tokensThink` (pensamiento — se factura como salida; el caso de la sonda de mapeo que quemó 7.700 tokens pensando lo hizo visible) y `tokensCached` (prefijo con descuento). `tokensFromGeminiResponse` extrae los 4; nuevo `addTokenUsage` para flujos multi-llamada.
+- **TODOS los flujos de IA instrumentados** (antes solo coach-chat tenía tokens):
+  · `studio-nutrition` (el más caro, antes CERO métricas): acumulador por operación (trozos + reintentos de drift + consolidación) con flush único al final; swap registra por llamada; errores y macro-invalid registran `errors`/`fallbacks`.
+  · `coach-analysis` y `workout-analysis` (este último antes sin métricas): llamadas reales (con reintento anti-degeneración) + tokens + fallbacks.
+  · `weekly-plan`: el cliente del coach expone `diagnostics.usage` y la ruta registra attempts reales + tokens.
+  · `analyze-plate` (antes sin métricas): tokens por llamada + **`thinkingBudget: 0` AÑADIDO** (no lo fijaba → 2.5-flash pensaba por defecto y se facturaba como salida en cada foto).
+- **Tests:** unitarios de aiMetrics (forma anidada vía update, fallback a set, campos inválidos ignorados, best-effort sin excepciones, extracción y suma de tokens). Los mocks de `aiMetrics` en los tests de rutas ahora incluyen `tokensFromGeminiResponse`/`addTokenUsage`.
+- **Cómo leer el gasto:** `aiMetrics/{YYYY-MM-DD}` → un mapa por endpoint con `{calls, errors, fallbacks, tokensIn, tokensOut, tokensThink, tokensCached}`. Coste ≈ tokensIn×$0.30/M + (tokensOut+tokensThink)×$2.50/M − descuento de tokensCached. A partir de HOY el gasto de GCP es atribuible por flujo y por día.
+- **Deuda restante del punto 1 (menor):** los docs históricos de aiMetrics quedan con claves planas (solo afecta a lecturas de fechas pasadas); no hay alertas automáticas (valorar un chequeo semanal si el gasto vuelve a subir).
 
 ## Sesión del 20 de julio de 2026, parte 8 (reporte del usuario con capturas: nutrición 502, UX de Progreso, sección sobrante en Hoy)
 

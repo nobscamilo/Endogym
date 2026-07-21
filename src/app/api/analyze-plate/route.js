@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { analyzePlateWithGemini } from '../../../services/geminiPlateAnalyzer.js';
 import { callGeminiPlateModel, isGeminiConfigured, resolveGeminiPlateModel } from '../../../services/geminiClient.js';
+import { recordAiMetric } from '../../../lib/aiMetrics.js';
 import { sanitizeGoogleAiModelNameForLog } from '../../../services/googleGenAiTransport.js';
 import { evaluateMealAdherence } from '../../../core/adherence.js';
 import { createMeal, getLatestWeeklyPlan, getUserProfile } from '../../../lib/repositories/firestoreRepository.js';
@@ -294,9 +295,13 @@ export async function POST(request) {
           });
           modelSource = 'gemini';
           modelResolved = sanitizeGoogleAiModelNameForLog(modelOutput?.diagnostics?.modelResolved ?? modelRequested);
+          // OBSERVABILIDAD (20-jul-2026): este flujo (imagen = muchos tokens de entrada)
+          // no registraba métricas de IA.
+          await recordAiMetric('analyze-plate', { calls: 1, ...(modelOutput?.diagnostics?.usage || {}) }).catch(() => {});
           return modelOutput;
         } catch (error) {
           logError('gemini_call_failed', error, { traceId, userId: user.uid });
+          await recordAiMetric('analyze-plate', { calls: 1, errors: 1, fallbacks: fallbackEnabled ? 1 : 0 }).catch(() => {});
           if (!fallbackEnabled) {
             throw new Error('Falló la inferencia del modelo Gemini y el fallback está desactivado.');
           }

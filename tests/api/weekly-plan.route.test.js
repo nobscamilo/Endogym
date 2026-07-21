@@ -71,6 +71,16 @@ vi.mock('../../src/services/exerciseCoachClient.js', () => ({
 // FASE 3.6 — métricas best-effort anuladas en tests.
 vi.mock('../../src/lib/aiMetrics.js', () => ({
   recordAiMetric: vi.fn(async () => {}),
+  tokensFromGeminiResponse: (data) => {
+    const u = data?.usageMetadata || {};
+    return { tokensIn: Number(u.promptTokenCount) || 0, tokensOut: Number(u.candidatesTokenCount) || 0, tokensThink: Number(u.thoughtsTokenCount) || 0, tokensCached: Number(u.cachedContentTokenCount) || 0 };
+  },
+  addTokenUsage: (a = {}, b = {}) => ({
+    tokensIn: (Number(a.tokensIn) || 0) + (Number(b.tokensIn) || 0),
+    tokensOut: (Number(a.tokensOut) || 0) + (Number(b.tokensOut) || 0),
+    tokensThink: (Number(a.tokensThink) || 0) + (Number(b.tokensThink) || 0),
+    tokensCached: (Number(a.tokensCached) || 0) + (Number(b.tokensCached) || 0),
+  }),
   tokensFromGeminiResponse: () => ({ tokensIn: 0, tokensOut: 0 }),
 }));
 

@@ -143,6 +143,9 @@ export async function callGeminiPlateModel({
       topP: 0.9,
       responseMimeType: 'application/json',
       responseJsonSchema: PLATE_SCHEMA,
+      // COSTE (20-jul-2026): sin esto, 2.5-flash PIENSA por defecto y esos tokens se
+      // facturan como salida. El análisis de plato es extracción estructurada: no lo necesita.
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 
@@ -164,6 +167,13 @@ export async function callGeminiPlateModel({
       modelResolved: typeof data?.modelVersion === 'string' ? data.modelVersion : model,
       candidateCount: Array.isArray(data?.candidates) ? data.candidates.length : 0,
       generatedAt: new Date().toISOString(),
+      // Observabilidad: tokens reales de la llamada (la ruta los registra en aiMetrics).
+      usage: {
+        tokensIn: Number(data?.usageMetadata?.promptTokenCount) || 0,
+        tokensOut: Number(data?.usageMetadata?.candidatesTokenCount) || 0,
+        tokensThink: Number(data?.usageMetadata?.thoughtsTokenCount) || 0,
+        tokensCached: Number(data?.usageMetadata?.cachedContentTokenCount) || 0,
+      },
     },
   };
 }
