@@ -1,7 +1,18 @@
 import { getAdminServices } from '../firebaseAdmin.js';
 
 const PROFILE_DOC_ID = 'main';
-const ACCOUNT_COLLECTIONS = ['profile', 'meals', 'workouts', 'metrics', 'weeklyPlans', 'rateLimits'];
+// TODAS las subcolecciones de users/{uid}. Borrar el documento del usuario NO borra sus
+// subcolecciones (semántica de Firestore), así que lo que falte aquí sobrevive a "eliminar
+// mi cuenta" y queda huérfano en Firestore.
+//
+// BUG corregido (25-jul-2026): faltaban SIETE, entre ellas `coachChat` (la memoria del chat,
+// que guarda los mensajes que escribió la persona tal cual) e `integrations` (credenciales
+// de Strava). Al añadir una subcolección nueva hay que añadirla también aquí.
+export const ACCOUNT_COLLECTIONS = [
+  'profile', 'meals', 'workouts', 'metrics', 'weeklyPlans', 'rateLimits',
+  'coachChat', 'coachReports', 'coachFeedback', 'coachRecommendations',
+  'workoutAnalyses', 'studioNutrition', 'integrations',
+];
 const DEFAULT_EXPORT_LIMIT = 5000;
 
 function sanitizeFood(food) {
@@ -674,12 +685,18 @@ export async function exportUserAccountData(userId, options = {}) {
     ? Math.min(Math.max(options.maxDocsPerCollection, 1), 20000)
     : DEFAULT_EXPORT_LIMIT;
 
-  const [profile, meals, workouts, metrics, weeklyPlans] = await Promise.all([
+  // El derecho de acceso cubre también lo que el usuario escribió en el chat y los informes
+  // que la IA generó SOBRE él. `integrations` se excluye a propósito: guarda credenciales
+  // OAuth de Strava y un export no debe entregar tokens (sí se borra al eliminar la cuenta).
+  const [profile, meals, workouts, metrics, weeklyPlans, coachChat, coachReports, workoutAnalyses] = await Promise.all([
     getUserProfile(userId),
     userRef.collection('meals').limit(maxDocsPerCollection).get(),
     userRef.collection('workouts').limit(maxDocsPerCollection).get(),
     userRef.collection('metrics').limit(maxDocsPerCollection).get(),
     userRef.collection('weeklyPlans').limit(maxDocsPerCollection).get(),
+    userRef.collection('coachChat').limit(maxDocsPerCollection).get(),
+    userRef.collection('coachReports').limit(maxDocsPerCollection).get(),
+    userRef.collection('workoutAnalyses').limit(maxDocsPerCollection).get(),
   ]);
 
   return {
@@ -688,6 +705,9 @@ export async function exportUserAccountData(userId, options = {}) {
     workouts: workouts.docs.map((doc) => doc.data()),
     metrics: metrics.docs.map((doc) => doc.data()),
     weeklyPlans: weeklyPlans.docs.map((doc) => doc.data()),
+    coachChat: coachChat.docs.map((doc) => doc.data()),
+    coachReports: coachReports.docs.map((doc) => doc.data()),
+    workoutAnalyses: workoutAnalyses.docs.map((doc) => doc.data()),
     meta: {
       maxDocsPerCollection,
       truncatedCollections: [
