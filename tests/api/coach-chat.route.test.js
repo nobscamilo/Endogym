@@ -79,8 +79,9 @@ vi.mock('../../src/lib/aiMetrics.js', () => ({
   tokensFromGeminiResponse: () => ({ tokensIn: 0, tokensOut: 0 }),
 }));
 
+const { AuthenticationError } = await import('../../src/lib/auth.js');
 const { dateKeyInTimeZone } = await import('../../src/lib/appTime.js');
-const { POST } = await import('../../src/app/api/coach-chat/route.js');
+const { POST, GET, DELETE } = await import('../../src/app/api/coach-chat/route.js');
 
 async function readJson(response) {
   return response.json();
@@ -500,6 +501,43 @@ describe('/api/coach-chat route', () => {
     expect(response.status).toBe(422);
     expect(json.error).toMatch(/reformula/i);
     expect(mocks.saveCoachChatMemory).not.toHaveBeenCalled();
+  });
+
+  it('GET devuelve el hilo que el servidor recuerda, ya recortado por TTL', async () => {
+    const fresh = new Date().toISOString();
+    const old = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    mocks.getCoachChatMemory.mockResolvedValue([
+      { role: 'user', text: 'de hace un mes', at: old },
+      { role: 'user', text: '¿subo peso?', at: fresh },
+      { role: 'coach', text: 'Sube 2,5 kg.', at: fresh },
+    ]);
+
+    const response = await GET(new Request('http://localhost/api/coach-chat'));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.turns.map((t) => t.text)).toEqual(['¿subo peso?', 'Sube 2,5 kg.']);
+  });
+
+  it('GET sin sesión responde 401 y un fallo de Firestore no rompe el chat', async () => {
+    mocks.getAuthenticatedUser.mockRejectedValueOnce(new AuthenticationError('sin token'));
+    const unauth = await GET(new Request('http://localhost/api/coach-chat'));
+    expect(unauth.status).toBe(401);
+
+    mocks.getCoachChatMemory.mockRejectedValue(new Error('firestore caído'));
+    const response = await GET(new Request('http://localhost/api/coach-chat'));
+    const json = await readJson(response);
+    expect(response.status).toBe(200);
+    expect(json.turns).toEqual([]);
+  });
+
+  it('DELETE vacía la memoria del coach', async () => {
+    const response = await DELETE(new Request('http://localhost/api/coach-chat', { method: 'DELETE' }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.cleared).toBe(true);
+    expect(mocks.saveCoachChatMemory).toHaveBeenCalledWith('user-1', []);
   });
 
   it('returns 429 and skips Gemini when the coach chat budget is exhausted', async () => {

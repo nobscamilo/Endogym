@@ -20,7 +20,7 @@
 | `GET`, `POST`, `PATCH` | `/api/weekly-plan` | Consultar, generar y personalizar planes. |
 | `POST` | `/api/analyze-plate` | Analizar foto y persistir comida. |
 | `GET` | `/api/studio-data` | Datos reales normalizados para Ignios Studio. |
-| `POST` | `/api/coach-chat` | Preguntar al Coach IA con contexto real del usuario. |
+| `POST`, `GET`, `DELETE` | `/api/coach-chat` | Preguntar al Coach IA con contexto real; leer o borrar el hilo que recuerda. |
 | `GET`, `POST` | `/api/coach-analysis` | Consultar o generar el análisis del coach de los entrenos realizados (Progreso). |
 | `GET` | `/api/workout-history` | Historial paginado de entrenos hechos (cursor `before`, análisis cacheado inline). |
 | `POST` | `/api/workout-analysis` | Analizar UNA sesión del historial (caché permanente por workout). |
@@ -93,11 +93,18 @@ Payload:
 
 ```json
 {
-  "text": "Respuesta del coach..."
+  "text": "Respuesta del coach...",
+  "redFlag": false
 }
 ```
 
-Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y `details.retryAfterSeconds`.
+`redFlag:true` marca la respuesta fija de seguridad (con `category`): el cliente debe presentarla como aviso sanitario, no como una respuesta más, y no pedir feedback sobre ella.
+
+Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y `details.retryAfterSeconds`. Una salida bloqueada por el modelo sin texto devuelve `422` con motivo. El cliente traduce cada estado a un mensaje accionable (límite por hora con su espera, sesión caducada, coach no configurado) en vez de un único texto genérico.
+
+`GET /api/coach-chat` devuelve `{ turns: [{ role, text, at }] }` con el hilo que el servidor recuerda (memoria conversacional, TTL 7 días, ya recortada), para que el modal no se abra en blanco mientras el coach sí recuerda. Un fallo de lectura devuelve `turns: []` sin romper el chat.
+
+`DELETE /api/coach-chat` vacía esa memoria: el coach deja de recordar la conversación.
 
 ## Análisis del coach (Progreso)
 

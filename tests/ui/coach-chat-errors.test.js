@@ -66,8 +66,25 @@ describe('Chat del coach — el error que ve el usuario explica la causa real', 
     expect(source).not.toContain("if (!res.ok) throw new Error('coach-chat HTTP ' + res.status);");
   });
 
-  it('las burbujas de error no piden feedback 👍👎 (no son respuestas del coach)', () => {
+  it('ni los errores ni el aviso de seguridad piden feedback 👍👎 (no son respuestas del coach)', () => {
     const coach = read('public/studio/app/studio/coach.jsx');
-    expect(coach).toContain("m.role === 'coach' && !m.failed ? <CoachFeedback");
+    const feedbackLine = coach.split('\n').find((l) => l.includes('<CoachFeedback endpoint="coach-chat"'));
+    expect(feedbackLine).toBeTruthy();
+    expect(feedbackLine).toContain('!m.failed');
+    expect(feedbackLine).toContain('!m.redFlag');
+  });
+
+  it('el aviso de red flag se pinta como aviso, no como una respuesta más', () => {
+    const coach = read('public/studio/app/studio/coach.jsx');
+    expect(coach).toContain("m.redFlag ? ' alert' : ''");
+    const css = read('public/studio/app/studio/screens.css');
+    expect(css).toContain('.ask-bubble.alert');
+  });
+
+  it('el shim expone historial y borrado del hilo, y propaga redFlag', () => {
+    const source = read('scripts/build-studio.mjs');
+    expect(source).toContain('redFlag: Boolean(data.redFlag)');
+    expect(source).toContain('history: async function ()');
+    expect(source).toContain('clearHistory: async function ()');
   });
 });

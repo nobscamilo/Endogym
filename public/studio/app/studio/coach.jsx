@@ -115,13 +115,40 @@ function CoachFeedback({ endpoint, text }) {
 
 function AskCoach({ open, onClose }) {
   const [q, setQ] = useStateC('');
-  const [log, setLog] = useStateC([]); // {role, text}
+  const [log, setLog] = useStateC([]); // {role, text, failed?, redFlag?}
   const [busy, setBusy] = useStateC(false);
+  const [loadingLog, setLoadingLog] = useStateC(false);
   const scrollRef = useRefC(null);
   const inputRef = useRefC(null);
 
   useEffectC(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [log, busy]);
   useEffectC(() => { if (!open) { setLog([]); setQ(''); setBusy(false); } }, [open]);
+
+  /* El servidor recuerda el hilo hasta 7 días. Sin esto el modal se abría en blanco y el
+     coach respondía referenciando una conversación que el usuario ya no veía. */
+  useEffectC(() => {
+    if (!open) return undefined;
+    let active = true;
+    setLoadingLog(true);
+    (async () => {
+      let turns = [];
+      try {
+        if (window.claude && window.claude.history) turns = await window.claude.history();
+      } catch (e) { turns = []; }
+      if (!active) return;
+      setLog(turns.map((t) => ({ role: t.role === 'user' ? 'user' : 'coach', text: t.text })));
+      setLoadingLog(false);
+    })();
+    return () => { active = false; };
+  }, [open]);
+
+  const clearHistory = async () => {
+    if (busy) return;
+    setLog([]); setQ('');
+    try {
+      if (window.claude && window.claude.clearHistory) await window.claude.clearHistory();
+    } catch (e) { /* el hilo ya está vacío en pantalla; el próximo turno lo reescribe */ }
+  };
   useEffectC(() => {
     if (!open) return undefined;
     const body = document.body;
@@ -148,15 +175,18 @@ function AskCoach({ open, onClose }) {
     // El cliente envía solo el mensaje del usuario.
     let answer = '';
     let failed = false;
+    let redFlag = false;
     try {
       if (window.claude && window.claude.complete) {
-        answer = await window.claude.complete(question);
+        const res = await window.claude.complete(question);
+        answer = res && res.text ? res.text : '';
+        redFlag = Boolean(res && res.redFlag);
       }
     } catch (e) { answer = coachErrorMessage(e); failed = true; }
     if (!answer) { answer = COACH_FALLBACK.default; failed = true; }
-    // `failed` marca la burbuja como aviso del sistema: no es una respuesta del coach y no
-    // tiene sentido pedir 👍👎 sobre ella.
-    setLog((l) => [...l, { role: 'coach', text: answer, failed }]);
+    // `failed` marca la burbuja como aviso del sistema y `redFlag` como aviso de seguridad:
+    // ninguna de las dos es una respuesta del coach, así que no se vota con 👍👎.
+    setLog((l) => [...l, { role: 'coach', text: answer, failed, redFlag }]);
     setBusy(false);
   };
 
@@ -169,18 +199,24 @@ function AskCoach({ open, onClose }) {
         <div className="ask-head">
           <span className="cb-av"><Icon name="sparkles" size={18} /><span className="cb-live" /></span>
           <div><strong style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>Coach Ignios</strong><div className="tiny faint">Pregúntale lo que quieras</div></div>
-          <button className="icon-btn" style={{ marginLeft: 'auto', width: 36, height: 36 }} onClick={onClose}><Icon name="close" size={18} /></button>
+          {log.length ? (
+            <button className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={clearHistory} disabled={busy}
+              title="El coach deja de recordar esta conversación">Borrar conversación</button>
+          ) : null}
+          <button className="icon-btn" style={{ marginLeft: log.length ? 0 : 'auto', width: 36, height: 36 }} onClick={onClose}><Icon name="close" size={18} /></button>
         </div>
         <div className="ask-log" ref={scrollRef}>
-          {log.length === 0 ? (
+          {loadingLog && log.length === 0 ? (
+            <div className="ask-empty"><p className="muted" style={{ margin: 0 }}>Recuperando vuestra conversación…</p></div>
+          ) : log.length === 0 ? (
             <div className="ask-empty">
               <p className="muted" style={{ margin: '0 0 14px', lineHeight: 1.5 }}>Soy tu coach. Te conozco: tu plan, tu nutrición y tu glucemia. ¿Qué quieres saber?</p>
               <div className="ask-suggest">{COACH_SUGGEST.map((s, i) => <button key={i} onClick={() => send(s)}>{s}</button>)}</div>
             </div>
           ) : log.map((m, i) => (
             <div key={i} className={`ask-msg ${m.role}`}>
-              {m.role === 'coach' ? <span className="cb-av sm"><Icon name="sparkles" size={13} /></span> : null}
-              <div className="ask-bubble">{m.text}{m.role === 'coach' && !m.failed ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}</div>
+              {m.role === 'coach' ? <span className="cb-av sm"><Icon name={m.redFlag ? 'heart' : 'sparkles'} size={13} /></span> : null}
+              <div className={`ask-bubble${m.redFlag ? ' alert' : ''}`}>{m.text}{m.role === 'coach' && !m.failed && !m.redFlag ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}</div>
             </div>
           ))}
           {busy ? <div className="ask-msg coach"><span className="cb-av sm"><Icon name="sparkles" size={13} /></span><div className="ask-bubble"><div className="cb-typing"><span /><span /><span /></div></div></div> : null}

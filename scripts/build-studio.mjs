@@ -137,25 +137,50 @@ window.__signOut = async function () {
   window.location.href = '/';
 };
 
+async function __coachChatRequest(method, body) {
+  let token = null;
+  try { token = await __getIdToken(); } catch (e) { token = null; }
+  const headers = { 'content-type': 'application/json' };
+  if (token) headers['authorization'] = 'Bearer ' + token;
+  const init = { method: method, headers: headers };
+  if (body) init.body = JSON.stringify(body);
+  const res = await fetch('/api/coach-chat', init);
+  const data = await res.json().catch(function () { return null; });
+  if (!res.ok) {
+    // El motivo REAL viaja hasta la UI: un 429 ("espera una hora") y un 503 ("no
+    // configurado") no son el mismo problema y antes se veían con el mismo mensaje.
+    const err = new Error((data && data.error) || ('coach-chat HTTP ' + res.status));
+    err.status = res.status;
+    const retry = data && data.details && data.details.retryAfterSeconds;
+    if (retry) err.retryAfterSeconds = retry;
+    throw err;
+  }
+  return data || {};
+}
+
 window.claude = {
   // FASE 0.1: se envía SOLO el mensaje del usuario; la persona del coach vive en el servidor.
+  // Devuelve el payload completo: redFlag marca la respuesta fija de seguridad, que la UI
+  // debe presentar como aviso y no como una respuesta más del coach.
   complete: async function (message) {
-    let token = null;
-    try { token = await __getIdToken(); } catch (e) { token = null; }
-    const headers = { 'content-type': 'application/json' };
-    if (token) headers['authorization'] = 'Bearer ' + token;
-    const res = await fetch('/api/coach-chat', { method: 'POST', headers, body: JSON.stringify({ message }) });
-    const data = await res.json().catch(function () { return null; });
-    if (!res.ok) {
-      // El motivo REAL viaja hasta la UI: un 429 ("espera una hora") y un 503 ("no
-      // configurado") no son el mismo problema y antes se veían con el mismo mensaje.
-      const err = new Error((data && data.error) || ('coach-chat HTTP ' + res.status));
-      err.status = res.status;
-      const retry = data && data.details && data.details.retryAfterSeconds;
-      if (retry) err.retryAfterSeconds = retry;
-      throw err;
-    }
-    return data && typeof data.text === 'string' ? data.text : '';
+    const data = await __coachChatRequest('POST', { message: message });
+    return {
+      text: typeof data.text === 'string' ? data.text : '',
+      redFlag: Boolean(data.redFlag),
+      category: data.category || null,
+    };
+  },
+  // Historial del hilo que el servidor recuerda (hasta 7 días), para que el modal no se abra
+  // en blanco mientras el coach sí recuerda. Nunca rompe el chat: ante fallo, sin historial.
+  history: async function () {
+    try {
+      const data = await __coachChatRequest('GET', null);
+      return Array.isArray(data.turns) ? data.turns : [];
+    } catch (e) { return []; }
+  },
+  clearHistory: async function () {
+    await __coachChatRequest('DELETE', null);
+    return true;
   },
 };
 

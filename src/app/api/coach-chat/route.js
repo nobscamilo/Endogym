@@ -191,6 +191,53 @@ async function buildUserContext(uid) {
   } catch { return { text: '', profile: null, plan: null }; }
 }
 
+// GET: historial del hilo (memoria conversacional del servidor).
+//
+// El coach recordaba hasta 7 días, pero la UI vaciaba el log al cerrar el modal: el usuario
+// volvía a una pantalla en blanco y el coach le respondía referenciando una conversación que
+// él ya no veía. Devolver lo que el servidor recuerda cierra ese desfase.
+export async function GET(request) {
+  return withTrace('coach_chat_history', async ({ traceId }) => {
+    let user;
+    try {
+      user = await getAuthenticatedUser(request);
+    } catch (error) {
+      if (error instanceof AuthenticationError) return errorResponse('Autenticación requerida.', 401);
+      throw error;
+    }
+    try {
+      const turns = trimChatMemory(await getCoachChatMemory(user.uid));
+      return jsonResponse({ ok: true, turns: turns.map((t) => ({ role: t.role, text: t.text, at: t.at })) });
+    } catch (error) {
+      logError('coach_chat_history_failed', error, { traceId, userId: user.uid });
+      // Sin historial el chat sigue funcionando: se abre vacío, como antes.
+      return jsonResponse({ ok: true, turns: [] });
+    }
+  });
+}
+
+// DELETE: el usuario borra lo que el coach recuerda de él. Ahora que el hilo es visible,
+// poder cerrarlo es parte del mismo control.
+export async function DELETE(request) {
+  return withTrace('coach_chat_history_clear', async ({ traceId }) => {
+    let user;
+    try {
+      user = await getAuthenticatedUser(request);
+    } catch (error) {
+      if (error instanceof AuthenticationError) return errorResponse('Autenticación requerida.', 401);
+      throw error;
+    }
+    try {
+      await saveCoachChatMemory(user.uid, []);
+      logInfo('coach_chat_history_cleared', { traceId, userId: user.uid });
+      return jsonResponse({ ok: true, cleared: true });
+    } catch (error) {
+      logError('coach_chat_history_clear_failed', error, { traceId, userId: user.uid });
+      return errorResponse('No se pudo borrar la conversación.', 502);
+    }
+  });
+}
+
 // Chat "Pregúntale al coach" del rediseño Studio.
 // Recibe { message } (SOLO el mensaje del usuario; la persona y el contexto se
 // construyen server-side en coachPersona.js — FASE 0.1) y devuelve { text } con la
