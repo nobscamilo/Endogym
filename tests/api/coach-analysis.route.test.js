@@ -225,6 +225,31 @@ describe('/api/coach-analysis route — alineación con objetivos', () => {
     expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(2);
   });
 
+  it('no lanza el segundo intento si ya no queda presupuesto antes del maxDuration de Vercel', async () => {
+    // El maxDuration de la función es 30 s. Si el primer intento consume su timeout entero,
+    // el segundo arrancaría pasado el segundo 20 y Vercel mataría la función con 504,
+    // perdiendo hasta el heurístico (que no necesita IA). Debe cortar y responder 200.
+    mocks.requestGoogleGenerateContent.mockImplementation(async () => {
+      vi.setSystemTime(new Date(Date.now() + 20_000));
+      return { response: { ok: false, status: 504 } };
+    });
+
+    const response = await POST(new Request('http://localhost/api/coach-analysis', { method: 'POST' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.source).toBe('heuristic');
+    expect(json.report.lastSession).toBeTruthy();
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('cada intento pide a Gemini como mucho el presupuesto global restante', async () => {
+    await POST(new Request('http://localhost/api/coach-analysis', { method: 'POST' }));
+    const { timeoutMs } = mocks.requestGoogleGenerateContent.mock.calls[0][0];
+    expect(timeoutMs).toBeGreaterThan(0);
+    expect(timeoutMs).toBeLessThanOrEqual(22_000);
+  });
+
   it('GET marca stale un informe legacy cuando cambia el contrato/contexto aunque no haya workout nuevo', async () => {
     mocks.getCoachAnalysis.mockResolvedValue({
       signature: '1-firma-legacy', source: 'ai', updatedAt: '2026-06-18T10:00:00Z',

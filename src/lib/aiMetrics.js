@@ -13,7 +13,9 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminServices } from './firebaseAdmin.js';
 
-const FIELDS = new Set(['calls', 'errors', 'fallbacks', 'redFlags', 'feedbackUp', 'feedbackDown', 'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached']);
+// `truncated`: respuestas cortadas por maxOutputTokens (si sube de forma sostenida, el
+// tope de salida se está quedando corto y hay que revisarlo, no seguir recortando frases).
+const FIELDS = new Set(['calls', 'errors', 'fallbacks', 'redFlags', 'truncated', 'feedbackUp', 'feedbackDown', 'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached']);
 
 export async function recordAiMetric(endpoint, fields = {}) {
   try {

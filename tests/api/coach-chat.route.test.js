@@ -380,6 +380,74 @@ describe('/api/coach-chat route', () => {
     expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(1);
   });
 
+  it('MAX_TOKENS: recorta a la última frase completa y NO persiste el trozo cortado', async () => {
+    mocks.requestGoogleGenerateContent.mockResolvedValue({
+      response: {
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            finishReason: 'MAX_TOKENS',
+            content: { parts: [{ text: 'Sube 2,5 kg en sentadilla. Mantén el RPE por debajo de 8. En press banca conviene que' }] },
+          }],
+        }),
+      },
+    });
+
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: '¿Subo peso?' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.text).toBe('Sube 2,5 kg en sentadilla. Mantén el RPE por debajo de 8.');
+    // La memoria guarda la MISMA respuesta recortada: un turno cortado a media palabra
+    // contaminaría los siguientes como si fuera lo que dijo el coach.
+    const saved = mocks.saveCoachChatMemory.mock.calls[0][1];
+    const coachTurn = saved.find((t) => t.role === 'coach');
+    expect(coachTurn.text).toBe('Sube 2,5 kg en sentadilla. Mantén el RPE por debajo de 8.');
+    expect(coachTurn.text).not.toContain('conviene que');
+  });
+
+  it('MAX_TOKENS sin ningún cierre de frase útil: devuelve el texto tal cual (no vacía la respuesta)', async () => {
+    mocks.requestGoogleGenerateContent.mockResolvedValue({
+      response: {
+        ok: true,
+        json: async () => ({
+          candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'Para tu objetivo lo primero es' }] } }],
+        }),
+      },
+    });
+
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: '¿Y ahora?' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.text).toBe('Para tu objetivo lo primero es');
+  });
+
+  it('salida bloqueada (SAFETY) sin texto: 422 con motivo, no un 502 mudo', async () => {
+    mocks.requestGoogleGenerateContent.mockResolvedValue({
+      response: {
+        ok: true,
+        json: async () => ({ candidates: [{ finishReason: 'SAFETY', content: { parts: [] } }] }),
+      },
+    });
+
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'algo que el modelo bloquea' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(422);
+    expect(json.error).toMatch(/reformula/i);
+    expect(mocks.saveCoachChatMemory).not.toHaveBeenCalled();
+  });
+
   it('returns 429 and skips Gemini when the coach chat budget is exhausted', async () => {
     mocks.enforceUserRateLimit.mockResolvedValue({
       allowed: false,

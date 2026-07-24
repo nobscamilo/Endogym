@@ -23,6 +23,21 @@ import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFla
 const CHAT_RAG_CHAR_BUDGET = 7000;
 const CHAT_RAG_TIMEOUT_MS = 4000;
 
+/**
+ * Recorta hasta el último final de frase. Se usa cuando Gemini corta por MAX_TOKENS:
+ * mostrar (y sobre todo PERSISTIR en la memoria) una respuesta cortada a media palabra
+ * contamina los turnos siguientes, que la reciben como si fuera lo que dijo el coach.
+ * Si no hay ningún cierre de frase razonable, devuelve el texto tal cual.
+ */
+export function trimToLastSentence(text) {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  const lastEnd = Math.max(s.lastIndexOf('.'), s.lastIndexOf('!'), s.lastIndexOf('?'), s.lastIndexOf('…'));
+  // Umbral: si el corte tira más de la mitad de la respuesta, es peor el remedio.
+  if (lastEnd < 0 || lastEnd < s.length / 2) return s;
+  return s.slice(0, lastEnd + 1);
+}
+
 async function buildGuidelinesContext({ profile, plan, message, traceId }) {
   if (!profile) return '';
   try {
@@ -262,12 +277,32 @@ export async function POST(request) {
       const data = await response.json();
       // FASE 3.6 — contador de llamadas + tokens (si la API los devuelve). Sin PII.
       await recordAiMetric('coach-chat', { calls: 1, ...tokensFromGeminiResponse(data) });
-      const text = (data?.candidates?.[0]?.content?.parts || [])
+      const candidate = data?.candidates?.[0];
+      const finishReason = candidate?.finishReason || null;
+      let text = (candidate?.content?.parts || [])
         .map((p) => (typeof p?.text === 'string' ? p.text : ''))
         .join('')
         .trim();
 
+      // Truncado por presupuesto de salida (maxOutputTokens: 512). Se recorta a la última
+      // frase completa ANTES de responder y de persistir la memoria; se registra para poder
+      // ver en métricas si el tope se queda corto de forma sistemática.
+      if (finishReason === 'MAX_TOKENS' && text) {
+        const trimmed = trimToLastSentence(text);
+        logInfo('coach_chat_truncated', {
+          traceId, userId: user.uid, chars: text.length, keptChars: trimmed.length,
+        });
+        await recordAiMetric('coach-chat', { truncated: 1 });
+        text = trimmed;
+      }
+
       if (!text) {
+        // finishReason SAFETY/RECITATION: Gemini bloqueó la salida y no hay nada que mostrar.
+        // No es un error de red: el usuario merece un motivo, no un 502 mudo.
+        if (finishReason && finishReason !== 'STOP') {
+          logInfo('coach_chat_no_text', { traceId, userId: user.uid, finishReason });
+          return errorResponse('El coach no puede responder a eso. Reformula la pregunta.', 422);
+        }
         return errorResponse('Respuesta vacía del coach.', 502);
       }
 

@@ -29,6 +29,17 @@ import {
 // POST regenera con Gemini (rate limit persistente) o, si la IA falla, con un resumen
 // heurístico observable construido desde las MISMAS reglas adaptativas reales del planner.
 
+// Presupuesto GLOBAL de IA (mismo patrón que exerciseCoachClient.js). El maxDuration de
+// Vercel es 30 s y aquí había DOS intentos de 20 s cada uno: si el primero agotaba su
+// timeout, el segundo arrancaba pasado el segundo 20 y la función moría con 504 — el
+// usuario perdía hasta el informe heurístico, que no necesita IA. Ahora los dos intentos
+// comparten un reloj que arranca al entrar en la ruta (el digest de Firestore también
+// consume presupuesto) y el segundo solo se lanza si queda margen útil.
+const AI_TOTAL_BUDGET_MS = 22_000;
+const AI_ATTEMPT_TIMEOUT_MS = 20_000;
+// Por debajo de esto un intento no da tiempo ni a devolver tokens: se pagaría y se tiraría.
+const AI_MIN_USEFUL_MS = 8_000;
+
 export async function GET(request) {
   return withTrace('coach_analysis_get', async ({ traceId }) => {
     let user;
@@ -58,6 +69,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   return withTrace('coach_analysis', async ({ traceId }) => {
+    const budgetDeadline = Date.now() + AI_TOTAL_BUDGET_MS;
     let user;
     try {
       user = await getAuthenticatedUser(request);
@@ -100,11 +112,19 @@ export async function POST(request) {
           { label: 'retry_thinking', thinkingConfig: { thinkingBudget: 512 } },
         ];
         for (const attempt of generationAttempts) {
+          // Nunca arrancar un intento que el maxDuration de Vercel va a cortar a medias.
+          const remainingMs = budgetDeadline - Date.now();
+          if (remainingMs < AI_MIN_USEFUL_MS) {
+            logInfo('coach_analysis_budget_exhausted', {
+              traceId, userId: user.uid, attempt: attempt.label, remainingMs,
+            });
+            break;
+          }
           try {
             const { response } = await requestGoogleGenerateContent({
               model,
               traceId,
-              timeoutMs: 20000,
+              timeoutMs: Math.min(AI_ATTEMPT_TIMEOUT_MS, remainingMs),
               parts: [{ text: buildCoachAnalysisPrompt(digest) }],
               generationConfig: {
                 temperature: 1.0,

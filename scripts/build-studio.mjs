@@ -145,8 +145,16 @@ window.claude = {
     const headers = { 'content-type': 'application/json' };
     if (token) headers['authorization'] = 'Bearer ' + token;
     const res = await fetch('/api/coach-chat', { method: 'POST', headers, body: JSON.stringify({ message }) });
-    if (!res.ok) throw new Error('coach-chat HTTP ' + res.status);
-    const data = await res.json();
+    const data = await res.json().catch(function () { return null; });
+    if (!res.ok) {
+      // El motivo REAL viaja hasta la UI: un 429 ("espera una hora") y un 503 ("no
+      // configurado") no son el mismo problema y antes se veían con el mismo mensaje.
+      const err = new Error((data && data.error) || ('coach-chat HTTP ' + res.status));
+      err.status = res.status;
+      const retry = data && data.details && data.details.retryAfterSeconds;
+      if (retry) err.retryAfterSeconds = retry;
+      throw err;
+    }
     return data && typeof data.text === 'string' ? data.text : '';
   },
 };

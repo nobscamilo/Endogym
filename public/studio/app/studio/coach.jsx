@@ -63,6 +63,25 @@ const COACH_FALLBACK = {
   default: 'Ahora no puedo consultar el motor IA. Usa el plan como referencia, prioriza técnica y seguridad, y registra la sesión para que el próximo ajuste tenga mejores datos.',
 };
 
+/* El fallo tiene causa y el usuario puede actuar sobre casi todas: un límite de preguntas
+   se espera, una sesión caducada se renueva. Antes las cuatro salían como "no puedo
+   consultar el motor IA", que no orienta a ninguna. */
+function coachErrorMessage(err) {
+  const status = err && err.status;
+  if (status === 429) {
+    const secs = Number(err.retryAfterSeconds);
+    const mins = Number.isFinite(secs) && secs > 0 ? Math.ceil(secs / 60) : null;
+    return 'Has hecho muchas preguntas seguidas y he llegado al límite por hora.'
+      + (mins ? ` Vuelve a preguntarme en ${mins} min.` : ' Inténtalo un poco más tarde.')
+      + ' Mientras tanto, el plan y el análisis de Progreso siguen disponibles.';
+  }
+  if (status === 401) return 'Tu sesión ha caducado. Vuelve a entrar y te sigo contando.';
+  if (status === 503) return 'El coach IA no está disponible ahora mismo (falta configuración del servidor). Es cosa nuestra, no tuya: inténtalo más tarde.';
+  if (status === 422) return 'No puedo responder a eso. Prueba a reformular la pregunta con lo que quieres saber de tu entrenamiento o tu nutrición.';
+  if (status === 413) return 'Ese mensaje es demasiado largo. Resúmelo un poco y te respondo.';
+  return COACH_FALLBACK.default;
+}
+
 /* FASE 3.4 — Feedback 👍👎 por respuesta del coach (chat y análisis). Solo guarda
    endpoint + rating + hash corto del texto (nunca el contenido). */
 function coachFeedbackHash(text) {
@@ -128,13 +147,16 @@ function AskCoach({ open, onClose }) {
     // FASE 0.1: la persona/reglas del coach viven en el SERVIDOR (coachPersona.js).
     // El cliente envía solo el mensaje del usuario.
     let answer = '';
+    let failed = false;
     try {
       if (window.claude && window.claude.complete) {
         answer = await window.claude.complete(question);
       }
-    } catch (e) { answer = ''; }
-    if (!answer) answer = COACH_FALLBACK.default;
-    setLog((l) => [...l, { role: 'coach', text: answer }]);
+    } catch (e) { answer = coachErrorMessage(e); failed = true; }
+    if (!answer) { answer = COACH_FALLBACK.default; failed = true; }
+    // `failed` marca la burbuja como aviso del sistema: no es una respuesta del coach y no
+    // tiene sentido pedir 👍👎 sobre ella.
+    setLog((l) => [...l, { role: 'coach', text: answer, failed }]);
     setBusy(false);
   };
 
@@ -158,7 +180,7 @@ function AskCoach({ open, onClose }) {
           ) : log.map((m, i) => (
             <div key={i} className={`ask-msg ${m.role}`}>
               {m.role === 'coach' ? <span className="cb-av sm"><Icon name="sparkles" size={13} /></span> : null}
-              <div className="ask-bubble">{m.text}{m.role === 'coach' ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}</div>
+              <div className="ask-bubble">{m.text}{m.role === 'coach' && !m.failed ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}</div>
             </div>
           ))}
           {busy ? <div className="ask-msg coach"><span className="cb-av sm"><Icon name="sparkles" size={13} /></span><div className="ask-bubble"><div className="cb-typing"><span /><span /><span /></div></div></div> : null}
@@ -174,4 +196,4 @@ function AskCoach({ open, onClose }) {
   return createPortal && document.body ? createPortal(modal, document.body) : modal;
 }
 
-Object.assign(window, { CoachBanner, AskCoach, useTypewriter, COACH_MSGS, CoachFeedback });
+Object.assign(window, { CoachBanner, AskCoach, useTypewriter, COACH_MSGS, CoachFeedback, coachErrorMessage });
