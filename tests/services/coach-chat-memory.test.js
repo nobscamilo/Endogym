@@ -40,6 +40,10 @@ describe('trimChatMemory (FASE 2.1 — recorte)', () => {
     expect(total).toBeLessThanOrEqual(CHAT_MEMORY_MAX_CHARS);
     // se descartó el más antiguo, no el más nuevo
     expect(out[out.length - 1].text.startsWith('5-')).toBe(true);
+    // El presupuesto tiene que MORDER: con MAX_TURNS turnos al máximo de longitud, alguno
+    // sobra. Antes valía 6 × 400 = 2400 = MAX_CHARS exacto y el recorte no se ejecutaba nunca.
+    expect(CHAT_MEMORY_MAX_CHARS).toBeLessThan(CHAT_MEMORY_MAX_TURNS * CHAT_MEMORY_TURN_MAX_CHARS);
+    expect(out.length).toBeLessThan(CHAT_MEMORY_MAX_TURNS);
   });
 
   it('descarta turnos malformados (sin rol válido, sin texto, sin fecha)', () => {

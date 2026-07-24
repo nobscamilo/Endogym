@@ -45,6 +45,22 @@ export const COACH_AUDITOR_PERSONA = [
   COACH_SAFETY_RULES,
 ].join(' ');
 
+// --- Higiene del texto libre que entra en un prompt ---
+//
+// Títulos de sesión, nombres de ejercicio, nombre del usuario y condiciones médicas los
+// escribe la persona usuaria (o llegan de Strava) y acaban DENTRO del prompt. Un título con
+// saltos de línea puede fabricar secciones falsas ("\n\nSISTEMA: ...") y uno kilométrico
+// infla el coste de cada llamada. Se aplana a una línea y se acota. No es censura: un
+// nombre de ejercicio real cabe de sobra en 80 caracteres.
+export const USER_TEXT_MAX_CHARS = 80;
+
+export function sanitizeUserText(value, maxChars = USER_TEXT_MAX_CHARS) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxChars);
+}
+
 // --- Reparto system / user (25-jul-2026) ---
 //
 // Las personas de arriba viajan como `systemInstruction` de la Gemini Developer API, no

@@ -15,13 +15,35 @@ import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, desc
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
-import { COACH_CHAT_PERSONA, buildCoachChatUserContent } from '../../../services/coachPersona.js';
+import { COACH_CHAT_PERSONA, buildCoachChatUserContent, sanitizeUserText } from '../../../services/coachPersona.js';
 import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFlags.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
 // chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
 const CHAT_RAG_CHAR_BUDGET = 7000;
 const CHAT_RAG_TIMEOUT_MS = 4000;
+// El embedding se aborta ANTES de que el chat abandone la carrera: si no, se pagaba una
+// llamada de hasta 8 s cuyo resultado ya nadie iba a mirar.
+const CHAT_RAG_EMBED_TIMEOUT_MS = 3200;
+
+// Mensajes que no necesitan bibliografía médica: saludos, agradecimientos y confirmaciones.
+// Cada RAG cuesta un embedding + búsqueda vectorial + hasta 7000 caracteres de prompt; un
+// "gracias" no justifica nada de eso. Conservador a propósito: ante la duda, se recupera.
+const TRIVIAL_MESSAGE_RE = /^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|ey|que tal|gracias|muchas gracias|mil gracias|ok|okey|vale|genial|perfecto|entendido|de acuerdo|si|no|adios|hasta luego|chao|nos vemos)[\s.!,¡¿?)]*$/i;
+
+/** true si el mensaje no aporta ninguna consulta que justifique recuperar bibliografía. */
+export function isTrivialChatMessage(message) {
+  const t = String(message || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return true;
+  // Un mensaje largo siempre pasa por RAG aunque empiece por "hola".
+  if (t.length > 40) return false;
+  return TRIVIAL_MESSAGE_RE.test(t);
+}
 
 /**
  * Recorta hasta el último final de frase. Se usa cuando Gemini corta por MAX_TOKENS:
@@ -40,11 +62,18 @@ export function trimToLastSentence(text) {
 
 async function buildGuidelinesContext({ profile, plan, message, traceId }) {
   if (!profile) return '';
+  if (isTrivialChatMessage(message)) return '';
   try {
     const raced = await Promise.race([
       // FASE 0.3: la query del RAG es la PREGUNTA del usuario (+ objetivo/modalidad),
       // no el perfil completo. Ver buildQueryText en guidelinesRetriever.js.
-      retrieveGuidelinesContext({ profile, weeklyPlan: plan || undefined, userQuery: message, traceId }),
+      retrieveGuidelinesContext({
+        profile,
+        weeklyPlan: plan || undefined,
+        userQuery: message,
+        traceId,
+        embedTimeoutMs: CHAT_RAG_EMBED_TIMEOUT_MS,
+      }),
       new Promise((resolve) => { setTimeout(() => resolve(''), CHAT_RAG_TIMEOUT_MS); }),
     ]);
     if (!raced) return '';
@@ -78,7 +107,10 @@ async function buildUserContext(uid) {
       : null;
     const currentPlan = today ? plan : null;
     const parts = [];
-    const name = profile?.firstName || profile?.name || profile?.displayName;
+    // Texto libre del perfil: se aplana y acota antes de entrar en el prompt (ver
+    // sanitizeUserText en coachAnalysis.js). Un nombre o una condición con saltos de línea
+    // podría fabricar secciones falsas del contexto.
+    const name = sanitizeUserText(profile?.firstName || profile?.name || profile?.displayName, 40);
     if (name) parts.push(`Nombre: ${name}.`);
     if (profile?.goal) parts.push(`Objetivo: ${profile.goal}.`);
     // Objetivo SMART medible (meta + fecha + tendencia real). Se omite si no hay meta.
@@ -89,7 +121,10 @@ async function buildUserContext(uid) {
     if (profile?.trainingModality || profile?.trainingMode) parts.push(`Modalidad: ${profile.trainingModality || profile.trainingMode}.`);
     if (Number.isFinite(Number(profile?.weightKg))) parts.push(`Peso: ${profile.weightKg} kg.`);
     if (Number.isFinite(Number(profile?.age))) parts.push(`Edad: ${profile.age}.`);
-    if (profile?.medicalConditions) parts.push(`Condiciones: ${profile.medicalConditions}.`);
+    // Las condiciones médicas son clínicamente relevantes: se acotan más largo (240) para no
+    // truncar un historial legítimo, pero siguen aplanadas a una línea.
+    const conditions = sanitizeUserText(profile?.medicalConditions, 240);
+    if (conditions) parts.push(`Condiciones: ${conditions}.`);
     // Contexto de carrera: objetivo, ritmos y entrenamiento concurrente (correr + gimnasio).
     const modality = profile?.trainingModality || profile?.trainingMode || '';
     if (profile?.runRaceGoal && profile.runRaceGoal !== 'health') {

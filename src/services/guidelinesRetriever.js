@@ -217,9 +217,13 @@ const HYBRID_SUBQUERIES = [
   + 'gestión de volumen e intensidad y recuperación entre sesiones de fuerza y cardio.',
 ];
 
-async function embedQuery(text, traceId) {
+// El timeout del embedding NO puede ser mayor que el presupuesto de quien llama: el chat
+// abandona el RAG a los ~4 s, así que un embedding de 8 s se pagaba entero para tirarlo.
+const EMBED_TIMEOUT_MS = 8000;
+
+async function embedQuery(text, traceId, timeoutMs = EMBED_TIMEOUT_MS) {
   try {
-    const [vec] = await requestGoogleEmbeddings({ texts: [text], taskType: 'RETRIEVAL_QUERY', traceId, timeoutMs: 8000 });
+    const [vec] = await requestGoogleEmbeddings({ texts: [text], taskType: 'RETRIEVAL_QUERY', traceId, timeoutMs });
     return (vec && vec.length === EMBEDDING_DIMENSIONS) ? vec : null;
   } catch (error) {
     logError('guidelines_vector_embed_failed', error, { traceId });
@@ -242,7 +246,7 @@ async function nearestDocs(db, vector, limit) {
 // ----------------------------------------------------------------------------
 // Modo principal: búsqueda vectorial (con filtro de bibliografía y multi-query híbrido).
 // ----------------------------------------------------------------------------
-async function retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId }) {
+async function retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId, embedTimeoutMs }) {
   if (!process.env.GEMINI_API_KEY) {
     return null; // sin key no se puede embeber; usar fallback
   }
@@ -263,7 +267,7 @@ async function retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId })
 
   let docs;
   try {
-    const vectors = (await Promise.all(queryTexts.map((t) => embedQuery(t, traceId)))).filter(Boolean);
+    const vectors = (await Promise.all(queryTexts.map((t) => embedQuery(t, traceId, embedTimeoutMs)))).filter(Boolean);
     if (!vectors.length) return null;
     // Sobre-recuperar por query; en multi-query cada sub-consulta aporta su cuota.
     const perQuery = useMultiQuery ? Math.ceil(PASSAGE_FETCH_LIMIT / vectors.length) : PASSAGE_FETCH_LIMIT;
@@ -618,11 +622,11 @@ ${contextBlocks.join('\n\n')}
  * RAG principal: intenta búsqueda semántica (vector) y degrada a léxica (keywords)
  * si la primera no está disponible. Retorna texto de contexto + citaciones.
  */
-export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, userQuery, traceId }) {
+export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, userQuery, traceId, embedTimeoutMs }) {
   try {
     const { db } = await getAdminServices();
 
-    const vectorResult = await retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId });
+    const vectorResult = await retrieveByVector({ db, profile, weeklyPlan, userQuery, traceId, embedTimeoutMs });
     if (vectorResult && vectorResult.contextText) {
       return vectorResult;
     }
@@ -640,7 +644,7 @@ export async function retrieveGuidelinesContextWithCitations({ profile, weeklyPl
 /**
  * Igual que el anterior pero retorna sólo el texto del contexto.
  */
-export async function retrieveGuidelinesContext({ profile, weeklyPlan, userQuery, traceId }) {
-  const result = await retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, userQuery, traceId });
+export async function retrieveGuidelinesContext({ profile, weeklyPlan, userQuery, traceId, embedTimeoutMs }) {
+  const result = await retrieveGuidelinesContextWithCitations({ profile, weeklyPlan, userQuery, traceId, embedTimeoutMs });
   return result.contextText;
 }

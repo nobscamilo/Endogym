@@ -6,7 +6,11 @@
 
 export const CHAT_MEMORY_MAX_TURNS = 6;     // pares usuario+coach = 3 intercambios
 export const CHAT_MEMORY_TTL_DAYS = 7;
-export const CHAT_MEMORY_MAX_CHARS = 2400;  // presupuesto total inyectado
+// El presupuesto total era 6 × 400 = 2400, exactamente el máximo alcanzable, así que el
+// recorte por caracteres NUNCA llegaba a ejecutarse: era un tope decorativo. Se baja a 1600
+// para que sea un límite real (los turnos largos sí desalojan a los más antiguos) y para
+// acotar de verdad lo que se inyecta en cada llamada.
+export const CHAT_MEMORY_MAX_CHARS = 1600;  // presupuesto total inyectado
 export const CHAT_MEMORY_TURN_MAX_CHARS = 400; // cada turno se trunca a esto
 
 function ttlCutoffIso(now) {
