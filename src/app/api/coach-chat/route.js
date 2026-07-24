@@ -15,7 +15,7 @@ import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, desc
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
-import { buildCoachChatPrompt } from '../../../services/coachPersona.js';
+import { COACH_CHAT_PERSONA, buildCoachChatUserContent } from '../../../services/coachPersona.js';
 import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFlags.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
@@ -254,7 +254,10 @@ export async function POST(request) {
         model,
         traceId,
         timeoutMs: 12000,
-        parts: [{ text: buildCoachChatPrompt({ message, userContext, guidelinesContext, memoryContext }) }],
+        // La persona y las reglas de seguridad van en systemInstruction; el turno de
+        // usuario solo lleva datos (contexto real, RAG, memoria) y la pregunta.
+        systemInstruction: COACH_CHAT_PERSONA,
+        parts: [{ text: buildCoachChatUserContent({ message, userContext, guidelinesContext, memoryContext }) }],
         generationConfig: {
           temperature: 0.6,
           topP: 0.9,

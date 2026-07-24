@@ -536,8 +536,8 @@ export async function buildCoachAnalysisDigest(uid) {
 export function buildCoachAnalysisPrompt(digest) {
   const { profile, plan, done, last, loadComparison, progressMemory, adaptiveTuning } = digest;
   const lines = [];
-  // FASE 2.3 — persona única: el analista comparte núcleo con chat y auditor.
-  lines.push(COACH_ANALYST_PERSONA);
+  // FASE 2.3 — persona única: el analista comparte núcleo con chat y auditor. Desde el
+  // 25-jul-2026 viaja como systemInstruction (ver coachPersona.js), no en estas líneas.
   if (profile) {
     lines.push(`Perfil: ${profile.sex === 'female' ? 'mujer' : 'hombre'}, ${profile.age ?? '?'} años, ${profile.weightKg ?? '?'} kg. Objetivo: ${profile.goal || '?'}. Modalidad: ${profile.trainingModality || '?'}.${profile.runRaceGoal ? ` Objetivo de carrera: ${profile.runRaceGoal}.` : ''}`);
   }
@@ -726,7 +726,11 @@ export async function buildWorkoutAnalysisDigest(uid, workoutId) {
 export function buildWorkoutAnalysisPrompt(digest) {
   const { profile, workout, comparables, checkin, loadComparison } = digest;
   const lines = [];
-  lines.push('Eres un deportólogo de élite y coach del usuario en la app Ignios. Analiza ESTA sesión concreta con SUS DATOS REALES, en español, directo y crítico, citando números (kg, ppm, min/km, RPE, minutos). PROHIBIDO inventar datos que no estén abajo.');
+  // La identidad y las reglas de seguridad ya no se redactan aquí: esta ruta tenía su propia
+  // persona ad-hoc que se saltaba las reglas compartidas (nada de diagnóstico, resistencia a
+  // que le cambien el rol). Ahora usa COACH_ANALYST_PERSONA como systemInstruction y aquí
+  // queda SOLO la tarea concreta.
+  lines.push('Tarea: analiza ESTA sesión concreta con SUS DATOS REALES, citando números (kg, ppm, min/km, RPE, minutos). PROHIBIDO inventar datos que no estén abajo.');
   if (profile) {
     lines.push(`Perfil: ${profile.sex === 'female' ? 'mujer' : 'hombre'}, ${profile.age ?? '?'} años, ${profile.weightKg ?? '?'} kg. Objetivo: ${profile.goal || '?'}. Modalidad: ${profile.trainingModality || '?'}.${profile.runRaceGoal ? ` Objetivo de carrera: ${profile.runRaceGoal}.` : ''}`);
   }

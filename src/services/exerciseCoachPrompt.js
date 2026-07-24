@@ -1,4 +1,3 @@
-import { COACH_AUDITOR_PERSONA } from './coachPersona.js';
 function compactExercise(exercise, index) {
   const prescription = exercise?.prescription?.format === 'reps'
     ? {
@@ -47,10 +46,9 @@ export function buildExerciseCoachPrompt({ profile, weeklyPlan, clinicalGuidelin
 
   const contextSec = clinicalGuidelinesContext ? `\n\n${clinicalGuidelinesContext}\n` : '';
 
-  return `
-Rol:
-${COACH_AUDITOR_PERSONA}
-${contextSec}
+  // El rol (COACH_AUDITOR_PERSONA) viaja como systemInstruction desde exerciseCoachClient.js
+  // (25-jul-2026): aquí queda solo la base científica y los datos del usuario.
+  return `${contextSec}
 Base científica:
 - ACSM's Guidelines for Exercise Testing and Prescription (11th edition, disponible en la base local) + contexto RAG recuperado de la bibliografía del proyecto: marco FITT-VP, progresión gradual, seguridad preparticipativa y dosificación de resistencia/cardiorrespiratorio.
 - DeLee, Drez & Miller's Orthopaedic Sports Medicine y Braddom's Physical Medicine and Rehabilitation (base local): progresión conservadora, retorno a actividad, restricciones por lesión/comorbilidad y prevención de sobrecarga.

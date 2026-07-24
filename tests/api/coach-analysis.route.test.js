@@ -225,6 +225,15 @@ describe('/api/coach-analysis route — alineación con objetivos', () => {
     expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(2);
   });
 
+  it('la persona del analista va en systemInstruction, no concatenada al prompt de datos', async () => {
+    await POST(new Request('http://localhost/api/coach-analysis', { method: 'POST' }));
+    const call = mocks.requestGoogleGenerateContent.mock.calls[0][0];
+    expect(call.systemInstruction).toContain('Eres el Coach IA de Ignios');
+    expect(call.systemInstruction).toContain('FITT-VP');
+    expect(call.systemInstruction).toContain('No des diagnóstico médico');
+    expect(call.parts[0].text).not.toContain('Eres el Coach IA de Ignios');
+  });
+
   it('no lanza el segundo intento si ya no queda presupuesto antes del maxDuration de Vercel', async () => {
     // El maxDuration de la función es 30 s. Si el primer intento consume su timeout entero,
     // el segundo arrancaría pasado el segundo 20 y Vercel mataría la función con 504,

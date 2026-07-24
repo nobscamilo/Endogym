@@ -21,6 +21,7 @@ import {
   getCoachAnalysis,
   saveCoachRecommendation,
 } from '../../../lib/repositories/firestoreRepository.js';
+import { COACH_ANALYST_PERSONA } from '../../../services/coachPersona.js';
 
 // Análisis del coach (Progreso): analiza el ÚLTIMO entreno realizado, lo compara con los
 // previos (manuales + Strava + check-ins) y explica los ajustes que aplicará a las próximas
@@ -125,6 +126,7 @@ export async function POST(request) {
               model,
               traceId,
               timeoutMs: Math.min(AI_ATTEMPT_TIMEOUT_MS, remainingMs),
+              systemInstruction: COACH_ANALYST_PERSONA,
               parts: [{ text: buildCoachAnalysisPrompt(digest) }],
               generationConfig: {
                 temperature: 1.0,

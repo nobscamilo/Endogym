@@ -126,7 +126,10 @@ describe('coachAnalysis service', () => {
     expect(prompt).toContain('Press militar');
     expect(prompt).toContain('Base aeróbica');
     expect(prompt).toContain('no aplicó ajustes adaptativos');
-    expect(prompt).toContain('PROHIBIDO inventar');
+    expect(prompt).toContain('PROHIBIDO introducir cifras objetivo');
+    // La persona y sus reglas ya NO se concatenan al prompt: viajan como systemInstruction
+    // (la ruta lo verifica). Aquí solo queda contexto determinista y tarea.
+    expect(prompt).not.toContain('Eres el Coach IA de Ignios');
   });
 
   it('buildCoachAnalysisPrompt: prioriza la meta SMART y las señales deterministas de carrera', () => {

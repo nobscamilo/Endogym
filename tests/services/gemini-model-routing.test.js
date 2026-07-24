@@ -168,11 +168,41 @@ describe('gemini model routing', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain('/models/gemini-coach-model:generateContent');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.thinkingConfig).toEqual({
-      thinkingBudget: 0,
-    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    // La persona del auditor viaja en el campo systemInstruction de la API, separada del
+    // turno de usuario (que solo lleva base científica y datos del plan).
+    expect(body.systemInstruction.parts[0].text).toContain('Eres el Coach IA de Ignios');
+    expect(body.systemInstruction.parts[0].text).toContain('auditar y personalizar un plan semanal');
+    expect(body.contents[0].parts[0].text).not.toContain('Eres el Coach IA de Ignios');
     expect(coach.diagnostics).toBeTruthy();
     expect(coach.diagnostics.modelRequested).toBe('gemini-coach-model');
+  });
+
+  it('sin systemInstruction el cuerpo no incluye el campo (análisis de plato)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({
+          foods: [{
+            name: 'Arroz', calories: 200, proteinGrams: 4, carbsGrams: 42, fatGrams: 1,
+            availableCarbsGrams: 39, glycemicIndex: 72, processedLevel: 1,
+          }],
+          confidence: 0.5,
+          notes: [],
+        }) }] } }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callGeminiPlateModel({
+      imageBase64: Buffer.from('fake-image').toString('base64'),
+      promptContext: { dish: 'Arroz' },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.systemInstruction).toBeUndefined();
+    expect(Array.isArray(body.contents)).toBe(true);
   });
 
   it('retries coach call when first response cannot be parsed', async () => {

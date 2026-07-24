@@ -1,4 +1,5 @@
 import { buildExerciseCoachPrompt } from './exerciseCoachPrompt.js';
+import { COACH_AUDITOR_PERSONA } from './coachPersona.js';
 import {
   isGoogleAiConfigured,
   isValidGoogleAiModelName,
@@ -251,6 +252,7 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
         traceId,
         // Cada intento respeta el presupuesto global restante (min 4 s útiles).
         timeoutMs: Math.min(timeoutMs, Math.max(4_000, budgetDeadline - Date.now())),
+        systemInstruction: COACH_AUDITOR_PERSONA,
         parts: [{ text: prompt }],
         generationConfig: {
           temperature: 0.2,

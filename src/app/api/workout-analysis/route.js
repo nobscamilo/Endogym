@@ -20,13 +20,21 @@ import {
   saveWorkoutAnalysis,
   getWorkoutAnalysis,
 } from '../../../lib/repositories/firestoreRepository.js';
+import { COACH_ANALYST_PERSONA } from '../../../services/coachPersona.js';
 
 // Análisis del coach de UNA sesión del historial. Caché permanente: una sesión pasada es
 // inmutable, así que se genera UNA vez y se sirve desde users/{uid}/workoutAnalyses/{workoutId}.
 // Los hits de caché NO consumen rate limit; la generación comparte el scope `coach-analysis`.
 
+// Mismo presupuesto global que coach-analysis: dos intentos de 20 s podían pasar del
+// maxDuration de 30 s de Vercel y matar la función con 504, perdiendo el heurístico.
+const AI_TOTAL_BUDGET_MS = 22_000;
+const AI_ATTEMPT_TIMEOUT_MS = 20_000;
+const AI_MIN_USEFUL_MS = 8_000;
+
 export async function POST(request) {
   return withTrace('workout_analysis', async ({ traceId }) => {
+    const budgetDeadline = Date.now() + AI_TOTAL_BUDGET_MS;
     let user;
     try {
       user = await getAuthenticatedUser(request);
@@ -85,11 +93,19 @@ export async function POST(request) {
           { label: 'retry_thinking', thinkingConfig: { thinkingBudget: 512 } },
         ];
         for (const attempt of generationAttempts) {
+          const remainingMs = budgetDeadline - Date.now();
+          if (remainingMs < AI_MIN_USEFUL_MS) {
+            logInfo('workout_analysis_budget_exhausted', {
+              traceId, userId: user.uid, attempt: attempt.label, remainingMs,
+            });
+            break;
+          }
           try {
             const { response } = await requestGoogleGenerateContent({
               model,
               traceId,
-              timeoutMs: 20000,
+              timeoutMs: Math.min(AI_ATTEMPT_TIMEOUT_MS, remainingMs),
+              systemInstruction: COACH_ANALYST_PERSONA,
               parts: [{ text: buildWorkoutAnalysisPrompt(digest) }],
               generationConfig: {
                 temperature: 1.0,
