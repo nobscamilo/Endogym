@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   resolveGeminiCoachModel: vi.fn(),
   enforceUserRateLimit: vi.fn(),
   getRateLimitHeaders: vi.fn(),
+  recordAiMetric: vi.fn(async () => {}),
   logInfo: vi.fn(),
 }));
 
@@ -70,7 +71,7 @@ vi.mock('../../src/services/exerciseCoachClient.js', () => ({
 
 // FASE 3.6 — métricas best-effort anuladas en tests.
 vi.mock('../../src/lib/aiMetrics.js', () => ({
-  recordAiMetric: vi.fn(async () => {}),
+  recordAiMetric: mocks.recordAiMetric,
   tokensFromGeminiResponse: (data) => {
     const u = data?.usageMetadata || {};
     return { tokensIn: Number(u.promptTokenCount) || 0, tokensOut: Number(u.candidatesTokenCount) || 0, tokensThink: Number(u.thoughtsTokenCount) || 0, tokensCached: Number(u.cachedContentTokenCount) || 0 };
@@ -446,6 +447,7 @@ describe('/api/weekly-plan route', () => {
         modelResolved: 'gemini-2.5-pro',
         attempts: 2,
         generatedAt: '2026-04-02T10:00:00.000Z',
+        usage: { tokensIn: 9100, tokensOut: 1200, tokensThink: 0, tokensCached: 0 },
       },
     });
     mocks.createWeeklyPlan.mockImplementation(async (_uid, payload) => ({ id: 'plan-ai', ...payload }));
@@ -468,6 +470,13 @@ describe('/api/weekly-plan route', () => {
     expect(json.plan.coachMeta.modelResolved).toBe('gemini-2.5-pro');
     expect(json.plan.coachMeta.attempts).toBe(2);
     expect(json.plan.coachWarning).toBeNull();
+    // Los tokens REALES tienen que llegar a la métrica: el plan semanal es el prompt más
+    // grande de la app y hasta el 25-jul-2026 se registraba con 0 tokens (coachMeta no
+    // copiaba diagnostics.usage), así que el reporte de coste lo daba por gratis.
+    expect(mocks.recordAiMetric).toHaveBeenCalledWith('weekly-plan', expect.objectContaining({
+      tokensIn: 9100,
+      tokensOut: 1200,
+    }));
   });
 
   it('applies only bounded structured Gemini adjustments to existing strength exercises', async () => {

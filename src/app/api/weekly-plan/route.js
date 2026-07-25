@@ -55,6 +55,21 @@ import {
 import { errorResponse, jsonResponse } from '../../../lib/http.js';
 import { logError, logInfo, withTrace } from '../../../lib/logger.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
+
+// Presupuesto de RAG del plan semanal. El chat ya acotaba el suyo a 7000 caracteres y este
+// flujo mandaba el contexto ENTERO: medido con scripts/ai_token_budget.mjs, 21.500 caracteres
+// (~5.400 tokens) sobre un prompt total de 34.400. Se recorta en el último salto de línea
+// para no cortar un pasaje a la mitad. Más generoso que el del chat (aquí la base científica
+// sostiene la auditoría del bloque completo), pero acotado: sin tope, el coste de este flujo
+// depende de cuánto devuelva el retriever, que no es una decisión de producto.
+const PLAN_RAG_CHAR_BUDGET = 12000;
+
+function capGuidelinesContext(contextText) {
+  const ctx = String(contextText || '');
+  if (ctx.length <= PLAN_RAG_CHAR_BUDGET) return ctx;
+  const cut = ctx.lastIndexOf('\n', PLAN_RAG_CHAR_BUDGET);
+  return ctx.slice(0, cut > 1000 ? cut : PLAN_RAG_CHAR_BUDGET);
+}
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 
 function parseLimit(searchParams) {
@@ -490,7 +505,7 @@ export async function POST(request) {
           weeklyPlan: generated,
           traceId,
         });
-        clinicalGuidelinesContext = guidelinesResult.contextText;
+        clinicalGuidelinesContext = capGuidelinesContext(guidelinesResult.contextText);
         clinicalCitations = guidelinesResult.citations;
       } catch (err) {
         logError('weekly_plan_guidelines_failed', err, { traceId, userId: user.uid });
@@ -528,6 +543,13 @@ export async function POST(request) {
             modelResolved: sanitizeGoogleAiModelNameForLog(aiCoach?.diagnostics?.modelResolved ?? coachModel),
             attempts: Number.isInteger(aiCoach?.diagnostics?.attempts) ? aiCoach.diagnostics.attempts : 1,
             generatedAt: aiCoach?.diagnostics?.generatedAt || new Date().toISOString(),
+            // BUG corregido (25-jul-2026): esto faltaba. exerciseCoachClient devuelve los
+            // tokens reales en diagnostics.usage, pero coachMeta no los copiaba, así que el
+            // `...(coachMeta?.usage || {})` de recordAiMetric más abajo no aportaba nada:
+            // el plan semanal —el flujo con el prompt MÁS GRANDE de la app— llevaba desde el
+            // 20-jul registrando llamadas con 0 tokens y saliendo a $0,0000 en el reporte de
+            // coste. El gasto existía; solo era invisible.
+            usage: aiCoach?.diagnostics?.usage || {},
           };
         } catch (error) {
           logError('exercise_coach_failed', error, { traceId, userId: user.uid });
