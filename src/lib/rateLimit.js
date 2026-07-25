@@ -5,6 +5,7 @@ export const RATE_LIMIT_SCOPES = Object.freeze({
   WEEKLY_PLAN_GENERATE: 'weekly-plan-generate',
   COACH_CHAT: 'coach-chat',
   COACH_ANALYSIS: 'coach-analysis',
+  WORKOUT_ANALYSIS: 'workout-analysis',
   STUDIO_NUTRITION: 'studio-nutrition',
 });
 
@@ -32,6 +33,17 @@ const DEFAULT_CONFIG = Object.freeze({
     windowSeconds: 60 * 60,
     maxEnv: 'COACH_ANALYSIS_RATE_LIMIT_MAX',
     windowEnv: 'COACH_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS',
+  },
+  // El análisis por sesión compartía la cuota del análisis de Progreso (6/h): el historial
+  // invita a pedirlo sesión a sesión y al sexto el usuario se quedaba sin el informe
+  // principal durante una hora, leyendo "Demasiados análisis seguidos" sin entender por qué.
+  // Cuota propia y más holgada: cada sesión se analiza UNA vez y se cachea para siempre,
+  // así que el gasto real está acotado por el número de entrenos, no por los clics.
+  [RATE_LIMIT_SCOPES.WORKOUT_ANALYSIS]: {
+    maxRequests: 15,
+    windowSeconds: 60 * 60,
+    maxEnv: 'WORKOUT_ANALYSIS_RATE_LIMIT_MAX',
+    windowEnv: 'WORKOUT_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS',
   },
   [RATE_LIMIT_SCOPES.STUDIO_NUTRITION]: {
     maxRequests: 12,

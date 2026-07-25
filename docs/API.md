@@ -67,6 +67,7 @@ Las operaciones IA costosas usan ventanas persistentes por usuario en Firestore:
 | `POST /api/weekly-plan` | 4 solicitudes cada 3600 segundos. |
 | `POST /api/coach-chat` | 20 solicitudes cada 3600 segundos. |
 | `POST /api/coach-analysis` | 6 solicitudes cada 3600 segundos. |
+| `POST /api/workout-analysis` | 15 solicitudes cada 3600 segundos (scope propio; los hits de caché no consumen cuota). |
 | `POST /api/studio-nutrition` | 12 solicitudes cada 3600 segundos (generación semanal y `swapMeal`). |
 
 Al superar el limite responden HTTP `429`, cabecera `Retry-After` y `details.retryAfterSeconds`.

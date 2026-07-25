@@ -24,7 +24,9 @@ import { COACH_ANALYST_PERSONA } from '../../../services/coachPersona.js';
 
 // Análisis del coach de UNA sesión del historial. Caché permanente: una sesión pasada es
 // inmutable, así que se genera UNA vez y se sirve desde users/{uid}/workoutAnalyses/{workoutId}.
-// Los hits de caché NO consumen rate limit; la generación comparte el scope `coach-analysis`.
+// Los hits de caché NO consumen rate limit. La generación usa su PROPIO scope
+// (`workout-analysis`, 15/h): antes compartía el del informe de Progreso (6/h) y analizar
+// seis sesiones del historial dejaba al usuario sin el análisis principal durante una hora.
 
 // Mismo presupuesto global que coach-analysis: dos intentos de 20 s podían pasar del
 // maxDuration de 30 s de Vercel y matar la función con 504, perdiendo el heurístico.
@@ -65,11 +67,11 @@ export async function POST(request) {
 
       const rateLimit = await enforceUserRateLimit({
         userId: user.uid,
-        scope: RATE_LIMIT_SCOPES.COACH_ANALYSIS,
+        scope: RATE_LIMIT_SCOPES.WORKOUT_ANALYSIS,
       });
       const rateLimitHeaders = getRateLimitHeaders(rateLimit);
       if (!rateLimit.allowed) {
-        logInfo('rate_limit_exceeded', { traceId, userId: user.uid, scope: RATE_LIMIT_SCOPES.COACH_ANALYSIS, retryAfterSeconds: rateLimit.retryAfterSeconds });
+        logInfo('rate_limit_exceeded', { traceId, userId: user.uid, scope: RATE_LIMIT_SCOPES.WORKOUT_ANALYSIS, retryAfterSeconds: rateLimit.retryAfterSeconds });
         return errorResponse('Demasiados análisis seguidos. Espera antes de volver a intentarlo.', 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, rateLimitHeaders);
       }
 

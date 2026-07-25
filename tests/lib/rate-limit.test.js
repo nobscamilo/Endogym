@@ -159,4 +159,19 @@ describe('persistent Firestore rate limit', () => {
       retryAfterSeconds: 120,
     });
   });
+
+  it('el análisis por sesión NO gasta la cuota del informe de Progreso', async () => {
+    const now = new Date('2026-06-08T20:00:00.000Z');
+    // Agota el scope del análisis por sesión...
+    for (let i = 0; i < 15; i += 1) {
+      await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.WORKOUT_ANALYSIS, now });
+    }
+    const blocked = await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.WORKOUT_ANALYSIS, now });
+    expect(blocked.allowed).toBe(false);
+
+    // ...y el informe principal sigue disponible: son contadores independientes.
+    const analysis = await enforceUserRateLimit({ userId: 'user-1', scope: RATE_LIMIT_SCOPES.COACH_ANALYSIS, now });
+    expect(analysis.allowed).toBe(true);
+    expect(analysis.limit).toBe(6);
+  });
 });
