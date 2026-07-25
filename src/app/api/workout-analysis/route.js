@@ -21,6 +21,7 @@ import {
   getWorkoutAnalysis,
 } from '../../../lib/repositories/firestoreRepository.js';
 import { COACH_ANALYST_PERSONA } from '../../../services/coachPersona.js';
+import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 
 // Análisis del coach de UNA sesión del historial. Caché permanente: una sesión pasada es
 // inmutable, así que se genera UNA vez y se sirve desde users/{uid}/workoutAnalyses/{workoutId}.
@@ -85,7 +86,11 @@ export async function POST(request) {
       let aiCalls = 0;
       let aiTokens = {};
       const model = resolveGeminiCoachModel();
-      if (process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
+      // Freno de gasto: sin presupuesto se usa el análisis heurístico de la sesión, que la
+      // UI ya etiqueta como automático. No se rompe nada.
+      const spendBudget = await checkAiBudget({ userId: user.uid });
+      if (!spendBudget.allowed) logBudgetStop('workout-analysis', spendBudget, { traceId, userId: user.uid });
+      if (spendBudget.allowed && process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
         // Mismo fix que coach-analysis (20-jul-2026): con esquema + temperatura baja +
         // thinkingBudget 0, gemini-2.5-flash puede degenerar en bucles de \t hasta
         // MAX_TOKENS → JSON truncado → fallback heurístico permanente. Temperatura 1.0
@@ -147,6 +152,7 @@ export async function POST(request) {
 
       // OBSERVABILIDAD (20-jul-2026): este flujo no registraba ninguna métrica de IA.
       await recordAiMetric('workout-analysis', { calls: Math.max(1, aiCalls), fallbacks: source === 'heuristic' ? 1 : 0, ...aiTokens }).catch(() => {});
+      await recordUserAiSpend(user.uid, aiTokens);
       await saveWorkoutAnalysis(user.uid, workoutId, { analysis, source });
       logInfo('workout_analysis_result', { traceId, userId: user.uid, workoutId, source, comparables: digest.comparables.length });
       return jsonResponse({ ok: true, analysis, source, cached: false }, 200, rateLimitHeaders);

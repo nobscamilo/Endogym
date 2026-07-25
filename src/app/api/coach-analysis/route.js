@@ -22,6 +22,7 @@ import {
   saveCoachRecommendation,
 } from '../../../lib/repositories/firestoreRepository.js';
 import { COACH_ANALYST_PERSONA } from '../../../services/coachPersona.js';
+import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 
 // Análisis del coach (Progreso): analiza el ÚLTIMO entreno realizado, lo compara con los
 // previos (manuales + Strava + check-ins) y explica los ajustes que aplicará a las próximas
@@ -100,7 +101,12 @@ export async function POST(request) {
       let aiCalls = 0;
       let aiTokens = {};
       const model = resolveGeminiCoachModel();
-      if (process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
+      // Freno de gasto: si no hay presupuesto, este flujo NO falla — cae al informe
+      // heurístico, que sale de las mismas señales reales y se etiqueta honestamente en la
+      // UI como "Resumen automático (sin IA)".
+      const spendBudget = await checkAiBudget({ userId: user.uid });
+      if (!spendBudget.allowed) logBudgetStop('coach-analysis', spendBudget, { traceId, userId: user.uid });
+      if (spendBudget.allowed && process.env.GEMINI_API_KEY && isValidGoogleAiModelName(model)) {
         // BUG 20-jul-2026: gemini-2.5-flash con salida restringida por esquema
         // (responseSchema) + temperatura baja + thinkingBudget 0 entraba en un bucle
         // degenerado ('{"lastSession": "Tu \n\t\t\t…' hasta MAX_TOKENS) → JSON truncado →
@@ -166,6 +172,7 @@ export async function POST(request) {
 
       // FASE 3.6 — métricas: llamadas reales + tokens + fallback heurístico si aplica.
       await recordAiMetric('coach-analysis', { calls: Math.max(1, aiCalls), fallbacks: source === 'heuristic' ? 1 : 0, ...aiTokens });
+      await recordUserAiSpend(user.uid, aiTokens);
       const record = await saveCoachAnalysis(user.uid, { report, source, signature: digest.signature });
       // FASE 2.2 — persistir las recomendaciones emitidas + snapshot de e1RM para
       // comparar su cumplimiento de forma determinista en el siguiente análisis.

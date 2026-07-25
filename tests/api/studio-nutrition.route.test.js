@@ -49,6 +49,14 @@ vi.mock('../../src/services/exerciseCoachClient.js', () => ({
   resolveGeminiCoachModel: mocks.resolveGeminiCoachModel,
 }));
 
+
+// Freno de gasto: en tests se permite siempre; su lógica se prueba en tests/lib/ai-budget.test.js.
+vi.mock('../../src/lib/aiBudget.js', () => ({
+  checkAiBudget: vi.fn(async () => ({ allowed: true, reason: null, scope: null, spentUsd: 0, limitUsd: 0.5 })),
+  recordUserAiSpend: vi.fn(async () => {}),
+  logBudgetStop: vi.fn(),
+}));
+
 const { GET, POST } = await import('../../src/app/api/studio-nutrition/route.js');
 
 const DAY_NAMES = [

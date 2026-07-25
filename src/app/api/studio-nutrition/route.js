@@ -5,6 +5,7 @@ import { withTrace, logError, logInfo } from '../../../lib/logger.js';
 import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 import { isValidGoogleAiModelName, requestGoogleGenerateContent } from '../../../services/googleGenAiTransport.js';
 import { addTokenUsage, recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
+import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { currentWeekKey as currentAppWeekKey, addDaysToDateKey } from '../../../lib/appTime.js';
 import {
@@ -209,6 +210,21 @@ export async function POST(request) {
       return errorResponse('Demasiadas generaciones de nutrición seguidas. Espera antes de reintentar.', 429, { retryAfterSeconds: rateLimit.retryAfterSeconds }, getRateLimitHeaders(rateLimit));
     }
 
+    // Freno de gasto (lib/aiBudget.js). Este flujo no tiene heurístico: se corta con un
+    // mensaje honesto en vez de generar un plan de comidas inventado.
+    const spendBudget = await checkAiBudget({ userId: user.uid });
+    if (!spendBudget.allowed) {
+      logBudgetStop('studio-nutrition', spendBudget, { traceId, userId: user.uid });
+      return errorResponse(
+        spendBudget.scope === 'global'
+          ? 'La generación de nutrición ha alcanzado su límite diario de uso. Vuelve mañana.'
+          : 'Has llegado a tu límite diario de generación de nutrición. Mañana volvemos.',
+        429,
+        { reason: spendBudget.reason },
+        getRateLimitHeaders(rateLimit),
+      );
+    }
+
     // Cuerpo opcional: { swapMeal: { day, slot, request? } } cambia UNA comida del plan guardado.
     let body = {};
     try { body = await request.json(); } catch { body = {}; }
@@ -373,7 +389,9 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        await recordAiMetric('studio-nutrition', { calls: 1, ...tokensFromGeminiResponse(data) }).catch(() => {});
+        const usage = tokensFromGeminiResponse(data);
+        await recordAiMetric('studio-nutrition', { calls: 1, ...usage }).catch(() => {});
+        await recordUserAiSpend(user.uid, usage);
         const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('').trim();
         const meal = JSON.parse(text);
         if (!meal || !meal.dish || !Number(meal.kcal)) throw new Error('comida inválida');
@@ -401,7 +419,10 @@ Mantén el slot "${slot}" y el formato completo de comida. Devuelve SOLO el JSON
     // vez al final (éxito o error). Best-effort: nunca bloquea la respuesta.
     const aiUsage = { calls: 0, tokens: {} };
     const trackUsage = (data) => { aiUsage.tokens = addTokenUsage(aiUsage.tokens, tokensFromGeminiResponse(data)); };
-    const flushUsage = (extra = {}) => recordAiMetric('studio-nutrition', { calls: aiUsage.calls, ...aiUsage.tokens, ...extra }).catch(() => {});
+    const flushUsage = (extra = {}) => Promise.all([
+      recordAiMetric('studio-nutrition', { calls: aiUsage.calls, ...aiUsage.tokens, ...extra }).catch(() => {}),
+      recordUserAiSpend(user.uid, aiUsage.tokens),
+    ]);
 
     async function genChunk(daysList, styleHint) {
       const { response } = await requestGoogleGenerateContent({

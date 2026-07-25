@@ -29,6 +29,7 @@ function applyCoachAdjustments(days, adjustments) {
 }
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
 import { recordAiMetric } from '../../../lib/aiMetrics.js';
+import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 import { evaluatePreparticipationScreening } from '../../../core/screening.js';
 import { normalizeExerciseHistoryKey, resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import {
@@ -56,6 +57,8 @@ import { errorResponse, jsonResponse } from '../../../lib/http.js';
 import { logError, logInfo, withTrace } from '../../../lib/logger.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 
+import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
+
 // Presupuesto de RAG del plan semanal. El chat ya acotaba el suyo a 7000 caracteres y este
 // flujo mandaba el contexto ENTERO: medido con scripts/ai_token_budget.mjs, 21.500 caracteres
 // (~5.400 tokens) sobre un prompt total de 34.400. Se recorta en el último salto de línea
@@ -70,7 +73,6 @@ function capGuidelinesContext(contextText) {
   const cut = ctx.lastIndexOf('\n', PLAN_RAG_CHAR_BUDGET);
   return ctx.slice(0, cut > 1000 ? cut : PLAN_RAG_CHAR_BUDGET);
 }
-import { enforceUserRateLimit, getRateLimitHeaders, RATE_LIMIT_SCOPES } from '../../../lib/rateLimit.js';
 
 function parseLimit(searchParams) {
   const raw = searchParams.get('limit');
@@ -516,7 +518,14 @@ export async function POST(request) {
         weeklyPlan: generated,
       });
 
-      if (!forceMock && geminiConfigured) {
+      // Freno de gasto. Este es el flujo MÁS CARO (unos 32.000 tokens de entrada por
+      // llamada, ~9x el chat), así que es el primero que conviene parar. Sin presupuesto se
+      // entrega el plan heurístico ACSM, que ya es el fallback probado: el usuario recibe su
+      // plan igual, solo que sin la capa de auditoría de la IA.
+      const spendBudget = await checkAiBudget({ userId: user.uid });
+      if (!spendBudget.allowed) logBudgetStop('weekly-plan', spendBudget, { traceId, userId: user.uid });
+
+      if (!forceMock && geminiConfigured && spendBudget.allowed) {
         try {
           const aiCoach = await callGeminiExerciseCoach({
             profile,
@@ -642,6 +651,7 @@ export async function POST(request) {
         fallbacks: coachMeta?.fallbackApplied ? 1 : 0,
         ...(coachMeta?.usage || {}),
       }).catch(() => {});
+      await recordUserAiSpend(user.uid, coachMeta?.usage || {});
 
       if (profile.onboardingCompleted !== true && profile.preparticipationUpdatedAt) {
         await upsertUserProfile(user.uid, {

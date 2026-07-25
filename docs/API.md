@@ -72,6 +72,19 @@ Las operaciones IA costosas usan ventanas persistentes por usuario en Firestore:
 
 Al superar el limite responden HTTP `429`, cabecera `Retry-After` y `details.retryAfterSeconds`.
 
+### Freno de gasto (presupuesto diario en dinero)
+
+El rate limit cuenta **peticiones** y trata igual una del chat (~2.400 tokens de entrada) que una del plan semanal (~32.000). Sobre él hay un segundo freno que cuenta **coste estimado** (`src/lib/aiBudget.js`), con dos topes diarios configurables: por usuario (`AI_USER_DAILY_BUDGET_USD`, $0,50) y global de todo el sistema (`AI_GLOBAL_DAILY_BUDGET_USD`, $10).
+
+Comportamiento al agotarse, por flujo:
+
+| flujo | qué pasa |
+| --- | --- |
+| `weekly-plan`, `coach-analysis`, `workout-analysis` | **degradan al heurístico**: el usuario recibe su plan o su informe, etiquetado como automático |
+| `coach-chat`, `studio-nutrition`, `analyze-plate` | `429` con `details.reason` = `user_daily_budget` \| `global_daily_budget` y un mensaje que el cliente muestra tal cual |
+
+Las **red flags no dependen del presupuesto**: se resuelven antes, sin IA, y siguen funcionando con el freno activo. Si la lectura del presupuesto falla, se deja pasar: un freno de coste que tumba la app cuando su propia lectura falla es peor que el gasto que evita.
+
 ## Coaching semanal
 
 `POST /api/weekly-plan` genera la base del plan y solicita recomendaciones estructuradas a Gemini Developer API. Produccion usa `gemini-2.5-flash` estable, con latencia acotada y fallback ACSM observable. La sonda de produccion exige `coachSource=gemini` y `fallbackApplied=false`.

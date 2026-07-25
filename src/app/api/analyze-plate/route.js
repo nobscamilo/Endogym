@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { analyzePlateWithGemini } from '../../../services/geminiPlateAnalyzer.js';
 import { callGeminiPlateModel, isGeminiConfigured, resolveGeminiPlateModel } from '../../../services/geminiClient.js';
 import { recordAiMetric } from '../../../lib/aiMetrics.js';
+import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 import { sanitizeGoogleAiModelNameForLog } from '../../../services/googleGenAiTransport.js';
 import { evaluateMealAdherence } from '../../../core/adherence.js';
 import { createMeal, getLatestWeeklyPlan, getUserProfile } from '../../../lib/repositories/firestoreRepository.js';
@@ -255,6 +256,24 @@ export async function POST(request) {
         return errorResponse('El Content-Type declarado no coincide con la firma real de la imagen.', 400);
       }
 
+
+      // Freno de gasto (lib/aiBudget.js). Aquí el freno importa más que en otros flujos: la
+      // entrada es una IMAGEN, así que una llamada cuesta bastante más que un prompt de
+      // texto. No se degrada a la estimación de muestra: inventar los macros de una foto
+      // sería peor que decir que hoy no se puede.
+      const spendBudget = await checkAiBudget({ userId: user.uid });
+      if (!spendBudget.allowed) {
+        logBudgetStop('analyze-plate', spendBudget, { traceId, userId: user.uid });
+        return errorResponse(
+          spendBudget.scope === 'global'
+            ? 'El análisis de platos ha alcanzado su límite diario de uso. Vuelve mañana o registra la comida a mano.'
+            : 'Has llegado a tu límite diario de análisis de platos. Mañana volvemos; puedes registrar la comida a mano.',
+          429,
+          { reason: spendBudget.reason },
+          rateLimitHeaders
+        );
+      }
+
       const [weeklyPlan, profile] = await Promise.all([getLatestWeeklyPlan(user.uid), getUserProfile(user.uid)]);
       const todayPlanTarget = weeklyPlan?.days?.find((day) => day.date === dateKeyInTimeZone())?.nutritionTarget ?? null;
       const promptContext = buildPromptContext({
@@ -298,6 +317,7 @@ export async function POST(request) {
           // OBSERVABILIDAD (20-jul-2026): este flujo (imagen = muchos tokens de entrada)
           // no registraba métricas de IA.
           await recordAiMetric('analyze-plate', { calls: 1, ...(modelOutput?.diagnostics?.usage || {}) }).catch(() => {});
+          await recordUserAiSpend(user.uid, modelOutput?.diagnostics?.usage || {});
           return modelOutput;
         } catch (error) {
           logError('gemini_call_failed', error, { traceId, userId: user.uid });

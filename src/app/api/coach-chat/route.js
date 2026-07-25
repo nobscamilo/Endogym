@@ -10,6 +10,7 @@ import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.j
 import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince, listMetricsSince, getCoachChatMemory, saveCoachChatMemory } from '../../../lib/repositories/firestoreRepository.js';
 import { trimChatMemory, appendChatTurns, formatChatMemory } from '../../../services/coachChatMemory.js';
 import { recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
+import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
@@ -321,6 +322,20 @@ export async function POST(request) {
       );
     }
 
+    // Freno de gasto (ver lib/aiBudget.js). Va DESPUÉS de las red flags —la respuesta de
+    // seguridad nunca depende del presupuesto— y después del rate limit, pero ANTES de
+    // construir el contexto: si no vamos a llamar a Gemini, tampoco hace falta pagar las
+    // lecturas de Firestore ni el embedding del RAG.
+    const budget = await checkAiBudget({ userId: user.uid });
+    if (!budget.allowed) {
+      logBudgetStop('coach-chat', budget, { traceId, userId: user.uid });
+      // El chat no tiene heurístico al que caer: se dice la verdad y se acota la espera.
+      const message = budget.scope === 'global'
+        ? 'El coach ha alcanzado su límite diario de uso. Vuelve mañana; tu plan y tu análisis siguen disponibles.'
+        : 'Has usado mucho el coach hoy y has llegado al límite diario. Mañana volvemos; tu plan y tu análisis siguen disponibles.';
+      return errorResponse(message, 429, { reason: budget.reason }, rateLimitHeaders);
+    }
+
     const model = resolveGeminiCoachModel();
     if (!isValidGoogleAiModelName(model)) {
       return errorResponse('Modelo Gemini inválido.', 500);
@@ -364,7 +379,10 @@ export async function POST(request) {
 
       const data = await response.json();
       // FASE 3.6 — contador de llamadas + tokens (si la API los devuelve). Sin PII.
-      await recordAiMetric('coach-chat', { calls: 1, ...tokensFromGeminiResponse(data) });
+      const usage = tokensFromGeminiResponse(data);
+      await recordAiMetric('coach-chat', { calls: 1, ...usage });
+      // Y el mismo gasto imputado a SU cuenta, para el freno diario por usuario.
+      await recordUserAiSpend(user.uid, usage);
       const candidate = data?.candidates?.[0];
       const finishReason = candidate?.finishReason || null;
       let text = (candidate?.content?.parts || [])

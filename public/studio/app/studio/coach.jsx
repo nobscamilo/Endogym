@@ -68,6 +68,11 @@ const COACH_FALLBACK = {
    consultar el motor IA", que no orienta a ninguna. */
 function coachErrorMessage(err) {
   const status = err && err.status;
+  // Freno de gasto diario (lib/aiBudget.js): el servidor ya manda un texto pensado para
+  // leerse tal cual y distingue si el tope es tuyo o de todo el sistema. No lo reescribimos.
+  if (err && (err.reason === 'user_daily_budget' || err.reason === 'global_daily_budget')) {
+    return err.message;
+  }
   if (status === 429) {
     const secs = Number(err.retryAfterSeconds);
     const mins = Number.isFinite(secs) && secs > 0 ? Math.ceil(secs / 60) : null;

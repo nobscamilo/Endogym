@@ -53,6 +53,16 @@ describe('Chat del coach — el error que ve el usuario explica la causa real', 
     expect(coachErrorMessage({ status: 422 })).toMatch(/reformular/i);
   });
 
+  it('freno de gasto: se muestra el mensaje del servidor, que distingue tope propio del global', () => {
+    const propio = coachErrorMessage({ status: 429, reason: 'user_daily_budget', message: 'Has usado mucho el coach hoy y has llegado al límite diario.' });
+    expect(propio).toContain('límite diario');
+    // No debe caer en el texto de "límite por hora", que es otro problema y otra espera.
+    expect(propio).not.toContain('por hora');
+
+    const global = coachErrorMessage({ status: 429, reason: 'global_daily_budget', message: 'El coach ha alcanzado su límite diario de uso.' });
+    expect(global).toContain('límite diario de uso');
+  });
+
   it('un fallo desconocido o de red sigue cayendo al mensaje genérico', () => {
     expect(coachErrorMessage(new Error('network'))).toContain('motor IA');
     expect(coachErrorMessage({ status: 500 })).toContain('motor IA');
@@ -61,7 +71,8 @@ describe('Chat del coach — el error que ve el usuario explica la causa real', 
   it('el shim window.claude.complete propaga status y detalles del servidor', () => {
     const source = read('scripts/build-studio.mjs');
     expect(source).toContain('err.status = res.status;');
-    expect(source).toContain('data.details.retryAfterSeconds');
+    expect(source).toContain('details.retryAfterSeconds');
+    expect(source).toContain('err.reason = details.reason');
     // Ya no se descarta el cuerpo del error con un mensaje genérico de HTTP.
     expect(source).not.toContain("if (!res.ok) throw new Error('coach-chat HTTP ' + res.status);");
   });

@@ -153,8 +153,9 @@ async function __coachChatRequest(method, body) {
     // configurado") no son el mismo problema y antes se veían con el mismo mensaje.
     const err = new Error((data && data.error) || ('coach-chat HTTP ' + res.status));
     err.status = res.status;
-    const retry = data && data.details && data.details.retryAfterSeconds;
-    if (retry) err.retryAfterSeconds = retry;
+    const details = (data && data.details) || {};
+    if (details.retryAfterSeconds) err.retryAfterSeconds = details.retryAfterSeconds;
+    if (details.reason) err.reason = details.reason; // p. ej. freno de gasto diario
     throw err;
   }
   return data || {};

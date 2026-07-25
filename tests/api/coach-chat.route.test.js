@@ -79,6 +79,14 @@ vi.mock('../../src/lib/aiMetrics.js', () => ({
   tokensFromGeminiResponse: () => ({ tokensIn: 0, tokensOut: 0 }),
 }));
 
+
+// Freno de gasto: en tests se permite siempre; su lógica se prueba en tests/lib/ai-budget.test.js.
+vi.mock('../../src/lib/aiBudget.js', () => ({
+  checkAiBudget: vi.fn(async () => ({ allowed: true, reason: null, scope: null, spentUsd: 0, limitUsd: 0.5 })),
+  recordUserAiSpend: vi.fn(async () => {}),
+  logBudgetStop: vi.fn(),
+}));
+
 const { AuthenticationError } = await import('../../src/lib/auth.js');
 const { dateKeyInTimeZone } = await import('../../src/lib/appTime.js');
 const { POST, GET, DELETE } = await import('../../src/app/api/coach-chat/route.js');
