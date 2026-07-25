@@ -8,7 +8,9 @@
  *   - Firebase desde CDN (gstatic)
  *
  * Salida: public/studio/app/studio.bundle.js  (lo carga index.html con un solo <script>).
- * Se ejecuta en `prebuild` para que `npm run build` siempre regenere el bundle.
+ * NO se ejecuta solo: `npm run build` no lo invoca (no hay script `prebuild`). Tras editar
+ * cualquier fuente de public/studio/app/studio/ hay que correr `npm run build:studio` y
+ * commitear el bundle. El workflow studio-bundle-guard.yml falla si te lo saltas.
  *
  * Uso: node scripts/build-studio.mjs
  */
