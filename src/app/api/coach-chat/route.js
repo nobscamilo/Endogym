@@ -16,7 +16,7 @@ import { buildGoalProgress, describeGoalProgress } from '../../../services/goalP
 import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { COACH_CHAT_PERSONA, buildCoachChatUserContent, sanitizeUserText } from '../../../services/coachPersona.js';
-import { detectRedFlags, RED_FLAG_RESPONSE } from '../../../services/coachRedFlags.js';
+import { detectRedFlags, redFlagResponse } from '../../../services/coachRedFlags.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
 // chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
@@ -279,6 +279,9 @@ export async function POST(request) {
     // por cuota ni depender de que la IA esté configurada. Log sin contenido del mensaje.
     const redFlag = detectRedFlags(message);
     if (redFlag.flagged) {
+      // Cada categoría tiene su texto: lo cardiorrespiratorio manda parar y buscar
+      // valoración urgente; la conducta alimentaria no va de eso (ver coachRedFlags.js).
+      const safetyText = redFlagResponse(redFlag.category);
       logInfo('coach_chat_red_flag', {
         traceId,
         userId: user.uid,
@@ -287,10 +290,10 @@ export async function POST(request) {
       // La memoria también recuerda que se recomendó parar (continuidad del hilo).
       try {
         const prev = await getCoachChatMemory(user.uid);
-        await saveCoachChatMemory(user.uid, appendChatTurns(prev, message, RED_FLAG_RESPONSE));
+        await saveCoachChatMemory(user.uid, appendChatTurns(prev, message, safetyText));
       } catch { /* la memoria nunca bloquea la respuesta de seguridad */ }
       await recordAiMetric('coach-chat', { redFlags: 1 });
-      return jsonResponse({ text: RED_FLAG_RESPONSE, redFlag: true, category: redFlag.category });
+      return jsonResponse({ text: safetyText, redFlag: true, category: redFlag.category });
     }
 
     if (!process.env.GEMINI_API_KEY) {

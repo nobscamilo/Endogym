@@ -37,6 +37,56 @@ const CHEST_MUSCULAR_CONTEXT = [
 
 const CHEST_PAIN_RE = /(dolor|duele|dolia|molestia|pinchazo|punzada)[^.]{0,40}(pecho|torax|toracic)|((pecho|torax)[^.]{0,30}(dolor|duele|opresion|aprieta))/;
 
+// --- Conducta alimentaria (añadido 25-jul-2026) ---
+//
+// Ignios es una app de pérdida de peso con registro de comidas: hablar de déficit calórico,
+// de bajar kilos o de ayuno intermitente es la conversación NORMAL. Por eso aquí se invierte
+// el criterio de las reglas cardiorrespiratorias: allí "ante la duda, dispara" es gratis
+// (parar de entrenar no cuesta nada), pero aquí un falso positivo lanza un mensaje sobre la
+// relación con la comida a alguien que solo preguntaba cuántas calorías cenar. Eso es
+// paternalista, se siente como un juicio y hace que la persona deje de contarle cosas al
+// coach — justo lo contrario de lo que buscamos.
+//
+// Por eso el léxico exige señales ESPECÍFICAS (purga, restricción prolongada, compensación
+// explícita de lo comido, autodesprecio ligado a comer) y nunca dispara con vocabulario de
+// dieta corriente. Preferimos un falso negativo, que cae en el flujo normal del coach —
+// cuya persona ya le prohíbe diagnosticar y le obliga a derivar ante duda clínica — antes
+// que un falso positivo.
+
+// Purga: vómito autoinducido (incluido el eufemismo más habitual, "meterse los dedos"),
+// laxantes o diuréticos con finalidad de peso.
+const ED_PURGE_RE = /vomit\w*[^.]{0,45}(adelgaz|engordar|peso|compensar|para no)|(despues de comer|tras comer|cuando como|despues de cenar|tras cenar)[^.]{0,25}(vomit|me meto los dedos)|(me (hago|provoco)|provocarme)[^.]{0,15}(vomit|el vomito)|me meto los dedos|(laxante|diuretico)\w*[^.]{0,40}(adelgaz|peso|pesar|bascula|compensar|dieta|comer)/;
+
+// Restricción prolongada o intencionadamente severa (no "hoy he comido poco").
+//
+// Ojo con las dietas de EXCLUSIÓN, que se describen igual: "llevo dos semanas sin comer
+// carne" (vegetarianismo), "no como nada de gluten desde el lunes" (celiaquía). Por eso
+// "sin comer" y "no como nada" solo cuentan cuando NO les sigue un alimento: o cierran la
+// frase, o van con un cuantificador de ausencia total (nada, casi nada, apenas).
+const ED_RESTRICTION_PERIOD = '(llevo|voy)[^.]{0,20}(dias|semana)\\w*[^.]{0,25}sin comer';
+const ED_RESTRICTION_RE = new RegExp([
+  `${ED_RESTRICTION_PERIOD}(?! [a-z])`,              // "llevo 3 días sin comer, ¿entreno?"
+  `${ED_RESTRICTION_PERIOD} (casi nada|nada|apenas)`, // "...sin comer casi nada"
+  'no como (nada|casi nada)(?! de (?!nada))[^.]{0,25}(dias|semana|desde)',
+  'dejar de comer[^.]{0,25}(adelgaz|peso|rapido)',
+].join('|'));
+
+// Ejercicio o ayuno como castigo/compensación de lo que se ha comido.
+const ED_COMPENSATION_RE = /(he comido de mas|me he pasado comiendo|me pase comiendo|me pase con la (cena|comida)|comi de mas|el atracon|ese atracon)[^.]{0,70}(compensar|compensarlo|quemarlo|quemar todo|doble sesion|entreno el doble|entrenar el doble|castigar|purgar)|(compensar|quemar|castigarme)[^.]{0,35}(lo que (he )?com|el atracon|las calorias de|la cena de ayer)/;
+
+// Saltarse comidas de forma HABITUAL con finalidad de peso o para compensar. Un salto
+// puntual ("hoy no me dio tiempo a comer") no cuenta, y el ayuno intermitente es un
+// protocolo legítimo que se describe igual: si el mensaje lo menciona, no se dispara.
+const ED_INTERMITTENT_FASTING = /(ayuno intermitente|16\/8|18\/6|20\/4|ventana de alimentacion)/;
+const ED_SKIPPING_RE = /(me salto|saltarme|salto)[^.]{0,25}(la cena|el desayuno|la comida|comidas)[^.]{0,45}(todos los dias|cada dia|siempre|a diario)|(todos los dias|cada dia|siempre|a diario)[^.]{0,45}(me salto|saltarme|salto)[^.]{0,25}(la cena|el desayuno|la comida|comidas)/;
+const ED_SKIPPING_INTENT = /(adelgaz|bajar de peso|perder peso|para bajar|entreno el doble|entrenar el doble|doble sesion|quemar|compensar|no engordar)/;
+
+// Atracones descritos con pérdida de control o culpa (no "me di un atracón de pizza").
+const ED_BINGE_RE = /atracon\w*[^.]{0,70}(culpa|culpable|asco|vomit|purg|no puedo parar|descontrol|me odio)|(culpa|culpable|asco|no puedo parar|descontrol)[^.]{0,70}atracon/;
+
+// Autodesprecio explícitamente ligado a comer.
+const ED_GUILT_RE = /(me odio|me da asco|asco de mi|no me merezco|no merezco)[^.]{0,35}(comer|comida|comiendo|que como|haber comido)/;
+
 const RULES = [
   {
     category: 'sincope',
@@ -70,6 +120,18 @@ const RULES = [
       return !(muscular && !alarm);
     },
   },
+  // Va la ÚLTIMA a propósito: si el mensaje describe además un síntoma agudo (desmayo,
+  // palpitaciones), gana la regla clínica y la respuesta que manda es la de parar y buscar
+  // valoración urgente. Lo agudo primero.
+  {
+    category: 'conducta_alimentaria',
+    test: (t) => ED_PURGE_RE.test(t)
+      || ED_RESTRICTION_RE.test(t)
+      || ED_COMPENSATION_RE.test(t)
+      || ED_BINGE_RE.test(t)
+      || ED_GUILT_RE.test(t)
+      || (ED_SKIPPING_RE.test(t) && ED_SKIPPING_INTENT.test(t) && !ED_INTERMITTENT_FASTING.test(t)),
+  },
 ];
 
 /**
@@ -89,3 +151,26 @@ export const RED_FLAG_RESPONSE = 'Lo que describes puede ser una señal de alarm
   + 'Detén el ejercicio ahora y no entrenes hasta que te valore un profesional sanitario. '
   + 'Si los síntomas están ocurriendo ahora mismo (dolor u opresión en el pecho, desmayo, mucha dificultad para respirar), '
   + 'busca atención de urgencias o llama al 112. Cuando te hayan valorado, aquí estaré para adaptar tu plan con calma.';
+
+// La respuesta de "para de entrenar y ve a urgencias" no sirve aquí: ni el problema es
+// agudo ni el ejercicio es el asunto. Este texto (1) no diagnostica, (2) se NIEGA
+// explícitamente a dar la pauta de restricción o compensación que se le pide —callarse y
+// responder igual sería lo dañino—, (3) deriva a quien corresponde, (4) cubre el riesgo
+// físico agudo por si lo hay y (5) no juzga ni cierra la puerta. Sin recursos inventados:
+// médico de cabecera y 112, que son los que existen con seguridad.
+export const EATING_DISORDER_RESPONSE = 'Por lo que cuentas, esto tiene que ver con tu relación con la comida, y ahí no debo orientarte yo: '
+  + 'una respuesta mía sobre calorías o sobre cuánto entrenar podría hacerte más daño que bien. '
+  + 'No voy a darte pautas para restringir ni para compensar lo que has comido. '
+  + 'Cuéntaselo a tu médico de cabecera y pídele valoración: desde ahí pueden derivarte a psicología o a nutrición clínica, '
+  + 'que es quien acompaña esto de verdad y sabe hacerlo. '
+  + 'Si ahora mismo te encuentras mal físicamente (mareo, desmayo, palpitaciones), busca atención urgente o llama al 112. '
+  + 'Esto no es un juicio sobre ti ni cambia nada entre nosotros: cuando quieras, seguimos con tu entrenamiento.';
+
+const RESPONSES_BY_CATEGORY = {
+  conducta_alimentaria: EATING_DISORDER_RESPONSE,
+};
+
+/** Texto fijo que corresponde a la categoría detectada. */
+export function redFlagResponse(category) {
+  return RESPONSES_BY_CATEGORY[category] || RED_FLAG_RESPONSE;
+}

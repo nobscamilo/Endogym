@@ -70,6 +70,7 @@ Estas medidas pasaron tests, `next start` local y verificación de cabeceras en 
 - Los logs sustituyen identificadores invalidos por `<invalid-model>` para no persistir valores opacos.
 - El coach limita timeout y reintentos para responder con fallback antes del limite de Vercel.
 - El chat del coach requiere autenticacion, acepta `{ message }` como contrato principal, limita el mensaje a 4000 caracteres, trata `{ prompt }` legacy como texto de usuario, evalúa red flags deterministas antes de cuota/IA y aplica rate limiting persistente antes de llamar Gemini.
+- Red flags (`src/services/coachRedFlags.js`): cinco categorías clínicas (síncope, disnea, palpitaciones, lesión aguda, dolor torácico) y una de **conducta alimentaria**. Las clínicas son deliberadamente conservadoras ("ante la duda, dispara": parar de entrenar no cuesta nada) y comparten el texto de detener el ejercicio y buscar valoración. La de conducta alimentaria invierte el criterio —en una app de pérdida de peso, un falso positivo sobre la relación con la comida es dañino y paternalista—, así que exige señales específicas (purga, restricción prolongada, compensación explícita, autodesprecio ligado a comer) y nunca dispara con vocabulario de dieta corriente, dietas de exclusión ni ayuno intermitente. Su respuesta se niega a dar la pauta pedida, deriva a médico de cabecera y no diagnostica. Si el mensaje trae además un síntoma agudo, gana la regla clínica. El corpus de positivos **y negativos** vive en `tests/services/coach-red-flags.test.js`.
 
 ## Dependencias
 

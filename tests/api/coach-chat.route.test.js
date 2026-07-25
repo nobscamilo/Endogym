@@ -360,6 +360,40 @@ describe('/api/coach-chat route', () => {
     expect(JSON.stringify(logPayload)).not.toContain('opresión');
   });
 
+  it('conducta alimentaria: responde su texto propio, no el de "para de entrenar y ve a urgencias"', async () => {
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'He comido de más y quiero saber cuánto correr para compensarlo' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.redFlag).toBe(true);
+    expect(json.category).toBe('conducta_alimentaria');
+    // Se niega a dar la pauta pedida y deriva; NO manda parar de entrenar.
+    expect(json.text).toMatch(/no voy a darte pautas/i);
+    expect(json.text).toMatch(/médico de cabecera/i);
+    expect(json.text).not.toMatch(/detén el ejercicio/i);
+    // Como el resto de red flags: sin Gemini y sin gastar cuota.
+    expect(mocks.requestGoogleGenerateContent).not.toHaveBeenCalled();
+    expect(mocks.enforceUserRateLimit).not.toHaveBeenCalled();
+    // Y el log no lleva el contenido del mensaje.
+    const logPayload = mocks.logInfo.mock.calls.find((c) => c[0] === 'coach_chat_red_flag')[1];
+    expect(JSON.stringify(logPayload)).not.toContain('compensarlo');
+  });
+
+  it('una pregunta normal de déficit calórico NO dispara conducta alimentaria', async () => {
+    const response = await POST(new Request('http://localhost/api/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Estoy en déficit calórico, ¿cuántas calorías debería cenar hoy?' }),
+    }));
+    const json = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(json.redFlag).toBeUndefined();
+    expect(mocks.requestGoogleGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
   it('red flag funciona incluso sin GEMINI_API_KEY configurada (degradación elegante)', async () => {
     delete process.env.GEMINI_API_KEY;
     const response = await POST(new Request('http://localhost/api/coach-chat', {

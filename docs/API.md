@@ -98,7 +98,7 @@ Payload:
 }
 ```
 
-`redFlag:true` marca la respuesta fija de seguridad (con `category`): el cliente debe presentarla como aviso sanitario, no como una respuesta más, y no pedir feedback sobre ella.
+`redFlag:true` marca la respuesta fija de seguridad (con `category`): el cliente debe presentarla como aviso sanitario, no como una respuesta más, y no pedir feedback sobre ella. El texto depende de la categoría: las cinco clínicas mandan parar y buscar valoración; `conducta_alimentaria` se niega a dar pautas de restricción o compensación y deriva a médico de cabecera (ver `docs/SECURITY.md`).
 
 Si se supera el limite devuelve `429`, `Retry-After`, cabeceras `ratelimit-*` y `details.retryAfterSeconds`. Una salida bloqueada por el modelo sin texto devuelve `422` con motivo. El cliente traduce cada estado a un mensaje accionable (límite por hora con su espera, sesión caducada, coach no configurado) en vez de un único texto genérico.
 
