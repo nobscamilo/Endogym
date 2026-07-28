@@ -869,6 +869,11 @@ export async function GET(request) {
         planStatus: displayPlan ? 'active' : (latestPlan ? 'stale' : 'missing'),
         user: mapUser(profile, user),
         runPaces: displayPlan?.runPaces || null,
+        // Aviso de marca desfasada: el plan NO se recalcula solo con las carreras de Strava
+        // cuando hay marca manual (es un dato declarado por la persona), pero sí se le dice
+        // que se ha quedado atrás para que decida actualizarla.
+        runPacesNotice: displayPlan?.runPacesNotice || null,
+        runPacesSource: displayPlan?.runPacesSource || null,
         todaySession: mapTodaySession(displayPlan, today, workouts, profile),
         week: weekData?.days || [],
         weekVolumeHours: weekData?.volumeHours ?? null,

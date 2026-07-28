@@ -443,6 +443,18 @@ function ProgressScreen() {
       {/* Forma aeróbica (corredores): eficiencia ritmo/FC y predicción de carrera */}
       {D.runFitness ? (
         <SectionCard title="Forma aeróbica" icon="heart" sub="Calculada con tus carreras reales de Strava (ritmo y FC)">
+          {/* La marca guardada manda sobre los ritmos del plan; si las carreras reales dicen
+              que te has quedado corto, se avisa aquí en vez de cambiarla por tu cuenta. */}
+          {D.runPacesNotice ? (
+            <p className="tiny" style={{ margin: '0 0 12px', lineHeight: 1.5, color: 'var(--glu-mid)' }}>
+              {D.runPacesNotice.message}
+            </p>
+          ) : null}
+          {D.runPacesSource === 'strava' ? (
+            <p className="tiny muted" style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
+              Los ritmos de tu plan salen de tus carreras de Strava porque aún no has guardado una marca de referencia.
+            </p>
+          ) : null}
           <div className="row wrap" style={{ gap: 18 }}>
             {D.runFitness.efficiency ? (
               <div>
@@ -787,7 +799,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         if (d.ok) {
           const j = await d.json();
           const o = j && j.ok ? j.overrides : null;
-          if (o) ['user', 'todaySession', 'week', 'weekVolumeHours', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic', 'goalProgress', 'runFitness', 'runZones', 'coachAdjust', 'reentry', 'planStatus'].forEach((k) => { if (Object.prototype.hasOwnProperty.call(o, k)) D[k] = o[k]; });
+          if (o) ['user', 'todaySession', 'week', 'weekVolumeHours', 'library', 'macroTargets', 'macroEaten', 'progress', 'glycemic', 'goalProgress', 'runFitness', 'runZones', 'runPacesNotice', 'runPacesSource', 'coachAdjust', 'reentry', 'planStatus'].forEach((k) => { if (Object.prototype.hasOwnProperty.call(o, k)) D[k] = o[k]; });
         }
       } catch (e) { /* noop */ }
       setStatus('ok'); setTimeout(() => setStatus('idle'), 3500);

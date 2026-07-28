@@ -47,6 +47,56 @@ export function estimate5kPaceSecPerKm(refDistanceMeters, refTimeSeconds) {
   return t5k / 5; // s/km
 }
 
+/**
+ * Mismo ritmo de referencia de 5K, pero deducido de las CARRERAS REALES (Strava) en vez de
+ * una marca escrita a mano. Motivo (28-jul-2026): los ritmos prescritos salían solo de
+ * `runRefDistanceMeters/runRefTimeSeconds` del cuestionario. Si esa marca estaba vacía, el
+ * plan prescribía carreras SIN ritmo objetivo aunque hubiera decenas de carreras reales
+ * guardadas con ritmo y FC; y si el usuario mejoraba, seguía prescribiendo sobre la marca
+ * vieja hasta que la reescribiera a mano.
+ *
+ * Usa Riegel sobre el MEJOR esfuerzo real (mismo criterio que predictRaceTimeFromRuns, que
+ * ya se usaba para la predicción del chat). `minKm` descarta rodajes muy cortos, donde el
+ * ritmo medio no representa capacidad.
+ *
+ * Devuelve { p5SecPerKm, basedOn } o null si no hay ninguna carrera utilizable.
+ */
+export function estimate5kPaceFromRuns(runs, { minKm = 3, maxAgeDays = 120, now = new Date() } = {}) {
+  const cutoff = new Date(now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date());
+  cutoff.setUTCDate(cutoff.getUTCDate() - Math.max(1, Number(maxAgeDays) || 120));
+  const cutoffIso = cutoff.toISOString();
+  // Una marca de hace un año no describe la forma de hoy: se descarta por antigüedad.
+  const fresh = (Array.isArray(runs) ? runs : []).filter((w) => String(w?.performedAt || '') >= cutoffIso);
+  const best = predictRaceTimeFromRuns({ distanceMeters: 5000, runs: fresh, minKm });
+  if (!best) return null;
+  return { p5SecPerKm: Math.round(best.seconds / 5), basedOn: best.basedOn };
+}
+
+/**
+ * ¿La marca escrita a mano se ha quedado atrás respecto a lo que dicen las carreras reales?
+ * No cambia nada por su cuenta: devuelve un aviso para que lo decida la persona. El umbral
+ * de 15 s/km evita avisar por ruido (un día bueno, una bajada, un GPS optimista).
+ */
+export const STALE_PACE_THRESHOLD_SEC_PER_KM = 15;
+
+export function buildRunPaceNotice({ manualP5SecPerKm, runsEstimate }) {
+  const manual = toNum(manualP5SecPerKm);
+  const real = toNum(runsEstimate?.p5SecPerKm);
+  if (!Number.isFinite(manual) || !Number.isFinite(real)) return null;
+  const gain = manual - real; // positivo = corres MÁS rápido que tu marca
+  if (gain < STALE_PACE_THRESHOLD_SEC_PER_KM) return null;
+  return {
+    kind: 'stale_manual_ref',
+    manualPace: formatPace(manual),
+    realPace: formatPace(real),
+    gainSecPerKm: Math.round(gain),
+    basedOn: runsEstimate.basedOn,
+    // formatPace ya devuelve el sufijo "/km": no se repite.
+    message: `Tus carreras dicen que ahora corres a ${formatPace(real)} en 5K, ${Math.round(gain)} s/km más rápido que la marca que tienes guardada (${formatPace(manual)}). `
+      + 'Los ritmos del plan siguen calculados con la marca guardada: actualízala en tu perfil para que el plan use tu forma actual.',
+  };
+}
+
 // Desfases (s/km) respecto al ritmo de 5K para cada tipo de sesión (aprox. Daniels).
 const PACE_OFFSETS = {
   reps: -18,        // repeticiones cortas / técnica veloz

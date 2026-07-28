@@ -1,4 +1,5 @@
 import { GoalType } from '../domain/models.js';
+import { estimate5kPaceFromRuns } from './running.js';
 
 function toNumber(value, fallback = null) {
   if (value == null || value === '') return fallback;
@@ -86,6 +87,17 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     const date = normalizeDate(entry.takenAt || entry.createdAt || entry.date);
     return date && date >= since && date <= nowDate;
   });
+
+  // Carreras utilizables para deducir el ritmo de referencia: distancia y duración reales.
+  // Se toman de TODOS los entrenos recibidos, no de la ventana de 21 días: una referencia de
+  // forma física necesita más historia que una señal de fatiga (el propio estimador acota la
+  // antigüedad). No exige pulsómetro: el ritmo se calcula con distancia y tiempo.
+  const runsForPace = (Array.isArray(workouts) ? workouts : []).filter((w) => (
+    w?.source === 'strava'
+    && /run|carrera|trail/i.test(String(w.sportType || ''))
+    && toNumber(w.distanceKm) > 0
+    && toNumber(w.durationMinutes) > 0
+  ));
 
   const subjectiveWorkouts = recentWorkouts.filter((workout) => workout.checkinSkipped !== true);
   const sessionRpes = subjectiveWorkouts
@@ -220,6 +232,13 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
       baselineAvgHr: baseRunHr.length ? Math.round(median(baseRunHr)) : null,
       hrDriftBpm,
       hrSignal,
+    },
+    // Ritmo de referencia deducido de las carreras REALES. El planner lo usa como respaldo
+    // cuando no hay marca manual, y para avisar si la marca guardada se quedó atrás. Se
+    // calcula aquí porque este módulo ya recibe los entrenos y ya es "lo que dicen los datos".
+    running: {
+      paceRefFromRuns: estimate5kPaceFromRuns(runsForPace, { now: nowDate }),
+      runsWithPace: runsForPace.length,
     },
     inactivity: {
       daysSinceLastDone,

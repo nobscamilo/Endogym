@@ -24,6 +24,7 @@ import {
   weeksToRace,
   carbStrategyForDay,
   stepDownRunFocus,
+  buildRunPaceNotice,
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
@@ -1188,8 +1189,17 @@ export function generateWeeklyPlan({
 
   // Objetivo de carrera + ritmos derivados de una marca reciente (si la hay).
   const raceGoal = resolveRaceGoal(profile.runRaceGoal);
-  const p5 = estimate5kPaceSecPerKm(profile.runRefDistanceMeters, profile.runRefTimeSeconds);
+  // Ritmos de referencia. Prioridad: la marca que la persona escribió a mano (es su dato
+  // declarado y puede reflejar un test controlado); si no la hay, se deduce de sus carreras
+  // REALES. Antes solo existía la primera vía: sin marca, el plan prescribía carreras sin
+  // ningún ritmo objetivo aunque hubiera decenas de carreras sincronizadas de Strava.
+  const manualP5 = estimate5kPaceSecPerKm(profile.runRefDistanceMeters, profile.runRefTimeSeconds);
+  const runsEstimate = progressMemory?.running?.paceRefFromRuns || null;
+  const p5 = manualP5 ?? (runsEstimate?.p5SecPerKm ?? null);
   const runPaces = deriveRunPaces(p5);
+  const runPacesSource = manualP5 ? 'manual' : (runsEstimate?.p5SecPerKm ? 'strava' : null);
+  // Aviso (no cambia nada solo): la marca guardada se ha quedado por detrás de la realidad.
+  const runPacesNotice = buildRunPaceNotice({ manualP5SecPerKm: manualP5, runsEstimate });
 
   // Periodización: fase de la semana (por fecha de carrera si la hay, si no ciclo rodante).
   const weekStartISO = start.toISOString();
@@ -1370,6 +1380,8 @@ export function generateWeeklyPlan({
     trainingModality: modality,
     raceGoal,
     runPaces: pacesSummary(runPaces),
+    runPacesSource,
+    runPacesNotice,
     phase: trainingPhase,
     phaseLabel: phaseParams.label,
     weeksToRace: wtr,
