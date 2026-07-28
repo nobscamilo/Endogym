@@ -28,7 +28,7 @@ function applyCoachAdjustments(days, adjustments) {
   return applied;
 }
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
-import { recordAiMetric } from '../../../lib/aiMetrics.js';
+import { recordAiMetric, fallbackReasonField } from '../../../lib/aiMetrics.js';
 import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 import { evaluatePreparticipationScreening } from '../../../core/screening.js';
 import { normalizeExerciseHistoryKey, resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
@@ -649,6 +649,8 @@ export async function POST(request) {
       await recordAiMetric('weekly-plan', {
         calls: Math.max(1, Number(coachMeta?.attempts) || 1),
         fallbacks: coachMeta?.fallbackApplied ? 1 : 0,
+        // POR QUÉ cayó, no solo QUE cayó: el motivo vivía en un log de 1 h de retención.
+        ...(coachMeta?.fallbackApplied ? { [fallbackReasonField(coachMeta?.failureCode)]: 1 } : {}),
         ...(coachMeta?.usage || {}),
       }).catch(() => {});
       await recordUserAiSpend(user.uid, coachMeta?.usage || {});

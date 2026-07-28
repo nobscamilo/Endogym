@@ -314,7 +314,20 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
       }
 
       const sanitized = sanitizeCoachPayload(parsed);
-      validateCoachPayload(sanitized);
+      try {
+        validateCoachPayload(sanitized);
+      } catch (error) {
+        // Código propio: un JSON que parsea pero llega vacío de ajustes NO es lo mismo que un
+        // timeout ni que un 5xx, y antes los tres acababan como GEMINI_COACH_RUNTIME_ERROR.
+        // Sin distinguirlos, el 48% de fallback del plan semanal no se podía diagnosticar.
+        throw new GeminiCoachError(`Respuesta del coach incompleta: ${error.message}`, {
+          code: 'GEMINI_COACH_INVALID_PAYLOAD',
+          attempt,
+          maxAttempts,
+          model,
+          cause: error,
+        });
+      }
 
       return {
         ...sanitized,
@@ -335,19 +348,30 @@ export async function callGeminiExerciseCoach({ profile, weeklyPlan, traceId, cl
         },
       };
     } catch (error) {
+      // Un AbortError aquí SIEMPRE es nuestro propio timeout (el AbortController del
+      // transporte): merece código propio, porque "el modelo tardó demasiado" se arregla
+      // subiendo el presupuesto y "el modelo devolvió basura" no.
+      const isTimeout = error?.name === 'AbortError' || /aborted|timeout/i.test(error?.message || '');
       const normalizedError = error instanceof GeminiCoachError
         ? error
-        : new GeminiCoachError(`Fallo en llamada a coach IA: ${error?.message || 'error desconocido'}`, {
-          code: 'GEMINI_COACH_RUNTIME_ERROR',
-          attempt,
-          maxAttempts,
-          model,
-          cause: error,
-        });
+        : new GeminiCoachError(
+          isTimeout
+            ? `Timeout de la llamada al coach IA tras ${timeoutMs} ms de presupuesto por intento.`
+            : `Fallo en llamada a coach IA: ${error?.message || 'error desconocido'}`,
+          {
+            code: isTimeout ? 'GEMINI_COACH_TIMEOUT' : 'GEMINI_COACH_RUNTIME_ERROR',
+            attempt,
+            maxAttempts,
+            model,
+            cause: error,
+          }
+        );
 
       const retriableByCode =
         normalizedError.code === 'GEMINI_COACH_HTTP_RETRIABLE'
         || normalizedError.code === 'GEMINI_COACH_PARSE_ERROR'
+        || normalizedError.code === 'GEMINI_COACH_TIMEOUT'
+        || normalizedError.code === 'GEMINI_COACH_INVALID_PAYLOAD'
         || normalizedError.code === 'GEMINI_COACH_RUNTIME_ERROR';
 
       // No reintentar si no queda presupuesto útil: un segundo intento truncado por el

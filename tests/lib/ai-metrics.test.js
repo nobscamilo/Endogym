@@ -19,7 +19,7 @@ vi.mock('../../src/lib/firebaseAdmin.js', () => ({
   }),
 }));
 
-const { recordAiMetric, tokensFromGeminiResponse, addTokenUsage } = await import('../../src/lib/aiMetrics.js');
+const { recordAiMetric, tokensFromGeminiResponse, addTokenUsage, fallbackReasonField } = await import('../../src/lib/aiMetrics.js');
 
 describe('aiMetrics — observabilidad de IA (20-jul-2026)', () => {
   beforeEach(() => {
@@ -71,5 +71,24 @@ describe('aiMetrics — observabilidad de IA (20-jul-2026)', () => {
       { tokensIn: 950, tokensOut: 620, tokensThink: 10, tokensCached: 500 },
     );
     expect(total).toEqual({ tokensIn: 1850, tokensOut: 1220, tokensThink: 10, tokensCached: 500 });
+  });
+
+  it('fallbackReasonField traduce cada codigo de fallo a su contador', async () => {
+    expect(fallbackReasonField('GEMINI_COACH_TIMEOUT')).toBe('fbTimeout');
+    expect(fallbackReasonField('GEMINI_COACH_HTTP_RETRIABLE')).toBe('fbHttp');
+    expect(fallbackReasonField('GEMINI_COACH_HTTP_ERROR')).toBe('fbHttp');
+    expect(fallbackReasonField('GEMINI_COACH_PARSE_ERROR')).toBe('fbParse');
+    expect(fallbackReasonField('GEMINI_COACH_INVALID_PAYLOAD')).toBe('fbInvalid');
+    expect(fallbackReasonField('GEMINI_COACH_NOT_CONFIGURED')).toBe('fbNotConfigured');
+    // Un codigo desconocido no se pierde: cae en fbOther, nunca en undefined.
+    expect(fallbackReasonField('LO_QUE_SEA')).toBe('fbOther');
+    expect(fallbackReasonField(undefined)).toBe('fbOther');
+  });
+
+  it('los contadores de motivo pasan el filtro de campos permitidos', async () => {
+    await recordAiMetric('weekly-plan', { fallbacks: 1, fbTimeout: 1 });
+    const arg = mocks.update.mock.calls[0][0];
+    expect(arg['weekly-plan.fbTimeout']).toEqual({ __inc: 1 });
+    expect(arg['weekly-plan.fallbacks']).toEqual({ __inc: 1 });
   });
 });

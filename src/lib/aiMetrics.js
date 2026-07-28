@@ -15,7 +15,31 @@ import { getAdminServices } from './firebaseAdmin.js';
 
 // `truncated`: respuestas cortadas por maxOutputTokens (si sube de forma sostenida, el
 // tope de salida se está quedando corto y hay que revisarlo, no seguir recortando frases).
-const FIELDS = new Set(['calls', 'errors', 'fallbacks', 'redFlags', 'truncated', 'feedbackUp', 'feedbackDown', 'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached']);
+//
+// `fb*`: POR QUÉ cayó al heurístico. El motivo solo iba a los logs, y en plan Hobby duran
+// UNA HORA: cuando el 25-jul-2026 vimos un 48% de fallback en el plan semanal, la causa ya
+// no existía en ningún sitio y hubo que reproducirla a mano. Un contador por motivo
+// sobrevive, y convierte "cae al heurístico" en "cae por timeout" sin arqueología.
+const FIELDS = new Set([
+  'calls', 'errors', 'fallbacks', 'redFlags', 'truncated', 'feedbackUp', 'feedbackDown',
+  'fbTimeout', 'fbHttp', 'fbParse', 'fbInvalid', 'fbNotConfigured', 'fbBudget', 'fbOther',
+  'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached',
+]);
+
+// Traduce el código de GeminiCoachError al contador correspondiente.
+export function fallbackReasonField(failureCode) {
+  switch (String(failureCode || '')) {
+    case 'GEMINI_COACH_TIMEOUT': return 'fbTimeout';
+    case 'GEMINI_COACH_HTTP_RETRIABLE':
+    case 'GEMINI_COACH_HTTP_ERROR': return 'fbHttp';
+    case 'GEMINI_COACH_PARSE_ERROR': return 'fbParse';
+    case 'GEMINI_COACH_INVALID_PAYLOAD': return 'fbInvalid';
+    case 'GEMINI_COACH_NOT_CONFIGURED':
+    case 'GEMINI_COACH_INVALID_MODEL': return 'fbNotConfigured';
+    case 'AI_BUDGET_EXHAUSTED': return 'fbBudget';
+    default: return 'fbOther';
+  }
+}
 
 export async function recordAiMetric(endpoint, fields = {}) {
   try {

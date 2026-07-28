@@ -330,4 +330,32 @@ describe('gemini model routing', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sanitizeGoogleAiModelNameForLog(process.env.GEMINI_MODEL_COACH)).toBe('<invalid-model>');
   });
+
+  it('un timeout del transporte se marca como GEMINI_COACH_TIMEOUT, no como error generico', async () => {
+    process.env.GEMINI_COACH_MAX_RETRIES = '0';
+    const abort = new Error('The operation was aborted');
+    abort.name = 'AbortError';
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abort));
+
+    await expect(callGeminiExerciseCoach({
+      profile: { sex: 'male', age: 30, weightKg: 75, heightCm: 175, activityLevel: 'moderate' },
+      weeklyPlan: { goal: 'strength', trainingModality: 'full_gym', metabolicProfile: 'none', days: [] },
+    })).rejects.toMatchObject({ code: 'GEMINI_COACH_TIMEOUT' });
+  });
+
+  it('una respuesta sin ajustes accionables se marca como GEMINI_COACH_INVALID_PAYLOAD', async () => {
+    process.env.GEMINI_COACH_MAX_RETRIES = '0';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+        coachSummary: 'Resumen', acsmJustification: 'FITT', prescriptionAdjustments: [],
+        riskFlags: [], medicalDisclaimer: 'Educativo',
+      }) }] } }] }),
+    }));
+
+    await expect(callGeminiExerciseCoach({
+      profile: { sex: 'male', age: 30, weightKg: 75, heightCm: 175, activityLevel: 'moderate' },
+      weeklyPlan: { goal: 'strength', trainingModality: 'full_gym', metabolicProfile: 'none', days: [] },
+    })).rejects.toMatchObject({ code: 'GEMINI_COACH_INVALID_PAYLOAD' });
+  });
 });

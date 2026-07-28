@@ -16,7 +16,11 @@
 import { getAdminServices } from '../src/lib/firebaseAdmin.js';
 
 const PRICES = { in: 0.30 / 1e6, out: 2.50 / 1e6, cached: 0.075 / 1e6 };
-const COUNTERS = ['calls', 'errors', 'fallbacks', 'redFlags', 'truncated', 'feedbackUp', 'feedbackDown', 'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached'];
+const COUNTERS = ['calls', 'errors', 'fallbacks', 'redFlags', 'truncated', 'feedbackUp', 'feedbackDown',
+  'fbTimeout', 'fbHttp', 'fbParse', 'fbInvalid', 'fbNotConfigured', 'fbBudget', 'fbOther',
+  'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached'];
+// Motivos del fallback, para que el aviso diga QUE hacer y no solo que algo va mal.
+const FB_REASONS = { fbTimeout: 'timeout', fbHttp: 'HTTP/cuota', fbParse: 'JSON ilegible', fbInvalid: 'respuesta incompleta', fbNotConfigured: 'sin configurar', fbBudget: 'freno de gasto', fbOther: 'otros' };
 
 // Umbrales de salud. El dinero no es lo único que conviene vigilar: entre junio y julio de
 // 2026 el plan semanal cayó al heurístico en más de la mitad de las llamadas durante semanas
@@ -78,8 +82,8 @@ for (const { day, data } of days) {
   for (const [ep, m] of Object.entries(byEp)) {
     const c = costOf(m);
     dayCost += c;
-    totals[ep] = totals[ep] || { calls: 0, tokensIn: 0, tokensOut: 0, tokensThink: 0, tokensCached: 0, errors: 0, fallbacks: 0, truncated: 0, feedbackUp: 0, feedbackDown: 0, cost: 0 };
-    for (const k of ['calls', 'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached', 'errors', 'fallbacks', 'truncated', 'feedbackUp', 'feedbackDown']) totals[ep][k] += m[k] || 0;
+    totals[ep] = totals[ep] || Object.fromEntries([...COUNTERS.map((k) => [k, 0]), ['cost', 0]]);
+    for (const k of COUNTERS) totals[ep][k] += m[k] || 0;
     totals[ep].cost += c;
     parts.push(`${ep} $${c.toFixed(4)} (c${m.calls || 0}${m.tokensThink ? ` think${m.tokensThink}` : ''}${m.fallbacks ? ` fb${m.fallbacks}` : ''})`);
   }
@@ -125,7 +129,14 @@ for (const [ep, t] of rows) {
   );
   if (t.calls < THRESHOLDS.minSample) continue;
   if (t.fallbacks / t.calls > THRESHOLDS.fallbackRate) {
-    alerts.push(`${ep}: ${pct(t.fallbacks, t.calls)} de fallback heurístico — el flujo ha dejado de ser IA para esa fracción de usuarios`);
+    // El motivo dominante convierte el aviso en una instrucción: un timeout se arregla con
+    // presupuesto, un 429 con cuota y una respuesta incompleta tocando el prompt.
+    const motivos = Object.entries(FB_REASONS)
+      .filter(([k]) => t[k] > 0)
+      .sort((a, b) => t[b[0]] - t[a[0]])
+      .map(([k, label]) => `${label} ${t[k]}`);
+    const detalle = motivos.length ? ` · motivos: ${motivos.join(', ')}` : ' · motivo no registrado (deploy anterior al 26-jul-2026)';
+    alerts.push(`${ep}: ${pct(t.fallbacks, t.calls)} de fallback heurístico — el flujo ha dejado de ser IA para esa fracción de usuarios${detalle}`);
   }
   if (t.errors / t.calls > THRESHOLDS.errorRate) {
     alerts.push(`${ep}: ${pct(t.errors, t.calls)} de errores`);

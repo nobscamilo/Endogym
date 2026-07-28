@@ -72,6 +72,7 @@ vi.mock('../../src/services/exerciseCoachClient.js', () => ({
 // FASE 3.6 — métricas best-effort anuladas en tests.
 vi.mock('../../src/lib/aiMetrics.js', () => ({
   recordAiMetric: mocks.recordAiMetric,
+  fallbackReasonField: (code) => (code === 'GEMINI_COACH_TIMEOUT' ? 'fbTimeout' : 'fbOther'),
   tokensFromGeminiResponse: (data) => {
     const u = data?.usageMetadata || {};
     return { tokensIn: Number(u.promptTokenCount) || 0, tokensOut: Number(u.candidatesTokenCount) || 0, tokensThink: Number(u.thoughtsTokenCount) || 0, tokensCached: Number(u.cachedContentTokenCount) || 0 };
@@ -485,6 +486,9 @@ describe('/api/weekly-plan route', () => {
       tokensIn: 9100,
       tokensOut: 1200,
     }));
+    // Un éxito NO debe apuntar ningún contador de motivo de fallback.
+    const metric = mocks.recordAiMetric.mock.calls.at(-1)[1];
+    expect(Object.keys(metric).some((k) => k.startsWith('fb'))).toBe(false);
   });
 
   it('applies only bounded structured Gemini adjustments to existing strength exercises', async () => {
@@ -621,6 +625,11 @@ describe('/api/weekly-plan route', () => {
     expect(json.plan.coachMeta.fallbackApplied).toBe(true);
     expect(json.plan.coachMeta.attempts).toBe(3);
     expect(json.plan.coachWarning).toContain('GEMINI_COACH_RUNTIME_ERROR');
+    // El motivo del fallback tiene que quedar en la métrica: los logs de Vercel duran 1 h
+    // en plan Hobby, así que sin esto la causa se pierde (pasó con el 48% de julio).
+    const fbMetric = mocks.recordAiMetric.mock.calls.at(-1)[1];
+    expect(fbMetric.fallbacks).toBe(1);
+    expect(Object.keys(fbMetric).some((k) => k.startsWith('fb') && k !== 'fallbacks')).toBe(true);
   });
 
   it('PATCH validates planId before persisting customizations', async () => {
