@@ -593,6 +593,10 @@ const GOALS_WITH_TARGET = AV_GOALS.filter((g) => g.targetLabel).map((g) => g.val
 const AV_EQUIP = [
   { value: 'full_gym', title: 'Gimnasio', icon: 'dumbbell', detail: 'Máquinas, poleas y básicos' },
   { value: 'hybrid_run_gym', title: 'Correr + gym', icon: 'heart', detail: 'Fuerza y carrera concurrente' },
+  // "Solo correr" NO es carrera y nada más: la plantilla del planner incluye una sesión de
+  // fuerza preventiva por semana (ACSM la recomienda para reducir lesiones en corredores).
+  // El detalle lo dice para no vender una cosa y entregar otra.
+  { value: 'running', title: 'Solo correr', icon: 'heart', detail: 'Carrera + 1 fuerza preventiva' },
   { value: 'mixed', title: 'Flexible', icon: 'sliders', detail: 'Gym, casa y TRX' },
   { value: 'trx', title: 'TRX', icon: 'zap', detail: 'Suspensión y peso corporal' },
   { value: 'home', title: 'Casa', icon: 'profile', detail: 'Mínimo material' },
@@ -676,7 +680,10 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const selectedGoal = AV_GOALS.find((item) => item.value === goal) || null;
   const selectedModality = AV_EQUIP.find((item) => item.value === equip) || null;
   const targetEnabled = GOALS_WITH_TARGET.includes(goal);
-  const usesRace = equip === 'hybrid_run_gym';
+  // Quien solo corre tiene objetivo de carrera igual que quien combina: la pregunta de
+  // carrera no puede depender de que ademas vaya al gimnasio.
+  const RUN_MODALITIES = ['hybrid_run_gym', 'running'];
+  const usesRace = RUN_MODALITIES.includes(equip);
   const raceLabel = (RUN_GOALS.find(([v]) => v === raceGoal) || [null, 'Salud'])[1];
   const keyDate = usesRace && raceDate ? raceDate : (targetEnabled && goalDate ? goalDate : null);
 
@@ -872,7 +879,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
             ))}
           </div>
           {gear.length ? <p className="tiny muted" style={{ margin: '8px 0 0' }}>Si un ejercicio necesita algo que no marcaste, lo sustituimos por uno equivalente que sí puedas hacer.</p> : null}
-          {equip !== 'hybrid_run_gym' ? (
+          {!RUN_MODALITIES.includes(equip) ? (
             <>
               <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Formato híbrido</div>
               <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Fuerza en circuito con pulsaciones altas.</p>

@@ -94,6 +94,26 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     expect(patch.reentry.reason).toBe('otro');
   });
 
+  it('acepta la modalidad "solo correr" (la lista blanca la descartaba en silencio)', async () => {
+    await post(completeSurvey({ trainingModality: 'running', goal: 'endurance' }));
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.trainingModality).toBe('running');
+  });
+
+  it('la lista blanca de la encuesta cubre TODAS las modalidades que ofrece la UI', async () => {
+    // Si se añade una tarjeta a AV_EQUIP y no a MODALITIES, la encuesta la descarta sin
+    // avisar y el usuario acaba con otra modalidad. Este test ata las dos listas.
+    const fs = await import('node:fs');
+    const ui = fs.readFileSync('public/studio/app/studio/screen-more.jsx', 'utf8');
+    const bloque = ui.slice(ui.indexOf('const AV_EQUIP = ['), ui.indexOf('];', ui.indexOf('const AV_EQUIP = [')));
+    const ofrecidas = [...bloque.matchAll(/value: '([a-z_]+)'/g)].map((m) => m[1]);
+    expect(ofrecidas.length).toBeGreaterThanOrEqual(6);
+
+    const ruta = fs.readFileSync('src/app/api/studio-availability/route.js', 'utf8');
+    const aceptadas = ruta.slice(ruta.indexOf('const MODALITIES = new Set('), ruta.indexOf(');', ruta.indexOf('const MODALITIES = new Set(')));
+    for (const value of ofrecidas) expect(aceptadas).toContain(`'${value}'`);
+  });
+
   it('rechaza una encuesta incompleta en vez de completar el perfil con supuestos', async () => {
     const res = await post({ goal: 'strength', trainingModality: 'full_gym', daysPerWeek: 4 });
     const json = await res.json();

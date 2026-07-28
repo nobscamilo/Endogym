@@ -14,7 +14,10 @@ import {
 // Marca `studioAvailability: true` para que el planner honre la duración de forma segura.
 
 const GOALS = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'endurance', 'glycemic_control']);
-const MODALITIES = new Set(['full_gym', 'home', 'trx', 'mixed', 'hybrid_run_gym']);
+// Debe coincidir con AV_EQUIP de screen-more.jsx. Si falta una, la encuesta la descarta EN
+// SILENCIO y el usuario acaba con otra modalidad sin enterarse: eso le pasaba a `running`,
+// que el planner soporta desde siempre (MODALITY_TEMPLATES) pero la encuesta no dejaba pasar.
+const MODALITIES = new Set(['full_gym', 'home', 'trx', 'mixed', 'hybrid_run_gym', 'running']);
 const RACE_GOALS = new Set(['health', 'race_5k', 'race_10k', 'race_21k', 'race_42k']);
 const TRAINING_EXPERIENCE = new Set(['novice', 'intermediate', 'advanced']);
 const ACTIVITY_LEVELS = new Set(['sedentary', 'light', 'moderate', 'high']);
