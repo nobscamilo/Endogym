@@ -1,6 +1,7 @@
 import { logError, logInfo } from '../../../../lib/logger.js';
 import { ensureFreshToken, mapActivityToWorkout } from '../../../../services/stravaClient.js';
-import { getUserByStravaAthlete, saveStravaConnection, createWorkout } from '../../../../lib/repositories/firestoreRepository.js';
+import { getUserProfile, getUserByStravaAthlete, saveStravaConnection, createWorkout } from '../../../../lib/repositories/firestoreRepository.js';
+import { resolveHrMax } from '../../../../core/running.js';
 
 function verifyToken() {
   return process.env.STRAVA_VERIFY_TOKEN || process.env.STRAVA_STATE_SECRET || 'ignios-strava';
@@ -37,7 +38,12 @@ export async function POST(request) {
         });
         if (r.ok) {
           const a = await r.json();
-          await createWorkout(found.uid, mapActivityToWorkout(a));
+          // El webhook pide la actividad DETALLADA, así que aquí sí llega `perceived_exertion`
+          // (RPE que la persona pone en Strava). Con la FCmáx del perfil, además se estima el
+          // esfuerzo cuando no lo ha puesto: el motor adaptativo deja de depender del check-in.
+          const profile = await getUserProfile(found.uid).catch(() => null);
+          const hrMax = resolveHrMax({ profile: profile || {} })?.hrMax ?? null;
+          await createWorkout(found.uid, mapActivityToWorkout(a, { hrMax }));
           logInfo('strava_webhook_import', { userId: found.uid, activityId: body.object_id });
         }
       }

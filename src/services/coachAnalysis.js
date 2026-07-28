@@ -173,11 +173,18 @@ export function describeWorkout(w) {
   const dist = posNum(w.distanceKm);
   const hr = posNum(w.avgHeartRate);
   const hrMax = posNum(w.maxHeartRate);
+  // El RPE estimado por FC (actividades de Strava sin check-in) también informa al coach,
+  // pero SIEMPRE etiquetado: una estimación poblacional no es la percepción de esta persona,
+  // y el coach no puede citarla como si se la hubiera contado.
   const rpe = posNum(w.sessionRpe);
+  const rpeEst = rpe == null ? posNum(w.sessionRpeEstimated) : null;
+  const relEffort = posNum(w.relativeEffort);
   if (dur) parts.push(`${Math.round(dur)} min`);
   if (dist) parts.push(`${dist} km`);
   if (hr) parts.push(`FC media ${hr}${hrMax ? ` (máx ${hrMax})` : ''} ppm`);
   if (rpe) parts.push(`RPE ${rpe}/10`);
+  else if (rpeEst) parts.push(`RPE ~${rpeEst}/10 (estimado por FC, no reportado)`);
+  if (relEffort) parts.push(`carga Strava ${relEffort}`);
   if (Array.isArray(w.exercises) && w.exercises.length) {
     const lifts = w.exercises
       .filter((e) => e?.name && Number.isFinite(Number(e.weightKg)))

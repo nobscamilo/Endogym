@@ -756,7 +756,11 @@ export function mapProgress(metrics, workouts, plan, profile = null, todayKey = 
   for (let i = 6; i >= 0; i -= 1) {
     const key = addDaysToDateKey(todayKey, -i);
     const w = wlist.find((x) => String(x.performedAt || '').slice(0, 10) === key);
-    strain.push(w && Number.isFinite(Number(w.sessionRpe)) ? Number(w.sessionRpe) : 0);
+    // El esfuerzo estimado por FC de las actividades de Strava también dibuja: si no, quien
+    // entrena sin check-in veía la gráfica de carga siempre a cero teniendo entrenos reales.
+    const rpe = Number.isFinite(Number(w?.sessionRpe)) ? Number(w.sessionRpe)
+      : (Number.isFinite(Number(w?.sessionRpeEstimated)) ? Number(w.sessionRpeEstimated) : 0);
+    strain.push(w ? rpe : 0);
   }
   out.strain = strain.some((v) => v > 0) ? strain : [];
 

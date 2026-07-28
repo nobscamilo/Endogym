@@ -100,8 +100,13 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
   ));
 
   const subjectiveWorkouts = recentWorkouts.filter((workout) => workout.checkinSkipped !== true);
+  // Esfuerzo de cada sesión. Prioridad: el REPORTADO (check-in o RPE puesto en Strava);
+  // si no lo hay, el ESTIMADO por FC de la actividad importada. Antes solo contaba el
+  // reportado, así que quien entrena y sincroniza por Strava sin rellenar el check-in dejaba
+  // `avgSessionRpe` en null y el motor caía a su valor por defecto (6.5): la regla de fatiga
+  // alta no podía dispararse nunca con datos reales.
   const sessionRpes = subjectiveWorkouts
-    .map((workout) => toNumber(workout.sessionRpe))
+    .map((workout) => toNumber(workout.sessionRpe) ?? toNumber(workout.sessionRpeEstimated))
     .filter((value) => value != null);
   const fatigueScores = subjectiveWorkouts
     .map((workout) => toNumber(workout.fatigue))
@@ -204,6 +209,10 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     metrics: {
       completionRate: completionRate == null ? null : Number(completionRate.toFixed(2)),
       avgSessionRpe: avgSessionRpe == null ? null : Number(avgSessionRpe.toFixed(2)),
+      // Cuántos de esos esfuerzos son estimados por FC y no reportados por la persona: quien
+      // lo muestre debe poder decirlo, no presentarlo como percepción declarada.
+      rpeReportedCount: subjectiveWorkouts.filter((w) => toNumber(w.sessionRpe) != null).length,
+      rpeEstimatedCount: subjectiveWorkouts.filter((w) => toNumber(w.sessionRpe) == null && toNumber(w.sessionRpeEstimated) != null).length,
       avgFatigue: avgFatigue == null ? null : Number(avgFatigue.toFixed(2)),
       avgSleepHours: avgSleepHours == null ? null : Number(avgSleepHours.toFixed(2)),
       avgNutritionAdherence: avgNutritionAdherence == null ? null : Number(avgNutritionAdherence.toFixed(2)),

@@ -48,6 +48,32 @@ export function estimate5kPaceSecPerKm(refDistanceMeters, refTimeSeconds) {
 }
 
 /**
+ * Esfuerzo (RPE 0-10) ESTIMADO a partir del % de la FC máxima.
+ *
+ * Por qué existe (28-jul-2026): el motor adaptativo se mueve con `sessionRpe`, que solo
+ * llegaba del check-in manual. Quien entrena y sincroniza por Strava sin rellenar el
+ * check-in dejaba el motor ciego de esfuerzo: `avgSessionRpe` caía a su valor por defecto
+ * (6.5) y la regla de fatiga alta no podía dispararse nunca con datos reales.
+ *
+ * Aproximación de la relación FC–RPE: RPE ≈ (%FCmáx − 50) / 5, acotado a 1-10. Da 2 al 60%,
+ * 4 al 70%, 6 al 80%, 8 al 90% y 10 al 100%, que es el orden de magnitud habitual de las
+ * tablas de Borg CR10 frente a %FCmáx.
+ *
+ * NO es un RPE reportado y no debe presentarse como tal: es una estimación poblacional, no
+ * la percepción de esta persona. Por eso se guarda en un campo aparte
+ * (`sessionRpeEstimated`) y quien lo consume debe decir que es estimado.
+ */
+export function estimateSessionRpeFromHr({ avgHeartRate, hrMax }) {
+  const hr = toNum(avgHeartRate);
+  const max = toNum(hrMax);
+  if (!Number.isFinite(hr) || !Number.isFinite(max) || max < 120 || hr <= 0) return null;
+  const pct = (hr / max) * 100;
+  if (pct < 35 || pct > 115) return null; // fuera de rango fisiológico creíble: mejor nada
+  const rpe = (pct - 50) / 5;
+  return Math.round(Math.min(10, Math.max(1, rpe)) * 10) / 10;
+}
+
+/**
  * Mismo ritmo de referencia de 5K, pero deducido de las CARRERAS REALES (Strava) en vez de
  * una marca escrita a mano. Motivo (28-jul-2026): los ritmos prescritos salían solo de
  * `runRefDistanceMeters/runRefTimeSeconds` del cuestionario. Si esa marca estaba vacía, el
@@ -334,6 +360,27 @@ export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal }) {
 export function hrMaxFromAge(age) {
   const a = Number(age);
   return Number.isFinite(a) && a > 0 ? Math.round(208 - 0.7 * a) : null;
+}
+
+/**
+ * FCmáx a usar para este perfil, con su procedencia. Prioridad: la medida por la persona
+ * (si es plausible), luego la máxima realmente observada en sus carreras, y por último la
+ * estimación por edad (Tanaka). Devuelve { hrMax, source } o null.
+ *
+ * Centralizado el 28-jul-2026: la misma cascada estaba escrita a mano en coach-chat y hacía
+ * falta otra vez en el sync de Strava. Dos copias de una regla clínica es una de más.
+ */
+export function resolveHrMax({ profile = {}, observedMaxHr = null } = {}) {
+  const manual = toNum(profile?.hrMaxBpm);
+  const observed = toNum(observedMaxHr);
+  if (Number.isFinite(manual) && manual >= 120) {
+    // Si la persona ya ha superado su máxima declarada, manda lo observado: el corazón no miente.
+    const hrMax = Number.isFinite(observed) ? Math.max(manual, observed) : manual;
+    return { hrMax, source: hrMax > manual ? 'observada' : 'medida por el usuario' };
+  }
+  if (Number.isFinite(observed) && observed >= 120) return { hrMax: observed, source: 'observada' };
+  const byAge = hrMaxFromAge(profile?.age);
+  return byAge ? { hrMax: byAge, source: 'estimada por edad' } : null;
 }
 
 // Zona por % de FC máx (modelo de 5 zonas).

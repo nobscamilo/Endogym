@@ -4,6 +4,7 @@
 // con HMAC para atar el callback al usuario autenticado sin almacenar nada temporal.
 
 import crypto from 'node:crypto';
+import { estimateSessionRpeFromHr } from '../core/running.js';
 
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
@@ -93,13 +94,30 @@ export async function getActivities(accessToken, { afterEpoch, perPage = 30 } = 
   return res.json();
 }
 
-// Mapea una actividad de Strava a un payload de workout de Ignios.
-export function mapActivityToWorkout(a) {
+// Tipos de sesión que Strava permite etiquetar en una carrera. Saber que una actividad fue
+// una CARRERA de verdad (no un rodaje) cambia cómo debe leerse su esfuerzo y su ritmo.
+const RUN_WORKOUT_TYPES = { 0: 'default', 1: 'race', 2: 'long_run', 3: 'workout' };
+
+/**
+ * Mapea una actividad de Strava a un payload de workout de Ignios.
+ *
+ * `hrMax` es opcional: si se pasa, se calcula además un RPE ESTIMADO por frecuencia
+ * cardiaca. Se guarda en `sessionRpeEstimated`, nunca en `sessionRpe`, porque ese campo
+ * está reservado al esfuerzo que la persona REPORTA en el check-in. Mezclarlos convertiría
+ * una estimación poblacional en un dato personal declarado.
+ */
+export function mapActivityToWorkout(a, { hrMax = null } = {}) {
   const distanceKm = a.distance ? Math.round((a.distance / 1000) * 100) / 100 : null;
   const movingMin = a.moving_time ? Math.round(a.moving_time / 60) : null;
   const avgPaceSecPerKm = (a.distance && a.moving_time && a.distance > 0)
     ? Math.round(a.moving_time / (a.distance / 1000))
     : null;
+  const avgHeartRate = Number.isFinite(a.average_heartrate) ? Math.round(a.average_heartrate) : null;
+  // `perceived_exertion` es RPE REPORTADO por la persona en Strava (0-10). Si existe, vale
+  // tanto como el del check-in: es su percepción, no una estimación nuestra.
+  const reportedRpe = Number.isFinite(a.perceived_exertion) ? Math.round(a.perceived_exertion * 10) / 10 : null;
+  const estimatedRpe = estimateSessionRpeFromHr({ avgHeartRate, hrMax });
+
   return {
     source: 'strava',
     stravaId: a.id,
@@ -108,9 +126,18 @@ export function mapActivityToWorkout(a) {
     performedAt: a.start_date || new Date().toISOString(),
     durationMinutes: movingMin,
     distanceKm,
-    avgHeartRate: Number.isFinite(a.average_heartrate) ? Math.round(a.average_heartrate) : null,
+    avgHeartRate,
     maxHeartRate: Number.isFinite(a.max_heartrate) ? Math.round(a.max_heartrate) : null,
     avgPaceSecPerKm,
+    // Relative Effort de Strava (carga de la sesión por FC, su equivalente a TRIMP). Viene
+    // en la lista de actividades, sin llamada extra, y es el mejor dato de CARGA que da la API.
+    relativeEffort: Number.isFinite(a.suffer_score) ? Math.round(a.suffer_score) : null,
+    elevationGainM: Number.isFinite(a.total_elevation_gain) ? Math.round(a.total_elevation_gain) : null,
+    stravaWorkoutType: RUN_WORKOUT_TYPES[a.workout_type] || null,
+    // Esfuerzo: el reportado manda; el estimado va aparte y se etiqueta como tal.
+    sessionRpe: reportedRpe,
+    sessionRpeEstimated: reportedRpe == null ? estimatedRpe : null,
+    rpeSource: reportedRpe != null ? 'strava_reported' : (estimatedRpe != null ? 'hr_estimate' : null),
     completed: true,
   };
 }
