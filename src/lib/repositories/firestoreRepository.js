@@ -175,6 +175,14 @@ function buildWorkoutRecord({ ref, userId, payload, createdAt, updatedAt }) {
     avgPaceSecPerKm: safeNumber(payload.avgPaceSecPerKm),
     sportType: typeof payload.sportType === 'string' ? payload.sportType.slice(0, 40) : null,
     stravaActivityId: payload.stravaId != null ? String(payload.stravaId).slice(0, 40) : null,
+    // Esfuerzo y carga importados (28-jul-2026). OJO: esta lista es BLANCA — un campo que no
+    // esté aquí se descarta en silencio por mucho que lo produzca el mapeo de Strava.
+    relativeEffort: safeNumber(payload.relativeEffort),
+    elevationGainM: safeNumber(payload.elevationGainM),
+    // RPE ESTIMADO por FC: separado de sessionRpe (reportado) a propósito, nunca fusionarlos.
+    sessionRpeEstimated: safeNumber(payload.sessionRpeEstimated),
+    rpeSource: typeof payload.rpeSource === 'string' ? payload.rpeSource.slice(0, 24) : null,
+    stravaWorkoutType: typeof payload.stravaWorkoutType === 'string' ? payload.stravaWorkoutType.slice(0, 24) : null,
     createdAt,
     updatedAt,
   };

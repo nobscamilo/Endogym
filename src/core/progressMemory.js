@@ -69,6 +69,38 @@ function isDoneForInactivity(w) {
   return w.completed !== false;
 }
 
+
+// Kilometraje semanal real: la última semana y la media de las últimas 4. Se usa como base
+// de la progresión en km del plan (ver buildWeeklyKmTarget en running.js).
+function weeklyKmFromRuns(runs, nowDate) {
+  const km = (w) => toNumber(w.distanceKm) || 0;
+  const desde = (dias) => {
+    const d = new Date(nowDate);
+    d.setUTCDate(d.getUTCDate() - dias);
+    return d;
+  };
+  const enVentana = (dias) => runs.filter((w) => {
+    const d = normalizeDate(w.performedAt || w.createdAt);
+    return d && d >= desde(dias) && d <= nowDate;
+  });
+  const ultimaSemana = enVentana(7);
+  const cuatroSemanas = enVentana(28);
+  const total = (list) => Math.round(list.reduce((acc, w) => acc + km(w), 0) * 10) / 10;
+  const dosSemanas = enVentana(14);
+  const media4 = cuatroSemanas.length ? total(cuatroSemanas) / 4 : null;
+  const media2 = dosSemanas.length ? total(dosSemanas) / 2 : null;
+  // La base es la MAYOR de las dos medias. Con solo la de 4 semanas, alguien que acaba de
+  // subir el volumen (p. ej. de 3 a 22 km/semana) recibiría un plan muy por debajo de lo que
+  // ya está corriendo; con solo la última semana, un pico puntual fijaría el listón. La media
+  // de 2 semanas recoge la tendencia reciente sin que una sola semana mande.
+  const baseline = [media4, media2].filter((v) => v != null).reduce((a, b) => Math.max(a, b), 0);
+  return {
+    weeklyKm: ultimaSemana.length ? total(ultimaSemana) : null,
+    weeklyKmBaseline: baseline > 0 ? Math.round(baseline * 10) / 10 : null,
+    runsLast28d: cuatroSemanas.length,
+  };
+}
+
 export function buildProgressMemory({ workouts = [], meals = [], metrics = [], lookbackDays = 21, now = new Date(), lastDoneAtHint = null }) {
   const nowDate = normalizeDate(now) || new Date();
   const since = new Date(nowDate);
@@ -248,6 +280,10 @@ export function buildProgressMemory({ workouts = [], meals = [], metrics = [], l
     running: {
       paceRefFromRuns: estimate5kPaceFromRuns(runsForPace, { now: nowDate }),
       runsWithPace: runsForPace.length,
+      // Kilometraje REAL, para que el plan progrese en km y no solo en minutos. `baseline`
+      // es la media semanal de las últimas 4 semanas: una sola semana buena o mala no debe
+      // mover el volumen prescrito.
+      ...weeklyKmFromRuns(runsForPace, nowDate),
     },
     inactivity: {
       daysSinceLastDone,

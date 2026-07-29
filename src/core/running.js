@@ -47,6 +47,67 @@ export function estimate5kPaceSecPerKm(refDistanceMeters, refTimeSeconds) {
   return t5k / 5; // s/km
 }
 
+// --- Volumen en KILÓMETROS (28-jul-2026) -----------------------------------------------
+//
+// Hasta ahora el plan progresaba en MINUTOS: la plantilla fijaba 45/50/65 min y el volumen
+// se escalaba por fase y por el factor adaptativo. Para un objetivo de carrera, la variable
+// que de verdad manda es el kilometraje semanal, y era ciega a lo que la persona corría de
+// verdad (nadie leía `distanceKm`, que llega de Strava en cada actividad).
+//
+// Freno principal: la regla clásica del 10% — no subir el volumen semanal más de un 10%
+// respecto a la base reciente. Es la salvaguarda estándar contra lesión por sobrecarga.
+export const MAX_WEEKLY_KM_INCREASE = 0.10;
+
+// Reparto del kilometraje semanal por tipo de sesión. La tirada larga se lleva la mayor
+// parte; las sesiones de calidad son cortas en volumen aunque sean duras.
+const KM_SHARE_WEIGHTS = { long: 3.0, easy: 2.0, tempo: 1.6, intervals: 1.2, reps: 1.0, drills: 0.8 };
+
+// Ritmo con el que se traduce cada tipo de sesión a minutos (claves de PACE_OFFSETS).
+// `drills` no tiene ritmo propio: se cuenta al ritmo fácil.
+const PACE_KEY_BY_RUN_TYPE = { long: 'long', easy: 'easy', tempo: 'tempo', intervals: 'intervals', reps: 'reps', drills: 'easy' };
+
+/**
+ * Objetivo de kilómetros para la semana. Parte de la base REAL y sube como mucho un 10%,
+ * aplicando además el factor de fase (taper baja) y el adaptativo (fatiga baja).
+ * Devuelve null si no hay base suficiente: sin datos no se inventa volumen.
+ */
+export function buildWeeklyKmTarget({ baselineKm, runsLast28d = 0, volumeFactor = 1, phaseFactor = 1 }) {
+  const base = toNum(baselineKm);
+  // Menos de 3 carreras en 4 semanas no es una base: es ruido.
+  if (!Number.isFinite(base) || base <= 0 || runsLast28d < 3) return null;
+  const vf = Number.isFinite(toNum(volumeFactor)) ? toNum(volumeFactor) : 1;
+  const pf = Number.isFinite(toNum(phaseFactor)) ? toNum(phaseFactor) : 1;
+  // El tope del 10% se aplica SOBRE la base; los factores solo pueden recortar por encima
+  // de eso, nunca empujar por encima del tope.
+  const techo = base * (1 + MAX_WEEKLY_KM_INCREASE);
+  const objetivo = Math.min(techo, base * (1 + MAX_WEEKLY_KM_INCREASE) * vf * pf);
+  return Math.round(Math.max(base * 0.5, objetivo) * 10) / 10;
+}
+
+/**
+ * Reparte el objetivo semanal entre las sesiones de carrera de la plantilla y traduce cada
+ * trozo a minutos usando el ritmo prescrito de ese tipo de sesión, para que km y minutos
+ * digan lo mismo. Devuelve { [runType]: { km, minutes } } o null si falta información.
+ */
+export function distributeWeeklyKm({ weeklyKmTarget, runTypesInWeek, paces }) {
+  const total = toNum(weeklyKmTarget);
+  const tipos = Array.isArray(runTypesInWeek) ? runTypesInWeek.filter(Boolean) : [];
+  if (!Number.isFinite(total) || total <= 0 || !tipos.length || !paces) return null;
+
+  const pesoTotal = tipos.reduce((acc, t) => acc + (KM_SHARE_WEIGHTS[t] ?? 1), 0);
+  if (!pesoTotal) return null;
+
+  const out = {};
+  for (const tipo of new Set(tipos)) {
+    const peso = KM_SHARE_WEIGHTS[tipo] ?? 1;
+    const km = Math.round(((total * peso) / pesoTotal) * 10) / 10;
+    const ritmo = toNum(paces[PACE_KEY_BY_RUN_TYPE[tipo]] ?? paces.facil);
+    const minutes = Number.isFinite(ritmo) ? Math.round((km * ritmo) / 60) : null;
+    out[tipo] = { km, minutes };
+  }
+  return out;
+}
+
 /**
  * Esfuerzo (RPE 0-10) ESTIMADO a partir del % de la FC máxima.
  *

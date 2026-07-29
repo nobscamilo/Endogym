@@ -25,6 +25,9 @@ import {
   carbStrategyForDay,
   stepDownRunFocus,
   buildRunPaceNotice,
+  buildWeeklyKmTarget,
+  distributeWeeklyKm,
+  runTypeFromFocus,
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
@@ -1201,10 +1204,34 @@ export function generateWeeklyPlan({
   // Aviso (no cambia nada solo): la marca guardada se ha quedado por detrás de la realidad.
   const runPacesNotice = buildRunPaceNotice({ manualP5SecPerKm: manualP5, runsEstimate });
 
+  // VOLUMEN EN KILÓMETROS: si hay base real de carreras (Strava) y ritmos, el plan progresa
+  // en km —la variable que manda en un objetivo de carrera— en vez de solo en minutos. Sin
+  // base suficiente se mantiene el comportamiento por minutos de siempre: no hay regresión.
+  const kmBaseline = progressMemory?.running?.weeklyKmBaseline ?? null;
+  const runsLast28d = progressMemory?.running?.runsLast28d ?? 0;
+
   // Periodización: fase de la semana (por fecha de carrera si la hay, si no ciclo rodante).
   const weekStartISO = start.toISOString();
   const trainingPhase = resolveTrainingPhase({ raceDateISO: profile.raceDate, weekStartISO });
   const phaseParams = resolvePhaseParams(trainingPhase);
+
+  // Objetivo semanal de km y su reparto por tipo de sesión. Se calcula una vez: la plantilla
+  // se repite cada semana, así que los tipos de carrera de la semana son los de la plantilla.
+  const weeklyKmTarget = buildWeeklyKmTarget({
+    baselineKm: kmBaseline,
+    runsLast28d,
+    volumeFactor: clamp(toNumber(adaptiveTuning?.workout?.volumeFactor, 1), 0.7, 1.2),
+    phaseFactor: phaseParams.volumeFactor,
+  });
+  const kmByRunType = weeklyKmTarget && runPaces
+    ? distributeWeeklyKm({
+      weeklyKmTarget,
+      runTypesInWeek: template
+        .filter((d) => d.sessionType === 'aerobic')
+        .map((d) => runTypeFromFocus(resolveSessionFocus({ modality, sessionType: d.sessionType, sessionTitle: d.title }))),
+      paces: runPaces,
+    })
+    : null;
   const wtr = weeksToRace(profile.raceDate, weekStartISO);
 
   const days = template.map((templateDay, index) => {
@@ -1244,6 +1271,22 @@ export function generateWeeklyPlan({
       durationMinutes = clamp(Math.round(longBase), 25, RACE_GOAL_META[raceGoal].longRunCapMin);
     }
 
+    // Con base real de km, los minutos salen del kilometraje objetivo y su ritmo, para que
+    // km y minutos no se contradigan. El tope de la tirada larga sigue mandando: la regla
+    // del 10% acota el crecimiento semanal, no autoriza una tirada de cualquier tamaño.
+    let targetKm = null;
+    if (templateDay.sessionType === 'aerobic' && kmByRunType) {
+      const tipo = runTypeFromFocus(sessionFocus);
+      const reparto = kmByRunType[tipo];
+      if (reparto?.km > 0 && reparto.minutes > 0) {
+        targetKm = reparto.km;
+        const capMin = sessionFocus === 'cardio_long'
+          ? RACE_GOAL_META[raceGoal].longRunCapMin
+          : 150;
+        durationMinutes = clamp(reparto.minutes, 20, capMin);
+      }
+    }
+
     const workout = {
       title: templateDay.title,
       sessionFocus,
@@ -1264,6 +1307,7 @@ export function generateWeeklyPlan({
       const stepDown = adaptiveTuning?.workout?.runIntensityStepDown === true;
       const rpFocus = stepDown ? stepDownRunFocus(sessionFocus) : sessionFocus;
       workout.runPrescription = buildRunPrescription({ sessionFocus: rpFocus, durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+      if (targetKm) workout.runPrescription.targetKm = targetKm;
       if (stepDown && rpFocus !== sessionFocus) {
         workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${workout.runPrescription.note || ''}`.trim();
       }
@@ -1329,7 +1373,29 @@ export function generateWeeklyPlan({
         if (d.sessionType === 'aerobic') {
           const stepDown2 = adaptiveTuning?.workout?.runIntensityStepDown === true;
           const rpFocus2 = stepDown2 ? stepDownRunFocus(d.sessionFocus) : d.sessionFocus;
+          // El aplanado por duración preferida NO puede borrar el objetivo en km: aquí la
+          // duración preferida actúa como TOPE, no como igualador. Si el tope recorta, el km
+          // objetivo baja en proporción — no se promete un kilometraje que no cabe en el rato
+          // que la persona dijo tener.
+          if (kmByRunType) {
+            const tipoKm = runTypeFromFocus(d.sessionFocus);
+            const repartoKm = kmByRunType[tipoKm];
+            if (repartoKm?.km > 0 && repartoKm.minutes > 0) {
+              const capKm = d.sessionFocus === 'cardio_long'
+                ? RACE_GOAL_META[raceGoal].longRunCapMin
+                : Math.max(prefMin, 20);
+              d.workout.durationMinutes = clamp(repartoKm.minutes, 20, capKm);
+            }
+          }
           d.workout.runPrescription = buildRunPrescription({ sessionFocus: rpFocus2, durationMinutes: d.workout.durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+          if (kmByRunType) {
+            const tipoKm = runTypeFromFocus(d.sessionFocus);
+            const repartoKm = kmByRunType[tipoKm];
+            if (repartoKm?.km > 0 && repartoKm.minutes > 0) {
+              const proporcion = d.workout.durationMinutes / repartoKm.minutes;
+              d.workout.runPrescription.targetKm = Math.round(repartoKm.km * Math.min(1, proporcion) * 10) / 10;
+            }
+          }
           if (stepDown2 && rpFocus2 !== d.sessionFocus) {
             d.workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${d.workout.runPrescription.note || ''}`.trim();
           }
@@ -1380,6 +1446,8 @@ export function generateWeeklyPlan({
     trainingModality: modality,
     raceGoal,
     runPaces: pacesSummary(runPaces),
+    weeklyKmTarget,
+    weeklyKmBaseline: kmBaseline,
     runPacesSource,
     runPacesNotice,
     phase: trainingPhase,

@@ -84,9 +84,11 @@ export async function ensureFreshToken(connection) {
   };
 }
 
-export async function getActivities(accessToken, { afterEpoch, perPage = 30 } = {}) {
+export async function getActivities(accessToken, { afterEpoch, perPage = 30, page = null } = {}) {
   const params = new URLSearchParams({ per_page: String(perPage) });
   if (afterEpoch) params.set('after', String(afterEpoch));
+  // Sin `page`, Strava devuelve siempre la primera: paginar sin esto repite el mismo lote.
+  if (Number.isFinite(Number(page)) && Number(page) > 0) params.set('page', String(Math.round(Number(page))));
   const res = await fetch(`${STRAVA_API}/athlete/activities?${params.toString()}`, {
     headers: { authorization: `Bearer ${accessToken}` },
   });
