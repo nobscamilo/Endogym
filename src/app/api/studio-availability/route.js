@@ -92,6 +92,13 @@ export async function POST(request) {
     if (Number.isFinite(barbell) && barbell >= 5 && barbell <= 35) patch.barbellKg = Math.round(barbell * 2) / 2;
     else if (body?.barbellKg === null) patch.barbellKg = null;
 
+    // Texto libre de condiciones. Ya lo leían el léxico de detectComorbidities, el contexto
+    // del chat y el prompt de nutrición, pero NINGUNA pantalla lo recogía: el campo estaba
+    // huérfano en la UI y solo se podía rellenar por API.
+    if (typeof body?.medicalConditions === 'string') {
+      patch.medicalConditions = body.medicalConditions.trim().slice(0, 500);
+    }
+
     // Comorbilidades ESTRUCTURADAS (checkboxes de Perfil): fuente principal de
     // detectComorbidities (calentamiento/retorno, restricciones de selección).
     if (body?.conditions && typeof body.conditions === 'object') {
@@ -103,6 +110,8 @@ export async function POST(request) {
         diabetes: body.conditions.diabetes === true,
         osteoarthritis: body.conditions.osteoarthritis === true,
         osteoporosis: body.conditions.osteoporosis === true,
+        // Metabólica, no restrictiva: cambia calidad de dieta y énfasis aeróbico, no filtra ejercicios.
+        hypercholesterolemia: body.conditions.hypercholesterolemia === true,
         asthma: body.conditions.asthma === true,
         pregnant: body.conditions.pregnant === true,
         injuryZones: (Array.isArray(body.conditions.injuryZones) ? body.conditions.injuryZones : [])

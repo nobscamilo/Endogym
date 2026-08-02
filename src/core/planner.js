@@ -29,7 +29,7 @@ import {
   distributeWeeklyKm,
   runTypeFromFocus,
 } from './running.js';
-import { buildWarmupProtocol, buildCooldownProtocol } from './warmupCooldown.js';
+import { buildWarmupProtocol, buildCooldownProtocol, detectComorbidities } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
 import { getMissingNutritionProfileFields } from './profileCompleteness.js';
 
@@ -678,8 +678,32 @@ function getSessionRpeRange(goal, sessionType) {
   return sessionType === 'resistance' ? 'RPE 6-8' : 'RPE 4-6';
 }
 
+/**
+ * Guía de CALIDAD de la dieta por condición. Deliberadamente NO toca los macros: el reparto
+ * proteína/carbohidrato/grasa lo manda el OBJETIVO (decisión del usuario, 29-jul-2026). Una
+ * hipercolesterolemia no cambia cuánta grasa comes, cambia QUÉ grasa y cuánta fibra: eso es
+ * compatible con cualquier reparto de macros.
+ *
+ * Referencias del orden de magnitud: grasa saturada por debajo del 7% de las calorías y
+ * 10-25 g/día de fibra soluble son los objetivos habituales de las guías de manejo lipídico.
+ */
+export function buildDietQualityTargets({ calories, comorbidities = {} }) {
+  if (!comorbidities.hypercholesterolemia) return null;
+  const kcal = Number(calories);
+  if (!Number.isFinite(kcal) || kcal <= 0) return null;
+  return {
+    reason: 'hipercolesterolemia',
+    maxSaturatedFatGrams: Math.round((kcal * 0.07) / 9),
+    minSolubleFiberGrams: 10,
+    minTotalFiberGrams: 30,
+    note: 'Prioriza grasa insaturada (aceite de oliva, frutos secos, pescado azul) sobre saturada, '
+      + 'y sube la fibra soluble (avena, legumbres, fruta con piel). Los macros del día siguen '
+      + 'los de tu objetivo: esto cambia la CALIDAD, no las cantidades.',
+  };
+}
+
 function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
-  const { sessionFocus = null, raceGoal = 'health' } = opts;
+  const { sessionFocus = null, raceGoal = 'health', comorbidities = null } = opts;
   // "Fuel for the work required": los carbohidratos del día escalan con la demanda de la
   // sesión (tirada larga/series/pierna altos; descanso bajo) y con el objetivo de carrera.
   const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal });
@@ -706,6 +730,8 @@ function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
     fatGrams,
     carbLevel: strat.level,      // 'alto' | 'medio' | 'bajo'
     carbTiming: strat.timing,    // guía de timing para el plan de comidas / coach
+    // Calidad por condición (no altera los macros de arriba).
+    dietQuality: buildDietQualityTargets({ calories, comorbidities: comorbidities || {} }),
   };
 }
 
@@ -1178,6 +1204,9 @@ export function generateWeeklyPlan({
   // (más abajo), que ya convierten con la prescripción completa (rest 25 s, carga ×0.85,
   // metadatos hybridCircuit para la tarjeta de la UI) y con tope de 2 sesiones.
 
+  // Comorbilidades del perfil (checkbox + léxico del texto libre). Se calculan una vez.
+  const comorbidities = detectComorbidities(profile);
+
   const baseTarget = buildMacroTargetFromProfile({ ...profile, goal }, adaptiveTuning);
   const mealsPerDay = clamp(toNumber(profile.mealsPerDay, 4), 3, 6);
   const workoutVolumeFactor = clamp(toNumber(adaptiveTuning?.workout?.volumeFactor, 1), 0.7, 1.2);
@@ -1243,7 +1272,7 @@ export function generateWeeklyPlan({
       sessionTitle: templateDay.title,
     });
 
-    const nutritionTarget = adjustMacroTargetForDay(baseTarget, templateDay, goal, { sessionFocus, raceGoal });
+    const nutritionTarget = adjustMacroTargetForDay(baseTarget, templateDay, goal, { sessionFocus, raceGoal, comorbidities });
 
     const sessionExercises = buildSessionExercises({
       modality,
@@ -1445,6 +1474,18 @@ export function generateWeeklyPlan({
     trainingMode,
     trainingModality: modality,
     raceGoal,
+    // Guía por condición a nivel de plan. La hipercolesterolemia no restringe ejercicio: al
+    // revés, el aeróbico es parte del tratamiento, así que la nota EMPUJA volumen aeróbico
+    // en vez de recortarlo (150-300 min/semana de intensidad moderada, orden de magnitud de
+    // las guías). Es una recomendación visible, no una reestructuración silenciosa del plan.
+    conditionGuidance: comorbidities.hypercholesterolemia
+      ? [{
+        condition: 'hipercolesterolemia',
+        aerobicMinPerWeek: 150,
+        note: 'Con colesterol elevado, el trabajo aeróbico continuo es parte del tratamiento: '
+          + 'apunta a 150-300 min/semana de intensidad moderada. No hay ejercicio prohibido por esto.',
+      }]
+      : null,
     runPaces: pacesSummary(runPaces),
     weeklyKmTarget,
     weeklyKmBaseline: kmBaseline,

@@ -648,7 +648,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [goal, setGoal] = useStateP(u.goalRaw || '');
   // Comorbilidades estructuradas (checkboxes): adaptan calentamiento, retorno,
   // selección de ejercicios y avisos del coach. Complementan al texto libre.
-  const [conds, setConds] = useStateP(u.conditions || { hypertension: false, hypertensionControlled: false, diabetes: false, osteoarthritis: false, osteoporosis: false, asthma: false, pregnant: false, injuryZones: [] });
+  const [conds, setConds] = useStateP(u.conditions || { hypertension: false, hypertensionControlled: false, diabetes: false, osteoarthritis: false, osteoporosis: false, hypercholesterolemia: false, asthma: false, pregnant: false, injuryZones: [] });
+  const [medText, setMedText] = useStateP(u.medicalConditions || '');
   const toggleCond = (k) => setConds((c) => ({ ...c, [k]: !c[k] }));
   const toggleZone = (z) => setConds((c) => ({ ...c, injuryZones: (c.injuryZones || []).includes(z) ? c.injuryZones.filter((x) => x !== z) : [...(c.injuryZones || []), z] }));
   // Objetivo SMART: meta numérica + fecha (como el objetivo de carrera).
@@ -773,6 +774,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         hrMaxBpm: hrMax ? Number(hrMax) : null,
         barbellKg: barKg ? Number(barKg) : null,
         conditions: conds,
+        medicalConditions: medText,
         equipment: gear,
         goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
         goalTargetDate: targetEnabled ? (goalDate || null) : null,
@@ -966,7 +968,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
             <div className="mb-label" style={{ marginBottom: 4 }}>Salud</div>
             <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — adapta tu plan con seguridad. Puedes saltarte este paso.</p>
           <div className="chips">
-            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis'], ['asthma', 'Asma'], ['pregnant', 'Embarazo']].map(([k, l]) => (
+            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['hypercholesterolemia', 'Colesterol alto'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis'], ['asthma', 'Asma'], ['pregnant', 'Embarazo']].map(([k, l]) => (
               <button key={k} type="button" className={`pill ${conds[k] ? 'accent' : ''}`} onClick={() => toggleCond(k)}>{l}</button>
             ))}
           </div>
@@ -982,6 +984,29 @@ function AvailabilitySurvey({ onSaved } = {}) {
             ))}
           </div>
           <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis, calentamiento más largo con asma, sin Valsalva en el embarazo). Es educativo, no diagnóstico.</p>
+          {conds.hypercholesterolemia ? (
+            <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>
+              Con colesterol alto no se prohíbe ningún ejercicio — el aeróbico es parte del tratamiento.
+              Lo que cambia es la calidad de la dieta (menos grasa saturada, más fibra) y el énfasis en
+              trabajo aeróbico continuo. Tus macros siguen los de tu objetivo.
+            </p>
+          ) : null}
+          {/* Texto libre: el léxico del planner reconoce varias condiciones escritas a mano, y
+              el coach lo tiene en cuenta al responder. Se dice claramente hasta dónde llega. */}
+          <div className="mb-label" style={{ marginTop: 16, marginBottom: 4 }}>Otras condiciones o lesiones</div>
+          <textarea
+            className="text-input"
+            rows={3}
+            maxLength={500}
+            value={medText}
+            onChange={(e) => setMedText(e.target.value)}
+            placeholder="Escribe cualquier otra condición, lesión o limitación relevante (opcional)" 
+          />
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
+            Lo que escribas aquí lo tiene en cuenta el coach al responderte. Las adaptaciones automáticas
+            del plan solo se aplican a las condiciones de la lista de arriba: si algo es importante para tu
+            entrenamiento, márcalo ahí además de escribirlo.
+          </p>
           </div>
         </section>
         </React.Fragment>) : null}

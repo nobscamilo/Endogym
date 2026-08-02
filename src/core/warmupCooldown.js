@@ -82,6 +82,13 @@ export function detectComorbidities(profile = {}) {
       || /(asma|broncoespasmo|bronquitis|\bepoc\b|asmatic)/.test(text),
     pregnant: structured.pregnant === true
       || /(embaraz|gestaci|postparto|posparto|puerperio)/.test(text),
+    // Hipercolesterolemia / dislipemia. OJO: NO es una restricción de ejercicio — el
+    // ejercicio aeróbico es parte del tratamiento, no algo a evitar. Tampoco se ata a
+    // `knownCardiometabolicDisease` del cribado: eso limitaría la intensidad y capa el RPE a
+    // 6, y un factor de riesgo lipídico no es una enfermedad cardiovascular conocida. Lo que
+    // sí cambia: calidad de la grasa, fibra y énfasis aeróbico.
+    hypercholesterolemia: structured.hypercholesterolemia === true
+      || /(hipercolesterolemia|dislipemia|dislipidemia|hiperlipidemia|colesterol alto|colesterol elevado|ldl alto|trigliceridos altos)/.test(text),
     cardiometabolic: screening.knownCardiometabolicDisease === true,
     injuries: [...new Set([...structuredInjuries, ...lexicalInjuries])],
     older: Number.isFinite(age) && age >= 60,

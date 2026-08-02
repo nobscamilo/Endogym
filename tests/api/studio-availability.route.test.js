@@ -129,6 +129,7 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     const patch = mocks.upsertUserProfile.mock.calls[0][1];
     expect(patch.conditions).toEqual({
       hypertension: true, hypertensionControlled: false, diabetes: false, osteoarthritis: true, osteoporosis: false,
+      hypercholesterolemia: false,
       asthma: false, pregnant: false,
       injuryZones: ['rodilla', 'lumbar'],
     });
