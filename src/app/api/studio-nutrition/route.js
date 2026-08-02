@@ -8,6 +8,7 @@ import { addTokenUsage, recordAiMetric, tokensFromGeminiResponse } from '../../.
 import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { currentWeekKey as currentAppWeekKey, addDaysToDateKey } from '../../../lib/appTime.js';
+import { normalizeNutritionPreferencesInput } from '../../../core/nutritionPlanner.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -185,6 +186,30 @@ function targetsFrom(plan) {
   };
 }
 
+
+/**
+ * Redacta las restricciones alimentarias para el prompt, separando por gravedad.
+ *
+ * Una ALERGIA no es una preferencia: se escribe como prohibición absoluta e innegociable,
+ * aparte de las intolerancias (que admiten matiz de cantidad) y de los alimentos que
+ * simplemente no gustan (evitar, pero no es un riesgo). Meterlas todas en la misma frase
+ * invita al modelo a tratarlas con el mismo peso.
+ */
+export function describeDietRestrictions(prefs) {
+  const lineas = [];
+  if (prefs.allergies?.length) {
+    lineas.push(`ALERGIAS (prohibido en absoluto, ni trazas ni como ingrediente de un plato): ${prefs.allergies.join(', ')}.`);
+  }
+  if (prefs.intolerances?.length) {
+    lineas.push(`Intolerancias (evítalas; si son inevitables, usa alternativas sin ese componente): ${prefs.intolerances.join(', ')}.`);
+  }
+  if (prefs.dislikedFoods?.length) {
+    lineas.push(`No le gustan (no los uses, hay alternativas de sobra): ${prefs.dislikedFoods.join(', ')}.`);
+  }
+  if (!lineas.length) return 'Sin alergias, intolerancias ni alimentos vetados declarados.';
+  return `${lineas.join('\n')}\nNINGÚN plato puede incluir lo anterior: si una receta típica lo lleva, cámbiala por otra.`;
+}
+
 export async function POST(request) {
   return withTrace('studio_nutrition', async ({ traceId }) => {
     let user;
@@ -236,7 +261,13 @@ export async function POST(request) {
     const t = targetsFrom(plan);
     const goal = profile?.goal || 'salud y composición corporal';
     const conditions = profile?.medicalConditions || 'ninguna declarada';
-    const restrictions = profile?.dietaryRestrictions || profile?.allergies || 'ninguna declarada';
+    // BUG corregido (2-ago-2026): esto leía `dietaryRestrictions` y `allergies`, campos que NO
+    // existen en el modelo de perfil. Las preferencias viven en `nutritionPreferences`, así que
+    // el menú semanal con IA salía SIEMPRE con "ninguna declarada" — aunque la persona hubiera
+    // declarado una alergia. Con alergias eso no es un detalle de calidad, es un riesgo.
+    const prefs = normalizeNutritionPreferencesInput(profile?.nutritionPreferences || {});
+    const patronDieta = { omnivore: 'omnívora', vegetarian: 'vegetariana', vegan: 'vegana' }[prefs.dietaryPattern] || 'omnívora';
+    const restrictions = describeDietRestrictions(prefs);
 
     // Contexto de entrenamiento por día (para "fuel for the work required"): tipo de sesión,
     // nivel de carbohidratos, timing y objetivos de macros específicos de cada día.
@@ -282,7 +313,8 @@ export async function POST(request) {
     const phaseLabel = plan?.phaseLabel || null;
 
     const baseRules = `Eres un nutricionista deportivo. Trabajas en español de España.
-Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; restricciones/alergias: ${restrictions}.${raceLabel ? `
+Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; dieta ${patronDieta}.
+${restrictions}${raceLabel ? `
 Objetivo de carrera: ${raceLabel}.${phaseLabel ? ` Fase de entrenamiento: ${phaseLabel}.` : ''}` : ''}
 PRINCIPIO "fuel for the work required": ajusta los carbohidratos a la demanda de CADA día (más en tirada larga/series/pierna, menos en descanso). Carbohidratos de absorción LENTA lejos del entreno y RÁPIDA peri-entreno. Cada día abajo trae su objetivo de kcal/macros y su nivel/timing de carbohidratos: respétalos.`;
 

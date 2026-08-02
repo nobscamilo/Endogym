@@ -650,6 +650,11 @@ function AvailabilitySurvey({ onSaved } = {}) {
   // selección de ejercicios y avisos del coach. Complementan al texto libre.
   const [conds, setConds] = useStateP(u.conditions || { hypertension: false, hypertensionControlled: false, diabetes: false, osteoarthritis: false, osteoporosis: false, hypercholesterolemia: false, asthma: false, pregnant: false, injuryZones: [] });
   const [medText, setMedText] = useStateP(u.medicalConditions || '');
+  const np = u.nutritionPreferences || {};
+  const [dietPattern, setDietPattern] = useStateP(np.dietaryPattern || 'omnivore');
+  const [allergies, setAllergies] = useStateP((np.allergies || []).join(', '));
+  const [intolerances, setIntolerances] = useStateP((np.intolerances || []).join(', '));
+  const [dislikes, setDislikes] = useStateP((np.dislikedFoods || []).join(', '));
   const toggleCond = (k) => setConds((c) => ({ ...c, [k]: !c[k] }));
   const toggleZone = (z) => setConds((c) => ({ ...c, injuryZones: (c.injuryZones || []).includes(z) ? c.injuryZones.filter((x) => x !== z) : [...(c.injuryZones || []), z] }));
   // Objetivo SMART: meta numérica + fecha (como el objetivo de carrera).
@@ -775,6 +780,13 @@ function AvailabilitySurvey({ onSaved } = {}) {
         barbellKg: barKg ? Number(barKg) : null,
         conditions: conds,
         medicalConditions: medText,
+        nutritionPreferences: {
+          dietaryPattern: dietPattern,
+          // El backend normaliza y trocea; aquí solo se manda lo escrito.
+          allergies: allergies.split(',').map((x) => x.trim()).filter(Boolean),
+          intolerances: intolerances.split(',').map((x) => x.trim()).filter(Boolean),
+          dislikedFoods: dislikes.split(',').map((x) => x.trim()).filter(Boolean),
+        },
         equipment: gear,
         goalTargetValue: targetEnabled && goalValue ? Number(goalValue) : null,
         goalTargetDate: targetEnabled ? (goalDate || null) : null,
@@ -1006,6 +1018,39 @@ function AvailabilitySurvey({ onSaved } = {}) {
             Lo que escribas aquí lo tiene en cuenta el coach al responderte. Las adaptaciones automáticas
             del plan solo se aplican a las condiciones de la lista de arriba: si algo es importante para tu
             entrenamiento, márcalo ahí además de escribirlo.
+          </p>
+
+          <div className="mb-label" style={{ marginTop: 20, marginBottom: 6 }}>Cómo comes</div>
+          <div className="chips">
+            {[['omnivore', 'Omnívora'], ['vegetarian', 'Vegetariana'], ['vegan', 'Vegana']].map(([v, l]) => (
+              <button key={v} type="button" className={`pill ${dietPattern === v ? 'accent' : ''}`}
+                aria-pressed={dietPattern === v} onClick={() => setDietPattern(v)}>{l}</button>
+            ))}
+          </div>
+
+          {/* Separadas a propósito: una alergia es una prohibición absoluta, una intolerancia
+              admite matiz y un alimento que no gusta es solo preferencia. El plan las trata
+              con distinto peso, así que se piden por separado en vez de en un cajón común. */}
+          <div className="mb-label" style={{ marginTop: 16, marginBottom: 4 }}>Alergias</div>
+          <textarea className="text-input" rows={2} maxLength={300} value={allergies}
+            onChange={(e) => setAllergies(e.target.value)}
+            placeholder="Separadas por comas. Ej: frutos secos, marisco" />
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
+            Ningún plato del menú las incluirá, ni como ingrediente de una receta.
+          </p>
+
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Intolerancias</div>
+          <textarea className="text-input" rows={2} maxLength={300} value={intolerances}
+            onChange={(e) => setIntolerances(e.target.value)}
+            placeholder="Separadas por comas. Ej: lactosa, gluten" />
+
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Alimentos que no te gustan</div>
+          <textarea className="text-input" rows={2} maxLength={300} value={dislikes}
+            onChange={(e) => setDislikes(e.target.value)}
+            placeholder="Separados por comas. Ej: brócoli, hígado" />
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
+            Se evitan en el menú semanal. Cuantos más pongas, menos variedad tendrá el plan: no hace
+            falta listar todo lo que no te entusiasma, solo lo que de verdad no vas a comer.
           </p>
           </div>
         </section>

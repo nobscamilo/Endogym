@@ -3,6 +3,7 @@ import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js'
 import { withTrace, logError } from '../../../lib/logger.js';
 import { upsertUserProfile } from '../../../lib/repositories/firestoreRepository.js';
 import { sanitizeEquipmentList } from '../../../core/equipmentPreferences.js';
+import { normalizeNutritionPreferencesInput } from '../../../core/nutritionPlanner.js';
 import {
   getMissingPrescriptionProfileFields,
   PROFILE_FIELD_LABELS,
@@ -91,6 +92,13 @@ export async function POST(request) {
     const barbell = Number(body?.barbellKg);
     if (Number.isFinite(barbell) && barbell >= 5 && barbell <= 35) patch.barbellKg = Math.round(barbell * 2) / 2;
     else if (body?.barbellKg === null) patch.barbellKg = null;
+
+    // Preferencias alimentarias: alergias, intolerancias, alimentos vetados y patrón de dieta.
+    // El planner de comidas ya sabía usarlas (parseNutritionPreferences) y el perfil ya las
+    // guardaba, pero ninguna pantalla del Studio las pedía: quedaban siempre vacías.
+    if (body?.nutritionPreferences && typeof body.nutritionPreferences === 'object') {
+      patch.nutritionPreferences = normalizeNutritionPreferencesInput(body.nutritionPreferences);
+    }
 
     // Texto libre de condiciones. Ya lo leían el léxico de detectComorbidities, el contexto
     // del chat y el prompt de nutrición, pero NINGUNA pantalla lo recogía: el campo estaba

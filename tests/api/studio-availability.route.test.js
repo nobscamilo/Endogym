@@ -114,6 +114,30 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     for (const value of ofrecidas) expect(aceptadas).toContain(`'${value}'`);
   });
 
+  it('guarda alergias, intolerancias y alimentos vetados de la encuesta', async () => {
+    // El planner de comidas ya sabía usarlos y el perfil ya los guardaba, pero ninguna
+    // pantalla los pedía: quedaban siempre vacíos.
+    await post(completeSurvey({
+      nutritionPreferences: {
+        dietaryPattern: 'vegetarian',
+        allergies: ['frutos secos', ' marisco '],
+        intolerances: ['lactosa'],
+        dislikedFoods: ['brócoli'],
+      },
+    }));
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.nutritionPreferences.dietaryPattern).toBe('vegetarian');
+    expect(patch.nutritionPreferences.allergies).toContain('frutos secos');
+    expect(patch.nutritionPreferences.intolerances).toEqual(['lactosa']);
+    expect(patch.nutritionPreferences.dislikedFoods).toEqual(['brócoli']);
+  });
+
+  it('un patrón dietético inventado cae a omnívora en vez de colarse', async () => {
+    await post(completeSurvey({ nutritionPreferences: { dietaryPattern: 'carnivora-extrema' } }));
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.nutritionPreferences.dietaryPattern).toBe('omnivore');
+  });
+
   it('rechaza una encuesta incompleta en vez de completar el perfil con supuestos', async () => {
     const res = await post({ goal: 'strength', trainingModality: 'full_gym', daysPerWeek: 4 });
     const json = await res.json();
