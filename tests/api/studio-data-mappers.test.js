@@ -299,3 +299,51 @@ describe('GET /api/studio-data — contrato autenticado explícito', () => {
     expect(json.overrides.user.profileComplete).toBe(false);
   });
 });
+
+describe('mapTodaySession — reconoce el entreno ya hecho', () => {
+  const plan = { days: [{ date: '2026-08-02', sessionType: 'aerobic', sessionFocus: 'cardio_easy', workout: { title: 'Rodaje suave', durationMinutes: 45, exercises: [{ name: 'Carrera zona 2' }] } }] };
+
+  it('sin entrenos ese día, la sesión no está hecha', () => {
+    expect(mapTodaySession(plan, '2026-08-02', []).done).toBe(false);
+  });
+
+  it('una actividad de Strava marca la sesión como hecha con sus datos reales', () => {
+    // El bug: esta función recibía los entrenos y no los miraba, así que después de correr y
+    // sincronizar la app seguía diciendo "Empezar" y no mostraba ninguna intensidad.
+    const out = mapTodaySession(plan, '2026-08-02', [{
+      source: 'strava', sportType: 'Run', performedAt: '2026-08-02T18:00:00Z', completed: true,
+      title: 'Carrera nocturna', durationMinutes: 52, distanceKm: 6.2, avgHeartRate: 144,
+      sessionRpeEstimated: 5.8, relativeEffort: 77,
+    }]);
+    expect(out.done).toBe(true);
+    expect(out.doneSource).toBe('strava');
+    expect(out.doneSummary.distanceKm).toBe(6.2);
+    expect(out.doneSummary.avgHeartRate).toBe(144);
+    // El RPE estimado viaja marcado como estimado: no se presenta como percepción reportada.
+    expect(out.doneSummary.rpeIsEstimated).toBe(true);
+  });
+
+  it('lo registrado en la app manda sobre Strava cuando hay ambos', () => {
+    const out = mapTodaySession(plan, '2026-08-02', [
+      { source: 'strava', performedAt: '2026-08-02T18:00:00Z', completed: true, durationMinutes: 52 },
+      { source: 'manual', performedAt: '2026-08-02T19:00:00Z', completed: true, durationMinutes: 60, sessionRpe: 8 },
+    ]);
+    expect(out.doneSource).toBe('manual');
+    expect(out.doneSummary.sessionRpe).toBe(8);
+    expect(out.doneSummary.rpeIsEstimated).toBe(false);
+  });
+
+  it('un check-in saltado no cuenta como sesión hecha', () => {
+    const out = mapTodaySession(plan, '2026-08-02', [
+      { source: 'daily_checkin', performedAt: '2026-08-02T08:00:00Z', completed: true, checkinSkipped: true },
+    ]);
+    expect(out.done).toBe(false);
+  });
+
+  it('los ejercicios NO se dan por hechos: Strava no dice qué series hiciste', () => {
+    const out = mapTodaySession(plan, '2026-08-02', [
+      { source: 'strava', performedAt: '2026-08-02T18:00:00Z', completed: true, durationMinutes: 52 },
+    ]);
+    expect(out.list.every((x) => x.done === false)).toBe(true);
+  });
+});

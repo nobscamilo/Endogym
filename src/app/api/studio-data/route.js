@@ -359,6 +359,50 @@ function buildSessionRationale(day, profile) {
 // `exact` (registro retroactivo): cuando es true, solo se devuelve la sesión si la fecha
 // pedida es EXACTAMENTE un día de entrenamiento del plan; sin fallback al primer día de
 // entreno (que falsearía la prescripción de un día de descanso o fuera de bloque).
+
+/**
+ * ¿Se hizo ya la sesión de este día? Mira los entrenos REALES (app, check-in o Strava) de esa
+ * fecha y devuelve el resumen con los datos que haya.
+ *
+ * Honestidad deliberada: se marca hecha la SESIÓN, no los ejercicios uno a uno. Una carrera
+ * de Strava demuestra que entrenaste, pero no dice qué series hiciste; dar por completado un
+ * ejercicio concreto sería inventarlo. Por eso `list[].done` sigue saliendo de lo que la
+ * persona marca en la app.
+ */
+function describeCompletion(day, workouts) {
+  const fecha = String(day?.date || '').slice(0, 10);
+  if (!fecha) return {};
+  const delDia = (Array.isArray(workouts) ? workouts : []).filter((w) => (
+    String(w?.performedAt || '').slice(0, 10) === fecha
+    && w?.completed !== false
+    && w?.checkinSkipped !== true
+  ));
+  if (!delDia.length) return { done: false };
+
+  // Prioridad de fuente: lo registrado en la app > Strava > check-in diario.
+  const orden = { manual: 0, strava: 1, daily_checkin: 2 };
+  const principal = [...delDia].sort((a, b) => (orden[a.source] ?? 9) - (orden[b.source] ?? 9))[0];
+  const num = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+  const rpe = num(principal.sessionRpe);
+  const rpeEst = rpe == null ? num(principal.sessionRpeEstimated) : null;
+  return {
+    done: true,
+    doneSource: principal.source || 'manual',
+    doneSummary: {
+      title: principal.title || null,
+      durationMin: num(principal.durationMinutes),
+      distanceKm: num(principal.distanceKm),
+      avgHeartRate: num(principal.avgHeartRate),
+      relativeEffort: num(principal.relativeEffort),
+      // El esfuerzo estimado por FC viaja marcado como tal: no es lo que la persona reportó.
+      sessionRpe: rpe,
+      sessionRpeEstimated: rpeEst,
+      rpeIsEstimated: rpe == null && rpeEst != null,
+    },
+  };
+}
+
 export function mapTodaySession(plan, today, workouts = [], profile = null, { exact = false, retroactive = false } = {}) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
@@ -421,6 +465,10 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
     durationMin: day.workout?.durationMinutes || null,
     intensity: rpeLabel(day.workout?.intensityRpe),
     list,
+    // BUG corregido (2-ago-2026): esta función RECIBÍA los entrenos y no los miraba nunca,
+    // así que una actividad importada de Strava no marcaba la sesión como hecha ni traía su
+    // intensidad. El usuario veía "Empezar" después de haber entrenado y sincronizado.
+    ...describeCompletion(day, workouts),
   };
   if (prim.length) out.primaryMuscles = prim;
   if (sec.length) out.secondaryMuscles = sec;

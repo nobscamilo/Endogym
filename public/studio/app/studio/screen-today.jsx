@@ -93,7 +93,7 @@ function TodayHub({ go, variant }) {
       <div className="grid g-2" style={{ gridTemplateColumns: '0.95fr 1.05fr' }}>
         <CoachCard go={go} />
         <SectionCard title="Sesión de hoy" icon="train"
-          action={<button className="btn soft sm" onClick={() => go('train')}>Empezar</button>}>
+          action={<button className="btn soft sm" onClick={() => go('train')}>{(window.STUDIO.todaySession || {}).done ? 'Ver sesión' : 'Empezar'}</button>}>
           {s ? <React.Fragment><div className="row between" style={{ marginBottom: 14 }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.18rem', letterSpacing: '-0.02em' }}>{s.title}</div>
@@ -254,8 +254,24 @@ function CoachCard({ go }) {
           <div><strong>Coach Ignios</strong><span>Tu plan de hoy</span></div>
         </div>
         <h3>{s.title ? `Hoy: ${s.title}.` : 'Tu plan, ajustado a ti.'}</h3>
-        <p>El coach adapta tu entrenamiento y nutrición a tus datos. Abre tu sesión, regístrala con el check-in o pregúntale lo que quieras en Progreso.</p>
+        {/* Si ya entrenaste (registro en la app, check-in o Strava), la tarjeta lo reconoce en
+            vez de seguir invitándote a empezar. Los datos son los reales de la actividad. */}
+        {s.done ? (
+          <p>
+            Sesión hecha{s.doneSource === 'strava' ? ', importada de Strava' : ''}
+            {s.doneSummary ? `: ${[
+              s.doneSummary.distanceKm ? `${s.doneSummary.distanceKm} km` : null,
+              s.doneSummary.durationMin ? `${s.doneSummary.durationMin} min` : null,
+              s.doneSummary.avgHeartRate ? `FC ${s.doneSummary.avgHeartRate} ppm` : null,
+              s.doneSummary.sessionRpe ? `RPE ${s.doneSummary.sessionRpe}/10`
+                : (s.doneSummary.sessionRpeEstimated ? `RPE ~${s.doneSummary.sessionRpeEstimated}/10 estimado por FC` : null),
+            ].filter(Boolean).join(' · ')}` : ''}.
+          </p>
+        ) : (
+          <p>El coach adapta tu entrenamiento y nutrición a tus datos. Abre tu sesión, regístrala con el check-in o pregúntale lo que quieras en Progreso.</p>
+        )}
         <div className="coach-chips">
+          {s.done ? <span><Icon name="check" size={14} /> Hecha</span> : null}
           {rec != null ? <span><Icon name="target" size={14} /> Disposición {rec}%</span> : null}
           {s.intensity ? <span><Icon name="bolt" size={14} /> {s.intensity}</span> : null}
           {s.focus ? <span><Icon name="train" size={14} /> {s.focus}</span> : null}
