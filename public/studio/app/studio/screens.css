@@ -359,12 +359,20 @@
 /* Respuesta fija de seguridad (red flag): no es una respuesta más del coach, así que no se
    pinta como tal ni se vota. Debe leerse como un aviso sanitario. */
 .ask-msg.coach .ask-bubble.alert { background: color-mix(in srgb, var(--glu-high) 12%, var(--surface-2)); border-color: var(--glu-high); font-weight: 500; }
-.ask-input { flex: none; display: flex; gap: 8px; padding: 12px 12px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+.ask-input { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 12px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+/* El botón de enviar es el control que no puede perderse: no encoge ni se deforma por
+   mucho que el texto o una pantalla estrecha aprieten. El que cede es el campo. */
+.ask-input .btn { flex: 0 0 auto; }
+.ask-input input { min-width: 0; }
 .ask-input input { flex: 1; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface-2); color: var(--ink); padding: 12px 16px; font: inherit; font-size: 0.9rem; }
 .ask-input input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
 .ask-input .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
 .ask-scrim.mobile { z-index: 1000; place-items: stretch center; }
-.ask-scrim.mobile .ask-card { width: 100%; height: 100%; max-height: 100%; min-height: 0; border-radius: 0; border-left: 0; border-right: 0; animation: none; }
+/* `100dvh` sigue al viewport visible cuando el navegador lo encoge (barra de URL, teclado);
+   con `height:100%` la tarjeta conservaba la altura del layout y su fila de entrada quedaba
+   por debajo del teclado en Android. `border: 0` evita la línea de 1px contra el borde de
+   la pantalla, que a pantalla completa se veía como un marco sucio. */
+.ask-scrim.mobile .ask-card { width: 100%; height: 100dvh; max-height: 100dvh; min-height: 0; border: 0; border-radius: 0; animation: none; }
 .ask-scrim.mobile .ask-head { padding-top: max(16px, env(safe-area-inset-top)); }
 
 /* ============ YouTube real en el reproductor ============ */

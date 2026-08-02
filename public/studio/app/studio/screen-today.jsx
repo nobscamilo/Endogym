@@ -167,7 +167,10 @@ function HeroAnillos({ go }) {
   return (
     <div className="card lg hero-card">
       <div className="ctitle"><span className="ico"><Icon name="today" size={19} /></span><h3>Tu día en anillos</h3><span className="pill tiny" style={{ marginLeft: 'auto' }}>Hoy</span></div>
-      <div className="readiness-wrap" style={{ marginTop: 16, gridTemplateColumns: 'auto 1fr' }}>
+      {/* Sin gridTemplateColumns inline: el estilo en línea ganaba a la regla `.app.mobile`
+          que apila las columnas, y en móvil la columna de texto quedaba en 100px — de ahí
+          que "1240 / 1980" se partiera a la mitad. El ancho de escritorio ya lo pone el CSS. */}
+      <div className="readiness-wrap" style={{ marginTop: 16 }}>
         <TripleRing rings={rings} size={168} />
         <div className="readiness-metrics">
           <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-move)' }}><Icon name="train" size={18} /></span>

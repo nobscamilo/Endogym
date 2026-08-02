@@ -242,7 +242,12 @@
 .dashed { border-top: 1px dashed var(--line-2); }
 
 /* segmented control (in-app) */
-.segc { display: inline-flex; background: var(--surface-3); border-radius: 999px; padding: 4px; gap: 2px; border: 1px solid var(--line); position: relative; }
+.segc { display: inline-flex; background: var(--surface-3); border-radius: 999px; padding: 4px; gap: 2px; border: 1px solid var(--line); position: relative; max-width: 100%; }
+/* En pantallas estrechas el control segmentado se salía por la derecha: sus botones no
+   parten texto (white-space: nowrap) y el contenedor era inline-flex sin tope. Con un
+   máximo del 100% y reparto equitativo, las pestañas encogen en vez de desbordar. */
+.app.mobile .segc { display: flex; width: 100%; }
+.app.mobile .segc button { flex: 1 1 0; min-width: 0; padding: 8px 10px; text-align: center; }
 .segc button { appearance: none; border: 0; background: transparent; cursor: pointer; font: inherit; font-size: 0.83rem; font-weight: 600; color: var(--ink-2); padding: 8px 16px; border-radius: 999px; position: relative; z-index: 1; transition: color var(--t-med) var(--ease); white-space: nowrap; }
 .segc button.on { color: var(--ink); }
 .segc .segc-thumb { position: absolute; top: 4px; bottom: 4px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-sm); transition: left var(--t-med) var(--ease-spring), width var(--t-med) var(--ease-spring); z-index: 0; }
@@ -257,8 +262,13 @@
   .g-4 { grid-template-columns: repeat(2, 1fr); }
   .g-3 { grid-template-columns: 1fr; }
 }
-.app.mobile .grid.g-2, .app.mobile .grid.g-3 { grid-template-columns: 1fr !important; }
-.app.mobile .grid.g-4 { grid-template-columns: 1fr 1fr !important; }
+/* `1fr` es en realidad `minmax(auto, 1fr)`: su mínimo es el contenido, así que un hijo ancho
+   (una tarjeta con texto largo) ensancha la columna por encima del contenedor y la tarjeta se
+   sale de la pantalla. `minmax(0, 1fr)` permite que la columna encoja y que el texto fluya. */
+.app.mobile .grid.g-2, .app.mobile .grid.g-3 { grid-template-columns: minmax(0, 1fr) !important; }
+.app.mobile .grid.g-4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+/* Misma razón: ninguna tarjeta debe imponer su ancho mínimo al contenedor. */
+.app.mobile .grid > * { min-width: 0; }
 
 /* densidad compacta (tweak) */
 [data-density='compacta'] .page { gap: 13px; }

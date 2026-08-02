@@ -14,6 +14,16 @@ const outfit = Outfit({
   display: 'swap',
 });
 
+// El teclado de Android debe encoger el viewport de layout: si no, las capas fijas a
+// pantalla completa dejan sus controles inferiores por debajo del teclado. `viewport-fit=cover`
+// habilita las safe-area-inset que ya usa el Studio.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+};
+
 export const metadata = {
   metadataBase: new URL(getPublicSiteUrl()),
   title: {

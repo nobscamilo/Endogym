@@ -2,7 +2,10 @@
 <html lang="es" data-theme="dark" data-accent="ambar" data-density="comoda" data-coach="gradiente">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- interactive-widget=resizes-content: sin esto, al abrir el teclado en Android el
+       viewport de layout NO encoge, y una capa fija a pantalla completa (el chat del
+       coach) deja su fila de entrada DEBAJO del teclado: el botón de enviar desaparece. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Ignios Studio</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <!-- Fuentes del diseño: Bricolage Grotesque (display) · Manrope (body) · Space Mono (mono) -->
@@ -26,6 +29,6 @@
 
   <!-- Bundle de producción: React + Firebase + Studio compilados (sin Babel-in-browser ni CDN).
        Se regenera con `node scripts/build-studio.mjs` (corre en `npm run prebuild`). -->
-  <script src="studio.bundle.js?v=5fb8f4e203" defer></script>
+  <script src="studio.bundle.js?v=83ffe1fec4" defer></script>
 </body>
 </html>
