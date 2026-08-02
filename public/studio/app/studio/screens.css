@@ -114,7 +114,10 @@
 [data-coach='sutil'] .coach .btn { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 
 /* tiles resumen */
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+/* `repeat(3, 1fr)` no encoge por debajo del contenido: una etiqueta larga como
+   "Moderada-alta" empujaba el tercer tile fuera de la tarjeta en móvil. */
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tile { min-width: 0; overflow-wrap: anywhere; }
 .tile { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; }
 .tile .t-num { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; }
 .tile .t-lbl { font-size: 0.72rem; color: var(--ink-2); margin-top: 4px; font-weight: 600; }

@@ -403,6 +403,40 @@ function describeCompletion(day, workouts) {
   };
 }
 
+
+/**
+ * Vista previa de un día FUTURO del plan: qué toca entrenar y qué comer.
+ *
+ * Motivo (2-ago-2026): el dato de mañana ya estaba en el plan guardado, pero para verlo había
+ * que ir a Entreno → semana y a Nutrición → carrusel de días, dos sitios distintos y ninguno
+ * respondía a "¿qué me espera mañana?". Poder anticipar el día siguiente es lo que permite
+ * organizarse (compra, horarios), así que va en la pantalla de inicio.
+ */
+export function mapDayPreview(plan, dateKey) {
+  const day = (Array.isArray(plan?.days) ? plan.days : []).find((d) => d?.date === dateKey);
+  if (!day) return null;
+  const nt = day.nutritionTarget || null;
+  const esDescanso = day.isTrainingDay === false || !day.workout;
+  return {
+    date: dateKey,
+    isRest: esDescanso,
+    title: esDescanso ? 'Descanso' : (day.workout?.title || 'Sesión'),
+    focus: day.sessionFocus || day.workout?.sessionFocus || '',
+    durationMin: esDescanso ? null : (day.workout?.durationMinutes || null),
+    intensity: esDescanso ? null : rpeLabel(day.workout?.intensityRpe),
+    runTargetKm: day.workout?.runPrescription?.targetKm ?? null,
+    runTargetPace: day.workout?.runPrescription?.targetPace ?? null,
+    nutrition: nt ? {
+      calories: nt.calories ?? null,
+      proteinGrams: nt.proteinGrams ?? null,
+      carbsGrams: nt.carbsGrams ?? null,
+      fatGrams: nt.fatGrams ?? null,
+      carbLevel: nt.carbLevel ?? null,
+      carbTiming: nt.carbTiming ?? null,
+    } : null,
+  };
+}
+
 export function mapTodaySession(plan, today, workouts = [], profile = null, { exact = false, retroactive = false } = {}) {
   const days = plan?.days;
   if (!Array.isArray(days) || !days.length) return null;
@@ -927,6 +961,8 @@ export async function GET(request) {
         runPacesNotice: displayPlan?.runPacesNotice || null,
         runPacesSource: displayPlan?.runPacesSource || null,
         todaySession: mapTodaySession(displayPlan, today, workouts, profile),
+        // Lo que viene: sin esto había que buscar en dos pantallas para saber qué toca mañana.
+        tomorrowPreview: mapDayPreview(displayPlan, addDaysToDateKey(today, 1)),
         week: weekData?.days || [],
         weekVolumeHours: weekData?.volumeHours ?? null,
         library: mapLibrary(displayPlan) || [],

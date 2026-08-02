@@ -113,6 +113,9 @@ function TodayHub({ go, variant }) {
         </SectionCard>
       </div>
 
+      {/* Mañana: el dato ya estaba en el plan, pero había que buscarlo en dos pantallas. */}
+      <TomorrowCard go={go} />
+
       {/* Nutrición glance + peso */}
       <div className="grid g-2">
         <SectionCard title="Nutrición de hoy" icon="nutrition"
@@ -182,6 +185,42 @@ function HeroAnillos({ go }) {
         </div>
       </div>
     </div>
+  );
+}
+
+
+/* ---- Mañana: qué toca entrenar y qué comer, para poder organizarse con antelación ---- */
+function TomorrowCard({ go }) {
+  const t = window.STUDIO.tomorrowPreview;
+  if (!t) return null;
+  const n = t.nutrition;
+  return (
+    <SectionCard title="Mañana" icon="chevronRight"
+      sub={t.isRest ? 'Día de descanso' : 'Lo que te espera, para que puedas organizarte'}
+      action={<button className="btn ghost sm" onClick={() => go('train')}>Ver semana</button>}>
+      <div className="row between wrap" style={{ gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em' }}>{t.title}</div>
+          <div className="muted tiny" style={{ marginTop: 2 }}>
+            {[
+              t.durationMin ? `${t.durationMin} min` : null,
+              t.runTargetKm ? `${t.runTargetKm} km` : null,
+              t.runTargetPace ? `a ${t.runTargetPace}` : null,
+              t.intensity || null,
+            ].filter(Boolean).join(' · ') || 'Sin sesión programada'}
+          </div>
+        </div>
+        {n && n.calories ? (
+          <div style={{ textAlign: 'right', minWidth: 0 }}>
+            <div className="num" style={{ fontWeight: 700 }}>{n.calories} kcal</div>
+            <div className="muted tiny" style={{ marginTop: 2 }}>{n.proteinGrams}P · {n.carbsGrams}C · {n.fatGrams}G</div>
+          </div>
+        ) : null}
+      </div>
+      {n && n.carbTiming ? (
+        <p className="tiny muted" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{n.carbTiming}</p>
+      ) : null}
+    </SectionCard>
   );
 }
 
