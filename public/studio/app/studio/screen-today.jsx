@@ -113,8 +113,8 @@ function TodayHub({ go, variant }) {
         </SectionCard>
       </div>
 
-      {/* Mañana: el dato ya estaba en el plan, pero había que buscarlo en dos pantallas. */}
-      <TomorrowCard go={go} />
+      {/* Próximos días: el dato ya estaba en el plan, pero había que buscarlo en dos pantallas. */}
+      <UpcomingCard go={go} />
 
       {/* Nutrición glance + peso */}
       <div className="grid g-2">
@@ -189,37 +189,55 @@ function HeroAnillos({ go }) {
 }
 
 
-/* ---- Mañana: qué toca entrenar y qué comer, para poder organizarse con antelación ---- */
-function TomorrowCard({ go }) {
-  const t = window.STUDIO.tomorrowPreview;
-  if (!t) return null;
-  const n = t.nutrition;
-  return (
-    <SectionCard title="Mañana" icon="chevronRight"
-      sub={t.isRest ? 'Día de descanso' : 'Lo que te espera, para que puedas organizarte'}
-      action={<button className="btn ghost sm" onClick={() => go('train')}>Ver semana</button>}>
-      <div className="row between wrap" style={{ gap: 12, alignItems: 'flex-start' }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em' }}>{t.title}</div>
+/* ---- Próximos días: planificar con antelación (compra, horarios) ----
+   Un solo día no basta para organizarse; se muestran 7 con la sesión y el objetivo de
+   calorías de cada uno. Mañana va destacado porque es el que más se consulta. */
+function UpcomingCard({ go }) {
+  const dias = Array.isArray(window.STUDIO.upcomingDays) ? window.STUDIO.upcomingDays : [];
+  const [abierto, setAbierto] = useStateT(false);
+  if (!dias.length) return null;
+  const visibles = abierto ? dias : dias.slice(0, 1);
+  const totalKcal = dias.reduce((a, d) => a + (d.nutrition?.calories || 0), 0);
+  const sesiones = dias.filter((d) => !d.isRest).length;
+
+  const linea = (d, i) => {
+    const detalle = d.isRest ? 'Descanso' : [
+      d.durationMin ? `${d.durationMin} min` : null,
+      d.runTargetKm ? `${d.runTargetKm} km` : null,
+      d.runTargetPace ? `a ${d.runTargetPace}` : null,
+    ].filter(Boolean).join(' · ');
+    return (
+      <div key={d.date} className="row between wrap" style={{
+        gap: 10, alignItems: 'flex-start', padding: '10px 0',
+        borderBottom: i < visibles.length - 1 ? '1px solid var(--line)' : 'none',
+      }}>
+        <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'capitalize' }}>
+            {i === 0 && !abierto ? 'Mañana' : `${d.dayName} ${d.dayNumber}`}
+            {i === 0 && abierto ? <span className="pill tiny" style={{ marginLeft: 8 }}>Mañana</span> : null}
+          </div>
           <div className="muted tiny" style={{ marginTop: 2 }}>
-            {[
-              t.durationMin ? `${t.durationMin} min` : null,
-              t.runTargetKm ? `${t.runTargetKm} km` : null,
-              t.runTargetPace ? `a ${t.runTargetPace}` : null,
-              t.intensity || null,
-            ].filter(Boolean).join(' · ') || 'Sin sesión programada'}
+            {d.isRest ? 'Descanso' : d.title}{detalle && !d.isRest ? ` · ${detalle}` : ''}
           </div>
         </div>
-        {n && n.calories ? (
-          <div style={{ textAlign: 'right', minWidth: 0 }}>
-            <div className="num" style={{ fontWeight: 700 }}>{n.calories} kcal</div>
-            <div className="muted tiny" style={{ marginTop: 2 }}>{n.proteinGrams}P · {n.carbsGrams}C · {n.fatGrams}G</div>
+        {d.nutrition?.calories ? (
+          <div style={{ textAlign: 'right', flex: '0 0 auto' }}>
+            <div className="num" style={{ fontWeight: 700, fontSize: '0.92rem' }}>{d.nutrition.calories} kcal</div>
+            <div className="muted tiny">{d.nutrition.proteinGrams}P · {d.nutrition.carbsGrams}C · {d.nutrition.fatGrams}G</div>
           </div>
         ) : null}
       </div>
-      {n && n.carbTiming ? (
-        <p className="tiny muted" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{n.carbTiming}</p>
-      ) : null}
+    );
+  };
+
+  return (
+    <SectionCard title="Próximos días" icon="chevronRight"
+      sub={abierto ? `${sesiones} sesiones y ${Math.round(totalKcal / dias.length)} kcal de media` : 'Lo que te espera, para que puedas organizarte'}
+      action={<button className="btn ghost sm" onClick={() => go('train')}>Ver semana</button>}>
+      {visibles.map(linea)}
+      <button className="btn ghost sm" style={{ marginTop: 10, alignSelf: 'flex-start' }} onClick={() => setAbierto(!abierto)}>
+        {abierto ? 'Ver solo mañana' : `Ver los próximos ${dias.length} días`}
+      </button>
     </SectionCard>
   );
 }

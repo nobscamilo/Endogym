@@ -419,6 +419,9 @@ export function mapDayPreview(plan, dateKey) {
   const esDescanso = day.isTrainingDay === false || !day.workout;
   return {
     date: dateKey,
+    // Nombre del día: en una lista de 7, la fecha sola obliga a contar con los dedos.
+    dayName: new Intl.DateTimeFormat('es-ES', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${dateKey}T12:00:00Z`)),
+    dayNumber: Number(dateKey.slice(8, 10)),
     isRest: esDescanso,
     title: esDescanso ? 'Descanso' : (day.workout?.title || 'Sesión'),
     focus: day.sessionFocus || day.workout?.sessionFocus || '',
@@ -961,8 +964,9 @@ export async function GET(request) {
         runPacesNotice: displayPlan?.runPacesNotice || null,
         runPacesSource: displayPlan?.runPacesSource || null,
         todaySession: mapTodaySession(displayPlan, today, workouts, profile),
-        // Lo que viene: sin esto había que buscar en dos pantallas para saber qué toca mañana.
-        tomorrowPreview: mapDayPreview(displayPlan, addDaysToDateKey(today, 1)),
+        // Lo que viene. Un solo día no basta para planificar (compra, horarios, quedadas):
+        // se envían los próximos 7, que es el horizonte con el que se organiza una semana.
+        upcomingDays: Array.from({ length: 7 }, (_, i) => mapDayPreview(displayPlan, addDaysToDateKey(today, i + 1))).filter(Boolean),
         week: weekData?.days || [],
         weekVolumeHours: weekData?.volumeHours ?? null,
         library: mapLibrary(displayPlan) || [],
