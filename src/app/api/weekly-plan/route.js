@@ -1,32 +1,10 @@
-import { buildHeuristicCoachPlan, generateWeeklyPlan, generateBlockPlan, normalizeWeeklyPlanSessionFocus } from '../../../core/planner.js';
+import { buildHeuristicCoachPlan, generateWeeklyPlan, generateBlockPlan, normalizeWeeklyPlanSessionFocus, applyCoachAdjustments } from '../../../core/planner.js';
 import { buildActiveBlockAdaptiveOverlay, isActiveBlockPlan } from '../../../core/activeBlockOverlay.js';
 import {
   getMissingPrescriptionProfileFields,
   PROFILE_FIELD_LABELS,
 } from '../../../core/profileCompleteness.js';
 
-// Aplica los ajustes estructurados del coach IA al plan, SIEMPRE dentro de límites de seguridad
-// (carga ±10%, series ±1) y solo a ejercicios de fuerza existentes. Devuelve cuántos aplicó.
-function applyCoachAdjustments(days, adjustments) {
-  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-  let applied = 0;
-  for (const adj of (adjustments || [])) {
-    const dayKey = norm(adj.day);
-    const day = (days || []).find((d) => dayKey.includes(norm(d.dayName)) || (d.date && dayKey.includes(String(d.date))) || norm(d.workout?.title) === norm(adj.day));
-    if (!day || !Array.isArray(day.workout?.exercises)) continue;
-    const ex = day.workout.exercises.find((e) => norm(e.name) === norm(adj.exercise));
-    if (!ex || !ex.prescription || ex.prescription.format !== 'reps') continue;
-    const loadPct = Math.min(1.1, Math.max(0.9, Number(adj.loadPct) || 1));
-    const setsDelta = Math.min(1, Math.max(-1, Math.round(Number(adj.setsDelta) || 0)));
-    if (ex.prescription.loadKg != null && loadPct !== 1) {
-      ex.prescription.loadKg = Math.round((ex.prescription.loadKg * loadPct) / 2.5) * 2.5;
-    }
-    if (setsDelta) ex.prescription.sets = Math.max(1, (Number(ex.prescription.sets) || 3) + setsDelta);
-    ex.prescription.coachAdjusted = true;
-    applied += 1;
-  }
-  return applied;
-}
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
 import { recordAiMetric, fallbackReasonField } from '../../../lib/aiMetrics.js';
 import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
