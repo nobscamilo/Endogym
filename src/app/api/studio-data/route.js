@@ -274,10 +274,18 @@ function rpeAvg(rpe) {
     if (Number.isFinite(a)) return a;
     if (Number.isFinite(b)) return b;
   }
+  // BUG (27-sep-2026): el plan guarda la intensidad como TEXTO ("RPE 5-8") y aquí solo se
+  // entendían números u objetos → devolvía null y TODAS las sesiones salían "Moderada" y con la
+  // misma barra de carga en Semana, fuera un rodaje suave o unas series.
+  if (typeof rpe === 'string') {
+    const nums = (rpe.match(/\d+(?:[.,]\d+)?/g) || []).map((n) => Number(n.replace(',', '.'))).filter(Number.isFinite);
+    if (nums.length >= 2) return (nums[0] + nums[1]) / 2;
+    if (nums.length === 1) return nums[0];
+  }
   return null;
 }
 
-function rpeLabel(rpe) {
+export function rpeLabel(rpe) {
   const v = rpeAvg(rpe);
   if (v == null) return 'Moderada';
   if (v < 5) return 'Suave';

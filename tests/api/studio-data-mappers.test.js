@@ -21,7 +21,7 @@ vi.mock('../../src/lib/logger.js', () => ({
   logInfo: vi.fn(),
 }));
 
-const { GET, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
+const { GET, rpeLabel, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
 
 const PLAN = {
   days: [
@@ -412,5 +412,14 @@ describe('mapTodaySession — reconoce el entreno ya hecho', () => {
       { source: 'strava', performedAt: '2026-08-02T18:00:00Z', completed: true, durationMinutes: 52 },
     ]);
     expect(out.list.every((x) => x.done === false)).toBe(true);
+  });
+});
+
+describe('rpeLabel — la intensidad guardada como texto', () => {
+  it('distingue un rodaje suave de unas series (antes todo salía "Moderada")', () => {
+    expect(rpeLabel('RPE 3-4')).toBe('Suave');
+    expect(rpeLabel('RPE 6-7')).toBe('Moderada');
+    expect(rpeLabel('RPE 8-9')).toBe('Alta');
+    expect(rpeLabel(null)).toBe('Moderada');
   });
 });
