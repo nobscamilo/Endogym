@@ -13,6 +13,8 @@ Hallazgos de las sondas reales (`scratch/gemini3-probe-2026-09-27.mjs`, `scratch
 
 Implementación: `adaptGenerationConfigForModel` (`googleGenAiTransport.js`) traduce UNA vez, dentro de `requestGoogleGenerateContent`, la config "de 2.5" de todos los flujos: en 3.x fuerza `temperature:1.0`, `thinkingBudget:0` → nivel más bajo admitido (`low` en 3.7+/Pro, `minimal` en ≤3.6), `thinkingBudget>0` (reintentos anti-bucle) → `medium`, y suma margen al tope de salida (+1024 low / +2048 medium) porque el pensamiento cuenta dentro de `maxOutputTokens`. En 2.5 no toca nada → **rollback = cambiar las env `GEMINI_MODEL*` en Vercel a `gemini-2.5-flash` y redeploy**, sin código. `DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'`. El freno de gasto (`aiBudget.js`) y `ai_cost_report.mjs` usan precios por día (`TOKEN_PRICE_PERIODS`: 2.5 hasta el 27-sep, 3.8 promo, 3.8 lista desde 2027). Embeddings siguen en `gemini-embedding-001` (cierre anunciado 14-may-2028; migrar a `gemini-embedding-2` exige re-embeber 7.128 pasajes y otro índice).
 
+Observabilidad: `tokensFromGeminiResponse` recoge `modelVersion` y `recordAiMetric` lo cuenta en `aiMetrics/{día}.{endpoint}.models.{modelo}` (puntos → `_`); `ai_cost_report.mjs` imprime "Modelos que respondieron". Es la prueba de qué modelo corre en producción (las env de Vercel no se leen desde el MCP).
+
 Evals antes/después (mismo código, solo cambia el modelo):
 - Chat (`coach_evals --repeat=3`): 2.5 = 18/18; 3.8 = 18/18 tras dos arreglos (margen de pensamiento; y la regex de `perdida_agresiva` marcaba como fallo "déficit de 500 kcal", la recomendación estándar — falso positivo corregido con lookbehind).
 - Plan semanal (`weekly_plan_evals --repeat=2`): 2.5 = 2/2 limpias, 15/15 ajustes, 9,4 s; 3.8 = 2/2, 6/6, **7,5 s**.

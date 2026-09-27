@@ -65,6 +65,17 @@ describe('aiMetrics — observabilidad de IA (20-jul-2026)', () => {
     expect(tokensFromGeminiResponse({})).toEqual({ tokensIn: 0, tokensOut: 0, tokensThink: 0, tokensCached: 0 });
   });
 
+  it('registra el modelo que respondió (modelVersion) como contador anidado por endpoint', async () => {
+    const usage = tokensFromGeminiResponse({ modelVersion: 'gemini-3.8-flash', usageMetadata: { promptTokenCount: 10 } });
+    expect(usage.model).toBe('gemini-3.8-flash');
+    await recordAiMetric('coach-chat', { calls: 1, ...usage });
+    const arg = mocks.update.mock.calls[0][0];
+    expect(arg['coach-chat.models.gemini-3_8-flash']).toEqual({ __inc: 1 });
+    mocks.update.mockRejectedValue(new Error('NOT_FOUND'));
+    await recordAiMetric('coach-chat', { calls: 2, model: 'gemini-3.8-flash' });
+    expect(mocks.set.mock.calls[0][0]['coach-chat'].models).toEqual({ 'gemini-3_8-flash': { __inc: 2 } });
+  });
+
   it('addTokenUsage acumula entre llamadas de una misma operación (trozos de nutrición)', () => {
     const total = addTokenUsage(
       { tokensIn: 900, tokensOut: 600 },

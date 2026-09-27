@@ -52,6 +52,12 @@ export async function recordAiMetric(endpoint, fields = {}) {
         increments[key] = Math.round(n);
       }
     }
+    // Contador por modelo dentro del mapa del endpoint: { ep: { models: { 'gemini-3_8-flash': n } } }.
+    // Firestore interpreta el punto como ruta, así que se sustituye por '_'.
+    const modelKey = typeof fields.model === 'string'
+      ? fields.model.replace(/[^a-z0-9_-]/gi, '_').slice(0, 60)
+      : '';
+    if (modelKey) increments[`models.${modelKey}`] = Math.max(1, Math.round(Number(fields.calls) || 1));
     if (!Object.keys(increments).length) return;
     const { db } = await getAdminServices();
     const day = new Date().toISOString().slice(0, 10);
@@ -66,7 +72,14 @@ export async function recordAiMetric(endpoint, fields = {}) {
     } catch {
       // El doc del día aún no existe: créalo con la forma anidada equivalente.
       const nested = { updatedAt: updates.updatedAt, [ep]: {} };
-      for (const [key, n] of Object.entries(increments)) nested[ep][key] = FieldValue.increment(n);
+      for (const [key, n] of Object.entries(increments)) {
+        if (key.startsWith('models.')) {
+          nested[ep].models = nested[ep].models || {};
+          nested[ep].models[key.slice(7)] = FieldValue.increment(n);
+        } else {
+          nested[ep][key] = FieldValue.increment(n);
+        }
+      }
       await ref.set(nested, { merge: true });
     }
   } catch { /* best-effort: nunca propagar */ }
@@ -82,6 +95,9 @@ export function tokensFromGeminiResponse(data) {
     tokensOut: Number(usage?.candidatesTokenCount) || 0,
     tokensThink: Number(usage?.thoughtsTokenCount) || 0,
     tokensCached: Number(usage?.cachedContentTokenCount) || 0,
+    // Modelo que REALMENTE respondió (27-sep-2026): sin esto no había forma de auditar qué
+    // modelo corría en producción sin leer las env de Vercel. Solo si la API lo devuelve.
+    ...(typeof data?.modelVersion === 'string' && data.modelVersion ? { model: data.modelVersion } : {}),
   };
 }
 
@@ -92,5 +108,6 @@ export function addTokenUsage(a = {}, b = {}) {
     tokensOut: (Number(a.tokensOut) || 0) + (Number(b.tokensOut) || 0),
     tokensThink: (Number(a.tokensThink) || 0) + (Number(b.tokensThink) || 0),
     tokensCached: (Number(a.tokensCached) || 0) + (Number(b.tokensCached) || 0),
+    ...((b.model || a.model) ? { model: b.model || a.model } : {}),
   };
 }

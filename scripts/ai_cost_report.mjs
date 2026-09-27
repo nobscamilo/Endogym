@@ -72,6 +72,17 @@ function costOf(m, day) {
 }
 
 const totals = {};
+// Modelos que respondieron por endpoint (contador `models`, desde el 27-sep-2026).
+const modelsSeen = {};
+for (const { data } of days) {
+  for (const [ep, v] of Object.entries(data || {})) {
+    if (v && typeof v === 'object' && v.models && typeof v.models === 'object') {
+      modelsSeen[ep] = modelsSeen[ep] || {};
+      for (const [m, n] of Object.entries(v.models)) modelsSeen[ep][m] = (modelsSeen[ep][m] || 0) + (Number(n) || 0);
+    }
+  }
+}
+
 const alerts = [];
 console.log(`\n=== Coste de IA por día (${from} → ${to}) ===`);
 for (const { day, data } of days) {
@@ -148,6 +159,10 @@ for (const [ep, t] of rows) {
   }
 }
 
+if (Object.keys(modelsSeen).length) {
+  console.log('\n=== Modelos que respondieron ===');
+  for (const [ep, ms] of Object.entries(modelsSeen)) console.log(`${ep.padEnd(22)} ${Object.entries(ms).map(([m, n]) => `${m.replace(/_/g, '.')}×${n}`).join(' · ')}`);
+}
 console.log('\nNota: coste ESTIMADO con la tabla TOKEN_PRICE_PERIODS de src/lib/aiBudget.js (2.5 Flash hasta el 27-sep-2026; 3.8 Flash después, promo hasta fin de 2026). Contrasta con la factura real de GCP.');
 console.log('"cacheado" es la fracción de tokens de entrada que Gemini sirvió de su caché de prefijo: sube si el bloque estable del prompt (persona, base científica) no cambia entre llamadas.');
 
