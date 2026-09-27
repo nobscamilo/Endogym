@@ -328,14 +328,7 @@ function CoachCard({ go }) {
             vez de seguir invitándote a empezar. Los datos son los reales de la actividad. */}
         {s.done ? (
           <p>
-            Sesión hecha{s.doneSource === 'strava' ? ', importada de Strava' : ''}
-            {s.doneSummary ? `: ${[
-              s.doneSummary.distanceKm ? `${s.doneSummary.distanceKm} km` : null,
-              s.doneSummary.durationMin ? `${s.doneSummary.durationMin} min` : null,
-              s.doneSummary.avgHeartRate ? `FC ${s.doneSummary.avgHeartRate} ppm` : null,
-              s.doneSummary.sessionRpe ? `RPE ${s.doneSummary.sessionRpe}/10`
-                : (s.doneSummary.sessionRpeEstimated ? `RPE ~${s.doneSummary.sessionRpeEstimated}/10 estimado por FC` : null),
-            ].filter(Boolean).join(' · ')}` : ''}.
+            Sesión hecha{s.doneSource === 'strava' ? ', importada de Strava' : ''}{doneSummaryText(s) ? `: ${doneSummaryText(s)}` : ''}.
           </p>
         ) : (
           <p>El coach adapta tu entrenamiento y nutrición a tus datos. Abre tu sesión, regístrala con el check-in o pregúntale lo que quieras en Progreso.</p>
@@ -343,8 +336,9 @@ function CoachCard({ go }) {
         <div className="coach-chips">
           {s.done ? <span><Icon name="check" size={14} /> Hecha</span> : null}
           {rec != null ? <span><Icon name="target" size={14} /> Disposición {rec}%</span> : null}
-          {s.intensity ? <span><Icon name="bolt" size={14} /> {s.intensity}</span> : null}
-          {s.focus ? <span><Icon name="train" size={14} /> {s.focus}</span> : null}
+          {/* En descanso no hay intensidad ni foco que mostrar (antes salía "recovery", el id interno). */}
+          {s.intensity && !s.isRestDay ? <span><Icon name="bolt" size={14} /> {s.intensity}</span> : null}
+          {s.focus && !s.isRestDay ? <span><Icon name="train" size={14} /> {typeof sessionFocusLabel === 'function' ? sessionFocusLabel(s.focus) : s.focus}</span> : null}
         </div>
       </div>
       <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => go('train')}>Ver sesión de hoy <Icon name="arrowRight" size={17} /></button>

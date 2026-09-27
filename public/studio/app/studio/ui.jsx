@@ -317,7 +317,7 @@ function doneSummaryText(s) {
     d.distanceKm ? `${String(Math.round(d.distanceKm * 10) / 10).replace('.', ',')} km` : null,
     d.durationMin ? `${Math.round(d.durationMin)} min` : null,
     d.avgHeartRate ? `FC ${Math.round(d.avgHeartRate)} ppm` : null,
-    d.sessionRpe ? `RPE ${d.sessionRpe}/10` : (d.sessionRpeEstimated ? `RPE ~${d.sessionRpeEstimated}/10 (estimado por FC)` : null),
+    d.sessionRpe ? `RPE ${d.sessionRpe}/10` : (d.sessionRpeEstimated ? `RPE ~${Math.round(d.sessionRpeEstimated)}/10 (estimado por FC)` : null),
   ].filter(Boolean).join(' · ');
 }
 
