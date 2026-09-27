@@ -17,7 +17,8 @@ import { buildExerciseCoachPrompt } from '../src/services/exerciseCoachPrompt.js
 import { retrieveGuidelinesContext } from '../src/services/guidelinesRetriever.js';
 import { getUserProfile, getLatestWeeklyPlan, getLastDoneWorkoutAt } from '../src/lib/repositories/firestoreRepository.js';
 
-const PRICES = { in: 0.30 / 1e6, out: 2.50 / 1e6 }; // gemini-2.5-flash, jul-2026
+import { tokenPricesFor } from '../src/lib/aiBudget.js';
+const PRICES = tokenPricesFor(); // precios vigentes hoy (ver TOKEN_PRICE_PERIODS)
 const MODEL = process.env.GEMINI_MODEL_COACH || 'gemini-2.5-flash';
 
 const uid = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '58aICQYmu7g7IwooVfatiuP2HQ72';

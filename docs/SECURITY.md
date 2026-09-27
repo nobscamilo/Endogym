@@ -65,7 +65,7 @@ Estas medidas pasaron tests, `next start` local y verificación de cabeceras en 
 
 ## Configuracion Gemini
 
-- Usa identificadores estables `gemini-*`; produccion fija `gemini-2.5-flash`.
+- Usa identificadores estables `gemini-*`; produccion fija `gemini-3.8-flash` (env `GEMINI_MODEL*`; rollback a `gemini-2.5-flash` sin cambiar código).
 - El transporte rechaza nombres de modelo invalidos antes de formar el endpoint.
 - Los logs sustituyen identificadores invalidos por `<invalid-model>` para no persistir valores opacos.
 - El coach limita timeout y reintentos para responder con fallback antes del limite de Vercel.

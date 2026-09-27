@@ -38,6 +38,9 @@ function buildGeminiEndpoint(model) {
   return `${GEMINI_BASE_URL}/models/${normalizeGoogleAiModelName(model)}:generateContent`;
 }
 
+// Modelo de texto por defecto si no hay GEMINI_MODEL* en el entorno. 27-sep-2026: 3.8 Flash
+// (mismo precio que 3.6/3.7 Flash y el más reciente; ver docs/PROJECT_STATUS.md).
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 export const EMBEDDING_MODEL = 'gemini-embedding-001';
 export const EMBEDDING_DIMENSIONS = 768;
 
@@ -133,6 +136,50 @@ function normalizeSystemInstruction(systemInstruction) {
   return null;
 }
 
+/**
+ * Adaptación de `generationConfig` a la familia Gemini 3 (migración 27-sep-2026).
+ *
+ * Los call sites siguen escribiendo la configuración "de 2.5" (temperatura propia +
+ * `thinkingBudget`) y aquí se traduce UNA vez, así un rollback a 2.5 por variable de entorno
+ * no toca código. Motivos, verificados con la guía oficial y con sondas reales:
+ *  - Google recomienda "keeping the temperature parameter at its default value of 1.0" en
+ *    Gemini 3: por debajo puede entrar en bucles (lo mismo que vimos en 2.5 con esquema JSON).
+ *  - `thinkingBudget` se acepta por compatibilidad, pero `thinkingLevel` es lo recomendado y
+ *    no pueden ir juntos. Presupuesto 0 → el nivel más bajo que admite el modelo; >0 (los
+ *    reintentos anti-bucle) → 'medium'. 3.7/3.8 Flash y Pro NO admiten 'minimal' (HTTP 400).
+ */
+const THINKING_HEADROOM_TOKENS = { low: 1024, medium: 2048 };
+
+export function isGemini3OrLaterModel(model) {
+  const m = /^gemini-(\d+)/i.exec(String(model || '').trim());
+  return Boolean(m && Number(m[1]) >= 3);
+}
+
+export function lowestThinkingLevel(model) {
+  // 'minimal' existe en 3 / 3.1–3.6 Flash y Flash-Lite; 3.7+ y Pro empiezan en 'low'.
+  return /^gemini-3(\.[0-6])?-flash/i.test(String(model || '').trim()) ? 'minimal' : 'low';
+}
+
+export function adaptGenerationConfigForModel(model, generationConfig = {}) {
+  const config = { ...(generationConfig || {}) };
+  if (!isGemini3OrLaterModel(model)) return config;
+  config.temperature = 1.0;
+  const tc = config.thinkingConfig;
+  if (tc && tc.thinkingLevel == null && tc.thinkingBudget != null) {
+    const { thinkingBudget, ...rest } = tc;
+    const level = Number(thinkingBudget) > 0 ? 'medium' : lowestThinkingLevel(model);
+    config.thinkingConfig = { ...rest, thinkingLevel: level };
+    // En Gemini 3 el pensamiento CUENTA dentro de maxOutputTokens y no se puede apagar del
+    // todo: sonda real (27-sep) en el chat con tope 512 → thinkingBudget:0 pensó 488 tokens y
+    // cortó la respuesta a mitad de frase (MAX_TOKENS); 'low' pensó ~200. Se añade margen
+    // para que el tope siga limitando la RESPUESTA visible. Solo se factura lo que se usa.
+    if (Number.isFinite(Number(config.maxOutputTokens)) && level !== 'minimal') {
+      config.maxOutputTokens = Number(config.maxOutputTokens) + THINKING_HEADROOM_TOKENS[level];
+    }
+  }
+  return config;
+}
+
 export async function requestGoogleGenerateContent({
   model,
   generationConfig,
@@ -165,7 +212,7 @@ export async function requestGoogleGenerateContent({
   const timeout = setTimeout(() => controller.abort(), normalizedTimeoutMs);
   let response;
   
-  const normalizedConfig = { ...generationConfig };
+  const normalizedConfig = adaptGenerationConfigForModel(model, generationConfig);
   if (normalizedConfig.responseJsonSchema && !normalizedConfig.responseSchema) {
     normalizedConfig.responseSchema = normalizedConfig.responseJsonSchema;
     delete normalizedConfig.responseJsonSchema;

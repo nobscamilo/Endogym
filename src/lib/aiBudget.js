@@ -20,14 +20,33 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminServices } from './firebaseAdmin.js';
 import { logError, logInfo } from './logger.js';
 
-// gemini-2.5-flash (Developer API, jul-2026). Mismos precios que scripts/ai_cost_report.mjs.
-export const TOKEN_PRICES_USD = { in: 0.30 / 1e6, out: 2.50 / 1e6, cached: 0.075 / 1e6 };
+// Precios por 1M tokens (Gemini Developer API, tier de pago). El modelo cambió el 27-sep-2026
+// (gemini-2.5-flash → gemini-3.8-flash) y 3.x Flash tiene precio promocional hasta fin de 2026,
+// así que el precio depende del DÍA del gasto. Fuente: ai.google.dev/gemini-api/docs/pricing
+// (consultado 27-sep-2026). Si se vuelve a 2.5 por variable de entorno, esto SOBREESTIMA (el
+// freno salta antes, nunca después). Mismos tramos que scripts/ai_cost_report.mjs.
+export const TOKEN_PRICE_PERIODS = [
+  { from: '0000-00-00', model: 'gemini-2.5-flash', in: 0.30 / 1e6, out: 2.50 / 1e6, cached: 0.075 / 1e6 },
+  { from: '2026-09-28', model: 'gemini-3.8-flash (promo)', in: 0.75 / 1e6, out: 3.75 / 1e6, cached: 0.075 / 1e6 },
+  { from: '2027-01-01', model: 'gemini-3.8-flash', in: 1.50 / 1e6, out: 7.50 / 1e6, cached: 0.15 / 1e6 },
+];
 
-export function estimateCostUsd({ tokensIn = 0, tokensOut = 0, tokensThink = 0, tokensCached = 0 } = {}) {
-  const cost = (Number(tokensIn) || 0) * TOKEN_PRICES_USD.in
-    + ((Number(tokensOut) || 0) + (Number(tokensThink) || 0)) * TOKEN_PRICES_USD.out
+export function tokenPricesFor(dayKey = new Date().toISOString().slice(0, 10)) {
+  const key = String(dayKey || '').slice(0, 10);
+  let chosen = TOKEN_PRICE_PERIODS[0];
+  for (const period of TOKEN_PRICE_PERIODS) if (key >= period.from) chosen = period;
+  return chosen;
+}
+
+// Compatibilidad: precios vigentes HOY.
+export const TOKEN_PRICES_USD = tokenPricesFor();
+
+export function estimateCostUsd({ tokensIn = 0, tokensOut = 0, tokensThink = 0, tokensCached = 0 } = {}, dayKey) {
+  const P = tokenPricesFor(dayKey);
+  const cost = (Number(tokensIn) || 0) * P.in
+    + ((Number(tokensOut) || 0) + (Number(tokensThink) || 0)) * P.out
     // Lo cacheado ya viene contado dentro de tokensIn: aquí se aplica su descuento.
-    - (Number(tokensCached) || 0) * (TOKEN_PRICES_USD.in - TOKEN_PRICES_USD.cached);
+    - (Number(tokensCached) || 0) * (P.in - P.cached);
   return cost > 0 ? cost : 0;
 }
 
@@ -58,13 +77,13 @@ export function __resetAiBudgetCache() {
   globalCache = { day: null, spentUsd: 0, at: 0 };
 }
 
-function sumMetricsCost(data) {
+function sumMetricsCost(data, dayKey) {
   let total = 0;
   const flat = {};
   for (const [key, value] of Object.entries(data || {})) {
     if (key === 'updatedAt') continue;
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      total += estimateCostUsd(value);
+      total += estimateCostUsd(value, dayKey);
     } else if (key.includes('.')) {
       // Documentos legacy con claves planas ("coach-chat.tokensIn").
       const [ep, field] = key.split('.');
@@ -72,7 +91,7 @@ function sumMetricsCost(data) {
       flat[ep][field] = Number(value) || 0;
     }
   }
-  for (const m of Object.values(flat)) total += estimateCostUsd(m);
+  for (const m of Object.values(flat)) total += estimateCostUsd(m, dayKey);
   return total;
 }
 
@@ -82,7 +101,7 @@ async function readGlobalSpend(day, now) {
   }
   const { db } = await getAdminServices();
   const snap = await db.collection('aiMetrics').doc(day).get();
-  const spentUsd = snap.exists ? sumMetricsCost(snap.data()) : 0;
+  const spentUsd = snap.exists ? sumMetricsCost(snap.data(), day) : 0;
   globalCache = { day, spentUsd, at: now };
   return spentUsd;
 }
@@ -128,10 +147,10 @@ export async function checkAiBudget({ userId, now = new Date() } = {}) {
  * aiMetrics, que ya lo lleva.
  */
 export async function recordUserAiSpend(userId, tokens, now = new Date()) {
-  const costUsd = estimateCostUsd(tokens);
+  const day = budgetDayKey(now);
+  const costUsd = estimateCostUsd(tokens, day);
   if (!userId || !(costUsd > 0)) return;
   try {
-    const day = budgetDayKey(now);
     const { db } = await getAdminServices();
     const ref = db.collection('users').doc(userId).collection('aiBudget').doc(day);
     await ref.set({

@@ -5,6 +5,7 @@ import {
   isValidGoogleAiModelName,
   requestGoogleGenerateContent,
   resolveGoogleAiBackend,
+  DEFAULT_GEMINI_MODEL,
 } from './googleGenAiTransport.js';
 const RETRIABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 const MAX_ERROR_SNIPPET = 500;
@@ -205,7 +206,7 @@ export function isGeminiConfigured() {
 }
 
 export function resolveGeminiCoachModel() {
-  const model = process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const model = process.env.GEMINI_MODEL_COACH || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   return typeof model === 'string' ? model.trim() : model;
 }
 

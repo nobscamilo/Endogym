@@ -51,16 +51,23 @@ describe('aiBudget — freno de gasto', () => {
   });
 
   it('estimateCostUsd cobra la salida más cara que la entrada y descuenta lo cacheado', () => {
-    const soloEntrada = estimateCostUsd({ tokensIn: 1_000_000 });
-    const soloSalida = estimateCostUsd({ tokensOut: 1_000_000 });
+    const d = '2026-09-01'; // periodo gemini-2.5-flash
+    const soloEntrada = estimateCostUsd({ tokensIn: 1_000_000 }, d);
+    const soloSalida = estimateCostUsd({ tokensOut: 1_000_000 }, d);
     expect(soloEntrada).toBeCloseTo(0.30, 5);
     expect(soloSalida).toBeCloseTo(2.50, 5);
     // El pensamiento se factura como salida.
-    expect(estimateCostUsd({ tokensThink: 1_000_000 })).toBeCloseTo(2.50, 5);
+    expect(estimateCostUsd({ tokensThink: 1_000_000 }, d)).toBeCloseTo(2.50, 5);
     // Lo cacheado ya venía dentro de tokensIn: sale más barato, nunca negativo.
-    const conCache = estimateCostUsd({ tokensIn: 1_000_000, tokensCached: 1_000_000 });
+    const conCache = estimateCostUsd({ tokensIn: 1_000_000, tokensCached: 1_000_000 }, d);
     expect(conCache).toBeLessThan(soloEntrada);
     expect(conCache).toBeGreaterThanOrEqual(0);
+  });
+
+  it('aplica el precio del modelo vigente según el día (2.5 → 3.8 promo → 3.8 lista)', () => {
+    expect(estimateCostUsd({ tokensIn: 1_000_000, tokensOut: 1_000_000 }, '2026-09-27')).toBeCloseTo(2.80, 5);
+    expect(estimateCostUsd({ tokensIn: 1_000_000, tokensOut: 1_000_000 }, '2026-10-15')).toBeCloseTo(4.50, 5);
+    expect(estimateCostUsd({ tokensIn: 1_000_000, tokensOut: 1_000_000 }, '2027-02-01')).toBeCloseTo(9.00, 5);
   });
 
   it('deja pasar cuando ni el usuario ni el global han llegado al tope', async () => {

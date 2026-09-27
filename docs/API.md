@@ -87,7 +87,7 @@ Las **red flags no dependen del presupuesto**: se resuelven antes, sin IA, y sig
 
 ## Coaching semanal
 
-`POST /api/weekly-plan` genera la base del plan y solicita recomendaciones estructuradas a Gemini Developer API. Produccion usa `gemini-2.5-flash` estable, con latencia acotada y fallback ACSM observable. La sonda de produccion exige `coachSource=gemini` y `fallbackApplied=false`.
+`POST /api/weekly-plan` genera la base del plan y solicita recomendaciones estructuradas a Gemini Developer API. Produccion usa `gemini-3.8-flash` (desde el 27-sep-2026), con latencia acotada y fallback ACSM observable. La sonda de produccion exige `coachSource=gemini` y `fallbackApplied=false`.
 
 El coach puede devolver `structuredAdjustments` opcionales. El servidor solo aplica cambios acotados a ejercicios de fuerza existentes en el plan: `loadPct` queda limitado a `0.90..1.10`, `setsDelta` a `-1..1`, y los ejercicios inventados o sin match de día/nombre se ignoran. La progresion por historial depende de `exercises[].id` en los entrenos registrados; ese ID se conserva al persistir `/api/workouts`.
 

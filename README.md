@@ -41,7 +41,7 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 - Las fotos de platos usan el bucket privado `endogym-vtety8-plates-eu` del proyecto Firebase/GCP; escritura y borrado fueron verificados.
 - Gemini Developer API funciona en producción con una key restringida a `generativelanguage.googleapis.com`. La key expuesta previamente fue revocada y los servicios Vertex quedaron deshabilitados.
 - `POST /api/analyze-plate` fue verificado end-to-end: guarda foto, obtiene inferencia Gemini real, persiste la comida y conserva fallback observable para fallos futuros.
-- `POST /api/weekly-plan` genera coaching Gemini real con `gemini-2.5-flash`, presupuesto de latencia acotado y fallback heuristico observable.
+- `POST /api/weekly-plan` genera coaching Gemini real con `gemini-3.8-flash` (desde el 27-sep-2026; antes `gemini-2.5-flash`), presupuesto de latencia acotado y fallback heuristico observable.
 - `POST /api/coach-chat` usa Gemini con contexto real del usuario y rate limiting persistente (`coach-chat`, 20 preguntas/h por defecto).
 - El coach tiene persona única server-side, detector determinista de red flags sin Gemini/rate limit, RAG por pregunta, memoria conversacional acotada, digest nutricional/recuperación 7d y cierre del loop entre recomendaciones y evolución real.
 - El Análisis del coach de Progreso integra meta SMART y señales de carrera deterministas, expone “Consonancia con tu objetivo”, usa fallback específico por objetivo e invalida el caché cuando cambia cualquier dato relevante. Desplegado el 20 jun en `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`.

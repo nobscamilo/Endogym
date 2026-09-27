@@ -124,7 +124,7 @@ Auditoria posterior del **31 de mayo de 2026**:
 - `FIREBASE_PRIVATE_KEY` fue corregida en Vercel y parsea correctamente;
 - `/api/profile` y `/api/meals` autenticados responden `200`;
 - `/api/analyze-plate` responde `201`, guarda foto y usa Gemini live sin fallback;
-- `/api/weekly-plan` responde `201` y genera coaching Gemini live con `gemini-2.5-flash` sin fallback;
+- `/api/weekly-plan` responde `201` y genera coaching Gemini live con `gemini-3.8-flash` sin fallback;
 - el bucket privado `endogym-vtety8-plates-eu` tiene acceso uniforme y prevencion publica;
 - las fotos `plates/` caducan a los 30 dias y soft delete esta deshabilitado;
 - la key Gemini expuesta fue revocada y reemplazada por una key restringida a `generativelanguage.googleapis.com`;

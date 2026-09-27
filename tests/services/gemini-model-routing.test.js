@@ -308,12 +308,12 @@ describe('gemini model routing', () => {
     expect(() => resolveGoogleAiBackend()).toThrow(/Usa Gemini Developer API/);
   });
 
-  it('uses Gemini 2.5 Flash as the default coach model when no override exists', () => {
+  it('uses Gemini 3.8 Flash as the default coach model when no override exists', () => {
     process.env.GOOGLE_AI_BACKEND = 'gemini';
     process.env.GEMINI_MODEL = '';
     process.env.GEMINI_MODEL_COACH = '';
 
-    expect(resolveGeminiCoachModel()).toBe('gemini-2.5-flash');
+    expect(resolveGeminiCoachModel()).toBe('gemini-3.8-flash');
   });
 
   it('rejects an opaque encrypted value before calling Gemini coach', async () => {

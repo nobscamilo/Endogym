@@ -14,8 +14,8 @@
 // Uso: node --env-file=.env.local scripts/ai_cost_report.mjs [desde=YYYY-MM-DD] [hasta=YYYY-MM-DD] [--alert]
 //   --alert  sale con código 1 si algún umbral se supera (para tarea programada)
 import { getAdminServices } from '../src/lib/firebaseAdmin.js';
+import { estimateCostUsd } from '../src/lib/aiBudget.js';
 
-const PRICES = { in: 0.30 / 1e6, out: 2.50 / 1e6, cached: 0.075 / 1e6 };
 const COUNTERS = ['calls', 'errors', 'fallbacks', 'redFlags', 'truncated', 'feedbackUp', 'feedbackDown',
   'fbTimeout', 'fbHttp', 'fbParse', 'fbInvalid', 'fbNotConfigured', 'fbBudget', 'fbOther',
   'tokensIn', 'tokensOut', 'tokensThink', 'tokensCached'];
@@ -66,10 +66,9 @@ function normalize(data) {
   return out;
 }
 
-function costOf(m) {
-  return (m.tokensIn || 0) * PRICES.in
-    + ((m.tokensOut || 0) + (m.tokensThink || 0)) * PRICES.out
-    - (m.tokensCached || 0) * (PRICES.in - PRICES.cached); // el cacheado ya cuenta en tokensIn; aquí el descuento
+// Precio por DÍA (cambio de modelo 27-sep-2026 y promo de 3.x Flash): misma tabla que el freno.
+function costOf(m, day) {
+  return estimateCostUsd(m, day);
 }
 
 const totals = {};
@@ -80,7 +79,7 @@ for (const { day, data } of days) {
   let dayCost = 0;
   const parts = [];
   for (const [ep, m] of Object.entries(byEp)) {
-    const c = costOf(m);
+    const c = costOf(m, day);
     dayCost += c;
     totals[ep] = totals[ep] || Object.fromEntries([...COUNTERS.map((k) => [k, 0]), ['cost', 0]]);
     for (const k of COUNTERS) totals[ep][k] += m[k] || 0;
@@ -149,7 +148,7 @@ for (const [ep, t] of rows) {
   }
 }
 
-console.log('\nNota: coste ESTIMADO con precios de gemini-2.5-flash (jul-2026). Contrasta con la factura real de GCP; si el desglose por SKU difiere, ajusta PRICES en este script.');
+console.log('\nNota: coste ESTIMADO con la tabla TOKEN_PRICE_PERIODS de src/lib/aiBudget.js (2.5 Flash hasta el 27-sep-2026; 3.8 Flash después, promo hasta fin de 2026). Contrasta con la factura real de GCP.');
 console.log('"cacheado" es la fracción de tokens de entrada que Gemini sirvió de su caché de prefijo: sube si el bloque estable del prompt (persona, base científica) no cambia entre llamadas.');
 
 if (alerts.length) {

@@ -1,5 +1,5 @@
 import { buildPlateAnalysisPrompt } from './platePrompt.js';
-import { isGoogleAiConfigured, requestGoogleGenerateContent } from './googleGenAiTransport.js';
+import { DEFAULT_GEMINI_MODEL, isGoogleAiConfigured, requestGoogleGenerateContent } from './googleGenAiTransport.js';
 
 const PLATE_SCHEMA = {
   type: 'object',
@@ -111,7 +111,7 @@ export function isGeminiConfigured() {
 }
 
 export function resolveGeminiPlateModel() {
-  const model = process.env.GEMINI_MODEL_PLATE || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const model = process.env.GEMINI_MODEL_PLATE || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   return typeof model === 'string' ? model.trim() : model;
 }
 

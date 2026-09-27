@@ -84,7 +84,7 @@ users/{userId}/rateLimits/{scope}
 
 1. `POST /api/weekly-plan` genera la base determinista del plan.
 2. La API consume una ventana persistente de rate limit por usuario.
-3. El coach usa Gemini Developer API con `gemini-2.5-flash` estable.
+3. El coach usa Gemini Developer API con `gemini-3.8-flash` (desde el 27-sep-2026; la config se adapta a Gemini 3 en `adaptGenerationConfigForModel`).
 4. El transporte rechaza identificadores que no sigan el formato `gemini-*`.
 5. El coach usa `thinkingBudget=0`, timeout de 10 segundos por intento y un reintento.
 6. Si Gemini devuelve `structuredAdjustments`, el servidor aplica solo ajustes acotados a ejercicios de fuerza existentes.
