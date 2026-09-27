@@ -15,7 +15,7 @@ import {
 } from '../../../lib/repositories/firestoreRepository.js';
 import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
-import { collapseWorkoutsByDay, findDaySession } from '../../../core/sessionHistory.js';
+import { collapseWorkoutsByDay, findDaySession, workoutDayKey } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
 import { exerciseMediaUrls } from '../../../core/exerciseCatalog/mediaMap.js';
 import { resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
@@ -54,7 +54,7 @@ function mapRunZones(workouts, plan, profile) {
   const typeByDate = {};
   (plan?.days || []).forEach((d) => { if (d.workout?.runPrescription) typeByDate[d.date] = d.workout.runPrescription.runType; });
   const items = runs.slice(0, 8).map((w) => {
-    const date = String(w.performedAt || '').slice(0, 10);
+    const date = workoutDayKey(w);
     const runType = typeByDate[date] || null;
     const z = hrZone(Number(w.avgHeartRate), hrMax);
     const v = runType ? validateRunZone({ avgHr: Number(w.avgHeartRate), hrMax, runType }) : null;
@@ -81,7 +81,7 @@ function mapRecentWorkouts(workouts) {
       // Number(null) === 0 (finito): descarta null/'' antes de convertir para no mostrar 0 falsos.
       const pos = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
       return {
-        date: String(w.performedAt || '').slice(0, 10),
+        date: workoutDayKey(w),
         title: w.title || w.sportType || 'Sesión',
         source: w.source === 'strava' ? 'strava' : w.source === 'daily_checkin' ? 'checkin' : 'app',
         durationMin: pos(w.durationMinutes) ? Math.round(Number(w.durationMinutes)) : null,
@@ -171,7 +171,7 @@ function mapStrava(connection, workouts) {
     .filter((w) => w.source === 'strava')
     .slice(0, 8)
     .map((w) => ({
-      date: (w.performedAt || '').slice(0, 10),
+      date: workoutDayKey(w),
       title: w.title || w.sportType || 'Actividad',
       sport: w.sportType || '',
       distanceKm: w.distanceKm ?? null,
@@ -373,7 +373,7 @@ function describeCompletion(day, workouts) {
   const fecha = String(day?.date || '').slice(0, 10);
   if (!fecha) return {};
   const delDia = (Array.isArray(workouts) ? workouts : []).filter((w) => (
-    String(w?.performedAt || '').slice(0, 10) === fecha
+    workoutDayKey(w) === fecha
     && w?.completed !== false
     && w?.checkinSkipped !== true
   ));
@@ -423,7 +423,8 @@ export function mapDayPreview(plan, dateKey) {
     dayName: new Intl.DateTimeFormat('es-ES', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${dateKey}T12:00:00Z`)),
     dayNumber: Number(dateKey.slice(8, 10)),
     isRest: esDescanso,
-    title: esDescanso ? 'Descanso' : (day.workout?.title || 'Sesión'),
+    // "Recuperación activa" no es lo mismo que "Descanso": se conserva el título del plan.
+    title: esDescanso ? (day.workout?.title || 'Descanso') : (day.workout?.title || 'Sesión'),
     focus: day.sessionFocus || day.workout?.sessionFocus || '',
     durationMin: esDescanso ? null : (day.workout?.durationMinutes || null),
     intensity: esDescanso ? null : rpeLabel(day.workout?.intensityRpe),
@@ -592,69 +593,109 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
   return out;
 }
 
-export function mapWeek(plan, today, workouts = []) {
-  let days = plan?.days;
-  if (!Array.isArray(days) || !days.length) return null;
-  // Un bloque vencido no se presenta como la semana actual. El usuario debe regenerarlo.
-  if (!days.some((d) => d.date === today)) return null;
-  // En un bloque de varias semanas, muestra solo la SEMANA actual (lunes→domingo).
-  // La salida temprana anterior ya descartó bloques que no contienen "today".
-  if (days.length > 7) {
-    const ref = days.find((d) => d.date === today) ? new Date(today) : new Date(days[0].date);
-    if (!Number.isNaN(ref.getTime())) {
-      const js = ref.getUTCDay();
-      const monday = new Date(ref);
-      monday.setUTCDate(ref.getUTCDate() + (js === 0 ? -6 : 1 - js));
-      const mondayStr = monday.toISOString().slice(0, 10);
-      const sunday = new Date(monday);
-      sunday.setUTCDate(monday.getUTCDate() + 6);
-      const sundayStr = sunday.toISOString().slice(0, 10);
-      const windowed = days.filter((d) => d.date >= mondayStr && d.date <= sundayStr);
-      if (windowed.length) days = windowed;
-      else days = days.slice(0, 7);
-    } else {
-      days = days.slice(0, 7);
-    }
-  }
-  let plannedMinutes = 0;
-  const week = days.map((d) => {
-    const training = d.isTrainingDay;
-    const v = rpeAvg(d.workout?.intensityRpe);
-    const load = training ? Math.min(1, Math.max(0.4, (v || 7) / 10)) : 0.15;
-    const durMin = Number(d.workout?.durationMinutes);
-    if (training && Number.isFinite(durMin) && durMin > 0) plannedMinutes += durMin;
-    const row = {
-      day: shortWeekday(d.dayName, d.date),
-      date: dayNumber(d.date),
-      dateISO: d.date || null,
-      focus: d.workout?.title || d.sessionFocus || '',
-      tag: d.sessionFocus || '',
-      load: Number(load.toFixed(2)),
-    };
-    if (d.date === today) row.today = true;
-    if (!training) row.rest = true;
-    if (d.date && today) row.past = d.date < today;
-    // Historial REAL del día: si hay una sesión registrada (manual/check-in/Strava), se adjunta su
-    // resumen para poder revisar en Semana lo que de verdad se hizo (ejercicios/kg/reps/RPE).
-    const logged = findDaySession(workouts, d.date);
-    if (logged) {
-      row.logged = {
-        sources: logged.sources || [],
-        sessionRpe: logged.sessionRpe ?? null,
-        fatigue: logged.fatigue ?? null,
-        durationMinutes: Number(logged.durationMinutes) > 0 ? Number(logged.durationMinutes) : null,
-        distanceKm: Number(logged.distanceKm) > 0 ? Number(logged.distanceKm) : null,
-        lifts: (Array.isArray(logged.exercises) ? logged.exercises : [])
-          .filter((e) => e?.name)
-          .slice(0, 14)
-          .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, reps: e.reps ?? null, sets: e.sets ?? null })),
-      };
-    }
-    return row;
+/**
+ * Microciclos del bloque: tramos de 7 días contados desde el PRIMER día del bloque.
+ *
+ * Motivo (27-sep-2026): Semana mostraba la semana natural lunes→domingo. Un bloque que empieza
+ * en domingo (o a mitad de semana) dejaba la "semana actual" con 1 solo día, mientras Hoy ya
+ * enseñaba los 7 siguientes: las dos pantallas se contradecían. El microciclo es la unidad real
+ * con la que el planner reparte carga (rodaje/fuerza/intervalos/descanso…), así que es lo que se
+ * enseña, con navegación entre los microciclos del bloque.
+ */
+export function planMicrocycles(plan) {
+  const days = (Array.isArray(plan?.days) ? plan.days : [])
+    .filter((d) => d?.date)
+    .slice()
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  if (!days.length) return [];
+  // Por DISTANCIA EN DÍAS al inicio (no por posición): un plan con huecos de fecha no debe
+  // mezclar días de semanas distintas en el mismo microciclo.
+  const t0 = Date.parse(`${days[0].date}T00:00:00Z`);
+  const buckets = new Map();
+  days.forEach((d) => {
+    const k = Math.floor((Date.parse(`${d.date}T00:00:00Z`) - t0) / (7 * 86400000));
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(d);
   });
-  if (!week.length) return null;
-  const volumeHours = plannedMinutes > 0 ? Math.round((plannedMinutes / 60) * 10) / 10 : null;
-  return { days: week, volumeHours };
+  return [...buckets.keys()].sort((a, b) => a - b).map((k) => buckets.get(k));
+}
+
+function mapWeekRow(d, today, workouts) {
+  const training = d.isTrainingDay;
+  const v = rpeAvg(d.workout?.intensityRpe);
+  const load = training ? Math.min(1, Math.max(0.4, (v || 7) / 10)) : 0.15;
+  const row = {
+    day: shortWeekday(d.dayName, d.date),
+    date: dayNumber(d.date),
+    dateISO: d.date || null,
+    focus: d.workout?.title || d.sessionFocus || '',
+    tag: d.sessionFocus || '',
+    load: Number(load.toFixed(2)),
+  };
+  if (d.date === today) row.today = true;
+  if (!training) row.rest = true;
+  if (d.date && today) {
+    row.past = d.date < today;
+    row.future = d.date > today;
+  }
+  // Historial REAL del día: si hay una sesión registrada (manual/check-in/Strava), se adjunta su
+  // resumen para poder revisar en Semana lo que de verdad se hizo (ejercicios/kg/reps/RPE).
+  const logged = findDaySession(workouts, d.date);
+  if (logged) {
+    row.logged = {
+      sources: logged.sources || [],
+      title: logged.title || null,
+      sessionRpe: logged.sessionRpe ?? null,
+      fatigue: logged.fatigue ?? null,
+      durationMinutes: Number(logged.durationMinutes) > 0 ? Number(logged.durationMinutes) : null,
+      distanceKm: Number(logged.distanceKm) > 0 ? Number(logged.distanceKm) : null,
+      lifts: (Array.isArray(logged.exercises) ? logged.exercises : [])
+        .filter((e) => e?.name)
+        .slice(0, 14)
+        .map((e) => ({ name: e.name, kg: Number(e.weightKg) > 0 ? Number(e.weightKg) : null, reps: e.reps ?? null, sets: e.sets ?? null })),
+    };
+    // Entreno en un día de descanso: es carga real que no estaba en el plan. Se marca como
+    // "extra" para que se vea (y no se confunda con haber cumplido una sesión planificada).
+    if (!training) row.extra = true;
+  }
+  return row;
+}
+
+function shortDateLabel(dateKey) {
+  if (!dateKey) return '';
+  return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    .format(new Date(`${dateKey}T12:00:00Z`)).replace('.', '');
+}
+
+export function mapWeek(plan, today, workouts = []) {
+  const cycles = planMicrocycles(plan);
+  if (!cycles.length) return null;
+  // Un bloque vencido no se presenta como la semana actual. El usuario debe regenerarlo.
+  const currentIndex = cycles.findIndex((c) => c.some((d) => d.date === today));
+  if (currentIndex < 0) return null;
+  const weeks = cycles.map((c, index) => {
+    let plannedMinutes = 0;
+    const rows = c.map((d) => {
+      const durMin = Number(d.workout?.durationMinutes);
+      if (d.isTrainingDay && Number.isFinite(durMin) && durMin > 0) plannedMinutes += durMin;
+      return mapWeekRow(d, today, workouts);
+    });
+    const start = c[0].date;
+    const end = c[c.length - 1].date;
+    return {
+      index,
+      label: `Semana ${index + 1} de ${cycles.length}`,
+      range: `${shortDateLabel(start)} – ${shortDateLabel(end)}`,
+      start,
+      end,
+      current: index === currentIndex,
+      sessionsPlanned: c.filter((d) => d.isTrainingDay).length,
+      volumeHours: plannedMinutes > 0 ? Math.round((plannedMinutes / 60) * 10) / 10 : null,
+      days: rows,
+    };
+  });
+  const cur = weeks[currentIndex];
+  return { days: cur.days, volumeHours: cur.volumeHours, weeks, currentIndex };
 }
 
 export function mapLibrary(plan) {
@@ -823,16 +864,24 @@ export function mapProgress(metrics, workouts, plan, profile = null, todayKey = 
   // Antes se dividían todos los workouts de 60 días entre las sesiones del bloque actual: datos
   // antiguos podían saturar el resultado en 100% aunque el usuario no hubiese registrado nada.
   const planDays = Array.isArray(plan?.days) ? plan.days : [];
-  const weekStart = mondayDateKeyFor(todayKey);
-  const weekEnd = addDaysToDateKey(weekStart, 6);
+  // Ventana = MICROCICLO actual del bloque (igual que la pestaña Semana). Si no hay bloque que
+  // contenga hoy, se cae a la semana civil lunes→domingo.
+  const cycle = planMicrocycles(plan).find((c) => c.some((d) => d.date === todayKey)) || null;
+  const weekStart = cycle ? cycle[0].date : mondayDateKeyFor(todayKey);
+  const weekEnd = cycle ? cycle[cycle.length - 1].date : addDaysToDateKey(weekStart, 6);
   const weekPlanDays = planDays.filter((d) => d.isTrainingDay && d.date >= weekStart && d.date <= weekEnd);
   const duePlanDays = weekPlanDays.filter((d) => d.date <= todayKey);
-  const doneDayKeys = new Set(collapseWorkoutsByDay(wlist).map((w) => String(w.performedAt || '').slice(0, 10)));
+  const doneDayKeys = new Set(collapseWorkoutsByDay(wlist).map((w) => workoutDayKey(w)));
   const done = duePlanDays.filter((d) => doneDayKeys.has(d.date)).length;
   out.sessionsPlan = weekPlanDays.length;
   out.sessionsDue = duePlanDays.length;
   out.sessionsDone = done;
   out.adherence = duePlanDays.length ? Math.round((done / duePlanDays.length) * 100) : null;
+  // Sesiones EXTRA: días con entreno real que el plan tenía como descanso/recuperación (o fuera
+  // del plan) dentro de la ventana. Cuentan como carga (el motor adaptativo ya las recibe), pero
+  // NO inflan la adherencia, que mide cumplimiento de lo planificado.
+  const plannedTrainingKeys = new Set(planDays.filter((d) => d.isTrainingDay).map((d) => d.date));
+  out.sessionsExtra = [...doneDayKeys].filter((k) => k >= weekStart && k <= todayKey && k <= weekEnd && !plannedTrainingKeys.has(k)).length;
   const planVolMin = weekPlanDays.reduce((a, d) => a + (Number(d.workout?.durationMinutes) || 0), 0);
   if (planVolMin) out.volumeWk = Number((planVolMin / 60).toFixed(1));
 
@@ -840,7 +889,7 @@ export function mapProgress(metrics, workouts, plan, profile = null, todayKey = 
   const strain = [];
   for (let i = 6; i >= 0; i -= 1) {
     const key = addDaysToDateKey(todayKey, -i);
-    const w = wlist.find((x) => String(x.performedAt || '').slice(0, 10) === key);
+    const w = wlist.find((x) => workoutDayKey(x) === key);
     // El esfuerzo estimado por FC de las actividades de Strava también dibuja: si no, quien
     // entrena sin check-in veía la gráfica de carga siempre a cero teniendo entrenos reales.
     const rpe = Number.isFinite(Number(w?.sessionRpe)) ? Number(w.sessionRpe)
@@ -969,6 +1018,8 @@ export async function GET(request) {
         upcomingDays: Array.from({ length: 7 }, (_, i) => mapDayPreview(displayPlan, addDaysToDateKey(today, i + 1))).filter(Boolean),
         week: weekData?.days || [],
         weekVolumeHours: weekData?.volumeHours ?? null,
+        weeks: weekData?.weeks || [],
+        weekIndex: weekData?.currentIndex ?? null,
         library: mapLibrary(displayPlan) || [],
         macroTargets: mapMacroTargets(displayPlan, today),
         macroEaten: mapMacroEaten(todayMeals),

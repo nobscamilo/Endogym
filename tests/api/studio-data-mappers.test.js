@@ -206,6 +206,73 @@ describe('mapWeek — historial por día + volumen real', () => {
   });
 });
 
+describe('mapWeek — microciclos del bloque (bug 27-sep-2026)', () => {
+  // Bloque real que empezó en DOMINGO: la semana natural lun→dom solo contenía 1 día.
+  const names = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const BLOCK = {
+    days: Array.from({ length: 21 }, (_, i) => {
+      const date = new Date(Date.UTC(2026, 8, 27 + i)).toISOString().slice(0, 10);
+      const rest = i % 7 === 0 || i % 7 === 4;
+      return {
+        date,
+        dayName: names[i % 7],
+        isTrainingDay: !rest,
+        sessionType: rest ? 'recovery' : 'aerobic',
+        workout: { title: rest ? 'Descanso' : 'Rodaje suave', durationMinutes: rest ? null : 40 },
+      };
+    }),
+  };
+  const strava = [{ source: 'strava', performedAt: '2026-09-27T14:15:43Z', completed: true, title: 'Carrera de tarde', distanceKm: 6.53, durationMinutes: 60 }];
+
+  it('la semana actual es el microciclo completo que contiene hoy (7 días, no 1)', () => {
+    const out = mapWeek(BLOCK, '2026-09-27', strava);
+    expect(out.days).toHaveLength(7);
+    expect(out.days[0].dateISO).toBe('2026-09-27');
+    expect(out.days[6].dateISO).toBe('2026-10-03');
+    expect(out.weeks).toHaveLength(3);
+    expect(out.currentIndex).toBe(0);
+    expect(out.weeks[0].label).toBe('Semana 1 de 3');
+    expect(out.weeks[2].days[6].dateISO).toBe('2026-10-17');
+    expect(out.weeks[0].sessionsPlanned).toBe(5);
+  });
+
+  it('en mitad del bloque apunta al microciclo correcto', () => {
+    const out = mapWeek(BLOCK, '2026-10-06', []);
+    expect(out.currentIndex).toBe(1);
+    expect(out.days.find((d) => d.today).dateISO).toBe('2026-10-06');
+  });
+
+  it('un entreno en día de descanso se marca como EXTRA con su resumen', () => {
+    const today = mapWeek(BLOCK, '2026-09-27', strava).days[0];
+    expect(today.rest).toBe(true);
+    expect(today.extra).toBe(true);
+    expect(today.logged.distanceKm).toBe(6.53);
+  });
+
+  it('la sesión de hoy (descanso) queda hecha con el resumen de Strava', () => {
+    const s = mapTodaySession(BLOCK, '2026-09-27', strava);
+    expect(s.isRestDay).toBe(true);
+    expect(s.done).toBe(true);
+    expect(s.doneSource).toBe('strava');
+  });
+
+  it('el progreso cuenta la sesión extra sin inflar la adherencia', () => {
+    const p = mapProgress([], strava, BLOCK, null, '2026-09-27');
+    expect(p.sessionsPlan).toBe(5);
+    expect(p.sessionsDue).toBe(0);
+    expect(p.adherence).toBeNull();
+    expect(p.sessionsExtra).toBe(1);
+  });
+
+  it('una carrera pasada la medianoche de Madrid cuenta para el día civil correcto', () => {
+    // 22:30Z del domingo = 00:30 del lunes en Madrid (CEST).
+    const late = [{ source: 'strava', performedAt: '2026-09-27T22:30:00Z', completed: true, distanceKm: 5 }];
+    const days = mapWeek(BLOCK, '2026-09-28', late).days;
+    expect(days.find((d) => d.dateISO === '2026-09-28').logged).toBeTruthy();
+    expect(days.find((d) => d.dateISO === '2026-09-27').logged).toBeUndefined();
+  });
+});
+
 describe('mapLibrary — vídeos vigentes', () => {
   it('no confía en el vídeo obsoleto persistido en el plan', () => {
     const plan = {

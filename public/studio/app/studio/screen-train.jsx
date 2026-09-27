@@ -121,7 +121,7 @@ function TrainScreen({ initialTab }) {
       if (r.ok) {
         const j = await r.json();
         const o = j && j.ok ? j.overrides : null;
-        if (o) ['todaySession', 'week', 'weekVolumeHours', 'library', 'planStatus'].forEach((k) => { if (Object.prototype.hasOwnProperty.call(o, k)) D[k] = o[k]; });
+        if (o) ['todaySession', 'week', 'weekVolumeHours', 'weeks', 'weekIndex', 'upcomingDays', 'library', 'planStatus'].forEach((k) => { if (Object.prototype.hasOwnProperty.call(o, k)) D[k] = o[k]; });
       }
       setGen((g) => g + 1);
       setGenStatus('ok');
@@ -510,7 +510,7 @@ function TrainSession() {
       const j = await d.json();
       const o = j && j.ok ? j.overrides : null;
       if (o && o.todaySession) { D.todaySession = o.todaySession; setList(o.todaySession.list); }
-      if (o) ['week', 'weekVolumeHours', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+      if (o) ['week', 'weekVolumeHours', 'weeks', 'weekIndex', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
     } catch (e) { /* noop */ }
   }
   async function changeFocus() {
@@ -761,7 +761,13 @@ function TrainSession() {
             <p className="eyebrow" style={{ color: 'rgba(255,255,255,0.85)' }}>{s.isRestDay ? 'Hoy: recuperación' : 'Sesión de hoy'}</p>
             <h2 style={{ fontSize: '1.7rem', margin: '6px 0 0' }}>{s.title}</h2>
             <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{[sessionFocusLabel(s.focus), s.durationMin ? `${s.durationMin} min` : null, s.intensity].filter(Boolean).join(' · ')}</p>
-            {s.isRestDay ? <p style={{ margin: '8px 0 0', opacity: 0.92, fontSize: '0.85rem', lineHeight: 1.4 }}>Día de descanso/recuperación. Si quieres entrenar fuerza igualmente, elige un grupo abajo; o registra otra sesión más abajo.</p> : null}
+            {s.done ? (
+              <p style={{ margin: '8px 0 0', fontSize: '0.88rem', lineHeight: 1.4, fontWeight: 600 }}>
+                ✓ {s.isRestDay ? 'Sesión extra en tu día de descanso' : 'Sesión hecha'}{s.doneSource === 'strava' ? ' (Strava)' : ''}{doneSummaryText(s) ? `: ${doneSummaryText(s)}` : ''}.
+              </p>
+            ) : null}
+            {s.isRestDay && !s.done ? <p style={{ margin: '8px 0 0', opacity: 0.92, fontSize: '0.85rem', lineHeight: 1.4 }}>Día de descanso/recuperación. Si quieres entrenar fuerza igualmente, elige un grupo abajo; o registra otra sesión más abajo.</p> : null}
+            {s.isRestDay && s.done ? <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.82rem', lineHeight: 1.4 }}>Cuenta como carga extra: el coach la tiene en cuenta al ajustar los próximos días. Prioriza sueño, hidratación y comida de recuperación.</p> : null}
           </div>
           <div className="row ac wrap" style={{ gap: 8 }}>
             {Array.isArray(s.list) && s.list.length ? (
@@ -1655,24 +1661,50 @@ function MesocycleReviewCard({ review }) {
 
 function TrainWeek() {
   const D = window.STUDIO;
-  const week = Array.isArray(D.week) ? D.week : [];
-  const progress = D.progress || {};
+  // Microciclos del bloque (27-sep-2026): antes se mostraba la semana natural lunes→domingo y un
+  // bloque que empezaba en domingo dejaba la "semana" con 1 solo día, mientras Hoy ya enseñaba los
+  // 7 siguientes. Ahora se navega por los microciclos reales del bloque.
+  const weeks = Array.isArray(D.weeks) && D.weeks.length ? D.weeks : null;
+  const baseIndex = weeks && Number.isInteger(D.weekIndex) ? D.weekIndex : 0;
+  const [wi, setWi] = useStateTr(baseIndex);
+  const idx = weeks ? Math.min(Math.max(0, wi), weeks.length - 1) : 0;
+  const cur = weeks ? weeks[idx] : null;
+  const week = cur ? cur.days : (Array.isArray(D.week) ? D.week : []);
   const adjust = D.coachAdjust;
   const adjustRules = adjust && Array.isArray(adjust.rules) ? adjust.rules : [];
   const review = D.mesocycleReview;
-  const volH = D.weekVolumeHours;
+  const volH = cur ? cur.volumeHours : D.weekVolumeHours;
   const volLabel = volH != null ? String(volH).replace('.', ',') : '—';
+  // Cumplimiento calculado sobre las filas del microciclo visible (misma regla que el servidor:
+  // solo sesiones planificadas ya vencidas; los entrenos en días de descanso son EXTRA y no
+  // inflan la adherencia).
+  const planned = week.filter((d) => !d.rest);
+  const due = planned.filter((d) => d.past || d.today);
+  const doneN = due.filter((d) => d.logged).length;
+  const extraN = week.filter((d) => d.extra).length;
+  const adherence = due.length ? Math.round((doneN / due.length) * 100) : null;
   // Día abierto para revisar lo realmente hecho (historial por día).
   const [openDay, setOpenDay] = useStateTr(null);
   const sel = openDay != null ? week[openDay] : null;
+  const goWeek = (n) => { setOpenDay(null); setWi(n); };
   return (
     <React.Fragment>
       {review && Array.isArray(review.reasons) && review.reasons.length ? <MesocycleReviewCard review={review} /> : null}
+      {weeks ? (
+        <div className="row ac between" style={{ gap: 8 }}>
+          <button type="button" className="btn ghost sm" disabled={idx === 0} onClick={() => goWeek(idx - 1)} aria-label="Semana anterior">‹</button>
+          <div style={{ textAlign: 'center', minWidth: 0 }}>
+            <strong style={{ fontSize: '0.98rem' }}>{cur.label}{cur.current ? ' · actual' : ''}</strong>
+            <div className="tiny muted" style={{ textTransform: 'capitalize' }}>{cur.range}</div>
+          </div>
+          <button type="button" className="btn ghost sm" disabled={idx >= weeks.length - 1} onClick={() => goWeek(idx + 1)} aria-label="Semana siguiente">›</button>
+        </div>
+      ) : null}
       <div className="grid g-4">
-        <div className="card"><Stat num={progress.sessionsPlan ?? 0} label="Planificadas esta semana" /></div>
-        <div className="card"><Stat num={volLabel} unit="h" label="Volumen semanal" /></div>
-        <div className="card"><Stat num={`${progress.sessionsDone ?? 0}/${progress.sessionsDue ?? 0}`} label="Registradas de las vencidas" /></div>
-        <div className="card"><Stat num={progress.adherence != null ? `${progress.adherence}%` : '—'} label={progress.sessionsDue ? 'Adherencia hasta hoy' : 'Adherencia · aún sin muestra'} color="var(--glu-good)" /></div>
+        <div className="card"><Stat num={planned.length} label={cur && !cur.current ? 'Planificadas' : 'Planificadas esta semana'} /></div>
+        <div className="card"><Stat num={volLabel} unit="h" label="Volumen planificado" /></div>
+        <div className="card"><Stat num={`${doneN}/${due.length}`} label={extraN ? `Registradas de las vencidas · +${extraN} extra` : 'Registradas de las vencidas'} /></div>
+        <div className="card"><Stat num={adherence != null ? `${adherence}%` : '—'} label={due.length ? 'Adherencia hasta hoy' : 'Adherencia · aún sin muestra'} color="var(--glu-good)" /></div>
       </div>
 
       <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día · toca un día para ver lo que hiciste">
@@ -1682,9 +1714,9 @@ function TrainWeek() {
               className={`wcol ${d.today ? 'today' : ''} ${d.rest ? 'rest' : ''} ${openDay === i ? 'sel' : ''}`}
               style={{ cursor: 'pointer', border: openDay === i ? '1px solid var(--accent)' : undefined, background: 'none', font: 'inherit', textAlign: 'center' }}
               onClick={() => setOpenDay(openDay === i ? null : i)}>
-              <span className="wc-day">{d.day}{d.logged ? ' ✓' : ''}</span>
+              <span className="wc-day">{d.day} {d.date}{d.logged ? ' ✓' : ''}</span>
               <div className="wc-bar"><i style={{ height: Math.max(6, d.load * 100) + '%' }} /></div>
-              <span className="wc-focus">{d.focus}</span>
+              <span className="wc-focus">{d.extra ? 'Extra' : d.focus}</span>
             </button>
           ))}
         </div>
@@ -1692,10 +1724,12 @@ function TrainWeek() {
           <div className="card" style={{ marginTop: 12, background: 'var(--surface-2)', boxShadow: 'none' }}>
             <div className="row ac between">
               <strong style={{ fontSize: '0.95rem' }}>{sel.day} · {sel.focus || 'Sesión'}</strong>
-              {sel.today ? <span className="pill accent tiny">Hoy</span> : (sel.rest ? <span className="pill tiny">Descanso</span> : null)}
+              <span className="row ac" style={{ gap: 6 }}>{sel.extra ? <span className="pill tiny">Sesión extra</span> : null}{sel.today ? <span className="pill accent tiny">Hoy</span> : (sel.rest ? <span className="pill tiny">Descanso</span> : null)}</span>
             </div>
             {sel.logged ? (
               <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+                {sel.extra ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Estaba planificado como descanso: cuenta como carga extra (el coach la tiene en cuenta para ajustar los días siguientes), no como sesión del plan.</p> : null}
+                {sel.logged.title ? <strong style={{ fontSize: '0.88rem' }}>{sel.logged.title}</strong> : null}
                 <div className="chips">
                   {sel.logged.sessionRpe != null ? <span className="pill tiny">RPE {sel.logged.sessionRpe}</span> : null}
                   {sel.logged.fatigue != null ? <span className="pill tiny">Fatiga {sel.logged.fatigue}</span> : null}

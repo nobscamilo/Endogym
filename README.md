@@ -27,6 +27,8 @@ No confundas estos estados. Que exista integración no implica que el proveedor 
 
 ## Estado resumido
 
+**Exploración UX paralela (9–10 de agosto de 2026):** `sites/ignios-explore/` contiene **Ignios Explore**, un prototipo completo construido con Sites para comparar una experiencia centrada en la siguiente decisión. Perfil incluye una encuesta inicial responsive de 6 pasos alineada con el contrato real de completitud, pero sus respuestas siguen siendo demo y no se persisten. Explore no reemplaza `/`, no consume Firebase/Gemini y mantiene un enlace explícito a `endogym.vercel.app`. Su build, lint, 3 tests de render/aislamiento/contrato y audit de dependencias de producción están verdes. Consulta la frontera técnica en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y el flujo de publicación en [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 Última verificación local y despliegue documentados: **20 de junio de 2026** (`46` archivos / `339` tests, build, smoke, audit 0 y conflictos verdes; contrato de datos reales + vídeos contextuales). Producción: `dpl_FpbL91Ukd97dy9aT73iAwX8rh52h`, bundle `bb2659ac92`, alias `endogym.vercel.app` reasignado y verificado con sondas HTTP + Playwright. Última sonda integral autenticada `e2e:production`: **10 de junio de 2026**.
 
 - El árbol fue recuperado de una resolución de conflictos incompleta.

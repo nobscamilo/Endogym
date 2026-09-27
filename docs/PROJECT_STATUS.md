@@ -1,6 +1,43 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **20 de julio de 2026, parte 10 (guías visuales en calentamiento/enfriamiento/movilidad)**.
+Ultima actualizacion: **27 de septiembre de 2026 (Semana por microciclos + entreno en día de descanso)**.
+
+## Sesión del 27 de septiembre de 2026 (Semana = microciclos del bloque; sesión extra en día de descanso)
+
+Reporte del usuario: (1) Hoy enseñaba los próximos 7 días pero Entreno › Semana no; (2) había entrenado y Hoy seguía diciendo "Descanso". Diagnóstico con datos REALES (sonda de solo lectura `scratch/today-probe-2026-09-27.mjs`):
+
+- **Causa 1:** `mapWeek` mostraba la semana NATURAL lunes→domingo que contiene hoy. El bloque vigente (endurance/running, 21 días) se generó el domingo 27-sep a las 22:49 (dos planes con 41 s de diferencia: `0Va58l7J…` y `008kmI8D…`) y empieza ese mismo domingo → la "semana" tenía **1 solo día**. Hoy (`upcomingDays`) usaba hoy+1…+7, de ahí la contradicción.
+- **Causa 2:** no era un fallo de Strava. La carrera (6,53 km · 60 min, 16:15 hora local) se importó bien (`strava-20353590698`) y `todaySession.done` ya era `true`. El plan tenía descanso ese día y la UI pintaba el título del plan ("Descanso") en cabecera y tarjeta sin reconocer el entreno.
+- **Fix Semana:** `planMicrocycles(plan)` agrupa los días por distancia en días al inicio del bloque (7 en 7, tolera huecos). `mapWeek` devuelve además `weeks[]` (label "Semana N de M", rango, `sessionsPlanned`, volumen) y `currentIndex`; `studio-data` expone `weeks`/`weekIndex`. `TrainWeek` navega con ‹ › y calcula planificadas/vencidas/adherencia del microciclo visible. `mapProgress` usa también el microciclo (cae a lun→dom si no hay bloque con hoy).
+- **Fix descanso + entreno (decisión del usuario: mostrar Y contabilizar):** fila `extra:true` en Semana, `progress.sessionsExtra` (no infla adherencia: esa sigue midiendo lo planificado), Hoy dice "Hoy tocaba descanso, pero entrenaste: …", tarjeta "Sesión de hoy" y banner de Entreno muestran "Sesión extra" con el resumen. La carga ya entraba en `buildProgressMemory`/`buildAdaptiveTuning` (usan todos los entrenos, con `sessionRpeEstimated` de Strava), así que el ajuste de los días siguientes no requería cambio. Helper compartido `doneSummaryText` en `ui.jsx`.
+- **Fecha civil:** `workoutDayKey` (`sessionHistory.js`) convierte ISO con hora a día civil `Europe/Madrid`; Strava guarda `start_date` en UTC y una carrera a las 00:30 se asignaba al día anterior. Aplicado en `studio-data` (completado, Semana, strain, adherencia, historial, zonas). Los registros de la app (`T12:00:00.000Z`) no cambian.
+- **Menor:** los días "Recuperación activa" ya no aparecen como "Descanso" en Próximos días.
+- **Seguridad de dependencias:** `npm audit` volvió a dar 6 vulnerabilidades (1 crítica: Next.js RCE en Image Optimization con AVIF, GHSA-2xp9-vwfh-vxw4; `sharp`, `nanoid`, `@vitest/mocker`, `baseline-browser-mapping`) → `npm audit fix` (sin `--force`).
+- **Tests:** +6 en `tests/api/studio-data-mappers.test.js` (microciclo desde domingo, índice a mitad de bloque, extra, done Strava, progreso sin inflar adherencia, carrera pasada medianoche). Suite 586/586 en sandbox y Mac; `next build` OK.
+- **Modelo IA:** el código y `.env.local` usan `gemini-2.5-flash` (chat, coach, plan, plato; embeddings `gemini-embedding-001`). Las env de Vercel no se pudieron leer (403 del MCP), así que producción NO está verificada al 100 % por esta vía. Google indica que 2.5 Flash sigue servido sin fecha de cierre pero con acceso restringido a usuarios previos, y recomienda familias 3.x para proyectos nuevos: migrar exige probar `responseSchema`/`thinking` flujo a flujo (ver ROADMAP).
+
+
+## Sesión del 10 de agosto de 2026 (encuesta inicial completa en Ignios Explore)
+
+El usuario validó positivamente la dirección minimalista, sobria y profesional de Explore —incluidos logo y atlas muscular— e identificó el hueco de producto principal: faltaba la encuesta inicial dentro de Perfil.
+
+- **Onboarding implementado:** wizard responsive de 6 pasos en `sites/ignios-explore/app/page.tsx`: Objetivo → Modalidad → Ritmo → Datos → Salud → Resumen. Se abre desde una tarjeta prominente y desde el encabezado de Perfil; permite avanzar/retroceder, valida cada paso y ofrece recorrerlo de nuevo.
+- **Contrato real respetado:** los obligatorios coinciden con `profileCompleteness.js`: objetivo, modalidad, experiencia, actividad cotidiana, sexo para estimación energética, edad, peso, altura, comidas/día, días/semana y minutos/sesión. No se introducen valores personales por defecto.
+- **Salud separada y opcional:** hipertensión (con control), diabetes, artrosis, osteoporosis, asma, embarazo, zonas lesionadas, patrón alimentario y alergias/intolerancias. La UI explica qué adapta y no bloquea el avance por omitirlo.
+- **Resumen honesto:** anticipa un bloque de 21 días y recuerda que la IA no salta guardarraíles clínicos. En Sites sigue siendo una demo efímera: no guarda respuestas ni modifica Endogym.
+- **Verificación:** `npm run lint` verde; `npm test` verde (build vinext + 3 tests, incluido contrato de onboarding); `npm audit --omit=dev` = 0 vulnerabilidades.
+- **Publicado:** Sites versión 2, deployment privado `succeeded` en `https://ignios-explore.sarmiento0.chatgpt.site`.
+
+## Sesión del 9 de agosto de 2026 (Ignios Explore en Sites, experiencia paralela)
+
+Petición del usuario: explorar una mejora integral de UX con Sites conservando en paralelo la experiencia conocida. **Decisión crítica:** no clonar la app productiva ni duplicar autenticación/datos clínicos. Se creó `sites/ignios-explore/` como superficie independiente, privada y explícitamente de demostración.
+
+- **Producto:** navegación completa por Inicio, Entreno, Nutrición, Progreso, Coach y Perfil. Inicio prioriza la siguiente decisión; Entreno ordena calentamiento → ejercicios → vuelta a la calma; Nutrición deja macros en segundo plano; Progreso pone objetivo/gráficas antes del análisis; Coach muestra el contexto y los límites; Perfil separa dirección, contexto, seguridad, nutrición y control de datos.
+- **Convivencia:** el prototipo enlaza a `https://endogym.vercel.app` desde escritorio y ajustes. No modifica la raíz oficial, el bundle Studio, las APIs ni Ruta A.
+- **Frontera de seguridad:** solo datos de demostración; no Firebase Auth, Firestore, fotos privadas, Gemini ni escrituras. La UI lo etiqueta de forma visible y las interacciones son locales/efímeras.
+- **Sites:** proyecto `Ignios Explore`, acceso owner-only, versión 1 guardada y despliegue privado **succeeded** en `https://ignios-explore.sarmiento0.chatgpt.site`. `.openai/hosting.json` conserva el `project_id`; D1/R2 no se usan.
+- **Verificación local del sitio:** `npm run lint` verde; `npm test` verde (build vinext + 2 tests de render/aislamiento); `npm audit --omit=dev` = 0 vulnerabilidades. Open Graph propio `public/og.png`; metadatos calculan URL absoluta desde el host entrante.
+- **Límite:** esto valida arquitectura de información y lenguaje visual, no equivalencia funcional. Antes de conectar datos reales hay que probar con usuarios y migrar por pantalla sobre las APIs/guardarraíles existentes; no hacer una segunda fuente de verdad.
 
 ## Sesión del 20 de julio de 2026, parte 10 (fotos de técnica en el reproductor de calentamiento y movilidad)
 

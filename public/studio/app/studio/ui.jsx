@@ -307,4 +307,18 @@ function Sheet({ open, onClose, children, title }) {
   );
 }
 
-Object.assign(window, { SectionCard, MacroLine, Stat, VideoThumb, VideoPlayer, VideoProvider, VideoCtx, useVideo, videoGrad, thumbBg, TechniquePhotos, Sheet });
+/* Resumen legible de lo que REALMENTE se hizo hoy (app, check-in o Strava). Compartido por Hoy y
+   Entreno para que ambos digan lo mismo. Devuelve '' si no hay datos. */
+function doneSummaryText(s) {
+  const d = (s && s.doneSummary) || null;
+  if (!d) return '';
+  return [
+    d.title || null,
+    d.distanceKm ? `${String(Math.round(d.distanceKm * 10) / 10).replace('.', ',')} km` : null,
+    d.durationMin ? `${Math.round(d.durationMin)} min` : null,
+    d.avgHeartRate ? `FC ${Math.round(d.avgHeartRate)} ppm` : null,
+    d.sessionRpe ? `RPE ${d.sessionRpe}/10` : (d.sessionRpeEstimated ? `RPE ~${d.sessionRpeEstimated}/10 (estimado por FC)` : null),
+  ].filter(Boolean).join(' · ');
+}
+
+Object.assign(window, { doneSummaryText, SectionCard, MacroLine, Stat, VideoThumb, VideoPlayer, VideoProvider, VideoCtx, useVideo, videoGrad, thumbBg, TechniquePhotos, Sheet });

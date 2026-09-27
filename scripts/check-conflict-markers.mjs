@@ -8,7 +8,15 @@ const trackedFiles = execFileSync('git', ['ls-files', '-z', '--cached', '--other
 const conflicts = [];
 
 for (const file of trackedFiles) {
-  const contents = readFileSync(file);
+  // `--others` incluye rutas no rastreadas; un enlace simbólico a directorio (p. ej. dentro de un
+  // subproyecto como sites/) hacía fallar el script con EISDIR. Solo interesan ficheros.
+  let contents;
+  try {
+    contents = readFileSync(file);
+  } catch (error) {
+    if (error?.code === 'EISDIR' || error?.code === 'ENOENT') continue;
+    throw error;
+  }
   if (contents.includes(0)) continue;
 
   const text = contents.toString('utf8');

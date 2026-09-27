@@ -1,3 +1,5 @@
+import { dateKeyInTimeZone } from '../lib/appTime.js';
+
 // Fusión de sesiones por día (fuente única de verdad para conteo e historial).
 //
 // Un mismo día de entrenamiento puede generar hasta 3 documentos en `workouts`:
@@ -9,8 +11,17 @@
 // quedándose con la info más rica de cada fuente. Strava que coincide con el día NO
 // suma una sesión extra.
 
+// Día CIVIL (Europe/Madrid por defecto) del entreno. Strava guarda `start_date` en UTC: una
+// carrera a las 00:30 del martes en Madrid es 22:30Z del lunes, y cortar el ISO la asignaba al
+// día anterior (27-sep-2026). Los registros de la app llevan `T12:00:00.000Z`, que cae el mismo
+// día civil, así que convertir no les afecta. Fechas sin hora se respetan tal cual.
 export function workoutDayKey(workout) {
-  return String(workout?.performedAt || '').slice(0, 10);
+  const raw = String(workout?.performedAt || '');
+  if (/T\d{2}:\d{2}/.test(raw) && /(Z|[+-]\d{2}:?\d{2})$/.test(raw)) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) return dateKeyInTimeZone(parsed);
+  }
+  return raw.slice(0, 10);
 }
 
 // Una sesión "hecha": el check-in solo cuenta si se completó; el resto cuenta salvo

@@ -79,7 +79,7 @@ function TodayHub({ go, variant }) {
         <div>
           <p className="eyebrow" style={{ textTransform: 'capitalize' }}>{fecha}</p>
           <h1>{saludo}, {user.name}</h1>
-          <p className="sub">{s ? `Hoy: ${s.title}${s.focus ? ` · ${s.focus}` : ''}.` : (D.planStatus === 'stale' ? 'Tu bloque terminó: genera uno nuevo para volver a tener una sesión de hoy.' : 'Aún no hay una sesión planificada para hoy.')}{rec != null ? ` Tu disposición está al ${rec}%.` : ''}</p>
+          <p className="sub">{s ? (s.isRestDay && s.done ? `Hoy tocaba ${String(s.title || 'descanso').toLowerCase()}, pero entrenaste${doneSummaryText(s) ? `: ${doneSummaryText(s)}` : ''}.` : `Hoy: ${s.title}${s.focus ? ` · ${s.focus}` : ''}${s.done ? ' · hecha ✓' : ''}.`) : (D.planStatus === 'stale' ? 'Tu bloque terminó: genera uno nuevo para volver a tener una sesión de hoy.' : 'Aún no hay una sesión planificada para hoy.')}{rec != null ? ` Tu disposición está al ${rec}%.` : ''}</p>
         </div>
       </div>
 
@@ -93,8 +93,21 @@ function TodayHub({ go, variant }) {
       <div className="grid g-2" style={{ gridTemplateColumns: '0.95fr 1.05fr' }}>
         <CoachCard go={go} />
         <SectionCard title="Sesión de hoy" icon="train"
-          action={<button className="btn soft sm" onClick={() => go('train')}>{(window.STUDIO.todaySession || {}).done ? 'Ver sesión' : 'Empezar'}</button>}>
-          {s ? <React.Fragment><div className="row between" style={{ marginBottom: 14 }}>
+          action={<button className="btn soft sm" onClick={() => go('train')}>{(window.STUDIO.todaySession || {}).done ? 'Ver sesión' : ((window.STUDIO.todaySession || {}).isRestDay ? 'Ver día' : 'Empezar')}</button>}>
+          {s && s.isRestDay ? (
+            <div className="stack" style={{ gap: 8 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.18rem', letterSpacing: '-0.02em' }}>{s.title || 'Descanso'}</div>
+              {s.done ? (
+                <React.Fragment>
+                  <div className="row ac" style={{ gap: 8 }}><span className="pill accent tiny">✓ Sesión extra{s.doneSource === 'strava' ? ' · Strava' : ''}</span></div>
+                  <p className="tiny" style={{ margin: 0, lineHeight: 1.45 }}>{doneSummaryText(s) || 'Entreno registrado.'}</p>
+                  <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Estaba planificado como descanso. Cuenta como carga extra (no como sesión del plan) y el coach la usa para ajustar los próximos días.</p>
+                </React.Fragment>
+              ) : (
+                <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Día de descanso planificado: la adaptación ocurre al recuperar. Si entrenas igualmente, se registrará como sesión extra.</p>
+              )}
+            </div>
+          ) : s ? <React.Fragment><div className="row between" style={{ marginBottom: 14 }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.18rem', letterSpacing: '-0.02em' }}>{s.title}</div>
               <div className="muted tiny" style={{ marginTop: 2 }}>{s.focus}</div>
@@ -201,7 +214,7 @@ function UpcomingCard({ go }) {
   const sesiones = dias.filter((d) => !d.isRest).length;
 
   const linea = (d, i) => {
-    const detalle = d.isRest ? 'Descanso' : [
+    const detalle = d.isRest ? '' : [
       d.durationMin ? `${d.durationMin} min` : null,
       d.runTargetKm ? `${d.runTargetKm} km` : null,
       d.runTargetPace ? `a ${d.runTargetPace}` : null,
@@ -217,7 +230,7 @@ function UpcomingCard({ go }) {
             {i === 0 && abierto ? <span className="pill tiny" style={{ marginLeft: 8 }}>Mañana</span> : null}
           </div>
           <div className="muted tiny" style={{ marginTop: 2 }}>
-            {d.isRest ? 'Descanso' : d.title}{detalle && !d.isRest ? ` · ${detalle}` : ''}
+            {d.title || 'Descanso'}{detalle ? ` · ${detalle}` : ''}
           </div>
         </div>
         {d.nutrition?.calories ? (
@@ -259,7 +272,7 @@ function HeroResumen({ go }) {
           </p>
           <div className="tiles">
             <div className="tile"><div className="t-num num">{rec != null ? `${rec}%` : '—'}</div><div className="t-lbl">Recuperación</div></div>
-            <div className="tile"><div className="t-num num">{progress.sessionsDone ?? 0}</div><div className="t-lbl">Sesiones hechas</div></div>
+            <div className="tile"><div className="t-num num">{progress.sessionsDone ?? 0}</div><div className="t-lbl">Sesiones hechas{progress.sessionsExtra ? ` · +${progress.sessionsExtra} extra` : ''}</div></div>
             <div className="tile"><div className="t-num num">{progress.adherence != null ? `${progress.adherence}%` : '—'}</div><div className="t-lbl">Adherencia</div></div>
           </div>
           <button className="btn block" onClick={() => go('train')}>Ver sesión de hoy <Icon name="arrowRight" size={17} /></button>
@@ -286,7 +299,7 @@ function HeroEditorial({ go }) {
       </div>
       <div className="ed-right">
         <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-recover)' }}><Icon name="moon" size={17} /></span>
-          <div><strong className="num">{progress.sessionsDone ?? 0}</strong><div className="rm-sub">sesiones hechas</div></div></div>
+          <div><strong className="num">{progress.sessionsDone ?? 0}</strong><div className="rm-sub">sesiones hechas{progress.sessionsExtra ? ` · +${progress.sessionsExtra} extra` : ''}</div></div></div>
         <div className="divider" />
         <div className="rm-line"><span className="rm-ico" style={{ color: 'var(--d-heart)' }}><Icon name="heart" size={17} /></span>
           <div><strong className="num">{progress.adherence != null ? `${progress.adherence}%` : '—'}</strong><div className="rm-sub">adherencia</div></div></div>
@@ -310,7 +323,7 @@ function CoachCard({ go }) {
           <span className="coach-av"><Icon name="sparkles" size={20} /></span>
           <div><strong>Coach Ignios</strong><span>Tu plan de hoy</span></div>
         </div>
-        <h3>{s.title ? `Hoy: ${s.title}.` : 'Tu plan, ajustado a ti.'}</h3>
+        <h3>{s.title ? (s.isRestDay && s.done ? 'Hoy: sesión extra en día de descanso.' : `Hoy: ${s.title}.`) : 'Tu plan, ajustado a ti.'}</h3>
         {/* Si ya entrenaste (registro en la app, check-in o Strava), la tarjeta lo reconoce en
             vez de seguir invitándote a empezar. Los datos son los reales de la actividad. */}
         {s.done ? (

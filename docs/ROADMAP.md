@@ -1,6 +1,16 @@
 # Roadmap de Endogym
 
-Ultima actualizacion: **20 de julio de 2026 (revisión de arquitectura: observabilidad hecha; deuda priorizada)**.
+Ultima actualizacion: **27 de septiembre de 2026 (Semana por microciclos; backlog de mejoras propuesto)**.
+
+## P1 - Propuestas de la revisión del 27 sep 2026
+
+- [x] Semana = microciclos del bloque con navegación; sesión extra en día de descanso visible y contabilizada (sin inflar adherencia); día civil Madrid para entrenos de Strava.
+- [ ] **Doble generación de plan:** el 27-sep se guardaron 2 bloques en 41 s (3 llamadas a `weekly-plan` ese día). Añadir idempotencia/bloqueo (p. ej. rechazar `rebuild` si hay un plan creado hace <2 min, y deshabilitar el botón mientras genera). Coste de IA y riesgo de estado inconsistente.
+- [ ] **Migración del modelo Gemini:** `gemini-2.5-flash` sigue servido pero con acceso restringido; evaluar la familia 3.x Flash con los evals existentes (`weekly_plan_evals.mjs`, chat) antes de cambiar `GEMINI_MODEL*`. No cambiar a ciegas: el bug del bucle de `\t` (20-jul) muestra que el comportamiento con esquema cambia entre modelos.
+- [ ] **Registrar en `aiMetrics` el modelo usado** por llamada: hoy no se puede auditar qué modelo corre en producción sin leer las env de Vercel.
+- [ ] **Sesión extra → reajuste explícito del día siguiente:** hoy entra en el motor adaptativo por RPE/volumen agregado; valorar una regla específica (p. ej. si la sesión extra es de alta carga y mañana toca calidad, sugerir cambiarla por rodaje suave) con aviso en Hoy.
+- [ ] **Rango de fechas en Nutrición alineado con microciclos** (hoy usa lunes civil para `weekKey`).
+
 
 ## P1 - Deuda de arquitectura (revisión del 20 jul 2026)
 
@@ -76,6 +86,9 @@ Valoración: la arquitectura (Vercel serverless + Firebase Auth/Firestore + buck
 
 ## P2 - UI / Experiencia de usuario
 
+- [x] Construir **Ignios Explore** en Sites como prototipo paralelo completo (Inicio, Entreno, Nutrición, Progreso, Coach y Perfil), privado, con datos demo y retorno explícito a Endogym. No conectado a Firebase/Gemini; no reemplaza producción.
+- [x] Completar Perfil de Explore con encuesta inicial multipaso: campos obligatorios reales, Salud opcional y resumen del bloque; responsive y sin persistencia demo.
+- [ ] Validar Ignios Explore con tareas concretas de usuario (encontrar la sesión, registrar una comida, interpretar progreso y entender límites del Coach) antes de migrar componentes. Adoptar por pantalla sobre la arquitectura existente, no mediante un segundo backend.
 - [x] Resolver duplicado del mapa muscular; mostrarlo solo en la columna derecha del tab "Hoy".
 - [x] Implementar modelos anatómicos clínicos 3D `gymbro-front-crop.png` / `gymbro-back-crop.png`.
 - [x] Corregir asignación de vistas frontal y posterior (imagen frontal mostraba la espalda y viceversa).

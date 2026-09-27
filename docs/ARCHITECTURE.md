@@ -26,6 +26,7 @@ Construir una app full-stack para nutricion, seguimiento glucemico, entrenamient
 | `src/components/MuscleMapFigure.js` | Componente de atlas anatómico 3D con superposiciones CSS de grupos musculares. |
 | `public/studio/app/studio/*` | Fuente del Studio React pre-compilado. |
 | `public/studio/app/studio.bundle.js` | Bundle Studio compilado y commiteado. |
+| `sites/ignios-explore/` | Prototipo UX paralelo en Sites: datos demo, sin acceso a Firebase/Gemini y sin sustituir la app oficial. |
 | `src/app/api/**/route.js` | APIs Next.js. |
 | `src/lib/auth.js` | Validacion de ID token y bypass local explicito. |
 | `src/lib/firebaseAdmin.js` | Inicializacion Firebase Admin. |
@@ -38,6 +39,14 @@ Construir una app full-stack para nutricion, seguimiento glucemico, entrenamient
 | `src/core/**` | Calculos y reglas de negocio sin efectos externos. |
 | `src/app/styles.css` | Hoja de estilos global: diseño premium, variables CSS, componentes y atlas anatómico. |
 | `public/anatomy/` | Imágenes clínicas 3D del atlas: `gymbro-front-crop.png`, `gymbro-back-crop.png`. |
+
+### Frontera de Ignios Explore (Sites)
+
+`sites/ignios-explore/` es un laboratorio de producto, no un segundo runtime de Endogym. Se publica con Sites y acceso privado para explorar navegación, jerarquía y microinteracciones. Usa únicamente datos de demostración y estado efímero del navegador; no recibe Firebase ID tokens, no llama a las Route Handlers, no persiste en Firestore y no invoca Gemini.
+
+Su encuesta inicial de Perfil refleja el contrato de `src/core/profileCompleteness.js` y separa los campos obligatorios de prescripción de Salud/preferencias opcionales. Es una simulación de UX: completar el wizard no activa `studioAvailability`, no genera un plan y no escribe datos.
+
+La app productiva conserva Ruta A en Vercel. Si una solución de Explore se adopta, debe migrarse por pantalla al Studio existente reutilizando sus contratos, aislamiento por `uid`, red flags, rate limits y guardarraíles deterministas. No se conectará Sites directamente a Firestore ni se mantendrán dos fuentes de verdad clínicas.
 
 ## Colecciones Firestore
 

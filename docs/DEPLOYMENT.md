@@ -1,5 +1,17 @@
 # Deploy de Endogym en Vercel
 
+## Ignios Explore en Sites (prototipo paralelo)
+
+`sites/ignios-explore/` se despliega por separado con Sites y acceso privado owner-only. No cambia el alias `endogym.vercel.app`, no forma parte de la producción Vercel y no requiere variables de Firebase o Gemini.
+
+- Metadatos del proyecto: `sites/ignios-explore/.openai/hosting.json` (solo `project_id`; D1/R2 nulos).
+- Verificación previa: desde esa carpeta, `npm run lint`, `npm test` y `npm audit --omit=dev`.
+- Publicación: build vinext validado → fuente exacta enviada al repositorio administrado por Sites → versión guardada → deployment privado.
+- Nunca copiar `.env.local` ni secretos al subproyecto. Mantenerlo con datos demo hasta que una decisión de UX se migre a la app oficial sobre las APIs existentes.
+- La URL de Sites es una superficie de evaluación; la URL canónica de producto sigue siendo `https://endogym.vercel.app`.
+- Despliegue privado verificado el 9 de agosto de 2026: `https://ignios-explore.sarmiento0.chatgpt.site` (Sites versión 1, estado `succeeded`).
+- Versión 2 publicada y verificada el 10 de agosto de 2026 en la misma URL privada: añade la encuesta inicial multipaso de Perfil; estado `succeeded`.
+
 ## RAG semántico: índice vectorial de Firestore
 
 Estado al **10 de junio de 2026**: el índice vectorial de `guideline_passages` fue **creado y verificado**. Sonda real: `mode:'vector'`, 12 pasajes y ~20k caracteres de contexto recuperado. El service-account del repo sigue sin permiso `indexAdmin`, así que si el índice se borra o se recrea otro proyecto, hazlo con `gcloud` autenticado como un usuario con rol Owner/Editor o `roles/datastore.indexAdmin`:
