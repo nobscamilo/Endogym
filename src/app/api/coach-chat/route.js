@@ -14,7 +14,7 @@ import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/ai
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
-import { hrMaxFromAge, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
+import { effectiveIntensityRpe, hrMaxFromAge, targetHrRangeForRunType, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { COACH_CHAT_PERSONA, buildCoachChatUserContent, sanitizeUserText } from '../../../services/coachPersona.js';
 import { detectRedFlags, redFlagResponse } from '../../../services/coachRedFlags.js';
@@ -174,6 +174,28 @@ async function buildUserContext(uid) {
         const hrMaxSource = (Number.isFinite(manualHrMax) && manualHrMax >= 120) ? 'medida por el usuario' : 'estimada por su edad/observada';
         if (v) parts.push(`FCmáx ~${hrMax} ppm (${hrMaxSource}). Última carrera: ${v.message}`);
       }
+      // Objetivo de intensidad de la sesión de carrera de hoy y de la PRÓXIMA (27-sep-2026).
+      // Sin esto el modelo improvisaba el RPE ("RPE 2-3") y mandaba "clavar" un ritmo, mientras
+      // el plan decía otro RPE: la misma sesión con tres intensidades distintas.
+      const describeRun = (day) => {
+        const rp = day?.workout?.runPrescription;
+        if (!rp?.runType) return null;
+        const hr = hrMax ? targetHrRangeForRunType(rp.runType, hrMax) : null;
+        return [
+          `${day.date} ${sanitizeUserText(day.workout?.title || 'carrera')}`,
+          rp.zoneLabel || null,
+          effectiveIntensityRpe(day.workout),
+          hr ? `FC objetivo ${hr.min}-${hr.max} ppm (${hr.label})` : null,
+          rp.targetPace ? `ritmo orientativo ${rp.targetPace}` : null,
+        ].filter(Boolean).join(', ');
+      };
+      const todayRun = describeRun(today);
+      if (todayRun) parts.push(`Carrera de hoy: ${todayRun}.`);
+      const nextRunDay = (Array.isArray(currentPlan?.days) ? currentPlan.days : [])
+        .filter((d) => d?.date && d.date > todayKey && d.workout?.runPrescription?.runType)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+      const nextRun = describeRun(nextRunDay);
+      if (nextRun) parts.push(`Próxima carrera: ${nextRun}.`);
       // Forma aeróbica real: eficiencia ritmo/FC y predicción con sus mejores esfuerzos.
       const efTrend = buildEfficiencyTrend(runs);
       if (efTrend) {
@@ -185,7 +207,7 @@ async function buildUserContext(uid) {
         const pred = predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs });
         if (pred) parts.push(`Predicción actual para su objetivo (${profile.runRaceGoal.replace('race_', '').toUpperCase()}, Riegel sobre su mejor esfuerzo real del ${pred.basedOn.date}): ~${formatRaceTime(pred.seconds)}.`);
       }
-      parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en Z2, apretar en los días de calidad) usando SU FCmáx por edad/medida; cada usuario es distinto.');
+      parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en rodajes y tiradas largas, apretar en los días de calidad) usando SU FCmáx. Usa EXACTAMENTE el RPE y el rango de FC indicados arriba para cada sesión; no inventes otros. En rodajes y tiradas largas mandan el esfuerzo (test del habla: poder hablar en frases completas) y la FC como techo; el ritmo es orientativo y se ralentiza con calor, desnivel o fatiga: nunca pidas clavar un ritmo en esas sesiones.');
     }
     if (!parts.length) return { text: '', profile, plan: currentPlan };
     return { text: `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`, profile, plan: currentPlan };

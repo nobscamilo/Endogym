@@ -459,6 +459,51 @@ export function hrZone(avgHr, hrMax) {
   return { zone, pct: Math.round(pct * 100) };
 }
 
+/**
+ * Esfuerzo objetivo (RPE 0-10, escala CR10) por tipo de carrera — FUENTE ÚNICA (27-sep-2026).
+ *
+ * Bug que lo motiva: todos los días aeróbicos de un bloque de resistencia heredaban
+ * "RPE 5-8" de `getSessionRpeRange` (planner), así que un "Rodaje suave · Zona 2 ·
+ * conversacional" se prescribía a la vez como RPE 5-8 (duro) y la UI lo llamaba "Moderada";
+ * el chat, sin dato, improvisaba otro ("RPE 2-3"). Tres cifras para la misma sesión.
+ *
+ * Coherencia con el resto de la app: Z2 = 60-70% FCmáx (`hrZone`) y la estimación FC→RPE
+ * (`estimateSessionRpeFromHr`) da 2 al 60% y 4 al 70%. ACSM (Guidelines 11.ª ed.) sitúa la
+ * intensidad moderada en 64-76% FCmáx ≈ RPE 12-13 en Borg 6-20 (≈3-4 en CR10) y la ligera en
+ * 57-63% ≈ 9-11 (≈2). Rodaje y tirada larga: 3-4 (conversacional, test del habla). Umbral:
+ * 6-7 ("cómodamente duro"). Series VO2máx: 8-9. Técnica/drills: 3-5.
+ */
+export const RUN_RPE_BY_TYPE = {
+  easy: 'RPE 3-4',
+  long: 'RPE 3-4',
+  tempo: 'RPE 6-7',
+  intervals: 'RPE 8-9',
+  reps: 'RPE 8-9',
+  drills: 'RPE 3-5',
+};
+
+/** RPE efectivo de un entreno: en carrera manda el tipo de sesión, no el genérico del bloque. */
+export function effectiveIntensityRpe(workout) {
+  const runType = workout?.runPrescription?.runType;
+  const byType = runType ? RUN_RPE_BY_TYPE[runType] : null;
+  if (!byType) return workout?.intensityRpe ?? null;
+  // Bloques generados desde el 27-sep-2026 ya guardan el RPE por tipo (con los ajustes que lo
+  // SUAVIZAN) y lo marcan; se respeta. Los anteriores llevan el genérico del bloque ("RPE 5-8"
+  // para todo lo aeróbico), que no es información: se sustituye por el del tipo.
+  if (workout?.intensityRpeSource === 'run_type' && workout?.intensityRpe) return workout.intensityRpe;
+  return byType;
+}
+
+/** Rango de FC (ppm) de la zona objetivo del tipo de carrera, con el modelo de 5 zonas de `hrZone`. */
+export function targetHrRangeForRunType(runType, hrMax) {
+  const max = Number(hrMax);
+  if (!Number.isFinite(max) || max < 120) return null;
+  const bands = { 1: [0.5, 0.6], 2: [0.6, 0.7], 3: [0.7, 0.8], 4: [0.8, 0.9], 5: [0.9, 1.0] };
+  const t = targetZoneForRunType(runType);
+  if (!t || !bands[t.min] || !bands[t.max]) return null;
+  return { min: Math.ceil(max * bands[t.min][0]), max: Math.ceil(max * bands[t.max][1]) - 1, label: t.label };
+}
+
 export function targetZoneForRunType(runType) {
   switch (runType) {
     case 'easy':

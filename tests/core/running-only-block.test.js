@@ -39,6 +39,20 @@ describe('bloque de "Solo correr"', () => {
     expect(conPrescripcion.length).toBe(aerobic.length);
   });
 
+  it('el RPE de cada carrera sale de su TIPO (bug 27-sep-2026: todo era "RPE 5-8")', () => {
+    const runs = plan.days.filter((d) => d.workout?.runPrescription?.runType);
+    const easy = runs.find((d) => d.workout.runPrescription.runType === 'easy');
+    const hard = runs.find((d) => ['intervals', 'tempo'].includes(d.workout.runPrescription.runType));
+    expect(easy.workout.intensityRpe).toBe('RPE 3-4');
+    expect(easy.workout.intensityRpeSource).toBe('run_type');
+    expect(hard.workout.intensityRpe).not.toBe(easy.workout.intensityRpe);
+    // Ningún rodaje fácil ni tirada larga por encima de RPE 4.
+    for (const d of runs.filter((r) => ['easy', 'long'].includes(r.workout.runPrescription.runType))) {
+      const high = Number(/-(\d+)/.exec(d.workout.intensityRpe)[1]);
+      expect(high).toBeLessThanOrEqual(4);
+    }
+  });
+
   it('varía los tipos de carrera en vez de repetir rodaje suave 12 veces', () => {
     const tipos = new Set(plan.days.map((d) => d.workout?.runPrescription?.runType).filter(Boolean));
     // Un bloque útil mezcla suave, calidad y tirada larga.

@@ -28,6 +28,7 @@ import {
   buildWeeklyKmTarget,
   distributeWeeklyKm,
   runTypeFromFocus,
+  RUN_RPE_BY_TYPE,
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol, detectComorbidities } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
@@ -1394,6 +1395,17 @@ export function generateWeeklyPlan({
       const stepDown = adaptiveTuning?.workout?.runIntensityStepDown === true;
       const rpFocus = stepDown ? stepDownRunFocus(sessionFocus) : sessionFocus;
       workout.runPrescription = buildRunPrescription({ sessionFocus: rpFocus, durationMinutes, raceGoal, paces: runPaces, phase: trainingPhase });
+      // RPE por TIPO de carrera (rodaje 3-4, umbral 6-7, series 8-9), no el genérico del bloque
+      // ("RPE 5-8" para todo). Solo se aplican los ajustes adaptativos que BAJAN la intensidad:
+      // un rodaje fácil no se endurece porque el usuario vaya bien. Ver RUN_RPE_BY_TYPE.
+      const runRpe = RUN_RPE_BY_TYPE[workout.runPrescription.runType];
+      if (runRpe) {
+        const softerOnly = adaptiveTuning
+          ? { ...adaptiveTuning, workout: { ...(adaptiveTuning.workout || {}), rpeShift: Math.min(0, toNumber(adaptiveTuning?.workout?.rpeShift, 0)) } }
+          : adaptiveTuning;
+        workout.intensityRpe = adjustRpeByAdaptive(runRpe, softerOnly, preparticipationScreening);
+        workout.intensityRpeSource = 'run_type';
+      }
       if (targetKm) workout.runPrescription.targetKm = targetKm;
       if (stepDown && rpFocus !== sessionFocus) {
         workout.runPrescription.note = `Reentrada tras el parón: esta semana corre un escalón más suave de lo planificado. ${workout.runPrescription.note || ''}`.trim();

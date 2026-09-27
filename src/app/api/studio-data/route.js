@@ -13,7 +13,7 @@ import {
   getLastDoneWorkoutAt,
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
-import { hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
+import { effectiveIntensityRpe, hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, findDaySession, workoutDayKey } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
@@ -427,7 +427,8 @@ export function mapDayPreview(plan, dateKey) {
     title: esDescanso ? (day.workout?.title || 'Descanso') : (day.workout?.title || 'Sesión'),
     focus: day.sessionFocus || day.workout?.sessionFocus || '',
     durationMin: esDescanso ? null : (day.workout?.durationMinutes || null),
-    intensity: esDescanso ? null : rpeLabel(day.workout?.intensityRpe),
+    intensity: esDescanso ? null : rpeLabel(effectiveIntensityRpe(day.workout)),
+    rpeTarget: esDescanso ? null : (effectiveIntensityRpe(day.workout) || null),
     runTargetKm: day.workout?.runPrescription?.targetKm ?? null,
     runTargetPace: day.workout?.runPrescription?.targetPace ?? null,
     nutrition: nt ? {
@@ -501,7 +502,10 @@ export function mapTodaySession(plan, today, workouts = [], profile = null, { ex
     title: day.workout?.title || 'Sesión de hoy',
     focus: day.sessionFocus || day.workout?.sessionFocus || '',
     durationMin: day.workout?.durationMinutes || null,
-    intensity: rpeLabel(day.workout?.intensityRpe),
+    // En carrera, el RPE sale del TIPO de sesión (rodaje 3-4, umbral 6-7, series 8-9) aunque el
+    // bloque guardado diga el genérico "RPE 5-8" (bloques anteriores al 27-sep-2026).
+    intensity: rpeLabel(effectiveIntensityRpe(day.workout)),
+    rpeTarget: effectiveIntensityRpe(day.workout) || null,
     list,
     // BUG corregido (2-ago-2026): esta función RECIBÍA los entrenos y no los miraba nunca,
     // así que una actividad importada de Strava no marcaba la sesión como hecha ni traía su
@@ -622,7 +626,7 @@ export function planMicrocycles(plan) {
 
 function mapWeekRow(d, today, workouts) {
   const training = d.isTrainingDay;
-  const v = rpeAvg(d.workout?.intensityRpe);
+  const v = rpeAvg(effectiveIntensityRpe(d.workout));
   const load = training ? Math.min(1, Math.max(0.4, (v || 7) / 10)) : 0.15;
   const row = {
     day: shortWeekday(d.dayName, d.date),

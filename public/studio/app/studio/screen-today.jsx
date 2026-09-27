@@ -218,6 +218,7 @@ function UpcomingCard({ go }) {
       d.durationMin ? `${d.durationMin} min` : null,
       d.runTargetKm ? `${d.runTargetKm} km` : null,
       d.runTargetPace ? `a ${d.runTargetPace}` : null,
+      d.rpeTarget || null,
     ].filter(Boolean).join(' · ');
     return (
       <div key={d.date} className="row between wrap" style={{

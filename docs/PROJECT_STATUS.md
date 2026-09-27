@@ -1,6 +1,16 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **27 de septiembre de 2026, parte 2 (migración a Gemini 3.8 Flash)**.
+Ultima actualizacion: **27 de septiembre de 2026, parte 3 (RPE de carrera coherente + contexto del coach)**.
+
+## Sesión del 27 de septiembre de 2026, parte 3 (RPE por tipo de carrera; instrucciones del coach)
+
+Origen: en la verificación de la parte 2, el chat respondió "clava 10:23/km… RPE 2-3/10 en Zona 2". Revisado a fondo:
+- **El "RPE 2-3" no era el error** (Z2 = 60-70 % FCmáx ≈ ligera-moderada ACSM ≈ CR10 2-4; la estimación FC→RPE de la app da 2 al 60 % y 4 al 70 %). La crítica inicial ("debería ser 3-4") era solo parcialmente correcta.
+- **El error real estaba en el PLAN:** `getSessionRpeRange(endurance, aerobic)` daba **"RPE 5-8" a TODOS los días de carrera** (rodaje, tirada larga, umbral y series). Un "Rodaje suave · Zona 2 · conversacional" se prescribía como RPE 5-8 y la UI lo etiquetaba "Moderada". Y el chat **no recibía** ni el RPE ni la FC objetivo de la sesión, así que improvisaba y además pedía "clavar" un ritmo.
+- **Fix:** `RUN_RPE_BY_TYPE` (`running.js`, fuente única): rodaje/larga 3-4, umbral 6-7, series 8-9, drills 3-5 (CR10; anclado a ACSM 11.ª ed.: moderada 64-76 % FCmáx ≈ Borg 12-13). El planner lo aplica en bloques nuevos (`intensityRpeSource:'run_type'`; solo se aplican ajustes adaptativos que BAJAN la intensidad). `effectiveIntensityRpe` corrige al LEER los bloques anteriores (sin regenerar). `studio-data` expone `rpeTarget` (banner de Entreno y Próximos días). El chat recibe "Carrera de hoy" y "Próxima carrera" con zona, RPE, FC objetivo en ppm (`targetHrRangeForRunType`) y ritmo ORIENTATIVO, y la regla: usar exactamente esos valores; en rodajes/tiradas largas mandan el test del habla y la FC como techo; nunca pedir "clavar" un ritmo.
+- **Verificado** con el handler real de `coach-chat` (dev-user con el bloque real copiado): 2/2 respuestas con "RPE 3-4", "110-127 ppm", ritmo orientativo y test del habla. 600 tests.
+- **Pendiente de DECISIÓN del usuario (no cambiado):** el modelo de zonas de la app (Z2 = 60-70 % FCmáx) es conservador. El primer umbral ventilatorio/test del habla suele caer más alto (~70-80 % FCmáx según entrenamiento). Con FCmáx 182, Z2 = 110-127 ppm, y su carrera real a 9:11/km fue a 158 ppm: a 110-127 ppm probablemente tendrá que alternar caminar y correr, y el ritmo orientativo de 10:23/km no cuadrará con esa FC. Opciones: %FCR (Karvonen, requiere FC en reposo), LTHR a partir de un test, o techo "fácil" ~75 % FCmáx. Afecta también a los veredictos de `coach-analysis`.
+
 
 ## Sesión del 27 de septiembre de 2026, parte 2 (migración de gemini-2.5-flash a gemini-3.8-flash)
 

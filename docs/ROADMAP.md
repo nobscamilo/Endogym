@@ -4,6 +4,9 @@ Ultima actualizacion: **27 de septiembre de 2026 (Semana por microciclos; backlo
 
 ## P1 - Propuestas de la revisión del 27 sep 2026
 
+- [x] RPE por tipo de carrera (rodaje 3-4 / umbral 6-7 / series 8-9) y contexto de intensidad en el chat (parte 3).
+- [ ] **Modelo de zonas de FC:** Z2 = 60-70 % FCmáx es conservador para correr; decidir entre %FCR (Karvonen, pedir FC en reposo en Perfil), LTHR por test de 30 min, o techo fácil ~75 % FCmáx. Cambia prescripción, validación de zonas y análisis del coach.
+
 - [x] Semana = microciclos del bloque con navegación; sesión extra en día de descanso visible y contabilizada (sin inflar adherencia); día civil Madrid para entrenos de Strava.
 - [ ] **Doble generación de plan:** el 27-sep se guardaron 2 bloques en 41 s (3 llamadas a `weekly-plan` ese día). Añadir idempotencia/bloqueo (p. ej. rechazar `rebuild` si hay un plan creado hace <2 min, y deshabilitar el botón mientras genera). Coste de IA y riesgo de estado inconsistente.
 - [x] **Migración del modelo Gemini (HECHO 27-sep):** `gemini-3.8-flash` con evals antes/después; ver PROJECT_STATUS. Pendiente derivado: migrar embeddings a `gemini-embedding-2` antes de may-2028 (re-embeber + índice nuevo). Texto original: `gemini-2.5-flash` sigue servido pero con acceso restringido; evaluar la familia 3.x Flash con los evals existentes (`weekly_plan_evals.mjs`, chat) antes de cambiar `GEMINI_MODEL*`. No cambiar a ciegas: el bug del bucle de `\t` (20-jul) muestra que el comportamiento con esquema cambia entre modelos.

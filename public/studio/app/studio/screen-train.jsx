@@ -760,7 +760,7 @@ function TrainSession() {
           <div>
             <p className="eyebrow" style={{ color: 'rgba(255,255,255,0.85)' }}>{s.isRestDay ? 'Hoy: recuperación' : 'Sesión de hoy'}</p>
             <h2 style={{ fontSize: '1.7rem', margin: '6px 0 0' }}>{s.title}</h2>
-            <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{[sessionFocusLabel(s.focus), s.durationMin ? `${s.durationMin} min` : null, s.intensity].filter(Boolean).join(' · ')}</p>
+            <p style={{ margin: '6px 0 0', opacity: 0.92, fontSize: '0.92rem' }}>{[sessionFocusLabel(s.focus), s.durationMin ? `${s.durationMin} min` : null, s.intensity ? `${s.intensity}${s.rpeTarget ? ` (${s.rpeTarget})` : ''}` : null].filter(Boolean).join(' · ')}</p>
             {s.done ? (
               <p style={{ margin: '8px 0 0', fontSize: '0.88rem', lineHeight: 1.4, fontWeight: 600 }}>
                 ✓ {s.isRestDay ? 'Sesión extra en tu día de descanso' : 'Sesión hecha'}{s.doneSource === 'strava' ? ' (Strava)' : ''}{doneSummaryText(s) ? `: ${doneSummaryText(s)}` : ''}.
