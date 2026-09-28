@@ -3,6 +3,8 @@ import {
   trimChatMemory,
   appendChatTurns,
   formatChatMemory,
+  selectChatMemoryForPrompt,
+  CHAT_MEMORY_STORE_TURN_MAX_CHARS,
   CHAT_MEMORY_MAX_TURNS,
   CHAT_MEMORY_MAX_CHARS,
   CHAT_MEMORY_TURN_MAX_CHARS,
@@ -31,19 +33,28 @@ describe('trimChatMemory (FASE 2.1 — recorte)', () => {
     expect(out[0].text).toBe(`t${12 - CHAT_MEMORY_MAX_TURNS}`);
   });
 
-  it('trunca cada turno y respeta el presupuesto total descartando los más antiguos', () => {
+  it('GUARDA el texto completo (bug 28-sep: el historial visible salía cortado a 400)', () => {
+    const long = 'y'.repeat(900);
+    const out = trimChatMemory([turn('coach', long, 0)], NOW);
+    expect(out[0].text).toHaveLength(900);
+    const huge = trimChatMemory([turn('coach', 'z'.repeat(5000), 0)], NOW);
+    expect(huge[0].text).toHaveLength(CHAT_MEMORY_STORE_TURN_MAX_CHARS);
+  });
+
+  it('al PROMPT: trunca cada turno y respeta el presupuesto total descartando los más antiguos', () => {
     const long = 'x'.repeat(1000);
     const turns = Array.from({ length: 6 }, (_, i) => turn('user', `${i}-${long}`, 0));
-    const out = trimChatMemory(turns, NOW);
+    const out = selectChatMemoryForPrompt(trimChatMemory(turns, NOW));
     out.forEach((t) => expect(t.text.length).toBeLessThanOrEqual(CHAT_MEMORY_TURN_MAX_CHARS));
     const total = out.reduce((acc, t) => acc + t.text.length, 0);
     expect(total).toBeLessThanOrEqual(CHAT_MEMORY_MAX_CHARS);
     // se descartó el más antiguo, no el más nuevo
     expect(out[out.length - 1].text.startsWith('5-')).toBe(true);
-    // El presupuesto tiene que MORDER: con MAX_TURNS turnos al máximo de longitud, alguno
-    // sobra. Antes valía 6 × 400 = 2400 = MAX_CHARS exacto y el recorte no se ejecutaba nunca.
+    // El presupuesto tiene que MORDER: con MAX_TURNS turnos al máximo de longitud, alguno sobra.
     expect(CHAT_MEMORY_MAX_CHARS).toBeLessThan(CHAT_MEMORY_MAX_TURNS * CHAT_MEMORY_TURN_MAX_CHARS);
     expect(out.length).toBeLessThan(CHAT_MEMORY_MAX_TURNS);
+    // formatChatMemory aplica ese mismo recorte.
+    expect(formatChatMemory(turns).length).toBeLessThan(CHAT_MEMORY_MAX_CHARS + 400);
   });
 
   it('descarta turnos malformados (sin rol válido, sin texto, sin fecha)', () => {

@@ -11,7 +11,7 @@ import { getUserProfile, getLatestWeeklyPlan, listWorkoutsSince, listMealsSince,
 import { trimChatMemory, appendChatTurns, formatChatMemory } from '../../../services/coachChatMemory.js';
 import { recordAiMetric, tokensFromGeminiResponse } from '../../../lib/aiMetrics.js';
 import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
-import { dateKeyInTimeZone } from '../../../lib/appTime.js';
+import { addDaysToDateKey, dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { buildNutritionDigest, describeNutritionDigest, buildRecoveryTrend, describeRecoveryTrend } from '../../../core/wellnessDigest.js';
 import { buildGoalProgress, describeGoalProgress } from '../../../services/goalProgress.js';
 import { effectiveIntensityRpe, hrMaxFromAge, targetHrRangeForRunType, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
@@ -145,6 +145,44 @@ async function buildUserContext(uid) {
     // 21 días, caer a days[0] daba la sesión del PRIMER día del bloque como "hoy" durante 20 días.
     if (today?.workout?.title) parts.push(`Sesión de hoy: ${today.workout.title}.`);
     if (today?.workout?.runPrescription?.structure) parts.push(`Prescripción de hoy: ${today.workout.runPrescription.structure}`);
+    // Semana que viene, día a día (28-sep-2026). Motivo: el usuario preguntó "¿y el jueves?" y el
+    // coach contestó "con gusto te detallaré…" sin detallar nada, porque solo conocía HOY. Cada
+    // día lleva lo que prescribe el plan: tipo, duración, km, RPE y, en carrera, zona, FC
+    // objetivo en ppm (con SU FCmáx) y ritmo ORIENTATIVO. Así no improvisa intensidades.
+    if (Array.isArray(currentPlan?.days)) {
+      const stravaRuns = (Array.isArray(workouts) ? workouts : [])
+        .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')));
+      const observedMaxHr = Math.max(0, ...stravaRuns.map((w) => Number(w.maxHeartRate) || 0));
+      const profileHrMax = Number(profile?.hrMaxBpm);
+      const weekHrMax = (Number.isFinite(profileHrMax) && profileHrMax >= 120)
+        ? Math.max(profileHrMax, observedMaxHr)
+        : (Math.max(observedMaxHr, hrMaxFromAge(profile?.age) || 0) || null);
+      const weekEnd = addDaysToDateKey(todayKey, 6);
+      const describeDay = (d) => {
+        const w = d.workout || {};
+        const rp = w.runPrescription || null;
+        const hr = rp && weekHrMax ? targetHrRangeForRunType(rp.runType, weekHrMax) : null;
+        const bits = [
+          Number(w.durationMinutes) > 0 ? `${w.durationMinutes} min` : null,
+          rp?.targetKm ? `${rp.targetKm} km` : null,
+          effectiveIntensityRpe(w),
+          rp?.zoneLabel || null,
+          hr ? `FC ${hr.min}-${hr.max} ppm` : null,
+          rp?.targetPace ? `ritmo orientativo ${rp.targetPace}` : null,
+          rp?.structure ? sanitizeUserText(rp.structure, 160) : null,
+        ].filter(Boolean);
+        const label = `${sanitizeUserText(d.dayName || '', 12)} ${d.date}${d.date === todayKey ? ' (hoy)' : ''}`;
+        const title = sanitizeUserText(w.title || (d.isTrainingDay ? 'Sesión' : 'Descanso'));
+        return `${label}: ${title}${bits.length ? ` (${bits.join(', ')})` : ''}`;
+      };
+      const weekDays = currentPlan.days
+        .filter((d) => d?.date && d.date >= todayKey && d.date <= weekEnd)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (weekDays.length) {
+        parts.push(`Plan de los próximos 7 días: ${weekDays.map(describeDay).join(' | ')}.`);
+        parts.push('Si pregunta por un día concreto, respóndele YA con los datos de ese día del plan (sesión, duración, intensidad y, en carrera, FC y ritmo orientativo); no prometas detallarlo después.');
+      }
+    }
     if (today?.nutritionTarget?.carbLevel) parts.push(`Carbohidratos hoy: nivel ${today.nutritionTarget.carbLevel}. ${today.nutritionTarget.carbTiming || ''}`);
 
     // FASE 1.1 — Digest nutricional determinista (7 días). Se omite si no hay registros.
@@ -174,28 +212,7 @@ async function buildUserContext(uid) {
         const hrMaxSource = (Number.isFinite(manualHrMax) && manualHrMax >= 120) ? 'medida por el usuario' : 'estimada por su edad/observada';
         if (v) parts.push(`FCmáx ~${hrMax} ppm (${hrMaxSource}). Última carrera: ${v.message}`);
       }
-      // Objetivo de intensidad de la sesión de carrera de hoy y de la PRÓXIMA (27-sep-2026).
-      // Sin esto el modelo improvisaba el RPE ("RPE 2-3") y mandaba "clavar" un ritmo, mientras
-      // el plan decía otro RPE: la misma sesión con tres intensidades distintas.
-      const describeRun = (day) => {
-        const rp = day?.workout?.runPrescription;
-        if (!rp?.runType) return null;
-        const hr = hrMax ? targetHrRangeForRunType(rp.runType, hrMax) : null;
-        return [
-          `${day.date} ${sanitizeUserText(day.workout?.title || 'carrera')}`,
-          rp.zoneLabel || null,
-          effectiveIntensityRpe(day.workout),
-          hr ? `FC objetivo ${hr.min}-${hr.max} ppm (${hr.label})` : null,
-          rp.targetPace ? `ritmo orientativo ${rp.targetPace}` : null,
-        ].filter(Boolean).join(', ');
-      };
-      const todayRun = describeRun(today);
-      if (todayRun) parts.push(`Carrera de hoy: ${todayRun}.`);
-      const nextRunDay = (Array.isArray(currentPlan?.days) ? currentPlan.days : [])
-        .filter((d) => d?.date && d.date > todayKey && d.workout?.runPrescription?.runType)
-        .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
-      const nextRun = describeRun(nextRunDay);
-      if (nextRun) parts.push(`Próxima carrera: ${nextRun}.`);
+
       // Forma aeróbica real: eficiencia ritmo/FC y predicción con sus mejores esfuerzos.
       const efTrend = buildEfficiencyTrend(runs);
       if (efTrend) {
@@ -207,7 +224,7 @@ async function buildUserContext(uid) {
         const pred = predictRaceTimeFromRuns({ distanceMeters: targetMeters, runs });
         if (pred) parts.push(`Predicción actual para su objetivo (${profile.runRaceGoal.replace('race_', '').toUpperCase()}, Riegel sobre su mejor esfuerzo real del ${pred.basedOn.date}): ~${formatRaceTime(pred.seconds)}.`);
       }
-      parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en rodajes y tiradas largas, apretar en los días de calidad) usando SU FCmáx. Usa EXACTAMENTE el RPE y el rango de FC indicados arriba para cada sesión; no inventes otros. En rodajes y tiradas largas mandan el esfuerzo (test del habla: poder hablar en frases completas) y la FC como techo; el ritmo es orientativo y se ralentiza con calor, desnivel o fatiga: nunca pidas clavar un ritmo en esas sesiones.');
+      parts.push('Si pregunta por su entreno de carrera, valora la disciplina de zonas (correr fácil de verdad en rodajes y tiradas largas, apretar en los días de calidad) usando SU FCmáx. Usa EXACTAMENTE el RPE y el rango de FC del plan de los próximos 7 días para cada sesión; no inventes otros. Si preguntan por un día concreto, descríbelo con esos datos. En rodajes y tiradas largas mandan el esfuerzo (test del habla: poder hablar en frases completas) y la FC como techo; el ritmo es orientativo y se ralentiza con calor, desnivel o fatiga: nunca pidas clavar un ritmo en esas sesiones.');
     }
     if (!parts.length) return { text: '', profile, plan: currentPlan };
     return { text: `\n\nContexto real del usuario (úsalo para personalizar): ${parts.join(' ')}`, profile, plan: currentPlan };

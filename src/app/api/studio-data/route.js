@@ -13,7 +13,7 @@ import {
   getLastDoneWorkoutAt,
   getStravaConnection,
 } from '../../../lib/repositories/firestoreRepository.js';
-import { effectiveIntensityRpe, hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
+import { effectiveIntensityRpe, targetHrRangeForRunType, hrMaxFromAge, hrZone, validateRunZone, buildEfficiencyTrend, predictRaceTimeFromRuns, formatRaceTime, resolveRaceGoal, RACE_GOAL_META } from '../../../core/running.js';
 import { buildGoalProgress } from '../../../services/goalProgress.js';
 import { collapseWorkoutsByDay, findDaySession, workoutDayKey } from '../../../core/sessionHistory.js';
 import { listSessionFocusChangeOptions } from '../../../core/planner.js';
@@ -36,6 +36,17 @@ function paceLabel(secPerKm) {
 
 // Validación de zonas: compara la FC real de cada carrera de Strava con la zona prescrita ese
 // día. Solo para perfiles de carrera (híbrido/running o con objetivo de carrera).
+// FCmáx de la app para este usuario (misma prioridad que en todas partes): medida en perfil >
+// máxima observada en sus carreras de Strava > estimación por edad.
+function resolveUserHrMax(workouts, profile) {
+  const runs = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => w.source === 'strava' && /run|carrera|trail/i.test(String(w.sportType || '')));
+  const observedMax = Math.max(0, ...runs.map((w) => Number(w.maxHeartRate) || 0));
+  const manualHrMax = Number(profile?.hrMaxBpm);
+  if (Number.isFinite(manualHrMax) && manualHrMax >= 120) return Math.max(manualHrMax, observedMax);
+  return Math.max(observedMax, hrMaxFromAge(profile?.age) || 0) || null;
+}
+
 function mapRunZones(workouts, plan, profile) {
   const modality = profile?.trainingModality || '';
   const isRunner = modality === 'hybrid_run_gym' || modality === 'running'
@@ -632,7 +643,65 @@ export function planMicrocycles(plan) {
   return [...buckets.keys()].sort((a, b) => a - b).map((k) => buckets.get(k));
 }
 
-function mapWeekRow(d, today, workouts) {
+const SESSION_TYPE_LABELS = {
+  resistance: 'Fuerza', aerobic: 'Carrera / cardio', mixed: 'Mixta', recovery: 'Recuperación', mindbody: 'Movilidad',
+};
+
+/**
+ * Prescripción COMPLETA de un día del plan para la vista Semana (28-sep-2026, pedido del
+ * usuario: "poder ver con más detalle las sesiones"). Antes, al tocar un día futuro solo se
+ * veía "Planificado: Rodaje suave". Todo sale del plan guardado; no se inventa nada: los
+ * campos que el plan no trae se omiten.
+ */
+export function mapPlannedDetail(d, { hrMax = null } = {}) {
+  const w = d?.workout;
+  if (!w) return null;
+  const rp = w.runPrescription || null;
+  const rpe = effectiveIntensityRpe(w);
+  const steps = (arr) => (Array.isArray(arr) ? arr : [])
+    .filter((x) => x && (x.step || x.name))
+    .map((x) => ({ step: x.step || x.name, min: Number(x.durationMinutes) > 0 ? Number(x.durationMinutes) : null, details: x.details || null }));
+  const out = {
+    type: SESSION_TYPE_LABELS[d.sessionType] || null,
+    durationMin: Number(w.durationMinutes) > 0 ? Number(w.durationMinutes) : null,
+    rpeTarget: rpe || null,
+    intensity: rpe ? rpeLabel(rpe) : null,
+    warmup: steps(w.warmup),
+    cooldown: steps(w.cooldown),
+  };
+  if (rp) {
+    const hr = hrMax ? targetHrRangeForRunType(rp.runType, hrMax) : null;
+    out.run = {
+      type: rp.runType || null,
+      zoneLabel: rp.zoneLabel || null,
+      hrTarget: hr,
+      pace: rp.targetPace || null,
+      paceRange: rp.targetRange || null,
+      targetKm: rp.targetKm ?? null,
+      structure: rp.structure || null,
+      note: rp.note || null,
+      drills: Array.isArray(rp.drills) ? rp.drills : [],
+    };
+  } else {
+    // Días de fuerza / mixtos / recuperación: la lista de ejercicios con su esquema y carga.
+    out.exercises = (Array.isArray(w.exercises) ? w.exercises : [])
+      .filter((e) => e?.name)
+      .slice(0, 16)
+      .map((e) => {
+        const p = e.prescription || null;
+        const load = p && Number(p.loadKg) > 0 ? `${p.loadKg} kg` : null;
+        return {
+          name: e.name,
+          scheme: schemeOf(p) || null,
+          load,
+          restSec: p && Number(p.restSeconds) > 0 ? Number(p.restSeconds) : null,
+        };
+      });
+  }
+  return out;
+}
+
+function mapWeekRow(d, today, workouts, opts = {}) {
   const training = d.isTrainingDay;
   const v = rpeAvg(effectiveIntensityRpe(d.workout));
   const load = training ? Math.min(1, Math.max(0.4, (v || 7) / 10)) : 0.15;
@@ -644,6 +713,8 @@ function mapWeekRow(d, today, workouts) {
     tag: d.sessionFocus || '',
     load: Number(load.toFixed(2)),
   };
+  const planned = mapPlannedDetail(d, opts);
+  if (planned) row.planned = planned;
   if (d.date === today) row.today = true;
   if (!training) row.rest = true;
   if (d.date && today) {
@@ -679,7 +750,7 @@ function shortDateLabel(dateKey) {
     .format(new Date(`${dateKey}T12:00:00Z`)).replace('.', '');
 }
 
-export function mapWeek(plan, today, workouts = []) {
+export function mapWeek(plan, today, workouts = [], opts = {}) {
   const cycles = planMicrocycles(plan);
   if (!cycles.length) return null;
   // Un bloque vencido no se presenta como la semana actual. El usuario debe regenerarlo.
@@ -690,7 +761,7 @@ export function mapWeek(plan, today, workouts = []) {
     const rows = c.map((d) => {
       const durMin = Number(d.workout?.durationMinutes);
       if (d.isTrainingDay && Number.isFinite(durMin) && durMin > 0) plannedMinutes += durMin;
-      return mapWeekRow(d, today, workouts);
+      return mapWeekRow(d, today, workouts, opts);
     });
     const start = c[0].date;
     const end = c[c.length - 1].date;
@@ -1010,7 +1081,7 @@ export async function GET(request) {
       const planHasToday = Array.isArray(planForStudio?.days)
         && planForStudio.days.some((day) => day?.date === today);
       const displayPlan = planHasToday ? planForStudio : null;
-      const weekData = mapWeek(displayPlan, today, workouts);
+      const weekData = mapWeek(displayPlan, today, workouts, { hrMax: resolveUserHrMax(workouts, profile) });
       // Contrato de verdad: en una sesión autenticada cada clave demo se reemplaza de forma
       // explícita por dato real, null o colección vacía. Nunca se omite para "conservar muestra".
       const overrides = {

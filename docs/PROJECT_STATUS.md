@@ -1,6 +1,19 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **27 de septiembre de 2026, parte 3 (RPE de carrera coherente + contexto del coach)**.
+Ultima actualizacion: **28 de septiembre de 2026 (pestaña Coach + botón flotante; chat rediseñado; Semana con prescripción completa)**.
+
+## Sesión del 28 de septiembre de 2026 (Coach con pestaña propia, chat arreglado, detalle de Semana)
+
+Reporte del usuario con captura de móvil: el chat "se ve inmundo"; quiere el coach con botón propio + flotante, y ver con más detalle las sesiones en Semana (eligió "prescripción completa").
+
+- **Causa del chat roto:** las burbujas usaban `className="ask-msg coach"` y `.coach` es la tarjeta del coach (`background: linear-gradient…; overflow:hidden`). Cada mensaje heredaba la franja naranja y, al tener overflow:hidden, el flex item del log podía encoger → el texto quedaba **recortado por arriba**. Además el historial se GUARDABA truncado a 400 caracteres (`trimChatMemory`), así que al reabrir el chat las respuestas salían cortadas a mitad de palabra ("…esa franja intens").
+- **Fix chat:** `CoachChatPanel` reutilizable (coach.jsx) con clases `chat-*` / `from-coach` / `from-user`, `.chat-msg { flex:none }`, input a 16 px (iOS no hace zoom). Memoria: se guarda completa (tope 2.000 caracteres/turno, `CHAT_MEMORY_STORE_TURN_MAX_CHARS`); el recorte 400/1.600 se aplica solo al PROMPT (`selectChatMemoryForPrompt`). Los turnos que ya estaban guardados cortados no se pueden recuperar.
+- **Pestaña Coach + flotante:** NAV con 6 pestañas (Hoy, Entreno, Coach, Nutrición, Progreso, Perfil); `CoachScreen` a pantalla completa; `CoachFab` en el resto de pantallas abre el modal. Ancho de pestaña por variable CSS `--tab-w` (48 px en ≤400 px: 6 pestañas caben en 360 px).
+- **Chat con la semana:** el contexto incluye "Plan de los próximos 7 días" (sesión, duración, km, RPE, zona, FC en ppm con SU FCmáx, ritmo orientativo, estructura) + regla de responder YA sobre un día concreto. Motivo: preguntó "¿y el jueves?" y el coach respondió "con gusto te detallaré…" sin datos.
+- **Semana con prescripción completa:** `mapPlannedDetail` (studio-data) → `week[].planned` (tipo, duración, RPE+etiqueta, calentamiento/vuelta a la calma por pasos, y en carrera zona, FC objetivo, ritmo orientativo+rango, km, estructura, nota, drills; en fuerza ejercicios con series×reps, carga y descanso). `WeekDayDetail` (screen-train) lo pinta con "Lo que hiciste" debajo; hoy abierto por defecto. Nota de intensidad según tipo: rodajes → test del habla y FC como techo; series → manda ritmo/RPE porque la FC tarda 1-2 min en subir.
+- **Bug de la tira semanal en móvil:** 4 columnas `1fr` que crecían con el texto y sacaban la 4.ª de la tarjeta → ahora fila deslizable de 7 días de 74 px (`scroll-snap`), texto a 2 líneas.
+- **Verificación:** 605 tests; capturas Playwright del bundle real a 360 px y 1280 px (chat, pestaña Coach, modal del flotante, Semana, detalle de rodaje, series y fuerza), 0 errores de consola, 0 desbordes horizontales. Hecho en un clon en la nube porque la Mac estaba desconectada; parche en `scratch/coach-semana-2026-09-28.patch`.
+
 
 ## Sesión del 27 de septiembre de 2026, parte 3 (RPE por tipo de carrera; instrucciones del coach)
 

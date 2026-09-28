@@ -118,7 +118,13 @@ function CoachFeedback({ endpoint, text }) {
   );
 }
 
-function AskCoach({ open, onClose }) {
+/* Panel de chat del coach — REUTILIZABLE (27/28-sep-2026): lo usan la pestaña "Coach" (a pantalla
+   completa, embebido) y el modal que abren el botón flotante y los banners.
+   Rediseño tras el reporte del usuario ("se ve inmundo"): las burbujas usaban la clase `coach`,
+   que colisionaba con la tarjeta `.coach` (degradado naranja + overflow:hidden). El overflow
+   convertía cada mensaje en un flex item encogible y el texto quedaba recortado POR ARRIBA.
+   Ahora las clases son `from-coach` / `from-user` y los mensajes no encogen (flex: none). */
+function CoachChatPanel({ active = true, onClose = null, embedded = false }) {
   const [q, setQ] = useStateC('');
   const [log, setLog] = useStateC([]); // {role, text, failed?, redFlag?}
   const [busy, setBusy] = useStateC(false);
@@ -126,26 +132,32 @@ function AskCoach({ open, onClose }) {
   const scrollRef = useRefC(null);
   const inputRef = useRefC(null);
 
-  useEffectC(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [log, busy]);
-  useEffectC(() => { if (!open) { setLog([]); setQ(''); setBusy(false); } }, [open]);
+  useEffectC(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [log, busy, loadingLog]);
+  useEffectC(() => { if (!active) { setLog([]); setQ(''); setBusy(false); } }, [active]);
 
-  /* El servidor recuerda el hilo hasta 7 días. Sin esto el modal se abría en blanco y el
+  /* El servidor recuerda el hilo hasta 7 días. Sin esto el panel se abría en blanco y el
      coach respondía referenciando una conversación que el usuario ya no veía. */
   useEffectC(() => {
-    if (!open) return undefined;
-    let active = true;
+    if (!active) return undefined;
+    let alive = true;
     setLoadingLog(true);
     (async () => {
       let turns = [];
       try {
         if (window.claude && window.claude.history) turns = await window.claude.history();
       } catch (e) { turns = []; }
-      if (!active) return;
+      if (!alive) return;
       setLog(turns.map((t) => ({ role: t.role === 'user' ? 'user' : 'coach', text: t.text })));
       setLoadingLog(false);
     })();
-    return () => { active = false; };
-  }, [open]);
+    return () => { alive = false; };
+  }, [active]);
+
+  useEffectC(() => {
+    if (!active || embedded) return undefined;
+    const id = setTimeout(() => { if (inputRef.current) inputRef.current.focus({ preventScroll: true }); }, 80);
+    return () => clearTimeout(id);
+  }, [active, embedded]);
 
   const clearHistory = async () => {
     if (busy) return;
@@ -154,30 +166,12 @@ function AskCoach({ open, onClose }) {
       if (window.claude && window.claude.clearHistory) await window.claude.clearHistory();
     } catch (e) { /* el hilo ya está vacío en pantalla; el próximo turno lo reescribe */ }
   };
-  useEffectC(() => {
-    if (!open) return undefined;
-    const body = document.body;
-    const main = document.querySelector('.main');
-    const prevBodyOverflow = body.style.overflow;
-    const prevMainOverflow = main ? main.style.overflowY : '';
-    body.style.overflow = 'hidden';
-    if (main) main.style.overflowY = 'hidden';
-    const id = setTimeout(() => {
-      if (inputRef.current) inputRef.current.focus({ preventScroll: true });
-    }, 80);
-    return () => {
-      clearTimeout(id);
-      body.style.overflow = prevBodyOverflow;
-      if (main) main.style.overflowY = prevMainOverflow;
-    };
-  }, [open]);
 
   const send = async (text) => {
     const question = (text || q).trim();
     if (!question || busy) return;
     setQ(''); setLog((l) => [...l, { role: 'user', text: question }]); setBusy(true);
     // FASE 0.1: la persona/reglas del coach viven en el SERVIDOR (coachPersona.js).
-    // El cliente envía solo el mensaje del usuario.
     let answer = '';
     let failed = false;
     let redFlag = false;
@@ -189,47 +183,76 @@ function AskCoach({ open, onClose }) {
       }
     } catch (e) { answer = coachErrorMessage(e); failed = true; }
     if (!answer) { answer = COACH_FALLBACK.default; failed = true; }
-    // `failed` marca la burbuja como aviso del sistema y `redFlag` como aviso de seguridad:
-    // ninguna de las dos es una respuesta del coach, así que no se vota con 👍👎.
+    // `failed` = aviso del sistema y `redFlag` = aviso de seguridad: no se votan con 👍👎.
     setLog((l) => [...l, { role: 'coach', text: answer, failed, redFlag }]);
     setBusy(false);
   };
 
+  return (
+    <div className={`chat-panel${embedded ? ' embedded' : ''}`}>
+      <div className="chat-head">
+        <span className="cb-av"><Icon name="sparkles" size={18} /><span className="cb-live" /></span>
+        <div className="chat-title">
+          <strong>Coach Ignios</strong>
+          <span className="tiny faint">Conoce tu plan, tus entrenos y tu nutrición</span>
+        </div>
+        {log.length ? (
+          <button type="button" className="chat-clear" onClick={clearHistory} disabled={busy}
+            title="El coach deja de recordar esta conversación" aria-label="Borrar conversación">
+            <Icon name="close" size={14} /><span>Borrar</span>
+          </button>
+        ) : null}
+        {onClose ? <button type="button" className="icon-btn chat-x" onClick={onClose} aria-label="Cerrar"><Icon name="close" size={18} /></button> : null}
+      </div>
+      <div className="chat-log" ref={scrollRef}>
+        {loadingLog && log.length === 0 ? (
+          <div className="chat-empty"><p className="muted" style={{ margin: 0 }}>Recuperando vuestra conversación…</p></div>
+        ) : log.length === 0 ? (
+          <div className="chat-empty">
+            <p className="muted" style={{ margin: '0 0 14px', lineHeight: 1.5 }}>Soy tu coach. Conozco tu plan de la semana, tus entrenos de Strava y tu nutrición. ¿Qué quieres saber?</p>
+            <div className="ask-suggest">{COACH_SUGGEST.map((s, i) => <button key={i} type="button" onClick={() => send(s)}>{s}</button>)}</div>
+          </div>
+        ) : log.map((m, i) => (
+          <div key={i} className={`chat-msg ${m.role === 'user' ? 'from-user' : 'from-coach'}`}>
+            {m.role === 'coach' ? <span className="cb-av sm"><Icon name={m.redFlag ? 'heart' : 'sparkles'} size={13} /></span> : null}
+            <div className={`chat-bubble${m.redFlag ? ' alert' : ''}${m.failed ? ' failed' : ''}`}>
+              <p>{m.text}</p>
+              {m.role === 'coach' && !m.failed && !m.redFlag ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}
+            </div>
+          </div>
+        ))}
+        {busy ? <div className="chat-msg from-coach"><span className="cb-av sm"><Icon name="sparkles" size={13} /></span><div className="chat-bubble"><div className="cb-typing"><span /><span /><span /></div></div></div> : null}
+      </div>
+      <form className="chat-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
+        <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Escribe tu pregunta…" enterKeyHint="send" />
+        <button type="submit" className="btn icon-only" disabled={busy || !q.trim()} aria-label="Enviar"><Icon name="arrowRight" size={18} /></button>
+      </form>
+    </div>
+  );
+}
+
+/* Modal del coach (botón flotante, banners). En móvil ocupa toda la pantalla. */
+function AskCoach({ open, onClose }) {
+  useEffectC(() => {
+    if (!open) return undefined;
+    const body = document.body;
+    const main = document.querySelector('.main');
+    const prevBodyOverflow = body.style.overflow;
+    const prevMainOverflow = main ? main.style.overflowY : '';
+    body.style.overflow = 'hidden';
+    if (main) main.style.overflowY = 'hidden';
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      if (main) main.style.overflowY = prevMainOverflow;
+    };
+  }, [open]);
   if (!open) return null;
   const isMobileSheet = typeof window !== 'undefined'
     && (window.matchMedia('(max-width: 700px)').matches || Boolean(document.querySelector('.app.mobile')));
   const modal = (
     <div className={`ask-scrim${isMobileSheet ? ' mobile' : ''}`} onClick={onClose}>
       <div className="ask-card" onClick={(e) => e.stopPropagation()}>
-        <div className="ask-head">
-          <span className="cb-av"><Icon name="sparkles" size={18} /><span className="cb-live" /></span>
-          <div><strong style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>Coach Ignios</strong><div className="tiny faint">Pregúntale lo que quieras</div></div>
-          {log.length ? (
-            <button className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={clearHistory} disabled={busy}
-              title="El coach deja de recordar esta conversación">Borrar conversación</button>
-          ) : null}
-          <button className="icon-btn" style={{ marginLeft: log.length ? 0 : 'auto', width: 36, height: 36 }} onClick={onClose}><Icon name="close" size={18} /></button>
-        </div>
-        <div className="ask-log" ref={scrollRef}>
-          {loadingLog && log.length === 0 ? (
-            <div className="ask-empty"><p className="muted" style={{ margin: 0 }}>Recuperando vuestra conversación…</p></div>
-          ) : log.length === 0 ? (
-            <div className="ask-empty">
-              <p className="muted" style={{ margin: '0 0 14px', lineHeight: 1.5 }}>Soy tu coach. Te conozco: tu plan, tu nutrición y tu glucemia. ¿Qué quieres saber?</p>
-              <div className="ask-suggest">{COACH_SUGGEST.map((s, i) => <button key={i} onClick={() => send(s)}>{s}</button>)}</div>
-            </div>
-          ) : log.map((m, i) => (
-            <div key={i} className={`ask-msg ${m.role}`}>
-              {m.role === 'coach' ? <span className="cb-av sm"><Icon name={m.redFlag ? 'heart' : 'sparkles'} size={13} /></span> : null}
-              <div className={`ask-bubble${m.redFlag ? ' alert' : ''}`}>{m.text}{m.role === 'coach' && !m.failed && !m.redFlag ? <CoachFeedback endpoint="coach-chat" text={m.text} /> : null}</div>
-            </div>
-          ))}
-          {busy ? <div className="ask-msg coach"><span className="cb-av sm"><Icon name="sparkles" size={13} /></span><div className="ask-bubble"><div className="cb-typing"><span /><span /><span /></div></div></div> : null}
-        </div>
-        <form className="ask-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
-          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Escribe tu pregunta…" />
-          <button type="submit" className="btn icon-only" disabled={busy || !q.trim()}><Icon name="arrowRight" size={18} /></button>
-        </form>
+        <CoachChatPanel active={open} onClose={onClose} />
       </div>
     </div>
   );
@@ -237,4 +260,22 @@ function AskCoach({ open, onClose }) {
   return createPortal && document.body ? createPortal(modal, document.body) : modal;
 }
 
-Object.assign(window, { CoachBanner, AskCoach, useTypewriter, COACH_MSGS, CoachFeedback, coachErrorMessage });
+/* Pestaña "Coach": el chat a pantalla completa dentro de la app. */
+function CoachScreen() {
+  return (
+    <div className="coach-screen screen-enter">
+      <CoachChatPanel active embedded />
+    </div>
+  );
+}
+
+/* Botón flotante: acceso al coach desde cualquier pantalla (se oculta en la pestaña Coach). */
+function CoachFab({ onOpen }) {
+  return (
+    <button type="button" className="coach-fab" onClick={onOpen} aria-label="Hablar con el coach" title="Hablar con el coach">
+      <Icon name="sparkles" size={22} />
+    </button>
+  );
+}
+
+Object.assign(window, { CoachBanner, AskCoach, CoachChatPanel, CoachScreen, CoachFab, useTypewriter, COACH_MSGS, CoachFeedback, coachErrorMessage });

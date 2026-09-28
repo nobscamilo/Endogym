@@ -4,6 +4,8 @@ Ultima actualizacion: **27 de septiembre de 2026 (Semana por microciclos; backlo
 
 ## P1 - Propuestas de la revisión del 27 sep 2026
 
+- [x] (28-sep) Pestaña Coach + botón flotante; chat rediseñado (sin recortes) y memoria visible completa; Semana con prescripción completa por día; el chat conoce los próximos 7 días.
+
 - [x] RPE por tipo de carrera (rodaje 3-4 / umbral 6-7 / series 8-9) y contexto de intensidad en el chat (parte 3).
 - [ ] **Modelo de zonas de FC:** Z2 = 60-70 % FCmáx es conservador para correr; decidir entre %FCR (Karvonen, pedir FC en reposo en Perfil), LTHR por test de 30 min, o techo fácil ~75 % FCmáx. Cambia prescripción, validación de zonas y análisis del coach.
 

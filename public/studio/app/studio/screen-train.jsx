@@ -1659,6 +1659,119 @@ function MesocycleReviewCard({ review }) {
   );
 }
 
+/* Detalle de un día de la semana (28-sep-2026): prescripción COMPLETA del plan + lo realizado.
+   Antes, un día futuro solo decía "Planificado: Rodaje suave". */
+function WeekDayDetail({ d }) {
+  const p = d.planned || null;
+  const run = p && p.run ? p.run : null;
+  const fmtMin = (m) => (m ? `${m}'` : '');
+  const Steps = ({ title, items }) => (Array.isArray(items) && items.length ? (
+    <div className="wd-block">
+      <div className="wd-lbl">{title}</div>
+      <ol className="wd-steps">
+        {items.map((x, k) => (
+          <li key={k}><span className="wd-step-min">{fmtMin(x.min)}</span><div><strong>{x.step}</strong>{x.details ? <span className="tiny muted"> {x.details}</span> : null}</div></li>
+        ))}
+      </ol>
+    </div>
+  ) : null);
+  const tiles = p ? [
+    p.durationMin ? { k: 'Duración', v: `${p.durationMin} min` } : null,
+    run && run.targetKm ? { k: 'Distancia', v: `${run.targetKm} km` } : null,
+    p.rpeTarget ? { k: 'Intensidad', v: p.intensity ? `${p.intensity} · ${p.rpeTarget}` : p.rpeTarget } : null,
+    run && run.hrTarget ? { k: 'FC objetivo', v: `${run.hrTarget.min}–${run.hrTarget.max} ppm`, s: run.hrTarget.label } : null,
+    run && run.pace ? { k: 'Ritmo orientativo', v: run.pace, s: run.paceRange || null } : null,
+  ].filter(Boolean) : [];
+  return (
+    <div className="card wd-card">
+      <div className="row ac between wrap" style={{ gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="tiny muted" style={{ textTransform: 'capitalize' }}>{d.day} {d.date}{p && p.type ? ` · ${p.type}` : ''}</div>
+          <strong style={{ fontSize: '1.02rem' }}>{d.focus || 'Sesión'}</strong>
+        </div>
+        <span className="row ac" style={{ gap: 6 }}>
+          {d.extra ? <span className="pill tiny">Sesión extra</span> : null}
+          {d.logged && !d.extra ? <span className="pill tiny">Hecha ✓</span> : null}
+          {d.today ? <span className="pill accent tiny">Hoy</span> : (d.rest ? <span className="pill tiny">Descanso</span> : null)}
+        </span>
+      </div>
+
+      {tiles.length ? (
+        <div className="wd-grid">
+          {tiles.map((t, k) => (
+            <div key={k} className="wd-tile"><div className="wd-k">{t.k}</div><div className="wd-v">{t.v}</div>{t.s ? <div className="wd-s">{t.s}</div> : null}</div>
+          ))}
+        </div>
+      ) : null}
+
+      {run && (run.zoneLabel || run.structure) ? (
+        <div className="wd-block">
+          <div className="wd-lbl">Sesión{run.zoneLabel ? ` · ${run.zoneLabel}` : ''}</div>
+          {run.structure ? <p className="wd-text">{run.structure}</p> : null}
+          {run.note ? <p className="tiny muted" style={{ margin: '4px 0 0', lineHeight: 1.45 }}>{run.note}</p> : null}
+          {run.hrTarget || run.pace ? (
+            <p className="tiny muted" style={{ margin: '4px 0 0', lineHeight: 1.45 }}>
+              {['easy', 'long'].includes(run.type)
+                ? 'Manda el esfuerzo (poder hablar en frases completas) y la FC como techo; el ritmo es orientativo y baja con calor, cuestas o fatiga.'
+                : 'En las series manda el ritmo y el esfuerzo objetivo: la FC tarda 1-2 min en subir, así que úsala para comprobar la recuperación entre series, no para regular una repetición corta.'}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Steps title="Calentamiento" items={p ? p.warmup : null} />
+      {run && Array.isArray(run.drills) && run.drills.length ? (
+        <div className="wd-block"><div className="wd-lbl">Técnica / drills</div><ul className="wd-list">{run.drills.map((x, k) => <li key={k}>{x}</li>)}</ul></div>
+      ) : null}
+      {p && Array.isArray(p.exercises) && p.exercises.length ? (
+        <div className="wd-block">
+          <div className="wd-lbl">Ejercicios</div>
+          <div className="stack" style={{ gap: 6 }}>
+            {p.exercises.map((e, k) => (
+              <div key={k} className="wd-ex">
+                <strong>{e.name}</strong>
+                <span className="tiny muted">{[e.scheme, e.load, e.restSec ? `desc. ${e.restSec}s` : null].filter(Boolean).join(' · ')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <Steps title="Vuelta a la calma" items={p ? p.cooldown : null} />
+
+      <div className="wd-block">
+        <div className="wd-lbl">Lo que hiciste</div>
+        {d.logged ? (
+          <div className="stack" style={{ gap: 8 }}>
+            {d.extra ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Estaba planificado como descanso: cuenta como carga extra (el coach la tiene en cuenta para ajustar los días siguientes), no como sesión del plan.</p> : null}
+            {d.logged.title ? <strong style={{ fontSize: '0.88rem' }}>{d.logged.title}</strong> : null}
+            <div className="chips">
+              {d.logged.sessionRpe != null ? <span className="pill tiny">RPE {d.logged.sessionRpe}</span> : null}
+              {d.logged.fatigue != null ? <span className="pill tiny">Fatiga {d.logged.fatigue}</span> : null}
+              {d.logged.durationMinutes != null ? <span className="pill tiny">{d.logged.durationMinutes} min</span> : null}
+              {d.logged.distanceKm != null ? <span className="pill tiny">{d.logged.distanceKm} km</span> : null}
+              {(d.logged.sources || []).includes('strava') ? <span className="pill tiny">Strava</span> : null}
+            </div>
+            {Array.isArray(d.logged.lifts) && d.logged.lifts.length ? (
+              <div className="stack" style={{ gap: 6 }}>
+                {d.logged.lifts.map((lf, k) => (
+                  <div key={k} className="wd-ex">
+                    <strong>{lf.name}</strong>
+                    <span className="tiny muted">{lf.kg != null ? `${lf.kg} kg` : 'peso corporal'}{lf.reps != null ? ` × ${lf.reps} reps` : ''}{lf.sets ? ` · ${lf.sets} series` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>
+            {d.past ? 'Sin registro de ese día.' : (d.today ? 'Aún no has registrado la sesión de hoy.' : 'Todavía no ha llegado.')}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TrainWeek() {
   const D = window.STUDIO;
   // Microciclos del bloque (27-sep-2026): antes se mostraba la semana natural lunes→domingo y un
@@ -1684,7 +1797,9 @@ function TrainWeek() {
   const extraN = week.filter((d) => d.extra).length;
   const adherence = due.length ? Math.round((doneN / due.length) * 100) : null;
   // Día abierto para revisar lo realmente hecho (historial por día).
-  const [openDay, setOpenDay] = useStateTr(null);
+  // Por defecto se abre HOY (si está en el microciclo visible): es lo primero que se consulta.
+  const todayIdx = week.findIndex((d) => d.today);
+  const [openDay, setOpenDay] = useStateTr(todayIdx >= 0 ? todayIdx : null);
   const sel = openDay != null ? week[openDay] : null;
   const goWeek = (n) => { setOpenDay(null); setWi(n); };
   return (
@@ -1707,12 +1822,12 @@ function TrainWeek() {
         <div className="card"><Stat num={adherence != null ? `${adherence}%` : '—'} label={due.length ? 'Adherencia hasta hoy' : 'Adherencia · aún sin muestra'} color="var(--glu-good)" /></div>
       </div>
 
-      <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día · toca un día para ver lo que hiciste">
+      <SectionCard title="Carga de la semana" icon="bolt" sub="Intensidad planificada por día · toca un día para ver la sesión completa">
         <div className="week-strip">
           {week.map((d, i) => (
             <button key={i} type="button"
               className={`wcol ${d.today ? 'today' : ''} ${d.rest ? 'rest' : ''} ${openDay === i ? 'sel' : ''}`}
-              style={{ cursor: 'pointer', border: openDay === i ? '1px solid var(--accent)' : undefined, background: 'none', font: 'inherit', textAlign: 'center' }}
+              style={{ font: 'inherit', textAlign: 'center', color: 'inherit' }}
               onClick={() => setOpenDay(openDay === i ? null : i)}>
               <span className="wc-day">{d.day} {d.date}{d.logged ? ' ✓' : ''}</span>
               <div className="wc-bar"><i style={{ height: Math.max(6, d.load * 100) + '%' }} /></div>
@@ -1720,41 +1835,7 @@ function TrainWeek() {
             </button>
           ))}
         </div>
-        {sel ? (
-          <div className="card" style={{ marginTop: 12, background: 'var(--surface-2)', boxShadow: 'none' }}>
-            <div className="row ac between">
-              <strong style={{ fontSize: '0.95rem' }}>{sel.day} · {sel.focus || 'Sesión'}</strong>
-              <span className="row ac" style={{ gap: 6 }}>{sel.extra ? <span className="pill tiny">Sesión extra</span> : null}{sel.today ? <span className="pill accent tiny">Hoy</span> : (sel.rest ? <span className="pill tiny">Descanso</span> : null)}</span>
-            </div>
-            {sel.logged ? (
-              <div className="stack" style={{ gap: 8, marginTop: 10 }}>
-                {sel.extra ? <p className="tiny muted" style={{ margin: 0, lineHeight: 1.45 }}>Estaba planificado como descanso: cuenta como carga extra (el coach la tiene en cuenta para ajustar los días siguientes), no como sesión del plan.</p> : null}
-                {sel.logged.title ? <strong style={{ fontSize: '0.88rem' }}>{sel.logged.title}</strong> : null}
-                <div className="chips">
-                  {sel.logged.sessionRpe != null ? <span className="pill tiny">RPE {sel.logged.sessionRpe}</span> : null}
-                  {sel.logged.fatigue != null ? <span className="pill tiny">Fatiga {sel.logged.fatigue}</span> : null}
-                  {sel.logged.durationMinutes != null ? <span className="pill tiny">{sel.logged.durationMinutes} min</span> : null}
-                  {sel.logged.distanceKm != null ? <span className="pill tiny">{sel.logged.distanceKm} km</span> : null}
-                  {(sel.logged.sources || []).includes('strava') ? <span className="pill tiny">Strava</span> : null}
-                </div>
-                {Array.isArray(sel.logged.lifts) && sel.logged.lifts.length ? (
-                  <div className="stack" style={{ gap: 6 }}>
-                    {sel.logged.lifts.map((lf, k) => (
-                      <div key={k} className="row ac between">
-                        <strong style={{ fontSize: '0.88rem' }}>{lf.name}</strong>
-                        <span className="tiny muted">{lf.kg != null ? `${lf.kg} kg` : 'peso corporal'}{lf.reps != null ? ` × ${lf.reps} reps` : ''}{lf.sets ? ` · ${lf.sets} series` : ''}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : <p className="tiny muted" style={{ margin: 0 }}>Registrada sin desglose de cargas.</p>}
-              </div>
-            ) : (
-              <p className="tiny muted" style={{ margin: '10px 0 0', lineHeight: 1.45 }}>
-                {sel.past ? 'Sin registro de ese día.' : (sel.today ? 'Aún no has registrado la sesión de hoy.' : `Planificado: ${sel.focus || '—'}.`)}
-              </p>
-            )}
-          </div>
-        ) : null}
+        {sel ? <WeekDayDetail d={sel} /> : null}
       </SectionCard>
 
       <CoachBanner screen="train_week" />

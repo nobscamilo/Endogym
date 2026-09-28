@@ -4,6 +4,8 @@ const { useState: useStateA, useEffect: useEffectA, useRef: useRefA } = React;
 const NAV = [
   { id: 'today', label: 'Hoy', icon: 'today' },
   { id: 'train', label: 'Entreno', icon: 'train' },
+  // Pestaña propia del coach (28-sep-2026, pedido del usuario). Además hay botón flotante.
+  { id: 'coach', label: 'Coach', icon: 'sparkles' },
   { id: 'nutrition', label: 'Nutrición', icon: 'nutrition' },
   { id: 'progress', label: 'Progreso', icon: 'progress' },
   { id: 'profile', label: 'Perfil', icon: 'profile' },
@@ -34,6 +36,7 @@ function App() {
   const [isMobile, setIsMobile] = useStateA(typeof window !== 'undefined' && window.innerWidth < 760);
   const [mini, setMini] = useStateA(false);
   const [sheet, setSheet] = useStateA(false);
+  const [coachOpen, setCoachOpen] = useStateA(false);
   const mainRef = useRefA(null);
 
   const theme = t.theme, accent = t.accent;
@@ -72,6 +75,7 @@ function App() {
       case 'train': return <TrainScreen />;
       case 'nutrition': return <NutritionScreen layout={t.nutriLayout} />;
       case 'progress': return <ProgressScreen />;
+      case 'coach': return <CoachScreen />;
       case 'profile': return <ProfileScreen theme={theme} setTheme={setTheme} notif={notif} />;
       default: return <TodayHub go={go} variant={t.homeLayout} />;
     }
@@ -157,13 +161,14 @@ function App() {
               )}
 
               <main className="main" ref={mainRef}>
-                <div key={view}>{screen}</div>
+                <div key={view} className={view === 'coach' ? 'view-fill' : undefined}>{screen}</div>
               </main>
 
               {/* Bottom tab bar (mobile) */}
               {isMobile ? (
                 <nav className="tabbar">
-                  <div className="tab-thumb" style={{ left: `calc(7px + ${navIdx} * 58px)`, width: '56px' }} />
+                  {/* El ancho de pestaña vive en CSS (--tab-w): con 6 pestañas no cabían a 56 px en 360 px. */}
+                  <div className="tab-thumb" style={{ left: `calc(7px + ${navIdx} * (var(--tab-w) + 2px))`, width: 'var(--tab-w)' }} />
                   {NAV.map((n) => (
                     <button key={n.id} className={`tab ${view === n.id ? 'active' : ''}`} onClick={() => go(n.id)}>
                       <span className="tab-ico"><Icon name={n.icon} size={21} /></span>
@@ -172,6 +177,10 @@ function App() {
                   ))}
                 </nav>
               ) : null}
+
+              {/* Acceso rápido al coach desde cualquier pantalla (no en la propia pestaña Coach). */}
+              {view !== 'coach' ? <CoachFab onOpen={() => setCoachOpen(true)} /> : null}
+              <AskCoach open={coachOpen} onClose={() => setCoachOpen(false)} />
 
               {/* Quick add sheet */}
               <Sheet open={sheet} onClose={() => setSheet(false)} title="Registro rápido">

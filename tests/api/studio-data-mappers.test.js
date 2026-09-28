@@ -21,7 +21,7 @@ vi.mock('../../src/lib/logger.js', () => ({
   logInfo: vi.fn(),
 }));
 
-const { GET, rpeLabel, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
+const { GET, rpeLabel, mapPlannedDetail, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
 
 const PLAN = {
   days: [
@@ -421,5 +421,34 @@ describe('rpeLabel — la intensidad guardada como texto', () => {
     expect(rpeLabel('RPE 6-7')).toBe('Moderada');
     expect(rpeLabel('RPE 8-9')).toBe('Alta');
     expect(rpeLabel(null)).toBe('Moderada');
+  });
+});
+
+describe('mapPlannedDetail — prescripción completa de un día (vista Semana, 28-sep-2026)', () => {
+  it('carrera: RPE por tipo, FC objetivo con la FCmáx del usuario, ritmo orientativo y estructura', () => {
+    const d = { date: '2026-09-28', sessionType: 'aerobic', isTrainingDay: true, workout: {
+      title: 'Rodaje suave', durationMinutes: 45, intensityRpe: 'RPE 5-8',
+      warmup: [{ step: 'Calentamiento general', durationMinutes: 4, details: 'Caminar rápido' }],
+      runPrescription: { runType: 'easy', zoneLabel: 'Zona 2 · conversacional', targetPace: '10:20/km', targetRange: '10:15–10:25/km', structure: 'Carrera continua suave 45 min.' },
+    } };
+    const p = mapPlannedDetail(d, { hrMax: 182 });
+    expect(p.rpeTarget).toBe('RPE 3-4');
+    expect(p.intensity).toBe('Suave');
+    expect(p.run.hrTarget).toEqual({ min: 110, max: 127, label: 'Z2' });
+    expect(p.run.pace).toBe('10:20/km');
+    expect(p.run.type).toBe('easy');
+    expect(p.warmup[0]).toEqual({ step: 'Calentamiento general', min: 4, details: 'Caminar rápido' });
+    expect(p).not.toHaveProperty('exercises');
+  });
+
+  it('fuerza: lista de ejercicios con esquema, carga y descanso; sin FC si no hay FCmáx', () => {
+    const d = { date: '2026-09-29', sessionType: 'resistance', isTrainingDay: true, workout: {
+      title: 'Fuerza', durationMinutes: 40, intensityRpe: 'RPE 5-6',
+      exercises: [{ name: 'Zancada', prescription: { format: 'reps', sets: 2, reps: '12-20', loadKg: 12.5, restSeconds: 60 } }],
+    } };
+    const p = mapPlannedDetail(d);
+    expect(p.type).toBe('Fuerza');
+    expect(p.exercises).toEqual([{ name: 'Zancada', scheme: '2 × 12-20', load: '12.5 kg', restSec: 60 }]);
+    expect(p).not.toHaveProperty('run');
   });
 });

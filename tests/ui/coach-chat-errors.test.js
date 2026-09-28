@@ -89,7 +89,17 @@ describe('Chat del coach — el error que ve el usuario explica la causa real', 
     const coach = read('public/studio/app/studio/coach.jsx');
     expect(coach).toContain("m.redFlag ? ' alert' : ''");
     const css = read('public/studio/app/studio/screens.css');
-    expect(css).toContain('.ask-bubble.alert');
+    expect(css).toContain('.chat-bubble.alert');
+  });
+
+  it('las burbujas NO usan la clase `coach` (colisiona con la tarjeta con degradado y recorta el texto)', () => {
+    // Bug 28-sep-2026: `.ask-msg.coach` heredaba `.coach { background: gradient; overflow: hidden }`:
+    // franja naranja y texto cortado por arriba al encoger el mensaje dentro del flex del log.
+    const coach = read('public/studio/app/studio/coach.jsx');
+    expect(coach).not.toMatch(/className=\{`(ask|chat)-msg \$\{m\.role\}`\}/);
+    expect(coach).toContain("'from-user' : 'from-coach'");
+    const css = read('public/studio/app/studio/screens.css');
+    expect(css).toMatch(/\.chat-msg \{ flex: none;/);
   });
 
   it('el shim expone historial y borrado del hilo, y propaga redFlag', () => {
