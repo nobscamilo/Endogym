@@ -434,7 +434,7 @@ describe('mapPlannedDetail — prescripción completa de un día (vista Semana, 
     const p = mapPlannedDetail(d, { hrMax: 182 });
     expect(p.rpeTarget).toBe('RPE 3-4');
     expect(p.intensity).toBe('Suave');
-    expect(p.run.hrTarget).toEqual({ min: 110, max: 127, label: 'Z2' });
+    expect(p.run.hrTarget).toEqual({ min: 110, max: 136, label: 'Z2' });
     expect(p.run.pace).toBe('10:20/km');
     expect(p.run.type).toBe('easy');
     expect(p.warmup[0]).toEqual({ step: 'Calentamiento general', min: 4, details: 'Caminar rápido' });

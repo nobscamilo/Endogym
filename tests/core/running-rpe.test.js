@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RUN_RPE_BY_TYPE, effectiveIntensityRpe, targetHrRangeForRunType, estimateSessionRpeFromHr } from '../../src/core/running.js';
+import { RUN_RPE_BY_TYPE, effectiveIntensityRpe, targetHrRangeForRunType, estimateSessionRpeFromHr, hrZone } from '../../src/core/running.js';
 
 // Bug 27-sep-2026: un "Rodaje suave · Zona 2 · conversacional" se prescribía como "RPE 5-8"
 // (genérico del bloque de resistencia) y el chat improvisaba otro RPE.
@@ -21,12 +21,19 @@ describe('RPE por tipo de carrera', () => {
     expect(effectiveIntensityRpe({ intensityRpe: 'RPE 7-8' })).toBe('RPE 7-8');
   });
 
-  it('el rango de FC de Z2 cuadra con la estimación FC→RPE (coherencia interna)', () => {
+  it('rodaje fácil: techo al 75 % de la FCmáx (decisión 28-sep-2026), no al 85 %', () => {
     const hr = targetHrRangeForRunType('easy', 182);
-    expect(hr).toEqual({ min: 110, max: 127, label: 'Z2' });
-    const rpeLow = estimateSessionRpeFromHr({ avgHeartRate: hr.min, hrMax: 182 });
+    expect(hr).toEqual({ min: 110, max: 136, label: 'Z2' });
+    // El techo no puede meter el rodaje en la "zona gris" (>~80 %).
+    expect(hr.max / 182).toBeLessThan(0.76);
     const rpeHigh = estimateSessionRpeFromHr({ avgHeartRate: hr.max, hrMax: 182 });
-    expect(rpeLow).toBeGreaterThanOrEqual(2);
-    expect(rpeHigh).toBeLessThanOrEqual(4);
+    expect(rpeHigh).toBeLessThanOrEqual(5);
+  });
+
+  it('las zonas del modelo son contiguas y la carrera real del 27-sep (158 ppm) es umbral, no Z2', () => {
+    expect(hrZone(136, 182).zone).toBe(2);
+    expect(hrZone(137, 182).zone).toBe(3);
+    expect(hrZone(158, 182).zone).toBe(4);
+    expect(targetHrRangeForRunType('intervals', 182)).toEqual({ min: 150, max: 181, label: 'Z4–5' });
   });
 });

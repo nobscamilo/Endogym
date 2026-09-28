@@ -22,6 +22,7 @@ import {
   formatRaceTime,
   hrMaxFromAge,
   hrZone,
+  zoneHrRange,
   predictRaceTimeFromRuns,
   validateRunZone,
 } from '../core/running.js';
@@ -353,10 +354,8 @@ export function buildRunGoalSignals({ profile, plan, workouts, now = new Date() 
     hrMaxSource = 'estimada por edad';
   }
 
-  const z2Range = hrMax ? {
-    min: Math.ceil(hrMax * 0.60),
-    max: Math.ceil(hrMax * 0.70) - 1,
-  } : null;
+  // Rango Z2 del modelo ÚNICO de zonas (HR_ZONE_BANDS; 60-75 % desde el 28-sep-2026).
+  const z2Range = hrMax ? zoneHrRange(2, hrMax) : null;
   const runTypeByDate = new Map();
   for (const day of Array.isArray(plan?.days) ? plan.days : []) {
     if (day?.date && day?.workout?.runPrescription?.runType) {

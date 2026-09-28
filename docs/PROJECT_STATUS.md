@@ -1,6 +1,14 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **28 de septiembre de 2026 (pestaña Coach + botón flotante; chat rediseñado; Semana con prescripción completa)**.
+Ultima actualizacion: **28 de septiembre de 2026, parte 2 (modelo de zonas de FC: rodaje fácil hasta el 75 %)**.
+
+## Sesión del 28 de septiembre de 2026, parte 2 (modelo de zonas de FC)
+
+- El usuario propuso techo del rodaje fácil al **85 % FCmáx**. Se le argumentó en contra: 85 % supera la intensidad moderada ACSM (64-76 %) y el primer umbral ventilatorio típico de un corredor recreativo (~75-80 %) → "zona gris" que fatiga sin el estímulo del rodaje; su carrera del 27-sep a 158 ppm (87 %) es justo ese patrón. **Eligió 75 %.**
+- `HR_ZONE_BANDS` (running.js) es ahora la fuente única: Z1 50-60, **Z2 60-75**, Z3 75-82, Z4 82-90, Z5 ≥90 % FCmáx. La usan `hrZone`, `zoneHrRange`, `targetHrRangeForRunType` (prescripción/Semana/chat) y el `z2Range` de coachAnalysis. Con FCmáx 182: rodaje 110-136 ppm (antes 110-127); series Z4-5 150-181; su carrera de 158 ppm se clasifica Z4.
+- Límite conocido: la estimación FC→RPE ((%−50)/5) da ~5 al 75 %, algo por encima del RPE 3-4 prescrito para rodajes; es poblacional y solo se usa cuando no hay RPE reportado.
+- Chat real verificado (dev-user): "rango 110-136 ppm con RPE 3-4, pulso como techo, test del habla". 606 tests.
+
 
 ## Sesión del 28 de septiembre de 2026 (Coach con pestaña propia, chat arreglado, detalle de Semana)
 

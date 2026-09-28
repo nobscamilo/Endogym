@@ -28,6 +28,7 @@ Actualiza los `.md` afectados al finalizar cambios. Evita reescribir documentos 
 
 ## Estado acumulado (actualizado el 20 de junio de 2026)
 
+- **(28 sep 2026) Zonas de FC = `HR_ZONE_BANDS` (running.js), Z2 = 60-75 % FCmáx por decisión del usuario.** Cambia solo esa tabla; no reintroduzcas bandas propias en otros módulos.
 - **(28 sep 2026) Scripts de despliegue: SIEMPRE `set -o pipefail`** (con `npm test | tail` un test rojo no paraba el push). Tests con dinero: calcula los tokens con `tokenPricesFor(día)`, nunca cifras fijas.
 - **(28 sep 2026) Chat del coach = `CoachChatPanel`** (pestaña `coach` + `CoachFab` + modal `AskCoach`). NO uses la clase `coach` en elementos del chat (colisiona con la tarjeta `.coach`). La memoria del chat se guarda completa; el recorte es solo del prompt (`selectChatMemoryForPrompt`). Semana: `week[].planned` sale de `mapPlannedDetail`.
 - **(27 sep 2026, parte 3) RPE de carrera = `RUN_RPE_BY_TYPE` (running.js).** Lee siempre la intensidad con `effectiveIntensityRpe(workout)`, no `workout.intensityRpe` a pelo (los bloques previos guardan el genérico "RPE 5-8"). El chat recibe RPE + FC objetivo de hoy y de la próxima carrera: si cambias el modelo de zonas, cambia `hrZone`, `targetZoneForRunType`, `targetHrRangeForRunType`, el `z2Range` de coachAnalysis y la estimación FC→RPE a la vez.

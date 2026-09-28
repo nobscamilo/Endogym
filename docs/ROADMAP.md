@@ -7,7 +7,7 @@ Ultima actualizacion: **27 de septiembre de 2026 (Semana por microciclos; backlo
 - [x] (28-sep) Pestaña Coach + botón flotante; chat rediseñado (sin recortes) y memoria visible completa; Semana con prescripción completa por día; el chat conoce los próximos 7 días.
 
 - [x] RPE por tipo de carrera (rodaje 3-4 / umbral 6-7 / series 8-9) y contexto de intensidad en el chat (parte 3).
-- [ ] **Modelo de zonas de FC:** Z2 = 60-70 % FCmáx es conservador para correr; decidir entre %FCR (Karvonen, pedir FC en reposo en Perfil), LTHR por test de 30 min, o techo fácil ~75 % FCmáx. Cambia prescripción, validación de zonas y análisis del coach.
+- [x] **(HECHO 28-sep: Z2 = 60-75 % FCmáx, `HR_ZONE_BANDS`) Modelo de zonas de FC:** Z2 = 60-70 % FCmáx es conservador para correr; decidir entre %FCR (Karvonen, pedir FC en reposo en Perfil), LTHR por test de 30 min, o techo fácil ~75 % FCmáx. Cambia prescripción, validación de zonas y análisis del coach.
 
 - [x] Semana = microciclos del bloque con navegación; sesión extra en día de descanso visible y contabilizada (sin inflar adherencia); día civil Madrid para entrenos de Strava.
 - [ ] **Doble generación de plan:** el 27-sep se guardaron 2 bloques en 41 s (3 llamadas a `weekly-plan` ese día). Añadir idempotencia/bloqueo (p. ej. rechazar `rebuild` si hay un plan creado hace <2 min, y deshabilitar el botón mientras genera). Coste de IA y riesgo de estado inconsistente.

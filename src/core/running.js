@@ -444,19 +444,46 @@ export function resolveHrMax({ profile = {}, observedMaxHr = null } = {}) {
   return byAge ? { hrMax: byAge, source: 'estimada por edad' } : null;
 }
 
-// Zona por % de FC máx (modelo de 5 zonas).
+/**
+ * Modelo de zonas por % de FC máx — FUENTE ÚNICA (28-sep-2026, decisión del usuario).
+ *
+ * Antes: bandas de 10 % (Z2 = 60-70 %). Con FCmáx 182 el rodaje fácil quedaba en 110-127 ppm,
+ * tan bajo que obligaba a alternar caminar y correr y no cuadraba con los ritmos de Strava.
+ * El usuario propuso techo al 85 %; se descartó (por encima de la intensidad moderada ACSM,
+ * 64-76 %, y del primer umbral ventilatorio típico de un corredor recreativo → "zona gris")
+ * y eligió **techo fácil al 75 %** (ACSM moderada ≈ RPE CR10 3-4; test del habla).
+ * Las demás bandas se reparten por encima: Z3 75-82 (aeróbico medio), Z4 82-90 (umbral),
+ * Z5 ≥90 (VO2máx). Si cambias esto, cambia SOLO esta tabla: la usan hrZone, los rangos en ppm
+ * de la prescripción, la validación de zonas y el análisis del coach.
+ */
+export const HR_ZONE_BANDS = {
+  1: [0.50, 0.60],
+  2: [0.60, 0.75],
+  3: [0.75, 0.82],
+  4: [0.82, 0.90],
+  5: [0.90, 1.00],
+};
+
 export function hrZone(avgHr, hrMax) {
   const hr = Number(avgHr);
   const max = Number(hrMax);
   if (!hr || !max) return null;
   const pct = hr / max;
   let zone;
-  if (pct < 0.60) zone = 1;
-  else if (pct < 0.70) zone = 2;
-  else if (pct < 0.80) zone = 3;
-  else if (pct < 0.90) zone = 4;
+  if (pct < HR_ZONE_BANDS[2][0]) zone = 1;
+  else if (pct < HR_ZONE_BANDS[3][0]) zone = 2;
+  else if (pct < HR_ZONE_BANDS[4][0]) zone = 3;
+  else if (pct < HR_ZONE_BANDS[5][0]) zone = 4;
   else zone = 5;
   return { zone, pct: Math.round(pct * 100) };
+}
+
+/** Rango en ppm de una zona del modelo (min inclusive, max = justo por debajo de la siguiente). */
+export function zoneHrRange(zone, hrMax) {
+  const max = Number(hrMax);
+  const b = HR_ZONE_BANDS[zone];
+  if (!b || !Number.isFinite(max) || max < 120) return null;
+  return { min: Math.ceil(max * b[0]), max: Math.ceil(max * b[1]) - 1 };
 }
 
 /**
@@ -467,8 +494,8 @@ export function hrZone(avgHr, hrMax) {
  * conversacional" se prescribía a la vez como RPE 5-8 (duro) y la UI lo llamaba "Moderada";
  * el chat, sin dato, improvisaba otro ("RPE 2-3"). Tres cifras para la misma sesión.
  *
- * Coherencia con el resto de la app: Z2 = 60-70% FCmáx (`hrZone`) y la estimación FC→RPE
- * (`estimateSessionRpeFromHr`) da 2 al 60% y 4 al 70%. ACSM (Guidelines 11.ª ed.) sitúa la
+ * Coherencia con el resto de la app: Z2 = 60-75% FCmáx (`HR_ZONE_BANDS`, desde el 28-sep-2026)
+ * y la estimación FC→RPE (`estimateSessionRpeFromHr`) da 2 al 60%, 4 al 70% y 5 al 75%. ACSM (Guidelines 11.ª ed.) sitúa la
  * intensidad moderada en 64-76% FCmáx ≈ RPE 12-13 en Borg 6-20 (≈3-4 en CR10) y la ligera en
  * 57-63% ≈ 9-11 (≈2). Rodaje y tirada larga: 3-4 (conversacional, test del habla). Umbral:
  * 6-7 ("cómodamente duro"). Series VO2máx: 8-9. Técnica/drills: 3-5.
@@ -498,10 +525,11 @@ export function effectiveIntensityRpe(workout) {
 export function targetHrRangeForRunType(runType, hrMax) {
   const max = Number(hrMax);
   if (!Number.isFinite(max) || max < 120) return null;
-  const bands = { 1: [0.5, 0.6], 2: [0.6, 0.7], 3: [0.7, 0.8], 4: [0.8, 0.9], 5: [0.9, 1.0] };
   const t = targetZoneForRunType(runType);
-  if (!t || !bands[t.min] || !bands[t.max]) return null;
-  return { min: Math.ceil(max * bands[t.min][0]), max: Math.ceil(max * bands[t.max][1]) - 1, label: t.label };
+  const lo = t ? zoneHrRange(t.min, max) : null;
+  const hi = t ? zoneHrRange(t.max, max) : null;
+  if (!lo || !hi) return null;
+  return { min: lo.min, max: hi.max, label: t.label };
 }
 
 export function targetZoneForRunType(runType) {

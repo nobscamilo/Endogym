@@ -199,7 +199,7 @@ describe('coachAnalysis service', () => {
       now: new Date('2026-06-04T12:00:00.000Z'),
     });
     expect(signals.raceGoal).toBe('21K');
-    expect(signals.z2Range).toEqual({ min: 110, max: 127 });
+    expect(signals.z2Range).toEqual({ min: 110, max: 136 }); // 60-75 % de 182 (modelo del 28-sep-2026)
     expect(signals.latestZone).toMatchObject({ actualZone: 2, target: 'Z2', verdict: 'ok' });
     expect(signals.keySessionAdherence).toMatchObject({ planned: 2, completed: 1, missed: 1 });
     expect(signals.prediction).toMatchObject({ goal: '21K' });
