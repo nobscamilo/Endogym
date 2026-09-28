@@ -16,6 +16,7 @@ const {
   checkAiBudget,
   recordUserAiSpend,
   estimateCostUsd,
+  tokenPricesFor,
   budgetDayKey,
   __resetAiBudgetCache,
 } = await import('../../src/lib/aiBudget.js');
@@ -161,15 +162,18 @@ describe('aiBudget — freno de gasto', () => {
 
   it('el gasto recién apuntado se suma al acumulado global cacheado (el freno no llega tarde)', async () => {
     const day = budgetDayKey();
+    // Tokens calculados con el precio VIGENTE del día: con cifras fijas el test se pudría al
+    // cambiar de tramo de precios (le pasó el 28-sep-2026, primer día a precio de 3.8 Flash).
+    const outPrice = tokenPricesFor(day).out;
     // Global a $0.90 de un tope de $1.00: aún deja pasar.
     mocks.getAdminServices.mockResolvedValue({
-      db: fakeDb({ [`aiMetrics/${day}`]: { x: { tokensOut: 360_000 } } }),
+      db: fakeDb({ [`aiMetrics/${day}`]: { x: { tokensOut: Math.round(0.90 / outPrice) } } }),
     });
     expect((await checkAiBudget({ userId: 'u' })).allowed).toBe(true);
 
     // Una llamada cara entra ANTES de que expire la caché de 30 s: el freno debe verla
     // igualmente, sin esperar al siguiente refresco desde Firestore.
-    await recordUserAiSpend('u', { tokensOut: 100_000 }); // +$0.25
+    await recordUserAiSpend('u', { tokensOut: Math.round(0.25 / outPrice) }); // +$0.25
     const despues = await checkAiBudget({ userId: 'u' });
     expect(despues.allowed).toBe(false);
     expect(despues.scope).toBe('global');
