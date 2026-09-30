@@ -57,7 +57,7 @@ vi.mock('../../src/lib/aiBudget.js', () => ({
   logBudgetStop: vi.fn(),
 }));
 
-const { GET, POST } = await import('../../src/app/api/studio-nutrition/route.js');
+const { GET, POST, planNutritionSignature } = await import('../../src/app/api/studio-nutrition/route.js');
 
 const DAY_NAMES = [
   ['lunes', 'Lun'],
@@ -359,5 +359,16 @@ describe('/api/studio-nutrition route', () => {
     expect(json.stale).toBe(true);
     expect(json.reason).toBe('training_plan_changed');
     expect(json.planSignature).toMatch(/^[a-f0-9]{16}$/);
+  });
+});
+
+describe('planNutritionSignature — compatibilidad con menús ya generados', () => {
+  const plan = { id: 'p1', isBlock: true, phase: 'peak', days: [{ date: '2026-09-28', sessionType: 'aerobic', workout: { title: 'Rodaje', durationMinutes: 60 }, nutritionTarget: { calories: 3000, carbsGrams: 350, proteinGrams: 180, fatGrams: 90 } }] };
+  it('un plan SIN resumen de dieta conserva la firma de antes (no caduca menús existentes)', () => {
+    // Valor dorado: la misma firma que daba el código anterior al 30-sep-2026 (sin clave diet).
+    expect(planNutritionSignature(plan)).toBe('fb00394dfddb802f');
+  });
+  it('cambiar la dieta del plan cambia la firma (el menú se regenera)', () => {
+    expect(planNutritionSignature({ ...plan, diet: { pattern: 'keto' } })).not.toBe(planNutritionSignature(plan));
   });
 });

@@ -49,7 +49,7 @@ function compactNutritionTarget(target = {}) {
   };
 }
 
-function planNutritionSignature(plan) {
+export function planNutritionSignature(plan) {
   if (!plan || typeof plan !== 'object') return 'no-weekly-plan';
   const days = Array.isArray(plan.days) ? plan.days : [];
   const payload = {
@@ -64,7 +64,10 @@ function planNutritionSignature(plan) {
     weeksToRace: Number.isFinite(Number(plan.weeksToRace)) ? Number(plan.weeksToRace) : null,
     runPaces: plan.runPaces || null,
     baseTarget: compactNutritionTarget(plan.baseTarget),
-    diet: plan.diet || null,
+    // La clave `diet` SOLO se añade si el plan la trae: meterla siempre (aunque sea null)
+    // cambiaba la firma de TODOS los planes anteriores al 30-sep y marcaba como caducado el
+    // menú semanal ya generado de cada usuario (regresión del commit 307deb2).
+    ...(plan.diet ? { diet: plan.diet } : {}),
     days: days.map((day) => ({
       date: day.date || null,
       sessionType: day.sessionType || null,
