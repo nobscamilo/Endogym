@@ -1,6 +1,25 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **30 de septiembre de 2026, parte 2 (tipos de dieta con idoneidad por perfil; dieta separada de salud)**.
+Ultima actualizacion: **30 de septiembre de 2026, parte 3 (auditoría de nutrición por sesión + hotfix de firma del menú)**.
+
+## Sesión del 30 de septiembre de 2026, parte 3 (¿la dieta se adapta a cada sesión? ¿está todo separado?)
+
+**Hotfix desplegado (`d67dd43`):** 307deb2 metía siempre `diet: plan.diet || null` en `planNutritionSignature` → en TODOS los planes previos la firma cambiaba y el menú de la semana de cada usuario salía "caducado" (verificado con el de Camilo: firma guardada 5c7dacfa… ≠ calculada). Ahora la clave solo entra si el plan la trae; test con valor dorado. Git en la Mac vuelve a funcionar sin `DEVELOPER_DIR` (licencia de Xcode aceptada).
+
+**Lo que SÍ funciona (verificado con datos reales, semana 28-sep):** `carbStrategyForDay` periodiza por tipo de sesión: descanso ×0,80 (310 g), rodaje ×0,95 (368 g), fuerza ×1,0 (387 g), series/umbral ×1,20 (464 g), tirada larga ×1,35 (522 g). El menú IA cumple esos objetivos día a día (Sáb 524 g HC/3.600 kcal; Dom 307 g/2.885 kcal) y pone glClass alto solo en días de calidad/larga. Rango 2,9-5,0 g/kg: dentro de las bandas IOC/ACSM para 1 h/día (corrección a lo dicho antes: no es "excesivo" en g/kg; el problema es el total calórico con 105 kg y objetivo único de resistencia).
+
+**Fallos encontrados (NO corregidos; pendiente de decisión del usuario):**
+1. La periodización depende SOLO del tipo, no de la duración ni de la intensidad real: tirada larga de 60 o de 150 min = mismo ×1,35; series = umbral.
+2. Fuerza de pierna = fuerza de torso (×1,0); `mixed`/circuito híbrido, `mindbody`, `cardio_drills` y `cardio` genérico caen al valor por defecto sin regla propia.
+3. Cambios de sesión (studio-swap: convertir carrera→fuerza, cambiar foco, ampliar duración) NO recalculan `nutritionTarget` → el día convertido conserva los HC de la carrera.
+4. Entrenos reales (Strava, sesión extra, entrenar en día de descanso) no ajustan la ingesta del día.
+5. Sin campo "hora a la que entreno": el menú fija 08:00/14:00/18:00/21:30 e inventa el timing ("2-3 h antes de las series") — auditoría #17 confirmada.
+6. `prePostNutrition` ignora la dieta: con keto dice "prioriza el carbohidrato"; con HTA dice "añade sal".
+
+**Separación dieta/salud — mezclas que quedan:**
+- El OBJETIVO "Controlar glucosa" (`goal=glycemic_control`) se trata como DIABETES en `detectComorbidities` (warmupCooldown) y `prePostNutrition`, y además baja un 14 % los HC; `dietSuitability` no lo considera → tres vías distintas al "IG bajo".
+- `metabolicProfile` (p. ej. `insulin_resistance` de Camilo, puesto en el panel heredado) NO es editable en el Studio y ahora IMPONE IG bajo bloqueado; `detectComorbidities` ignora `metabolicProfile=type2_diabetes` (sí lo lee dietSuitability/cribado) → dos fuentes de verdad para "diabetes".
+- `studio-data` `hasConds` (✓ del paso Salud) no cuenta hipercolesterolemia, cardiovascular ni renal.
 
 ## Sesión del 30 de septiembre de 2026, parte 2 (tipos de dieta, idoneidad por perfil, dieta ≠ salud)
 
