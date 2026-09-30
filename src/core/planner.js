@@ -29,10 +29,12 @@ import {
   distributeWeeklyKm,
   runTypeFromFocus,
   RUN_RPE_BY_TYPE,
+  resolveHrMax,
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol, detectComorbidities } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
 import { assessDietPreferences } from './dietSuitability.js';
+import { buildRunLoadPolicy, capTrainingPhase, applyRunLoadPolicyToWeek, applyRaceWeek } from './runLoadPolicy.js';
 import { getMissingNutritionProfileFields } from './profileCompleteness.js';
 
 const ACTIVITY_FACTORS = {
@@ -707,10 +709,10 @@ export function buildDietQualityTargets({ calories, comorbidities = {} }) {
 const KETO_MAX_CARBS_G = 50;
 
 function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
-  const { sessionFocus = null, raceGoal = 'health', comorbidities = null, dietPattern = 'omnivore', durationMinutes = null, hybridCircuit = false } = opts;
+  const { sessionFocus = null, raceGoal = 'health', comorbidities = null, dietPattern = 'omnivore', durationMinutes = null, hybridCircuit = false, preRace = false } = opts;
   // "Fuel for the work required": los carbohidratos del día escalan con el TIPO y la DURACIÓN
   // de la sesión (ver carbStrategyForDay) y con el objetivo de carrera.
-  const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal, durationMinutes, hybridCircuit });
+  const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal, durationMinutes, hybridCircuit, preRace });
   let carbsFactor = strat.factor;
   let fatFactor = 1;
   // Compensa la grasa en sentido inverso para no disparar kcal en días de mucha demanda
@@ -772,6 +774,7 @@ export function refreshDayNutrition(day, { plan = {}, profile = {} } = {}) {
     dietPattern,
     durationMinutes: day.sessionType === 'recovery' ? null : day.workout?.durationMinutes,
     hybridCircuit: Boolean(day.workout?.hybridCircuit),
+    preRace: day.preRace === true,
   });
   day.nutritionTarget = nutritionTarget;
   day.meals = splitMealsForDay(nutritionTarget, plan.mealsPerDay || profile.mealsPerDay);
@@ -1289,6 +1292,7 @@ export function generateWeeklyPlan({
   preparticipationScreening = null,
   progressMemory = null,
   adaptiveTuning = null,
+  weekIndex = 0,
 }) {
   const goal = resolveGoal(profile.goal);
   const modality = resolveTrainingModality(profile.trainingModality, profile.trainingMode);
@@ -1344,7 +1348,22 @@ export function generateWeeklyPlan({
 
   // Periodización: fase de la semana (por fecha de carrera si la hay, si no ciclo rodante).
   const weekStartISO = start.toISOString();
-  const trainingPhase = resolveTrainingPhase({ raceDateISO: profile.raceDate, weekStartISO });
+  // Política de carga de carrera (auditoría #1 #2 #6 #7): solo en modalidades con carrera.
+  const runsModality = modality === TrainingModality.RUNNING || modality === TrainingModality.HYBRID_RUN_GYM;
+  const runLoadPolicy = runsModality
+    ? buildRunLoadPolicy({
+      progressMemory,
+      profile,
+      screening: preparticipationScreening,
+      hrMax: resolveHrMax({ profile })?.hrMax ?? null,
+    })
+    : null;
+  // La fase de la fecha, acotada por el nivel/base (un nivel Base no entra en "pico").
+  const trainingPhase = capTrainingPhase(
+    resolveTrainingPhase({ raceDateISO: profile.raceDate, weekStartISO }),
+    runLoadPolicy,
+    weeksToRace(profile.raceDate, weekStartISO),
+  );
   const phaseParams = resolvePhaseParams(trainingPhase);
 
   // Objetivo semanal de km y su reparto por tipo de sesión. Se calcula una vez: la plantilla
@@ -1510,7 +1529,9 @@ export function generateWeeklyPlan({
           const longBase = Math.max(prefMin, RACE_GOAL_META[raceGoal].longRunMin * phaseParams.longRunFactor);
           d.workout.durationMinutes = clamp(Math.round(longBase), 25, RACE_GOAL_META[raceGoal].longRunCapMin);
         } else {
-          d.workout.durationMinutes = clamp(prefMin, 20, 150);
+          // El factor de volumen de la FASE también manda aquí: antes el aplanado dejaba el
+          // taper a 60 min igual que el resto del bloque (auditoría #3/#29).
+          d.workout.durationMinutes = clamp(Math.round(prefMin * (d.sessionType === 'recovery' ? 1 : phaseParams.volumeFactor)), 20, 150);
         }
         // Recalcula la prescripción de carrera si cambió la duración.
         if (d.sessionType === 'aerobic') {
@@ -1571,8 +1592,17 @@ export function generateWeeklyPlan({
     });
   }
 
+  // Carga de carrera: techo semanal desde la carga REAL, calidad según base, correr/caminar
+  // y, si la carrera cae en esta semana, semana de carrera + día D.
+  const runLoadWeek = applyRunLoadPolicyToWeek(days, runLoadPolicy, {
+    weekIndex, raceGoal, paces: runPaces, phase: trainingPhase, volumeFactor: phaseParams.volumeFactor,
+  });
+  const raceWeek = runsModality && raceGoal !== 'health'
+    ? applyRaceWeek(days, { raceDate: profile.raceDate, raceGoal, p5SecPerKm: p5, policy: runLoadPolicy, paces: runPaces })
+    : null;
+
   // Objetivo nutricional FINAL de cada día, con la sesión ya definitiva (tras el recorte por
-  // disponibilidad, el aplanado de duración y el formato circuito).
+  // disponibilidad, el aplanado de duración, el formato circuito y la política de carga).
   days.forEach((d) => refreshDayNutrition(d, {
     plan: { baseTarget, goal, raceGoal, mealsPerDay, diet: { pattern: dietAssessment.chosen.pattern } },
     profile,
@@ -1618,6 +1648,19 @@ export function generateWeeklyPlan({
     metabolicProfile,
     mealsPerDay,
     baseTarget,
+    // Resumen de la política de carga (para la UI y el coach).
+    ...(runLoadPolicy ? {
+      runLoad: {
+        level: runLoadPolicy.level,
+        lowBase: runLoadPolicy.lowBase,
+        chronicWeeklyRunMin: runLoadPolicy.chronicWeeklyRunMin,
+        runsLast28d: runLoadPolicy.runsLast28d,
+        maxQuality: runLoadPolicy.maxQuality,
+        runWalk: runLoadPolicy.runWalk,
+        week: runLoadWeek,
+        race: raceWeek,
+      },
+    } : {}),
     // Hora habitual de entreno: entra en la firma del menú (cambiarla recoloca las comidas).
     ...(typeof profile.trainingTime === 'string' ? { trainingTime: profile.trainingTime } : {}),
     // Resumen de dieta (entra en la firma del menú semanal: cambiarla invalida el menú).
@@ -1681,10 +1724,11 @@ export function generateBlockPlan({
       preparticipationScreening,
       progressMemory,
       adaptiveTuning,
+      weekIndex: w,
     });
     if (w === 0) base = wp;
     allDays.push(...wp.days);
-    blockWeeks.push({ index: w, startDate: wp.startDate, phase: wp.phase, phaseLabel: wp.phaseLabel, weeksToRace: wp.weeksToRace });
+    blockWeeks.push({ index: w, startDate: wp.startDate, phase: wp.phase, phaseLabel: wp.phaseLabel, weeksToRace: wp.weeksToRace, runLoadWeek: wp.runLoad?.week || null, raceWeek: wp.runLoad?.race || null });
   }
 
   const days = allDays.slice(0, blockDays);

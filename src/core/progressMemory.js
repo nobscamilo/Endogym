@@ -94,10 +94,23 @@ function weeklyKmFromRuns(runs, nowDate) {
   // ya está corriendo; con solo la última semana, un pico puntual fijaría el listón. La media
   // de 2 semanas recoge la tendencia reciente sin que una sola semana mande.
   const baseline = [media4, media2].filter((v) => v != null).reduce((a, b) => Math.max(a, b), 0);
+  // Carga crónica en MINUTOS (misma regla: la mayor de las medias de 4 y 2 semanas). Es la que
+  // usa la política de carga del planner (#1 de la auditoría): con pocos km, los minutos
+  // reflejan mejor el tiempo de impacto de alguien que corre lento o alterna con caminar.
+  const mins = (list) => list.reduce((acc, w) => acc + (toNumber(w.durationMinutes) || 0), 0);
+  const minMedia4 = cuatroSemanas.length ? mins(cuatroSemanas) / 4 : null;
+  const minMedia2 = dosSemanas.length ? mins(dosSemanas) / 2 : null;
+  const minBaseline = [minMedia4, minMedia2].filter((v) => v != null).reduce((a, b) => Math.max(a, b), 0);
+  // FC media típica (mediana) de las carreras de 4 semanas: decide si hace falta correr/caminar
+  // para quedarse bajo el techo del rodaje fácil.
+  const hrs = cuatroSemanas.map((w) => toNumber(w.avgHeartRate)).filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
+  const medHr = hrs.length ? (hrs.length % 2 ? hrs[(hrs.length - 1) / 2] : (hrs[hrs.length / 2 - 1] + hrs[hrs.length / 2]) / 2) : null;
   return {
     weeklyKm: ultimaSemana.length ? total(ultimaSemana) : null,
     weeklyKmBaseline: baseline > 0 ? Math.round(baseline * 10) / 10 : null,
+    weeklyRunMinutesBaseline: minBaseline > 0 ? Math.round(minBaseline) : null,
     runsLast28d: cuatroSemanas.length,
+    recentRunAvgHr: medHr != null ? Math.round(medHr) : null,
   };
 }
 

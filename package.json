@@ -30,6 +30,7 @@
     "vitest": "^4.1.7"
   },
   "overrides": {
+    "@grpc/grpc-js": "^1.14.5",
     "postcss": "^8.5.25",
     "protobufjs": "^7.6.5",
     "sharp": "^0.35.3",

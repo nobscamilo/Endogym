@@ -213,6 +213,7 @@ const SESSION_FOCUS_LABELS = {
   cardio_long: 'Tirada larga',
   cardio_tempo: 'Tempo',
   cardio_intervals: 'Series',
+  race: 'Carrera',
   cardio_drills: 'Técnica',
   mindbody: 'Movilidad',
   recovery: 'Recuperación',

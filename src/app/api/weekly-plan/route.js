@@ -349,7 +349,10 @@ export async function POST(request) {
         : 21;
       const now = new Date();
       const since = new Date(now);
-      since.setUTCDate(since.getUTCDate() - lookbackDays);
+      // Se piden al menos 42 días: la carga crónica de carrera (4 semanas) y el recuento de
+      // carreras de 28 días se calculaban con solo 21 días de datos (ventana por defecto) y
+      // salían a la baja (30-sep-2026). `lookbackDays` sigue acotando las señales subjetivas.
+      since.setUTCDate(since.getUTCDate() - Math.max(lookbackDays, 42));
       const sinceIso = since.toISOString();
 
       const [recentWorkouts, recentMeals, recentMetrics, lastDoneAtHint] = await Promise.all([

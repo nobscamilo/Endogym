@@ -392,6 +392,7 @@ export function resolveTrainingPhase({ raceDateISO, weekStartISO }) {
 // tipo reflejan cuánto glucógeno gasta cada estímulo (series > umbral > larga > rodaje >
 // pierna > torso). Es una heurística documentada, no una ecuación validada.
 const CARB_COST_PER_HOUR = {
+  race: 0.36,
   cardio_intervals: 0.36,
   cardio_tempo: 0.32,
   cardio_long: 0.28,
@@ -420,7 +421,17 @@ function carbCostKey({ sessionType, sessionFocus, hybridCircuit }) {
   return null;
 }
 
-export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal, durationMinutes = null, hybridCircuit = false } = {}) {
+export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal, durationMinutes = null, hybridCircuit = false, preRace = false } = {}) {
+  // Víspera de carrera: aunque sea día de descanso, hidratos normales-altos y comida conocida.
+  if (preRace) {
+    return {
+      level: 'medio',
+      factor: raceGoal === 'race_21k' || raceGoal === 'race_42k' ? 1.3 : 1.05,
+      timing: 'Víspera de carrera: hidratos normales-altos repartidos en el día; cena conocida, con poca fibra y poca grasa. Nada nuevo.',
+      note: 'Llegar con el glucógeno lleno sin sobrecargar el estómago.',
+      minutes: 0,
+    };
+  }
   const goalBase = (raceGoal === 'race_21k' || raceGoal === 'race_42k') ? 0.08 : 0; // base algo más alta en fondo
   const minutes = Number.isFinite(Number(durationMinutes)) && Number(durationMinutes) > 0
     ? Number(durationMinutes) : DEFAULT_SESSION_MIN;

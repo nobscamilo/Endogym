@@ -146,6 +146,15 @@ async function buildUserContext(uid) {
     if (modality === 'hybrid_run_gym') {
       parts.push('Entrena CONCURRENTE (correr + gimnasio): ten en cuenta el efecto de interferencia, el orden de sesiones (no fuerza pesada de pierna antes de la tirada larga) y la recuperación entre estímulos.');
     }
+    // Política de carga (runLoadPolicy): el coach debe defender el mismo criterio que el plan.
+    const rl = currentPlan?.runLoad;
+    if (rl) {
+      const bits = [];
+      if (rl.lowBase) bits.push('base de carrera BAJA (el volumen parte de su carga real y sube ~10 %/semana)');
+      if (rl.maxQuality === 0) bits.push('sin series ni umbral hasta consolidar base');
+      if (rl.runWalk) bits.push(`correr/caminar ${rl.runWalk.run}:${rl.runWalk.walk} (${rl.runWalk.reason})`);
+      if (bits.length) parts.push(`Criterio del plan: ${bits.join('; ')}. No le propongas más volumen ni intensidad que esto; si lo pide, explica por qué.`);
+    }
     if (currentPlan?.phaseLabel) {
       parts.push(`Fase de entrenamiento: ${currentPlan.phaseLabel}${Number.isFinite(Number(currentPlan.weeksToRace)) && currentPlan.weeksToRace > 0 ? ` (faltan ${currentPlan.weeksToRace} semanas para la carrera)` : ''}.`);
     }

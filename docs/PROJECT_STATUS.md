@@ -1,11 +1,27 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **30 de septiembre de 2026, parte 4 (nutrición por tipo+duración, macros que siguen a la sesión, dieta ≠ salud cerrada, hora de entreno)**.
+Ultima actualizacion: **30 de septiembre de 2026, parte 5 (política de carga de carrera + semana de carrera: auditoría #1 #2 #3 #6 #7 #29)**.
+
+## Sesión del 30 de septiembre de 2026, parte 5 (bloque de entrenamiento de la auditoría)
+
+- **`src/core/runLoadPolicy.js` (nuevo)**, solo en modalidades `running`/`hybrid_run_gym`:
+  - `buildRunLoadPolicy`: base baja = nivel Base, <4 carreras/28 d o <90 min/semana. Techo semanal = max(suelo por nivel 75/120/180, crónica × 1,3) y +10 %/semana en el bloque. Calidad: 0 con base baja (1 con ≥8 carreras y ≥90 min), 2 con base consolidada; 0 si el cribado no permite alta intensidad. Correr/caminar si la FC mediana de sus carreras supera el 75 % FCmáx (2:1 si ≥12 ppm por encima, 3:1 si ≥6, 5:1 si menos) o, en nivel Base con <4 carreras, 3:1 por defecto. **Sin datos de carrera** se confía en el nivel declarado (Intermedio/Avanzado sin techo).
+  - `capTrainingPhase`: nunca por encima de base (Base), build (Intermedio), peak (Avanzado); con base baja no hay taper de 2 semanas (solo la semana de carrera).
+  - `applyRunLoadPolicyToWeek`: convierte la calidad sobrante en rodaje, recorta/reparte minutos (larga 40 %, resto a partes iguales, mín. 20 min; si no caben, quita rodajes → descanso activo), km objetivo proporcional (no con correr/caminar), prescripción rehecha.
+  - `applyRaceWeek`: día D = sesión `race` ("Carrera 10K", RPE 6-8, estrategia —correr/caminar desde el km 0 o parcial negativo—, tiempo orientativo por Riegel ×1,08 si corre/camina, avituallamiento si >75 min, aviso de parar ante dolor torácico/mareo/palpitaciones); víspera = descanso (HC normales-altos, `preRace`); +1/+2 = recuperación; antes: rodajes al 50 % con progresivos una vez; sin fuerza de pierna en los 4 días previos.
+- **Planner:** fase acotada por la política; el aplanado por `preferredDurationMinutes` aplica ya el factor de fase (antes el taper quedaba en 60 min); `weekIndex` para progresión; `plan.runLoad` (resumen) y `blockWeeks[].runLoadWeek/raceWeek`.
+- **progressMemory:** `weeklyRunMinutesBaseline` y `recentRunAvgHr`. **Bug:** `/api/weekly-plan` pedía solo 21 días de entrenos (ventana por defecto) pero calculaba bases de 28 días → `runsLast28d` y la base salían a la baja; ahora pide ≥42 días.
+- **Nutrición:** `carbStrategyForDay` con coste `race` y víspera `preRace`.
+- **UI/coach:** etiqueta "Carrera"; sin rango de FC el día D; el chat recibe el criterio del plan (base baja, sin calidad, correr/caminar) con la orden de no proponer más.
+- **Simulación con el perfil real (sin diabetes), bloque desde 1-oct:** sem. 1 base 78 min (20 + 35 larga + 23, correr/caminar 3:1), sem. 2 base 85 min, sem. 3 carrera: 20 min con progresivos, víspera descanso, 17-oct "Carrera 10K" ~1 h 42 min correr/caminar 3:1, HC 566 g.
+- **Tests:** 652 (nuevo `run-load-policy.test.js`; `studio-availability-planner` ahora declara nivel intermedio porque comprueba la selección de días).
+- **El bloque ACTIVO de cada usuario no cambia hasta regenerarse** (guardar Perfil o "Nuevo bloque").
 
 ## Backlog de la auditoría externa del 30-sep (estado tras la parte 4)
 
 - **Hechas:** #4 (fecha de carrera al chat), #12 (condición glucémica → menú; la "diabetes" de Camilo era falsa), #17 (hora de entreno), #50 (dieta ≠ salud), parte de #15 (diabetes/CV/renal → cribado ACSM), parte de #49 (aria-pressed y ✓ en Salud).
-- **P1 entrenamiento (sensible a fecha: carrera 17-oct):** #1 arranque desde carga real, #2/#3/#29 fase por nivel + semana de carrera/taper/día D, #6 intensidad para nivel Base, #7 correr/caminar cuando no se sostiene Z2, #8 progresión, #9 días no disponibles (guardias), #10 días/semana, #11 revisión vs bloque de 21 días, #5 recomendaciones del análisis → ajustes del plan.
+- **Hechas en la parte 5:** #1, #2, #3, #6, #7, #29.
+- **P1 entrenamiento pendiente:** #8 progresión de ritmos, #9 días no disponibles (guardias), #10 días/semana, #11 revisión vs bloque de 21 días, #5 recomendaciones del análisis → ajustes del plan.
 - **P1 salud/nutrición:** #13/#14 objetivo secundario (pérdida de peso) + déficit, #15 síntomas de alarma (dolor torácico, síncope, hipoglucemia, cojera) + pausa del plan + aviso IMC>30, #16 conservación del batch cooking.
 - **P2 datos:** #18 sesión hecha en otro día, #19 sesión parcial, #20 cifras de Progreso incoherentes, #21 peso del perfil, #22 volumen por grupo 110 %, #23 "Vas bien" sin datos.
 - **P2 sesiones:** #24-#28 (texto vs ejercicios, tiempos, carrera con kg/RIR, fuerza mal colocada y sin progresión, bloqueo de pierna).

@@ -678,7 +678,7 @@ export function mapPlannedDetail(d, { hrMax = null } = {}) {
     cooldown: steps(w.cooldown),
   };
   if (rp) {
-    const hr = hrMax ? targetHrRangeForRunType(rp.runType, hrMax) : null;
+    const hr = hrMax && rp.runType !== 'race' ? targetHrRangeForRunType(rp.runType, hrMax) : null; // el día de carrera no lleva rango de FC: manda la estrategia
     out.run = {
       type: rp.runType || null,
       zoneLabel: rp.zoneLabel || null,

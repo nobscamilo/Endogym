@@ -49,6 +49,9 @@ describe('studio availability honored in planner', () => {
         studioAvailability: true,
         daysPerWeek: 3,
         preferredDurationMinutes: 45,
+        // Desde el 30-sep-2026 un nivel Base sin base de carrera no recibe sesiones de calidad
+        // (runLoadPolicy). Este test comprueba la SELECCIÓN de días: nivel intermedio.
+        trainingExperience: 'intermediate',
       },
       startDate,
     });

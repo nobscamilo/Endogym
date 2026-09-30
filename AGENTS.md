@@ -123,6 +123,7 @@ No habilites Vertex AI.
 
 - **Dieta y salud van SEPARADAS (30-sep-2026):** la idoneidad de patrones de dieta y los mínimos por salud salen SOLO de `src/core/dietSuitability.js` (lo importan servidor y bundle del Studio). No dupliques reglas en prompts ni en la UI; la IA explica/aplica ese resultado. Para "comer con menos azúcar" existe `nutritionPreferences.lowGlycemic`: nunca pidas marcar una enfermedad para obtener un efecto dietético. Las condiciones clínicas (diabetes, CV, renal) alimentan también el cribado ACSM vía `preparticipationFromProfile`.
 - **Macros del día = sesión real:** cualquier código que cambie `sessionType`, foco, duración o formato de un día del plan debe llamar a `refreshDayNutrition` (planner.js). La demanda de HC sale de `carbStrategyForDay` (tipo + duración), no de constantes por tipo.
+- **Carga de carrera:** el volumen/intensidad de carrera lo acota `runLoadPolicy.js` (carga real, nivel, cribado, FC) DESPUÉS de la plantilla; no reintroduzcas duraciones de plantilla por otra vía. La semana de carrera la construye `applyRaceWeek`.
 - **Prefill del Perfil del Studio:** todo campo que el formulario reenvía al guardar DEBE salir en `mapUser` (studio-data); si no, el guardado lo borra (pasó con alergias y condiciones hasta el 30-sep-2026).
 
 ## RAG de directrices médicas (cómo añadir libros)
