@@ -2,6 +2,15 @@
 
 Ultima actualizacion: **30 de septiembre de 2026, parte 4 (nutrición por tipo+duración, macros que siguen a la sesión, dieta ≠ salud cerrada, hora de entreno)**.
 
+## Backlog de la auditoría externa del 30-sep (estado tras la parte 4)
+
+- **Hechas:** #4 (fecha de carrera al chat), #12 (condición glucémica → menú; la "diabetes" de Camilo era falsa), #17 (hora de entreno), #50 (dieta ≠ salud), parte de #15 (diabetes/CV/renal → cribado ACSM), parte de #49 (aria-pressed y ✓ en Salud).
+- **P1 entrenamiento (sensible a fecha: carrera 17-oct):** #1 arranque desde carga real, #2/#3/#29 fase por nivel + semana de carrera/taper/día D, #6 intensidad para nivel Base, #7 correr/caminar cuando no se sostiene Z2, #8 progresión, #9 días no disponibles (guardias), #10 días/semana, #11 revisión vs bloque de 21 días, #5 recomendaciones del análisis → ajustes del plan.
+- **P1 salud/nutrición:** #13/#14 objetivo secundario (pérdida de peso) + déficit, #15 síntomas de alarma (dolor torácico, síncope, hipoglucemia, cojera) + pausa del plan + aviso IMC>30, #16 conservación del batch cooking.
+- **P2 datos:** #18 sesión hecha en otro día, #19 sesión parcial, #20 cifras de Progreso incoherentes, #21 peso del perfil, #22 volumen por grupo 110 %, #23 "Vas bien" sin datos.
+- **P2 sesiones:** #24-#28 (texto vs ejercicios, tiempos, carrera con kg/RIR, fuerza mal colocada y sin progresión, bloqueo de pierna).
+- **P3 UI/texto/a11y:** #30-#48 (sin verificar una a una).
+
 ## Sesión del 30 de septiembre de 2026, parte 4 (los 3 bloques de la parte 3, implementados)
 
 **Bloque 1 — dieta ≠ salud:**
