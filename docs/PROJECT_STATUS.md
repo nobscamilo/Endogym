@@ -18,7 +18,7 @@ Ultima actualizacion: **30 de septiembre de 2026, parte 4 (nutrición por tipo+d
 - Simulación con el perfil real (sin diabetes): tirada 75 min 522→464 g; rodaje 368→391; pierna 387→414; series 464→468; umbral 464→453; descanso 310.
 - `profile.trainingTime` (HH:MM, chips en paso Datos) → `plan.trainingTime` (entra en la firma del menú solo si existe) → prompt del menú con regla de horario (pre 1,5-3 h antes, post ≤2 h; si no hay hora, timing relativo y prohibido afirmar horas) y contexto del coach.
 - Pendiente conocido: el overlay adaptativo (`activeBlockOverlay`) ajusta volumen al LEER sin recalcular macros; `more_time` en carrera usa ritmos de la marca manual, no los de Strava del plan.
-- Tests: 641.
+- Tests: 641. Desplegado `a811e38`; verificado en producción con Chrome (bundle v=40884dd83c): chips de perfil metabólico con su estado real, hora de entreno en Datos, ✓ en Salud. Sin guardar nada en el perfil real.
 
 ## Sesión del 30 de septiembre de 2026, parte 3 (¿la dieta se adapta a cada sesión? ¿está todo separado?)
 
