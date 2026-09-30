@@ -153,7 +153,7 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
     const patch = mocks.upsertUserProfile.mock.calls[0][1];
     expect(patch.conditions).toEqual({
       hypertension: true, hypertensionControlled: false, diabetes: false, osteoarthritis: true, osteoporosis: false,
-      hypercholesterolemia: false,
+      hypercholesterolemia: false, cardiovascular: false, kidneyDisease: false,
       asthma: false, pregnant: false,
       injuryZones: ['rodilla', 'lumbar'],
     });
@@ -198,5 +198,40 @@ describe('/api/studio-availability — objetivo SMART y reentrada', () => {
 
     await post(completeSurvey({ barbellKg: 'veinte' }));
     expect('barbellKg' in mocks.upsertUserProfile.mock.calls[4][1]).toBe(false);
+  });
+});
+
+describe('/api/studio-availability — dieta con riesgos', () => {
+  beforeEach(() => {
+    mocks.getAuthenticatedUser.mockReset();
+    mocks.upsertUserProfile.mockReset();
+    mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1' });
+    mocks.upsertUserProfile.mockResolvedValue(undefined);
+  });
+
+  it('keto sin confirmar riesgos → 409 y no guarda', async () => {
+    const res = await post({ nutritionPreferences: { dietaryPattern: 'keto' } });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.details.code).toBe('diet_risk_ack_required');
+    expect(mocks.upsertUserProfile).not.toHaveBeenCalled();
+  });
+
+  it('keto confirmada → guarda la confirmación con patrón y nivel', async () => {
+    const res = await post({ nutritionPreferences: { dietaryPattern: 'keto', acknowledgeRisks: true } });
+    expect(res.status).toBe(200);
+    const patch = mocks.upsertUserProfile.mock.calls[0][1];
+    expect(patch.nutritionPreferences.riskAcknowledgement).toMatchObject({ pattern: 'keto', level: 'caution' });
+  });
+
+  it('mediterránea no pide confirmación; lowGlycemic se guarda como preferencia', async () => {
+    const res = await post({ nutritionPreferences: { dietaryPattern: 'mediterranean', lowGlycemic: true } });
+    expect(res.status).toBe(200);
+    expect(mocks.upsertUserProfile.mock.calls[0][1].nutritionPreferences).toMatchObject({ dietaryPattern: 'mediterranean', lowGlycemic: true });
+  });
+
+  it('guarda las nuevas condiciones cardiovascular y renal', async () => {
+    await post({ conditions: { cardiovascular: true, kidneyDisease: true } });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].conditions).toMatchObject({ cardiovascular: true, kidneyDisease: true });
   });
 });

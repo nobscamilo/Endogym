@@ -1,3 +1,5 @@
+import { normalizeDietPattern } from './dietSuitability.js';
+
 function normalizeList(value) {
   if (Array.isArray(value)) {
     return value
@@ -15,9 +17,7 @@ function normalizeList(value) {
 
 function parseNutritionPreferences(profile = {}) {
   const pref = profile.nutritionPreferences || {};
-  const dietaryPattern = ['omnivore', 'vegetarian', 'vegan'].includes(pref.dietaryPattern)
-    ? pref.dietaryPattern
-    : 'omnivore';
+  const dietaryPattern = normalizeDietPattern(pref.dietaryPattern);
 
   const allergies = normalizeList(pref.allergies);
   const intolerances = normalizeList(pref.intolerances);
@@ -274,6 +274,9 @@ function hashSeed(seed) {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
+// El banco de platos fijo (plan heredado, sin IA) solo tiene omnívora/vegetariana/vegana.
+// Mediterránea, paleo y keto se sirven con el menú IA de Studio (studio-nutrition), que
+// recibe las reglas del patrón; aquí caen al banco omnívoro como respaldo.
 function chooseOption(type, pattern, restrictions, dayIndex, mealIndex) {
   const bank = BANK[pattern] || BANK.omnivore;
   const options = (bank[type] || []).filter((option) => !includesRestrictedWords(option, restrictions.blocked));
@@ -412,16 +415,26 @@ export function buildWeeklyNutritionPlan({ profile, days = [] }) {
   };
 }
 
+function normalizeRiskAcknowledgement(value) {
+  if (!value || typeof value !== 'object') return null;
+  const pattern = normalizeDietPattern(value.pattern);
+  const level = ['caution', 'not_advised'].includes(value.level) ? value.level : null;
+  const at = typeof value.at === 'string' && !Number.isNaN(Date.parse(value.at)) ? value.at : null;
+  if (!level || !at || pattern !== value.pattern) return null;
+  return { pattern, level, at };
+}
+
 export function normalizeNutritionPreferencesInput(input = {}) {
   const source = input.nutritionPreferences || input;
-  const dietaryPattern = ['omnivore', 'vegetarian', 'vegan'].includes(source.dietaryPattern)
-    ? source.dietaryPattern
-    : 'omnivore';
-
-  return {
-    dietaryPattern,
+  const out = {
+    dietaryPattern: normalizeDietPattern(source.dietaryPattern),
+    // Preferencia de carga glucémica baja SIN necesidad de declarar una enfermedad.
+    lowGlycemic: source.lowGlycemic === true,
     allergies: normalizeList(source.allergies),
     intolerances: normalizeList(source.intolerances),
     dislikedFoods: normalizeList(source.dislikedFoods),
   };
+  const ack = normalizeRiskAcknowledgement(source.riskAcknowledgement);
+  if (ack) out.riskAcknowledgement = ack;
+  return out;
 }

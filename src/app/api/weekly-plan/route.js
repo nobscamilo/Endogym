@@ -8,7 +8,7 @@ import {
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
 import { recordAiMetric, fallbackReasonField } from '../../../lib/aiMetrics.js';
 import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/aiBudget.js';
-import { evaluatePreparticipationScreening } from '../../../core/screening.js';
+import { evaluatePreparticipationScreening, preparticipationFromProfile } from '../../../core/screening.js';
 import { normalizeExerciseHistoryKey, resolveExerciseMetadata } from '../../../core/exerciseLibrary.js';
 import {
   callGeminiExerciseCoach,
@@ -359,7 +359,7 @@ export async function POST(request) {
         getLastDoneWorkoutAt(user.uid).catch(() => null),
       ]);
 
-      const preparticipationScreening = evaluatePreparticipationScreening(profile.preparticipation);
+      const preparticipationScreening = evaluatePreparticipationScreening(preparticipationFromProfile(profile));
       const progressMemory = buildProgressMemory({
         workouts: recentWorkouts,
         meals: recentMeals,

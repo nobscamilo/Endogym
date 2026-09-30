@@ -2,7 +2,7 @@
 // el prompt para Gemini, el informe heurístico de fallback y la firma de invalidación.
 // Separado de la ruta /api/coach-analysis para poder testearlo y sondearlo directamente.
 import { buildAdaptiveTuning, buildProgressMemory } from '../core/progressMemory.js';
-import { evaluatePreparticipationScreening } from '../core/screening.js';
+import { evaluatePreparticipationScreening, preparticipationFromProfile } from '../core/screening.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -496,7 +496,7 @@ export async function buildCoachAnalysisDigest(uid) {
       adaptiveTuning = buildAdaptiveTuning({
         profile,
         progressMemory,
-        screening: evaluatePreparticipationScreening(profile.preparticipation),
+        screening: evaluatePreparticipationScreening(preparticipationFromProfile(profile)),
       });
     } catch { adaptiveTuning = null; }
   }

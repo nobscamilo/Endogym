@@ -1,5 +1,5 @@
 import { GoalType, TrainingModality } from '../domain/models.js';
-import { evaluatePreparticipationScreening } from './screening.js';
+import { evaluatePreparticipationScreening, preparticipationFromProfile } from './screening.js';
 import { filterRestrictedExercises } from './comorbidityRestrictions.js';
 import { filterByEquipmentAndPreferences } from './equipmentPreferences.js';
 import {
@@ -1549,7 +1549,7 @@ export function buildSessionExercises({
   const experience = resolveTrainingExperience(profile);
 
   const highVolumeGoals = new Set(['weight_loss', 'recomposition', 'hypertrophy', 'strength', 'cut', 'bulk']);
-  const screening = profile?.preparticipation ? evaluatePreparticipationScreening(profile.preparticipation) : null;
+  const screening = profile ? evaluatePreparticipationScreening(preparticipationFromProfile(profile)) : null;
   const isStopGate = screening?.readinessGate === 'stop';
   // Minutos efectivos de la sesión: los que indicó el usuario en la encuesta del Studio o,
   // si no, la duración planificada de la propia sesión (plantilla). Así el nº de ejercicios

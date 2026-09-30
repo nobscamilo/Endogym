@@ -21,7 +21,7 @@ vi.mock('../../src/lib/logger.js', () => ({
   logInfo: vi.fn(),
 }));
 
-const { GET, rpeLabel, mapPlannedDetail, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
+const { GET, mapUser, rpeLabel, mapPlannedDetail, mapGlycemic, mapLibrary, mapMacroEaten, mapMacroTargets, mapProgress, mapTodaySession, mapWeek } = await import('../../src/app/api/studio-data/route.js');
 
 const PLAN = {
   days: [
@@ -450,5 +450,17 @@ describe('mapPlannedDetail — prescripción completa de un día (vista Semana, 
     expect(p.type).toBe('Fuerza');
     expect(p.exercises).toEqual([{ name: 'Zancada', scheme: '2 × 12-20', load: '12.5 kg', restSec: 60 }]);
     expect(p).not.toHaveProperty('run');
+  });
+});
+
+describe('mapUser — prefill del formulario de Perfil', () => {
+  it('expone dieta, alergias y texto de condiciones para que guardar la encuesta no los borre', () => {
+    const u = mapUser({
+      nutritionPreferences: { dietaryPattern: 'mediterranean', lowGlycemic: true, allergies: ['marisco'] },
+      medicalConditions: 'rodilla operada', metabolicProfile: 'insulin_resistance',
+    }, { email: 'a@b.c' });
+    expect(u.nutritionPreferences).toMatchObject({ dietaryPattern: 'mediterranean', lowGlycemic: true, allergies: ['marisco'] });
+    expect(u.medicalConditions).toBe('rodilla operada');
+    expect(u.metabolicProfile).toBe('insulin_resistance');
   });
 });

@@ -90,3 +90,20 @@ export function evaluatePreparticipationScreening(preparticipation = {}) {
     flags,
   };
 }
+
+/**
+ * Entrada del cribado a partir del PERFIL completo (30-sep-2026). Antes solo se leía el
+ * formulario `preparticipation` (del panel heredado, que el Studio no pide): una diabetes
+ * marcada en Perfil › Salud no llegaba al cribado y el plan permitía RPE 9 sin valoración
+ * médica. Algoritmo ACSM (2015): "enfermedad cardiovascular, metabólica (diabetes tipo 1/2)
+ * o renal conocida". Prediabetes/resistencia a la insulina e HTA son factores de riesgo,
+ * no enfermedad conocida, así que NO activan la marca. Solo puede AÑADIR la marca, nunca
+ * quitar una declarada en el formulario.
+ */
+export function preparticipationFromProfile(profile = {}) {
+  const base = profile?.preparticipation && typeof profile.preparticipation === 'object' ? profile.preparticipation : {};
+  const c = profile?.conditions && typeof profile.conditions === 'object' ? profile.conditions : {};
+  const known = c.diabetes === true || c.cardiovascular === true || c.kidneyDisease === true
+    || profile?.metabolicProfile === 'type2_diabetes';
+  return known ? { ...base, knownCardiometabolicDisease: true } : base;
+}

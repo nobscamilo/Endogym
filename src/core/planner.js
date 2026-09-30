@@ -32,6 +32,7 @@ import {
 } from './running.js';
 import { buildWarmupProtocol, buildCooldownProtocol, detectComorbidities } from './warmupCooldown.js';
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
+import { assessDietPreferences } from './dietSuitability.js';
 import { getMissingNutritionProfileFields } from './profileCompleteness.js';
 
 const ACTIVITY_FACTORS = {
@@ -703,8 +704,10 @@ export function buildDietQualityTargets({ calories, comorbidities = {} }) {
   };
 }
 
+const KETO_MAX_CARBS_G = 50;
+
 function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
-  const { sessionFocus = null, raceGoal = 'health', comorbidities = null } = opts;
+  const { sessionFocus = null, raceGoal = 'health', comorbidities = null, dietPattern = 'omnivore' } = opts;
   // "Fuel for the work required": los carbohidratos del día escalan con la demanda de la
   // sesión (tirada larga/series/pierna altos; descanso bajo) y con el objetivo de carrera.
   const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal });
@@ -720,8 +723,19 @@ function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
   }
 
   const proteinGrams = Math.max(30, Math.round(baseTarget.proteinGrams));
-  const carbsGrams = Math.max(20, Math.round(baseTarget.carbsGrams * carbsFactor));
-  const fatGrams = Math.max(20, Math.round(baseTarget.fatGrams * fatFactor));
+  let carbsGrams = Math.max(20, Math.round(baseTarget.carbsGrams * carbsFactor));
+  let fatGrams = Math.max(20, Math.round(baseTarget.fatGrams * fatFactor));
+  let carbLevel = strat.level;
+  let carbTiming = strat.timing;
+  if (dietPattern === 'keto') {
+    // Keto elegida (con riesgos confirmados): se respetan las MISMAS kcal del día, pero los
+    // hidratos quedan en ≤50 g y la grasa compensa. El carb cycling deja de aplicar.
+    const dayKcal = proteinGrams * 4 + carbsGrams * 4 + fatGrams * 9;
+    carbsGrams = Math.min(carbsGrams, KETO_MAX_CARBS_G);
+    fatGrams = Math.max(20, Math.round((dayKcal - proteinGrams * 4 - carbsGrams * 4) / 9));
+    carbLevel = 'bajo';
+    carbTiming = 'Dieta cetogénica: hidratos ≤50 g/día. Las series y los ritmos de carrera rendirán menos; no persigas ritmos en esas sesiones.';
+  }
   const calories = proteinGrams * 4 + carbsGrams * 4 + fatGrams * 9;
 
   return {
@@ -729,8 +743,8 @@ function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
     proteinGrams,
     carbsGrams,
     fatGrams,
-    carbLevel: strat.level,      // 'alto' | 'medio' | 'bajo'
-    carbTiming: strat.timing,    // guía de timing para el plan de comidas / coach
+    carbLevel,                   // 'alto' | 'medio' | 'bajo'
+    carbTiming,                  // guía de timing para el plan de comidas / coach
     // Calidad por condición (no altera los macros de arriba).
     dietQuality: buildDietQualityTargets({ calories, comorbidities: comorbidities || {} }),
   };
@@ -1265,6 +1279,8 @@ export function generateWeeklyPlan({
 
   // Comorbilidades del perfil (checkbox + léxico del texto libre). Se calculan una vez.
   const comorbidities = detectComorbidities(profile);
+  // Dieta: preferencia + mínimo por salud (consenso). Ver dietSuitability.js.
+  const dietAssessment = assessDietPreferences(profile);
 
   const baseTarget = buildMacroTargetFromProfile({ ...profile, goal }, adaptiveTuning);
   const mealsPerDay = clamp(toNumber(profile.mealsPerDay, 4), 3, 6);
@@ -1331,7 +1347,7 @@ export function generateWeeklyPlan({
       sessionTitle: templateDay.title,
     });
 
-    const nutritionTarget = adjustMacroTargetForDay(baseTarget, templateDay, goal, { sessionFocus, raceGoal, comorbidities });
+    const nutritionTarget = adjustMacroTargetForDay(baseTarget, templateDay, goal, { sessionFocus, raceGoal, comorbidities, dietPattern: dietAssessment.chosen.pattern });
 
     const sessionExercises = buildSessionExercises({
       modality,
@@ -1567,6 +1583,15 @@ export function generateWeeklyPlan({
     metabolicProfile,
     mealsPerDay,
     baseTarget,
+    // Resumen de dieta (entra en la firma del menú semanal: cambiarla invalida el menú).
+    diet: {
+      pattern: dietAssessment.chosen.pattern,
+      level: dietAssessment.chosen.level,
+      lowGlycemic: dietAssessment.lowGlycemic,
+      lowGlycemicLockedByHealth: dietAssessment.lowGlycemicLockedByHealth,
+      suggested: dietAssessment.suggested.pattern,
+      healthConstraints: dietAssessment.healthConstraints.map((c) => c.key),
+    },
     // Nº de sesiones de fuerza reorganizadas como circuito híbrido esta semana (0 si no aplica).
     hybridCircuitDays,
     acsmPrescription,

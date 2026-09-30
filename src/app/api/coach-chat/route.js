@@ -18,6 +18,7 @@ import { effectiveIntensityRpe, hrMaxFromAge, targetHrRangeForRunType, validateR
 import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever.js';
 import { COACH_CHAT_PERSONA, buildCoachChatUserContent, sanitizeUserText } from '../../../services/coachPersona.js';
 import { detectRedFlags, redFlagResponse } from '../../../services/coachRedFlags.js';
+import { declaredConditionLabels, dietContextForCoach } from '../../../core/dietSuitability.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
 // chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
@@ -126,10 +127,16 @@ async function buildUserContext(uid) {
     // truncar un historial legítimo, pero siguen aplanadas a una línea.
     const conditions = sanitizeUserText(profile?.medicalConditions, 240);
     if (conditions) parts.push(`Condiciones: ${conditions}.`);
+    // Condiciones marcadas en Perfil › Salud (antes el chat solo veía el texto libre).
+    const declared = profile ? declaredConditionLabels(profile) : [];
+    if (declared.length) parts.push(`Condiciones declaradas (casillas de salud): ${declared.join(', ')}.`);
+    // Dieta: elección, idoneidad para su perfil y sugerencia (motor determinista).
+    if (profile) parts.push(dietContextForCoach(profile));
     // Contexto de carrera: objetivo, ritmos y entrenamiento concurrente (correr + gimnasio).
     const modality = profile?.trainingModality || profile?.trainingMode || '';
     if (profile?.runRaceGoal && profile.runRaceGoal !== 'health') {
-      parts.push(`Objetivo de carrera: ${profile.runRaceGoal.replace('race_', '').toUpperCase()}.`);
+      const raceDay = typeof profile.raceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(profile.raceDate) ? profile.raceDate : null;
+      parts.push(`Objetivo de carrera: ${profile.runRaceGoal.replace('race_', '').toUpperCase()}${raceDay ? `, el ${raceDay} (fecha de la carrera)` : ''}.`);
     }
     if (currentPlan?.runPaces) {
       const rp = currentPlan.runPaces;

@@ -652,6 +652,10 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [medText, setMedText] = useStateP(u.medicalConditions || '');
   const np = u.nutritionPreferences || {};
   const [dietPattern, setDietPattern] = useStateP(np.dietaryPattern || 'omnivore');
+  // Preferencia de carga glucémica baja SIN tener que marcar una enfermedad (30-sep-2026).
+  const [lowGlycemic, setLowGlycemic] = useStateP(np.lowGlycemic === true);
+  // Confirmación de riesgos de la dieta elegida (keto/paleo/vegana según perfil).
+  const [dietAck, setDietAck] = useStateP(false);
   const [allergies, setAllergies] = useStateP((np.allergies || []).join(', '));
   const [intolerances, setIntolerances] = useStateP((np.intolerances || []).join(', '));
   const [dislikes, setDislikes] = useStateP((np.dislikedFoods || []).join(', '));
@@ -705,6 +709,19 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const raceLabel = (RUN_GOALS.find(([v]) => v === raceGoal) || [null, 'Salud'])[1];
   const keyDate = usesRace && raceDate ? raceDate : (targetEnabled && goalDate ? goalDate : null);
 
+  // ---- Dieta: idoneidad en vivo con el MISMO motor que el servidor (dietSuitability.js). ----
+  // Se recalcula con lo que la persona va marcando en Salud, objetivo y carrera: sugerimos
+  // la de mejor evidencia para SU perfil, avisamos de riesgos y, si elige una con precaución
+  // o no aconsejada, pedimos confirmación explícita (el servidor también la exige).
+  const dietDraft = {
+    conditions: conds, medicalConditions: medText, metabolicProfile: u.metabolicProfile,
+    goal, runRaceGoal: raceGoal, trainingModality: equip, age: Number(age) || u.age,
+    nutritionPreferences: { dietaryPattern: dietPattern, lowGlycemic, riskAcknowledgement: np.riskAcknowledgement },
+  };
+  const diet = assessDietPreferences(dietDraft);
+  const dietAckOk = !diet.requiresAck || diet.acknowledged || dietAck;
+  const pickDiet = (v) => { setDietPattern(v); setDietAck(false); };
+
   // ---- WIZARD por pasos (rediseño de la encuesta): 6 pasos con validación propia. ----
   // El paso de Salud es opcional (siempre válido). El resumen final concentra el "bloque
   // resultante" y el guardado; save() sigue validando TODO como red de seguridad y salta
@@ -722,7 +739,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
     Boolean(goal),
     Boolean(equip),
     Boolean(trainingExperience && activityLevel),
-    true, // salud: opcional
+    dietAckOk, // salud: opcional, salvo confirmar los riesgos de la dieta elegida
     Boolean(sex) && inRangeW(age, 12, 100) && inRangeW(weight, 30, 300) && inRangeW(height, 120, 230)
       && inRangeW(meals, 3, 6) && inRangeW(mins, 20, 150) && inRangeW(days, 1, 7),
     true, // resumen
@@ -731,7 +748,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
     'Elige un objetivo para continuar.',
     'Elige dónde entrenas para continuar.',
     'Marca tu nivel y tu actividad cotidiana.',
-    '',
+    'Confirma que has leído los riesgos de la dieta elegida.',
     'Faltan datos: revisa sexo, edad, peso, altura, comidas, min/sesión y días/semana.',
     '',
   ];
@@ -782,6 +799,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
         medicalConditions: medText,
         nutritionPreferences: {
           dietaryPattern: dietPattern,
+          lowGlycemic,
+          acknowledgeRisks: diet.requiresAck && dietAck ? true : undefined,
           // El backend normaliza y trocea; aquí solo se manda lo escrito.
           allergies: allergies.split(',').map((x) => x.trim()).filter(Boolean),
           intolerances: intolerances.split(',').map((x) => x.trim()).filter(Boolean),
@@ -797,6 +816,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         method: 'POST', headers,
         body: JSON.stringify(surveyPayload),
       });
+      if (r.status === 409) { setStatus('dietack'); setStep(3); return; }
       if (!r.ok) { setStatus('err'); return; }
       // Biometría inicial (opcional): primera medición de cintura (+ Navy cuello/cadera) y peso.
       const wc = Number(waistCm);
@@ -980,8 +1000,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
             <div className="mb-label" style={{ marginBottom: 4 }}>Salud</div>
             <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — adapta tu plan con seguridad. Puedes saltarte este paso.</p>
           <div className="chips">
-            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['hypercholesterolemia', 'Colesterol alto'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis'], ['asthma', 'Asma'], ['pregnant', 'Embarazo']].map(([k, l]) => (
-              <button key={k} type="button" className={`pill ${conds[k] ? 'accent' : ''}`} onClick={() => toggleCond(k)}>{l}</button>
+            {[['hypertension', 'Hipertensión'], ['diabetes', 'Diabetes'], ['hypercholesterolemia', 'Colesterol alto'], ['cardiovascular', 'Enfermedad cardiovascular'], ['kidneyDisease', 'Enfermedad renal'], ['osteoarthritis', 'Artrosis'], ['osteoporosis', 'Osteoporosis'], ['asthma', 'Asma'], ['pregnant', 'Embarazo']].map(([k, l]) => (
+              <button key={k} type="button" className={`pill ${conds[k] ? 'accent' : ''}`} aria-pressed={!!conds[k]} onClick={() => toggleCond(k)}>{l}</button>
             ))}
           </div>
           {conds.hypertension ? (
@@ -995,6 +1015,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
               <button key={z} type="button" className={`pill ${((conds.injuryZones || []).includes(z)) ? 'accent' : ''}`} onClick={() => toggleZone(z)} style={{ textTransform: 'capitalize' }}>{z}</button>
             ))}
           </div>
+          <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Marca solo condiciones que tengas de verdad: también ajustan la intensidad permitida y la valoración previa al ejercicio. Si solo quieres comer con menos azúcar, usa «Carga glucémica baja» en «Cómo comes».</p>
           <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis, calentamiento más largo con asma, sin Valsalva en el embarazo). Es educativo, no diagnóstico.</p>
           {conds.hypercholesterolemia ? (
             <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>
@@ -1021,12 +1042,53 @@ function AvailabilitySurvey({ onSaved } = {}) {
           </p>
 
           <div className="mb-label" style={{ marginTop: 20, marginBottom: 6 }}>Cómo comes</div>
-          <div className="chips">
-            {[['omnivore', 'Omnívora'], ['vegetarian', 'Vegetariana'], ['vegan', 'Vegana']].map(([v, l]) => (
-              <button key={v} type="button" className={`pill ${dietPattern === v ? 'accent' : ''}`}
-                aria-pressed={dietPattern === v} onClick={() => setDietPattern(v)}>{l}</button>
+          <div className="diet-suggest">
+            <div className="row ac between" style={{ gap: 8 }}>
+              <span className="tiny"><strong>Sugerida para tu perfil: {diet.suggested.label}</strong></span>
+              {dietPattern !== diet.suggested.pattern ? (
+                <button type="button" className="pill tiny" onClick={() => pickDiet(diet.suggested.pattern)}>Usar esta</button>
+              ) : <span className="pill tiny accent">Elegida</span>}
+            </div>
+            <p className="tiny muted" style={{ margin: '4px 0 0', lineHeight: 1.45 }}>{diet.suggested.reasons.join(' ')}</p>
+          </div>
+          <div className="profile-choice-grid diets" style={{ marginTop: 10 }}>
+            {diet.assessments.map((a) => (
+              <button key={a.pattern} type="button" className={`choice-tile diet-tile ${dietPattern === a.pattern ? 'on' : ''}`}
+                aria-pressed={dietPattern === a.pattern} onClick={() => pickDiet(a.pattern)}>
+                <span className="choice-head"><strong>{a.label}</strong></span>
+                <span className={`diet-level ${a.level}`}>{a.levelLabel}</span>
+                <span className="choice-detail">{DIET_PATTERN_META[a.pattern].short}</span>
+              </button>
             ))}
           </div>
+          {diet.chosen.reasons.length || diet.chosen.risks.length ? (
+            <div className={`diet-risk ${diet.chosen.level}`} role={diet.requiresAck ? 'alert' : undefined}>
+              <strong className="tiny">{diet.chosen.label}: {diet.chosen.levelLabel.toLowerCase()}</strong>
+              {diet.chosen.reasons.map((t, i) => <p key={`r${i}`} className="tiny" style={{ margin: '4px 0 0', lineHeight: 1.45 }}>{t}</p>)}
+              {diet.chosen.risks.length ? (
+                <ul className="tiny" style={{ margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.45 }}>
+                  {diet.chosen.risks.map((t, i) => <li key={`k${i}`}>{t}</li>)}
+                </ul>
+              ) : null}
+              {diet.requiresAck && !diet.acknowledged ? (
+                <label className="row ac tiny" style={{ gap: 8, marginTop: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={dietAck} onChange={(e) => setDietAck(e.target.checked)} />
+                  <span>He leído los riesgos y quiero seguir con esta dieta. Consultaré a mi médico si tengo alguna de las condiciones indicadas.</span>
+                </label>
+              ) : null}
+              {diet.requiresAck && diet.acknowledged ? <p className="tiny muted" style={{ margin: '6px 0 0' }}>Riesgos ya confirmados.</p> : null}
+            </div>
+          ) : null}
+
+          <div className="chips" style={{ marginTop: 12 }}>
+            <button type="button" className={`pill ${diet.lowGlycemic ? 'accent' : ''}`} aria-pressed={diet.lowGlycemic}
+              disabled={diet.lowGlycemicLockedByHealth} onClick={() => setLowGlycemic(!lowGlycemic)}>Carga glucémica baja</button>
+          </div>
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
+            {diet.lowGlycemicLockedByHealth
+              ? 'Activada por tu condición de salud: no se puede quitar mientras esté marcada.'
+              : 'Hidratos integrales o de índice glucémico bajo en la base del día, sin necesidad de marcar ninguna enfermedad. Alrededor de las sesiones largas o intensas se mantienen los hidratos rápidos que necesitas.'}
+          </p>
 
           {/* Separadas a propósito: una alergia es una prohibición absoluta, una intolerancia
               admite matiz y un alimento que no gusta es solo preferencia. El plan las trata
@@ -1119,6 +1181,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
             {status === 'ok' ? <span className="tiny" style={{ color: 'var(--glu-good)' }}>Guardado y plan reajustado.</span> : null}
             {status === 'err' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>No se pudo guardar. Reintenta.</span> : null}
             {status === 'invalid' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Faltan campos: te hemos llevado al paso pendiente.</span> : null}
+            {status === 'dietack' ? <span className="tiny" style={{ color: 'var(--glu-high)' }}>Confirma los riesgos de la dieta elegida (paso Salud).</span> : null}
             {status === 'noauth' ? <span className="tiny muted">Inicia sesión para guardar.</span> : null}
           </div>
         </section>

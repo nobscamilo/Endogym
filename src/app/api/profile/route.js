@@ -143,8 +143,19 @@ function normalizePayload(payload = {}, existingProfile = null) {
   const preferredDurationMinutes = preferredDurationValue == null
     ? null
     : clamp(Math.round(preferredDurationValue), 20, 180);
+  // El panel heredado no conoce `lowGlycemic` ni la confirmación de riesgos de la dieta: si
+  // no vienen en el payload, se conservan los guardados (si no, un guardado desde ahí los borraba).
   const nutritionPreferences = hasOwn(source, 'nutritionPreferences')
-    ? normalizeNutritionPreferencesInput(payload.nutritionPreferences)
+    ? (() => {
+      const incoming = payload.nutritionPreferences || {};
+      const prev = existing.nutritionPreferences || {};
+      const next = normalizeNutritionPreferencesInput(incoming);
+      if (!hasOwn(incoming, 'lowGlycemic') && prev.lowGlycemic === true) next.lowGlycemic = true;
+      if (!next.riskAcknowledgement && prev.riskAcknowledgement?.pattern === next.dietaryPattern) {
+        next.riskAcknowledgement = prev.riskAcknowledgement;
+      }
+      return next;
+    })()
     : (existing.nutritionPreferences || normalizeNutritionPreferencesInput());
   const adaptiveThresholds = hasOwn(source, 'adaptiveThresholds')
     ? normalizeAdaptiveThresholds(payload.adaptiveThresholds)

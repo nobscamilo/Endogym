@@ -14,7 +14,7 @@ import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js'
 import { withTrace, logError } from '../../../lib/logger.js';
 import { buildActiveBlockAdaptiveOverlay, isActiveBlockPlan } from '../../../core/activeBlockOverlay.js';
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
-import { evaluatePreparticipationScreening } from '../../../core/screening.js';
+import { evaluatePreparticipationScreening, preparticipationFromProfile } from '../../../core/screening.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -92,7 +92,7 @@ export async function GET(request) {
         const adaptiveTuning = buildAdaptiveTuning({
           profile,
           progressMemory,
-          screening: evaluatePreparticipationScreening(profile.preparticipation),
+          screening: evaluatePreparticipationScreening(preparticipationFromProfile(profile)),
         });
         planForStudio = buildActiveBlockAdaptiveOverlay({
           plan: latestPlan,

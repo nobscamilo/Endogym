@@ -62,6 +62,8 @@ import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+// Motor de idoneidad de dietas COMPARTIDO con el servidor (una sola fuente de verdad).
+import { assessDietPreferences, DIET_PATTERN_META } from './src/core/dietSuitability.js';
 
 // --- Integración con el backend (sustituye al shim inline del index.html) ---
 let __auth = null;

@@ -1,7 +1,8 @@
 import { jsonResponse, errorResponse } from '../../../lib/http.js';
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { withTrace, logError } from '../../../lib/logger.js';
-import { upsertUserProfile } from '../../../lib/repositories/firestoreRepository.js';
+import { getUserProfile, upsertUserProfile } from '../../../lib/repositories/firestoreRepository.js';
+import { assessDietPreferences } from '../../../core/dietSuitability.js';
 import { sanitizeEquipmentList } from '../../../core/equipmentPreferences.js';
 import { normalizeNutritionPreferencesInput } from '../../../core/nutritionPlanner.js';
 import {
@@ -116,6 +117,9 @@ export async function POST(request) {
         // Gravedad: solo tiene sentido si hay HTA marcada.
         hypertensionControlled: body.conditions.hypertension === true && body.conditions.hypertensionControlled === true,
         diabetes: body.conditions.diabetes === true,
+        // 30-sep-2026: necesarias para la idoneidad de dietas (keto/paleo) y el cribado ACSM.
+        cardiovascular: body.conditions.cardiovascular === true,
+        kidneyDisease: body.conditions.kidneyDisease === true,
         osteoarthritis: body.conditions.osteoarthritis === true,
         osteoporosis: body.conditions.osteoporosis === true,
         // Metabólica, no restrictiva: cambia calidad de dieta y énfasis aeróbico, no filtra ejercicios.
@@ -188,6 +192,36 @@ export async function POST(request) {
             missingLabels: missingFields.map((field) => PROFILE_FIELD_LABELS[field] || field),
           }
         );
+      }
+    }
+
+    // Dieta con precaución / no aconsejada para el perfil: se respeta la elección, pero solo
+    // después de que la persona confirme que ha visto los riesgos. La confirmación queda
+    // guardada con patrón + nivel: si cambia el perfil (p. ej. marca una cardiopatía estando
+    // en keto) y el nivel empeora, se vuelve a pedir. Se evalúa sobre el perfil RESULTANTE.
+    if (patch.nutritionPreferences || patch.conditions || patch.metabolicProfile || typeof patch.medicalConditions === 'string') {
+      let existing = null;
+      try { existing = await getUserProfile(user.uid); } catch { existing = null; }
+      const prevPrefs = existing?.nutritionPreferences || {};
+      const nextPrefs = { ...(patch.nutritionPreferences || prevPrefs) };
+      if (!nextPrefs.riskAcknowledgement && prevPrefs.riskAcknowledgement) nextPrefs.riskAcknowledgement = prevPrefs.riskAcknowledgement;
+      const merged = { ...(existing || {}), ...patch, nutritionPreferences: nextPrefs };
+      const assessment = assessDietPreferences(merged);
+      if (assessment.requiresAck && !assessment.acknowledged) {
+        if (body?.nutritionPreferences?.acknowledgeRisks === true) {
+          nextPrefs.riskAcknowledgement = { pattern: assessment.chosen.pattern, level: assessment.chosen.level, at: new Date().toISOString() };
+        } else {
+          return errorResponse('Esta dieta tiene riesgos para tu perfil: confírmalos para guardarla.', 409, {
+            code: 'diet_risk_ack_required',
+            chosen: assessment.chosen,
+            suggested: assessment.suggested,
+          });
+        }
+      } else if (!assessment.requiresAck) {
+        delete nextPrefs.riskAcknowledgement;
+      }
+      if (patch.nutritionPreferences || nextPrefs.riskAcknowledgement !== prevPrefs.riskAcknowledgement) {
+        patch.nutritionPreferences = nextPrefs;
       }
     }
 

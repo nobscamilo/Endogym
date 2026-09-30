@@ -9,6 +9,7 @@ import { checkAiBudget, recordUserAiSpend, logBudgetStop } from '../../../lib/ai
 import { resolveGeminiCoachModel } from '../../../services/exerciseCoachClient.js';
 import { currentWeekKey as currentAppWeekKey, addDaysToDateKey } from '../../../lib/appTime.js';
 import { normalizeNutritionPreferencesInput } from '../../../core/nutritionPlanner.js';
+import { DIET_PATTERN_META, dietRulesForMenuPrompt, declaredConditionLabels } from '../../../core/dietSuitability.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -63,6 +64,7 @@ function planNutritionSignature(plan) {
     weeksToRace: Number.isFinite(Number(plan.weeksToRace)) ? Number(plan.weeksToRace) : null,
     runPaces: plan.runPaces || null,
     baseTarget: compactNutritionTarget(plan.baseTarget),
+    diet: plan.diet || null,
     days: days.map((day) => ({
       date: day.date || null,
       sessionType: day.sessionType || null,
@@ -195,6 +197,14 @@ function targetsFrom(plan) {
  * simplemente no gustan (evitar, pero no es un riesgo). Meterlas todas en la misma frase
  * invita al modelo a tratarlas con el mismo peso.
  */
+// Condiciones para el prompt del menú: las casillas de Perfil › Salud + el texto libre.
+export function describeConditionsForMenu(profile) {
+  const labels = declaredConditionLabels(profile || {});
+  const free = String(profile?.medicalConditions || '').replace(/\s+/g, ' ').trim();
+  if (free) labels.push(`(texto del usuario) ${free.slice(0, 300)}`);
+  return labels.length ? labels.join('; ') : 'ninguna declarada';
+}
+
 export function describeDietRestrictions(prefs) {
   const lineas = [];
   if (prefs.allergies?.length) {
@@ -260,14 +270,17 @@ export async function POST(request) {
     ]);
     const t = targetsFrom(plan);
     const goal = profile?.goal || 'salud y composición corporal';
-    const conditions = profile?.medicalConditions || 'ninguna declarada';
+    // Condiciones: casillas estructuradas + texto libre. Antes solo el texto libre: una
+    // condición marcada en Perfil › Salud no llegaba nunca al menú (30-sep-2026).
+    const conditions = describeConditionsForMenu(profile);
     // BUG corregido (2-ago-2026): esto leía `dietaryRestrictions` y `allergies`, campos que NO
     // existen en el modelo de perfil. Las preferencias viven en `nutritionPreferences`, así que
     // el menú semanal con IA salía SIEMPRE con "ninguna declarada" — aunque la persona hubiera
     // declarado una alergia. Con alergias eso no es un detalle de calidad, es un riesgo.
     const prefs = normalizeNutritionPreferencesInput(profile?.nutritionPreferences || {});
-    const patronDieta = { omnivore: 'omnívora', vegetarian: 'vegetariana', vegan: 'vegana' }[prefs.dietaryPattern] || 'omnívora';
+    const patronDieta = (DIET_PATTERN_META[prefs.dietaryPattern]?.label || 'Omnívora').toLowerCase();
     const restrictions = describeDietRestrictions(prefs);
+    const dietRules = dietRulesForMenuPrompt({ ...(profile || {}), nutritionPreferences: prefs });
 
     // Contexto de entrenamiento por día (para "fuel for the work required"): tipo de sesión,
     // nivel de carbohidratos, timing y objetivos de macros específicos de cada día.
@@ -314,6 +327,8 @@ export async function POST(request) {
 
     const baseRules = `Eres un nutricionista deportivo. Trabajas en español de España.
 Perfil: objetivo "${goal}"; condiciones médicas: ${conditions}; dieta ${patronDieta}.
+Reglas de dieta OBLIGATORIAS (patrón elegido + mínimos por salud; si chocan con los macros de un día, prioriza estas reglas):
+${dietRules}
 ${restrictions}${raceLabel ? `
 Objetivo de carrera: ${raceLabel}.${phaseLabel ? ` Fase de entrenamiento: ${phaseLabel}.` : ''}` : ''}
 PRINCIPIO "fuel for the work required": ajusta los carbohidratos a la demanda de CADA día (más en tirada larga/series/pierna, menos en descanso). Carbohidratos de absorción LENTA lejos del entreno y RÁPIDA peri-entreno. Cada día abajo trae su objetivo de kcal/macros y su nivel/timing de carbohidratos: respétalos.`;

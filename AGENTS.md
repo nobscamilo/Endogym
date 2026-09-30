@@ -121,6 +121,9 @@ No habilites Vertex AI.
 - Los componentes de atlas anatómico residen en `src/components/MuscleMapFigure.js`; las imágenes en `public/anatomy/`. No reemplaces los modelos 3D sin actualización explícita de coordenadas de superposición.
 - **Tests dependientes de fecha (NO pudrirlos):** si el código bajo prueba usa `Date.now()`/`new Date()` INTERNOS para una ventana de recencia (p. ej. `buildCoachAnalysisDigest` filtra a 28 días, `studio-data`/`coach-chat`/`session-for-date` a 21/42/60/7 días), un test con fixtures de fecha FIJA se pondrá en rojo solo con el paso del tiempo real. Usa uno de: (a) `vi.useFakeTimers({toFake:['Date']})` + `vi.setSystemTime(...)`; (b) mockear el reloj inyectable (`dateKeyInTimeZone`); (c) fixtures relativos a `Date.now()`. Barrido completo hecho el 17 jul 2026 (ver `docs/PROJECT_STATUS.md`): la suite quedó limpia salvo `coach-analysis.route`, ya corregido.
 
+- **Dieta y salud van SEPARADAS (30-sep-2026):** la idoneidad de patrones de dieta y los mínimos por salud salen SOLO de `src/core/dietSuitability.js` (lo importan servidor y bundle del Studio). No dupliques reglas en prompts ni en la UI; la IA explica/aplica ese resultado. Para "comer con menos azúcar" existe `nutritionPreferences.lowGlycemic`: nunca pidas marcar una enfermedad para obtener un efecto dietético. Las condiciones clínicas (diabetes, CV, renal) alimentan también el cribado ACSM vía `preparticipationFromProfile`.
+- **Prefill del Perfil del Studio:** todo campo que el formulario reenvía al guardar DEBE salir en `mapUser` (studio-data); si no, el guardado lo borra (pasó con alergias y condiciones hasta el 30-sep-2026).
+
 ## RAG de directrices médicas (cómo añadir libros)
 
 El Coach IA inyecta contexto desde la colección Firestore `guidelines`. Pipeline para añadir un libro nuevo:

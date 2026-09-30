@@ -1,6 +1,42 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **28 de septiembre de 2026, parte 2 (modelo de zonas de FC: rodaje fácil hasta el 75 %)**.
+Ultima actualizacion: **30 de septiembre de 2026, parte 2 (tipos de dieta con idoneidad por perfil; dieta separada de salud)**.
+
+## Sesión del 30 de septiembre de 2026, parte 2 (tipos de dieta, idoneidad por perfil, dieta ≠ salud)
+
+Petición: añadir mediterránea, paleo y keto; que el coach SUGIERA la dieta según el perfil (p. ej. no keto a un cardiópata/diabético) y, si el usuario la quiere igualmente, advertir de los riesgos. Contexto: el usuario marcó "diabetes" (no la tiene) para conseguir un menú de IG bajo.
+
+- **Motor determinista `src/core/dietSuitability.js`** (fuente única, servidor + bundle del Studio): patrones omnívora, mediterránea, vegetariana, vegana, paleo, keto → nivel `recommended|suitable|caution|not_advised` + razones + riesgos. La IA EXPLICA/aplica, no decide. Mediterránea siempre "recomendada" (PREDIMED). Keto: precaución por defecto; con diabetes sigue en PRECAUCIÓN (no prohibida: consenso ADA acepta bajo en HC) con avisos de insulina/sulfonilureas (hipoglucemia) e iSGLT2 (cetoacidosis euglucémica); **no aconsejada** con enfermedad CV, colesterol alto, renal, embarazo o menor. Con objetivo de carrera avisa del rendimiento (Burke 2017, PMID 28012184). Paleo: precaución con colesterol/CV/renal. Vegana: B12 siempre.
+- **Dieta ≠ salud, con consenso:** `nutritionPreferences.lowGlycemic` = preferencia de carga glucémica baja SIN marcar enfermedad. Diabetes/prediabetes/resistencia a la insulina la IMPONEN (bloqueada en UI). Restricciones de salud (`healthDietConstraints`): glucémica, lípidos (<10 % saturada), sodio (<5 g sal; anula el "repón sodio" de keto), renal.
+- **Confirmación de riesgos:** si el patrón elegido es caution/not_advised, `/api/studio-availability` responde **409 `diet_risk_ack_required`** salvo `acknowledgeRisks:true`; se guarda `riskAcknowledgement {pattern, level, at}`. Si el perfil cambia y el nivel empeora, se vuelve a pedir. El panel heredado (`/api/profile`) conserva lowGlycemic/ack pero NO exige la confirmación (Studio es la app por defecto).
+- **Planner:** keto → HC ≤50 g/día con las MISMAS kcal (la grasa compensa); `plan.diet` (pattern, level, lowGlycemic, suggested, healthConstraints) entra en la firma del menú semanal → cambiar la dieta invalida el menú cacheado.
+- **Menú IA (`studio-nutrition`):** "Reglas de dieta OBLIGATORIAS" (`dietRulesForMenuPrompt`) + condiciones de las CASILLAS (antes solo leía el texto libre: una diabetes marcada nunca llegaba al menú).
+- **Coach chat:** recibe condiciones de las casillas, `dietContextForCoach` (elegida, nivel, sugerida, no aconsejadas, regla de respetar decisión y explicar riesgos) y la **fecha de carrera** (auditoría #4).
+- **Cribado ACSM:** `preparticipationFromProfile` — diabetes, enfermedad CV o renal marcadas en Salud → `knownCardiometabolicDisease` (antes solo el formulario heredado). Prediabetes/RI/HTA no (factores de riesgo). Aplicado en weekly-plan, studio-data, session-for-date, coachAnalysis, exerciseLibrary.
+- **Condiciones nuevas:** `cardiovascular`, `kidneyDisease` (chips con `aria-pressed`).
+- **BUG grave encontrado:** `studio-data` no exponía `nutritionPreferences` ni `medicalConditions` → el formulario de Perfil los prefijaba VACÍOS y **cada guardado de la encuesta borraba alergias, intolerancias y texto de condiciones**. Corregido (`mapUser` exportado y testeado).
+- **UI (screen-more.jsx, paso Salud):** tarjeta "Sugerida para tu perfil" + "Usar esta"; 6 tarjetas con nivel; caja de razones/riesgos; casilla de confirmación obligatoria; chip "Carga glucémica baja".
+- **Pendiente para el usuario:** desmarcar Diabetes en Perfil › Salud, elegir dieta + IG bajo, guardar y regenerar el menú. Confirmar si `metabolicProfile=insulin_resistance` es real (hoy impone IG bajo).
+- **No resuelto (fuera de alcance):** HC de 310-522 g/día con ~5 km/semana de carrera (la periodización de HC no mira la carga real); resto de la auditoría.
+- Tests: 625 (nuevo `tests/core/diet-suitability.test.js`, casos 409/ack en studio-availability, mapUser).
+
+## Auditoría externa del 30 de septiembre de 2026 (50 mejoras "Ignios EndoGym") — TRIAGE, SIN CAMBIOS DE CÓDIGO
+
+Un usuario externo revisó la app con la cuenta de Camilo y entregó 50 mejoras. Se contrastaron contra Firestore (sondas de solo lectura `scratch/audit-probe*-2026-09-30.mjs`) y el código. Nada implementado aún; pendiente de que el usuario priorice.
+
+**Confirmadas con datos (bloque activo 27-sep → 17-oct, fase guardada `peak`, semanas 2-3 `taper`):**
+- #1 Carga inicial: `weeklyKmBaseline` 4,9 km/sem pero `runsLast28d`=2 al crear el bloque → `buildWeeklyKmTarget` devuelve null (umbral <3 carreras) y el planner cae a la PLANTILLA fija (60/60/60/75 min de carrera ≈ 4,25 h/sem de carrera frente a ~40 min/sem reales). Causa raíz: sin datos suficientes se usa la plantilla en vez de un arranque conservador.
+- #2/#3/#29 Fase por fecha, no por nivel (`resolveTrainingPhase`: 3-4 semanas → pico). El "taper" de las semanas 2-3 casi no baja volumen (60 min siguen en 60; solo la tirada 75→60). Día de carrera (17-oct) = `cardio_long` 60 min; 16-oct umbral; 14-oct series. No existe tipo de sesión "carrera".
+- #4 El chat recibe `weeksToRace` pero no `profile.raceDate`.
+- #12 + hallazgo NO reportado por el auditor: `profile.conditions.diabetes=true` y `metabolicProfile=insulin_resistance`, pero el cribado ACSM guardado (actualizado el 11-abr-2026, refresco cada 15 días vencido) tiene `knownCardiometabolicDisease:false`, `currentlyActive:false` → `highIntensityAllowed:true`, RPE máx 9. `conditions.diabetes` no alimenta `screening.js` ni la nutrición (solo `buildSafetyNotes` por metabolicProfile). Menú: 310-522 g HC/día.
+- #13/#14 kcal 2.883-3.587 con 105 kg porque `goal=endurance` (objetivo único): la app es coherente con el objetivo; el fallo es no permitir objetivo secundario de pérdida de peso.
+- #7 FCmáx 182 = Tanaka (37 años), `hrMaxBpm` null. OJO: el auditor dice máx observada 172, pero hay 177 ppm el 30-ago. Ritmos "fácil 10:23/km" salen de la carrera del 27-sep a 158 ppm (Z4) → ritmo y techo de FC se contradicen.
+- #9 No hay fechas no disponibles (solo daysPerWeek). #10 perfil 6 días vs plantilla 5 + 2 recuperación. #19 adherencia binaria (`studio-data` ~l.958). #39 el bloque arranca el día de creación (domingo).
+- #18 matiz: la fuerza se hizo el LUNES 28 (Strava "Entrenamiento con pesas vespertino"), no el martes; el 33 % es correcto por diseño, el problema real es no reconocer una sesión desplazada.
+
+**Aclaración del usuario (30-sep):** NO tiene diabetes; la marcó para conseguir un menú de IG bajo. Decisión: separar "tipo de dieta/preferencias" de "restricciones por salud", con consenso (la condición clínica impone un mínimo que la preferencia no puede relajar). Hallazgo: el truco ni funcionaba — `studio-nutrition` (prompt Gemini, ~l.263) lee `profile.medicalConditions` (texto libre, vacío), NO `conditions.diabetes`; y no existe opción de IG bajo en `nutritionPlanner` (solo omnivore/vegetarian/vegan). Corrección a la auditoría #36: "II 75" es el campo `ii` = índice INSULÍNICO, no IG (mala etiqueta, no error de dato). Pendiente de confirmar: si `metabolicProfile=insulin_resistance` es real.
+
+**No verificadas (plausibles, UI/texto):** #20-28, #30-49. #43 (COOP) es el aviso conocido del popup de Firebase Auth; baja prioridad. #16: arroz cocido → criterio más estricto (NHS ≤24 h en nevera), congelar.
 
 ## Sesión del 28 de septiembre de 2026, parte 2 (modelo de zonas de FC)
 

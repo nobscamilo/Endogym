@@ -3,7 +3,7 @@ import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js'
 import { withTrace, logError } from '../../../lib/logger.js';
 import { buildActiveBlockAdaptiveOverlay, isActiveBlockPlan } from '../../../core/activeBlockOverlay.js';
 import { buildAdaptiveTuning, buildProgressMemory } from '../../../core/progressMemory.js';
-import { evaluatePreparticipationScreening } from '../../../core/screening.js';
+import { evaluatePreparticipationScreening, preparticipationFromProfile } from '../../../core/screening.js';
 import {
   getUserProfile,
   getLatestWeeklyPlan,
@@ -221,7 +221,7 @@ function initialsFrom(name, last) {
 const GOAL_LABELS = { weight_loss: 'Pérdida de peso', recomposition: 'Recomposición', hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia', glycemic_control: 'Control glucémico' };
 const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Flexible', hybrid_run_gym: 'Correr + Gym', running: 'Carrera', cycling: 'Ciclismo', yoga: 'Yoga', pilates: 'Pilates' };
 
-function mapUser(profile, authUser) {
+export function mapUser(profile, authUser) {
   // IMPORTANTE: nunca devolvemos null ni dejamos el nombre sin asignar; si lo hiciéramos, el
   // bundle conservaría el usuario de MUESTRA ("Marta García"). Derivamos un nombre real del
   // perfil, del displayName de Google o del email; en último caso, un genérico neutro.
@@ -250,6 +250,13 @@ function mapUser(profile, authUser) {
   if (['sedentary', 'light', 'moderate', 'high'].includes(p.activityLevel)) out.activityLevel = p.activityLevel;
   // Comorbilidades estructuradas (prefill de los checkboxes de Perfil)
   if (p.conditions && typeof p.conditions === 'object') out.conditions = p.conditions;
+  // BUG corregido (30-sep-2026): el formulario de Perfil prefija dieta, alergias,
+  // intolerancias y texto de condiciones desde aquí, pero NO se enviaban: cada guardado de la
+  // encuesta mandaba esos campos VACÍOS y borraba lo que la persona había declarado (con
+  // alergias, eso es un riesgo). Ahora se exponen para el prefill.
+  if (p.nutritionPreferences && typeof p.nutritionPreferences === 'object') out.nutritionPreferences = p.nutritionPreferences;
+  if (typeof p.medicalConditions === 'string') out.medicalConditions = p.medicalConditions;
+  if (typeof p.metabolicProfile === 'string') out.metabolicProfile = p.metabolicProfile;
   // Objetivo SMART (prefill del formulario de Perfil)
   if (num(p.goalTarget?.value) !== undefined) out.goalTargetValue = num(p.goalTarget.value);
   if (p.goalTarget?.date) out.goalTargetDate = p.goalTarget.date;
@@ -1066,7 +1073,7 @@ export async function GET(request) {
         const adaptiveTuning = buildAdaptiveTuning({
           profile,
           progressMemory,
-          screening: evaluatePreparticipationScreening(profile.preparticipation),
+          screening: evaluatePreparticipationScreening(preparticipationFromProfile(profile)),
         });
         reentryTuning = adaptiveTuning;
         planForStudio = buildActiveBlockAdaptiveOverlay({
