@@ -18,6 +18,8 @@ Petición: añadir mediterránea, paleo y keto; que el coach SUGIERA la dieta se
 - **UI (screen-more.jsx, paso Salud):** tarjeta "Sugerida para tu perfil" + "Usar esta"; 6 tarjetas con nivel; caja de razones/riesgos; casilla de confirmación obligatoria; chip "Carga glucémica baja".
 - **Pendiente para el usuario:** desmarcar Diabetes en Perfil › Salud, elegir dieta + IG bajo, guardar y regenerar el menú. Confirmar si `metabolicProfile=insulin_resistance` es real (hoy impone IG bajo).
 - **No resuelto (fuera de alcance):** HC de 310-522 g/día con ~5 km/semana de carrera (la periodización de HC no mira la carga real); resto de la auditoría.
+- **Desplegado:** commit `307deb2`, alias `endogym.vercel.app` verificado en ese commit; bundle `v=3016496564` en producción; paso Salud comprobado con Chrome (sugerencia Mediterránea, 6 tarjetas con nivel, keto → caja de riesgos + casilla), SIN guardar cambios en el perfil real.
+- **Ops (Mac):** Xcode se actualizó sin aceptar la licencia → `/usr/bin/git` falla ("You have not agreed to the Xcode license"). Workaround sin sudo: `export DEVELOPER_DIR=/Library/Developer/CommandLineTools` en los scripts de despliegue. Solución definitiva: que el usuario ejecute `sudo xcodebuild -license accept`.
 - Tests: 625 (nuevo `tests/core/diet-suitability.test.js`, casos 409/ack en studio-availability, mapUser).
 
 ## Auditoría externa del 30 de septiembre de 2026 (50 mejoras "Ignios EndoGym") — TRIAGE, SIN CAMBIOS DE CÓDIGO
