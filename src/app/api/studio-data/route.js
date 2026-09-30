@@ -257,6 +257,7 @@ export function mapUser(profile, authUser) {
   if (p.nutritionPreferences && typeof p.nutritionPreferences === 'object') out.nutritionPreferences = p.nutritionPreferences;
   if (typeof p.medicalConditions === 'string') out.medicalConditions = p.medicalConditions;
   if (typeof p.metabolicProfile === 'string') out.metabolicProfile = p.metabolicProfile;
+  if (typeof p.trainingTime === 'string') out.trainingTime = p.trainingTime;
   // Objetivo SMART (prefill del formulario de Perfil)
   if (num(p.goalTarget?.value) !== undefined) out.goalTargetValue = num(p.goalTarget.value);
   if (p.goalTarget?.date) out.goalTargetDate = p.goalTarget.date;

@@ -650,6 +650,10 @@ function AvailabilitySurvey({ onSaved } = {}) {
   // selección de ejercicios y avisos del coach. Complementan al texto libre.
   const [conds, setConds] = useStateP(u.conditions || { hypertension: false, hypertensionControlled: false, diabetes: false, osteoarthritis: false, osteoporosis: false, hypercholesterolemia: false, asthma: false, pregnant: false, injuryZones: [] });
   const [medText, setMedText] = useStateP(u.medicalConditions || '');
+  // Perfil metabólico: antes solo editable en el panel heredado (invisible aquí).
+  const [metabolic, setMetabolic] = useStateP(u.metabolicProfile || 'none');
+  // Hora habitual de entreno (HH:MM) para colocar comidas y timing pre/post. '' = varía.
+  const [trainingTime, setTrainingTime] = useStateP(u.trainingTime || '');
   const np = u.nutritionPreferences || {};
   const [dietPattern, setDietPattern] = useStateP(np.dietaryPattern || 'omnivore');
   // Preferencia de carga glucémica baja SIN tener que marcar una enfermedad (30-sep-2026).
@@ -714,13 +718,16 @@ function AvailabilitySurvey({ onSaved } = {}) {
   // la de mejor evidencia para SU perfil, avisamos de riesgos y, si elige una con precaución
   // o no aconsejada, pedimos confirmación explícita (el servidor también la exige).
   const dietDraft = {
-    conditions: conds, medicalConditions: medText, metabolicProfile: u.metabolicProfile,
+    conditions: conds, medicalConditions: medText, metabolicProfile: metabolic === 'none' ? null : metabolic,
     goal, runRaceGoal: raceGoal, trainingModality: equip, age: Number(age) || u.age,
     nutritionPreferences: { dietaryPattern: dietPattern, lowGlycemic, riskAcknowledgement: np.riskAcknowledgement },
   };
   const diet = assessDietPreferences(dietDraft);
   const dietAckOk = !diet.requiresAck || diet.acknowledged || dietAck;
   const pickDiet = (v) => { setDietPattern(v); setDietAck(false); };
+  // ✓ en el paso Salud cuando hay algo declarado (condición, perfil metabólico, texto o dieta).
+  const healthDeclared = Object.entries(conds || {}).some(([k, v]) => k !== 'injuryZones' && v === true)
+    || (conds?.injuryZones || []).length > 0 || metabolic !== 'none' || medText.trim() !== '' || dietPattern !== 'omnivore' || lowGlycemic;
 
   // ---- WIZARD por pasos (rediseño de la encuesta): 6 pasos con validación propia. ----
   // El paso de Salud es opcional (siempre válido). El resumen final concentra el "bloque
@@ -797,6 +804,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
         barbellKg: barKg ? Number(barKg) : null,
         conditions: conds,
         medicalConditions: medText,
+        metabolicProfile: metabolic,
+        trainingTime: trainingTime || null,
         nutritionPreferences: {
           dietaryPattern: dietPattern,
           lowGlycemic,
@@ -856,7 +865,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
             {WIZARD_STEPS.map((w, i) => (
               <button key={w.id} type="button" className={`pill tiny ${i === step ? 'accent' : ''}`}
                 aria-current={i === step ? 'step' : undefined}
-                onClick={() => goStep(i)}>{stepValid[i] && i !== step && i !== 3 && i !== 5 ? '✓ ' : ''}{w.label}</button>
+                onClick={() => goStep(i)}>{stepValid[i] && i !== step && i !== 5 && (i !== 3 || healthDeclared) ? '✓ ' : ''}{w.label}</button>
             ))}
           </div>
         </div>
@@ -1015,6 +1024,12 @@ function AvailabilitySurvey({ onSaved } = {}) {
               <button key={z} type="button" className={`pill ${((conds.injuryZones || []).includes(z)) ? 'accent' : ''}`} onClick={() => toggleZone(z)} style={{ textTransform: 'capitalize' }}>{z}</button>
             ))}
           </div>
+          <div className="mb-label" style={{ marginTop: 12, marginBottom: 6 }}>Perfil metabólico <span className="tiny muted">(diagnóstico, si lo tienes)</span></div>
+          <div className="chips">
+            {[['none', 'Ninguno'], ['insulin_resistance', 'Resistencia a la insulina'], ['prediabetes', 'Prediabetes'], ['type2_diabetes', 'Diabetes tipo 2'], ['hypothyroidism', 'Hipotiroidismo'], ['pcos', 'SOP']].map(([v, l]) => (
+              <button key={v} type="button" className={`pill ${metabolic === v ? 'accent' : ''}`} aria-pressed={metabolic === v} onClick={() => setMetabolic(v)}>{l}</button>
+            ))}
+          </div>
           <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Marca solo condiciones que tengas de verdad: también ajustan la intensidad permitida y la valoración previa al ejercicio. Si solo quieres comer con menos azúcar, usa «Carga glucémica baja» en «Cómo comes».</p>
           <p className="tiny muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>Con esto el calentamiento, la vuelta a la calma y la selección de ejercicios se adaptan automáticamente (p. ej. sin saltos con artrosis, sin flexión espinal cargada con osteoporosis, calentamiento más largo con asma, sin Valsalva en el embarazo). Es educativo, no diagnóstico.</p>
           {conds.hypercholesterolemia ? (
@@ -1138,6 +1153,14 @@ function AvailabilitySurvey({ onSaved } = {}) {
             <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
             <div className="field"><label>Barra (kg) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="5" max="35" step="0.5" placeholder="20" title="Peso de la barra de tu gym. Solo afecta al desglose visual de cargas: «barra + discos por lado». Vacío = olímpica de 20 kg" value={barKg} onChange={(e) => setBarKg(e.target.value)} /></div>
           </div>
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 6 }}>¿A qué hora sueles entrenar? <span className="tiny muted">opc.</span></div>
+          <div className="chips">
+            {[['', 'Varía'], ['07:00', 'Temprano (7:00)'], ['10:00', 'Media mañana (10:00)'], ['13:30', 'Mediodía (13:30)'], ['18:00', 'Tarde (18:00)'], ['20:30', 'Noche (20:30)']].map(([v, l]) => (
+              <button key={v || 'var'} type="button" className={`pill ${trainingTime === v ? 'accent' : ''}`} aria-pressed={trainingTime === v} onClick={() => setTrainingTime(v)}>{l}</button>
+            ))}
+            {trainingTime && !['07:00', '10:00', '13:30', '18:00', '20:30'].includes(trainingTime) ? <span className="pill accent">{trainingTime}</span> : null}
+          </div>
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>El menú coloca la comida previa 1,5-3 h antes y la de recuperación en las 2 h siguientes. Si varía, te damos el timing en relativo.</p>
           <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Biometría</div>
           <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — para tu riesgo cardiometabólico y su evolución en Progreso.</p>
           <div className="grid g-4" style={{ gap: 10 }}>

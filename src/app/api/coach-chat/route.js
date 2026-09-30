@@ -132,6 +132,7 @@ async function buildUserContext(uid) {
     if (declared.length) parts.push(`Condiciones declaradas (casillas de salud): ${declared.join(', ')}.`);
     // Dieta: elección, idoneidad para su perfil y sugerencia (motor determinista).
     if (profile) parts.push(dietContextForCoach(profile));
+    if (typeof profile?.trainingTime === 'string') parts.push(`Suele entrenar a las ${profile.trainingTime}.`);
     // Contexto de carrera: objetivo, ritmos y entrenamiento concurrente (correr + gimnasio).
     const modality = profile?.trainingModality || profile?.trainingMode || '';
     if (profile?.runRaceGoal && profile.runRaceGoal !== 'health') {

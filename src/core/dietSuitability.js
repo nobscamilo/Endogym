@@ -259,7 +259,9 @@ export function assessDietPreferences(profile = {}) {
   // (mediterránea queda como "recomendada" siempre; es la de más evidencia).
   const suggested = [...assessments].sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level])[0];
   const chosenAssessment = byPattern[chosen];
-  const lowGlycemicPreferred = pref.lowGlycemic === true;
+  // El OBJETIVO "controlar glucosa" activa el IG bajo como PREFERENCIA (no bloqueada, no
+  // implica enfermedad). Solo una condición declarada lo bloquea.
+  const lowGlycemicPreferred = pref.lowGlycemic === true || profile.goal === 'glycemic_control';
   const lowGlycemic = lowGlycemicPreferred || health.lowGlycemicRequired;
   const ack = pref.riskAcknowledgement && typeof pref.riskAcknowledgement === 'object' ? pref.riskAcknowledgement : null;
   const requiresAck = chosenAssessment.level === 'caution' || chosenAssessment.level === 'not_advised';

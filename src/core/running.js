@@ -381,37 +381,88 @@ export function resolveTrainingPhase({ raceDateISO, weekStartISO }) {
 // ============================================================================
 // NUTRICIÓN: "fuel for the work required" — demanda de carbohidratos por día.
 // ============================================================================
-// Devuelve nivel de carbos del día y guía de timing según el tipo de sesión.
-export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal }) {
-  const goalBase = (raceGoal === 'race_21k' || raceGoal === 'race_42k') ? 0.12 : 0; // base más alta en fondo
-  let level = 'medio';
-  let factor = 1.0; // multiplicador de carbohidratos del día
-  let timing = 'Reparte los carbohidratos a lo largo del día.';
-  let note = '';
+// Devuelve nivel de carbos del día, factor sobre los HC base y guía de timing.
+//
+// 30-sep-2026: antes el factor dependía SOLO del tipo (tirada larga ×1,35 fuese de 60 o de
+// 150 min; series = umbral; pierna = torso; circuito/mind-body sin regla). Ahora:
+//   factor = 0,85 (día sin entreno relevante) + horas de sesión × coste por hora del tipo.
+// Ancla: las bandas IOC/ACSM (Thomas et al. 2016; Burke 2011) suben ~1-2 g/kg de HC por
+// cada hora extra de entrenamiento moderado-intenso. Con unos HC base ≈3,5-4 g/kg, un coste
+// de 0,25-0,35/h equivale a +0,9-1,4 g/kg por hora: dentro de esa horquilla. Los pesos por
+// tipo reflejan cuánto glucógeno gasta cada estímulo (series > umbral > larga > rodaje >
+// pierna > torso). Es una heurística documentada, no una ecuación validada.
+const CARB_COST_PER_HOUR = {
+  cardio_intervals: 0.36,
+  cardio_tempo: 0.32,
+  cardio_long: 0.28,
+  cardio_easy: 0.16,
+  cardio: 0.2,
+  cardio_drills: 0.12,
+  circuit: 0.26, // fuerza en circuito / sesión mixta: más densidad metabólica que la fuerza clásica
+  lower: 0.22,
+  full: 0.18,
+  upper: 0.12,
+  push: 0.12,
+  pull: 0.12,
+  strength: 0.16, // fuerza sin foco conocido
+  mindbody: 0.06,
+};
+const DEFAULT_SESSION_MIN = 60;
 
-  if (sessionType === 'recovery' || !sessionType) {
-    level = 'bajo'; factor = 0.8;
-    timing = 'Día suave: prioriza proteína y verduras; carbohidratos moderados de absorción lenta.';
-    note = 'Menos carga de carbohidratos en días sin entreno intenso.';
-  } else if (sessionFocus === 'cardio_long') {
-    level = 'alto'; factor = 1.35;
-    timing = 'Desayuno rico en carbohidratos 2-3 h antes; durante (>75 min) 30-60 g/h; recarga con carbohidratos + proteína al terminar.';
-    note = 'La tirada larga vacía el glucógeno: recarga sí o sí.';
-  } else if (sessionFocus === 'cardio_intervals' || sessionFocus === 'cardio_tempo') {
-    level = 'alto'; factor = 1.2;
-    timing = 'Carbohidratos de absorción rápida 1-2 h antes de la sesión de calidad y recarga inmediata al acabar.';
-    note = 'Sesión de alta intensidad: llega con glucógeno alto.';
-  } else if (sessionType === 'resistance') {
-    level = 'medio'; factor = 1.0;
-    timing = 'Carbohidratos de absorción LENTA antes y después (avena, arroz integral, boniato) para sostener la fuerza y recuperar.';
-    note = 'Día de fuerza: carbos lentos peri-entreno + proteína suficiente.';
-  } else if (sessionFocus === 'cardio_easy') {
-    level = 'medio'; factor = 0.95;
-    timing = 'Rodaje fácil: carbohidratos moderados; no necesitas recarga agresiva.';
+function carbCostKey({ sessionType, sessionFocus, hybridCircuit }) {
+  if (sessionType === 'aerobic') return CARB_COST_PER_HOUR[sessionFocus] != null ? sessionFocus : 'cardio';
+  if (sessionType === 'mixed' || hybridCircuit) return 'circuit';
+  if (sessionType === 'mindbody') return 'mindbody';
+  if (sessionType === 'resistance') {
+    if (sessionFocus === 'lower' || sessionFocus === 'lower_conditioning') return 'lower';
+    return CARB_COST_PER_HOUR[sessionFocus] != null ? sessionFocus : 'strength';
   }
+  return null;
+}
 
-  factor = Math.round((factor + goalBase) * 100) / 100;
-  return { level, factor, timing, note };
+export function carbStrategyForDay({ sessionType, sessionFocus, raceGoal, durationMinutes = null, hybridCircuit = false } = {}) {
+  const goalBase = (raceGoal === 'race_21k' || raceGoal === 'race_42k') ? 0.08 : 0; // base algo más alta en fondo
+  const minutes = Number.isFinite(Number(durationMinutes)) && Number(durationMinutes) > 0
+    ? Number(durationMinutes) : DEFAULT_SESSION_MIN;
+  const key = sessionType === 'recovery' || !sessionType ? null : carbCostKey({ sessionType, sessionFocus, hybridCircuit });
+
+  let factor;
+  let timing;
+  let note = '';
+  if (!key) {
+    factor = 0.8;
+    timing = 'Día suave: prioriza proteína y verduras; hidratos moderados de absorción lenta.';
+    note = 'Menos hidratos en días sin entreno exigente.';
+  } else {
+    factor = 0.85 + (minutes / 60) * CARB_COST_PER_HOUR[key];
+    if (key === 'cardio_long') {
+      timing = 'Desayuno rico en hidratos 2-3 h antes; recarga con hidratos + proteína al terminar.';
+      note = 'La tirada larga vacía el glucógeno: recarga sí o sí.';
+    } else if (key === 'cardio_intervals' || key === 'cardio_tempo') {
+      timing = 'Hidratos de absorción rápida 1-2 h antes de la sesión de calidad y recarga al acabar.';
+      note = 'Sesión intensa: llega con el glucógeno alto.';
+    } else if (key === 'cardio_easy' || key === 'cardio' || key === 'cardio_drills') {
+      timing = 'Rodaje suave: hidratos moderados; no necesitas recarga agresiva.';
+    } else if (key === 'mindbody') {
+      timing = 'Sesión de baja demanda: no hace falta ajustar los hidratos.';
+    } else if (key === 'circuit') {
+      timing = 'Circuito: hidratos moderados 2-3 h antes y proteína + hidratos después.';
+    } else {
+      timing = key === 'lower'
+        ? 'Día de pierna: hidratos de absorción lenta antes y después (avena, arroz, boniato) y proteína suficiente.'
+        : 'Día de fuerza: hidratos lentos alrededor del entreno y proteína suficiente.';
+    }
+    // Durante: >75 min de carrera continua → 30-60 g/h; >2,5 h → hasta 90 g/h (mezcla glucosa+fructosa).
+    if (sessionType === 'aerobic' && minutes > 75) {
+      timing += minutes > 150
+        ? ' Durante: 60-90 g de hidratos por hora (geles/bebida con glucosa+fructosa), empezando en los primeros 30-45 min.'
+        : ' Durante: 30-60 g de hidratos por hora a partir de los 45-60 min.';
+    }
+  }
+  factor = Math.min(1.7, Math.max(0.75, factor + goalBase));
+  factor = Math.round(factor * 100) / 100;
+  const level = factor >= 1.12 ? 'alto' : (factor <= 0.9 ? 'bajo' : 'medio');
+  return { level, factor, timing, note, minutes: key ? minutes : 0 };
 }
 
 // ============================================================================

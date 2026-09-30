@@ -68,6 +68,7 @@ export function planNutritionSignature(plan) {
     // cambiaba la firma de TODOS los planes anteriores al 30-sep y marcaba como caducado el
     // menú semanal ya generado de cada usuario (regresión del commit 307deb2).
     ...(plan.diet ? { diet: plan.diet } : {}),
+    ...(plan.trainingTime ? { trainingTime: plan.trainingTime } : {}),
     days: days.map((day) => ({
       date: day.date || null,
       sessionType: day.sessionType || null,
@@ -284,6 +285,12 @@ export async function POST(request) {
     const patronDieta = (DIET_PATTERN_META[prefs.dietaryPattern]?.label || 'Omnívora').toLowerCase();
     const restrictions = describeDietRestrictions(prefs);
     const dietRules = dietRulesForMenuPrompt({ ...(profile || {}), nutritionPreferences: prefs });
+    // Hora de entreno: sin ella el menú inventaba "2-3 h antes de las series" con comidas a
+    // horas fijas (auditoría #17). Con ella, las comidas se colocan alrededor de la sesión.
+    const trainingTime = typeof profile?.trainingTime === 'string' && /^\d{2}:\d{2}$/.test(profile.trainingTime) ? profile.trainingTime : null;
+    const trainingTimeRule = trainingTime
+      ? `HORA DE ENTRENO: entrena habitualmente a las ${trainingTime} (hora local). En días de entreno, coloca la comida PRE 1,5-3 h antes de esa hora y la POST dentro de las 2 h siguientes; ajusta el campo "time" de las comidas a esa hora (los slots siguen siendo Desayuno/Comida/Merienda/Cena) y cita la hora real en "serving". En días de descanso, horarios normales.`
+      : 'HORA DE ENTRENO: DESCONOCIDA. No afirmes a qué hora entrena ni digas "después de las series" en una comida concreta: da el timing en relativo ("si entrenas por la tarde, esta merienda 1,5-2 h antes").';
 
     // Contexto de entrenamiento por día (para "fuel for the work required"): tipo de sesión,
     // nivel de carbohidratos, timing y objetivos de macros específicos de cada día.
@@ -334,6 +341,7 @@ Reglas de dieta OBLIGATORIAS (patrón elegido + mínimos por salud; si chocan co
 ${dietRules}
 ${restrictions}${raceLabel ? `
 Objetivo de carrera: ${raceLabel}.${phaseLabel ? ` Fase de entrenamiento: ${phaseLabel}.` : ''}` : ''}
+${trainingTimeRule}
 PRINCIPIO "fuel for the work required": ajusta los carbohidratos a la demanda de CADA día (más en tirada larga/series/pierna, menos en descanso). Carbohidratos de absorción LENTA lejos del entreno y RÁPIDA peri-entreno. Cada día abajo trae su objetivo de kcal/macros y su nivel/timing de carbohidratos: respétalos.`;
 
     function dayLine(day) {

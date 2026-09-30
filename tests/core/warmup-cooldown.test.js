@@ -38,8 +38,11 @@ describe('detectComorbidities (léxico determinista)', () => {
     expect(detectComorbidities({ medicalConditions: 'tengo la tensión alta' }).hypertension).toBe(true);
   });
 
-  it('objetivo glucémico cuenta como señal de diabetes; el cribado como cardiometabólica', () => {
-    expect(detectComorbidities({ goal: 'glycemic_control' }).diabetes).toBe(true);
+  // Cambio de criterio (30-sep-2026): un OBJETIVO no es un diagnóstico. "Controlar glucosa"
+  // ya no marca diabetes; sí lo hacen la casilla, el perfil metabólico type2_diabetes o el texto.
+  it('objetivo glucémico NO es diabetes; perfil metabólico DM2 sí; el cribado como cardiometabólica', () => {
+    expect(detectComorbidities({ goal: 'glycemic_control' }).diabetes).toBe(false);
+    expect(detectComorbidities({ metabolicProfile: 'type2_diabetes' }).diabetes).toBe(true);
     expect(detectComorbidities({ preparticipation: { knownCardiometabolicDisease: true } }).cardiometabolic).toBe(true);
   });
 });

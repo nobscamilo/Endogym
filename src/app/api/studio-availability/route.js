@@ -101,6 +101,16 @@ export async function POST(request) {
       patch.nutritionPreferences = normalizeNutritionPreferencesInput(body.nutritionPreferences);
     }
 
+    // Hora habitual de entreno (HH:MM, hora local) para colocar las comidas y el timing
+    // pre/post del menú. null = varía / no lo sé (el menú da el timing en relativo).
+    if (typeof body?.trainingTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(body.trainingTime)) patch.trainingTime = body.trainingTime;
+    else if (body?.trainingTime === null) patch.trainingTime = null;
+
+    // Perfil metabólico: antes solo se editaba en el panel heredado y en el Studio quedaba
+    // invisible (y, desde el 30-sep, impone IG bajo). 'none' lo borra.
+    const METABOLIC = new Set(['none', 'insulin_resistance', 'prediabetes', 'type2_diabetes', 'hypothyroidism', 'pcos']);
+    if (METABOLIC.has(body?.metabolicProfile)) patch.metabolicProfile = body.metabolicProfile === 'none' ? null : body.metabolicProfile;
+
     // Texto libre de condiciones. Ya lo leían el léxico de detectComorbidities, el contexto
     // del chat y el prompt de nutrición, pero NINGUNA pantalla lo recogía: el campo estaba
     // huérfano en la UI y solo se podía rellenar por API.
@@ -199,7 +209,7 @@ export async function POST(request) {
     // después de que la persona confirme que ha visto los riesgos. La confirmación queda
     // guardada con patrón + nivel: si cambia el perfil (p. ej. marca una cardiopatía estando
     // en keto) y el nivel empeora, se vuelve a pedir. Se evalúa sobre el perfil RESULTANTE.
-    if (patch.nutritionPreferences || patch.conditions || patch.metabolicProfile || typeof patch.medicalConditions === 'string') {
+    if (patch.nutritionPreferences || patch.conditions || 'metabolicProfile' in patch || typeof patch.medicalConditions === 'string') {
       let existing = null;
       try { existing = await getUserProfile(user.uid); } catch { existing = null; }
       const prevPrefs = existing?.nutritionPreferences || {};

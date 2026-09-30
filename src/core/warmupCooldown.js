@@ -73,9 +73,12 @@ export function detectComorbidities(profile = {}) {
       || /(hipertension|tension|hta)[^.]{0,30}(controlada|tratada|estable)/.test(text)),
     osteoarthritis: structured.osteoarthritis === true
       || /(artrosis|osteoartritis|artritis)/.test(text),
+    // Diabetes = condición DECLARADA (casilla, perfil metabólico o texto). El OBJETIVO
+    // "controlar glucosa" ya NO la activa (30-sep-2026): un objetivo no es un diagnóstico, y
+    // marcaba como diabético a quien solo quería comer/entrenar para su glucemia.
     diabetes: structured.diabetes === true
-      || /(diabetes|diabetic|glucemia alta|azucar alta|\bdm2?\b)/.test(text)
-      || profile.goal === 'glycemic_control',
+      || profile.metabolicProfile === 'type2_diabetes'
+      || /(diabetes|diabetic|glucemia alta|azucar alta|\bdm2?\b)/.test(text),
     osteoporosis: structured.osteoporosis === true
       || /(osteoporosis|osteopenia)/.test(text),
     asthma: structured.asthma === true

@@ -1,6 +1,24 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **30 de septiembre de 2026, parte 3 (auditoría de nutrición por sesión + hotfix de firma del menú)**.
+Ultima actualizacion: **30 de septiembre de 2026, parte 4 (nutrición por tipo+duración, macros que siguen a la sesión, dieta ≠ salud cerrada, hora de entreno)**.
+
+## Sesión del 30 de septiembre de 2026, parte 4 (los 3 bloques de la parte 3, implementados)
+
+**Bloque 1 — dieta ≠ salud:**
+- `goal=glycemic_control` YA NO marca diabetes (`detectComorbidities`, `prePostNutrition`); en `dietSuitability` activa el IG bajo como PREFERENCIA (no bloqueada). Diabetes = casilla, `metabolicProfile=type2_diabetes` o texto (ahora las tres rutas lo leen igual). Test de warmup-cooldown actualizado a propósito (cambio de criterio).
+- `metabolicProfile` editable en el Studio (paso Salud: Ninguno/RI/Prediabetes/DM2/Hipotiroidismo/SOP; `'none'` → null en `/api/studio-availability`).
+- ✓ del paso Salud cuando hay algo declarado. Corrección: el `hasConds` de studio-data que cité en la parte 3 NO era el ✓ (es la justificación de selección de ejercicios; ahí sobran lípidos/CV/renal a propósito).
+
+**Bloque 2 — los macros siguen a la sesión:**
+- `refreshDayNutrition(day, {plan, profile})` (planner, exportada): recalcula `nutritionTarget` + `meals` con la sesión REAL. Se aplica (a) al final de `generateWeeklyPlan` (antes, los días convertidos en descanso por `daysPerWeek` y los aplanados por duración conservaban los macros de la plantilla) y (b) en `studio-swap` tras reprogramar, cambiar foco/convertir y "más tiempo".
+- `prePostNutrition` lee la dieta: keto sin carga de HC; IG bajo con HC rápido solo en sesión exigente; restricción de sodio → no "añade sal".
+
+**Bloque 3 — HC por tipo + duración y hora de entreno:**
+- `carbStrategyForDay({sessionType, sessionFocus, raceGoal, durationMinutes, hybridCircuit})`: factor = 0,85 + h × coste/h (series 0,36 · umbral 0,32 · larga 0,28 · rodaje 0,16 · circuito 0,26 · pierna 0,22 · full 0,18 · torso 0,12 · mind-body 0,06), acotado 0,75-1,7; descanso 0,80. Anclado a IOC/ACSM (+~1-2 g/kg por hora extra); heurística documentada. >75 min de carrera: 30-60 g/h durante; >150 min: 60-90 g/h.
+- Simulación con el perfil real (sin diabetes): tirada 75 min 522→464 g; rodaje 368→391; pierna 387→414; series 464→468; umbral 464→453; descanso 310.
+- `profile.trainingTime` (HH:MM, chips en paso Datos) → `plan.trainingTime` (entra en la firma del menú solo si existe) → prompt del menú con regla de horario (pre 1,5-3 h antes, post ≤2 h; si no hay hora, timing relativo y prohibido afirmar horas) y contexto del coach.
+- Pendiente conocido: el overlay adaptativo (`activeBlockOverlay`) ajusta volumen al LEER sin recalcular macros; `more_time` en carrera usa ritmos de la marca manual, no los de Strava del plan.
+- Tests: 641.
 
 ## Sesión del 30 de septiembre de 2026, parte 3 (¿la dieta se adapta a cada sesión? ¿está todo separado?)
 

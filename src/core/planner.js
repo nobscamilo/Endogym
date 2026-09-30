@@ -707,10 +707,10 @@ export function buildDietQualityTargets({ calories, comorbidities = {} }) {
 const KETO_MAX_CARBS_G = 50;
 
 function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
-  const { sessionFocus = null, raceGoal = 'health', comorbidities = null, dietPattern = 'omnivore' } = opts;
-  // "Fuel for the work required": los carbohidratos del día escalan con la demanda de la
-  // sesión (tirada larga/series/pierna altos; descanso bajo) y con el objetivo de carrera.
-  const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal });
+  const { sessionFocus = null, raceGoal = 'health', comorbidities = null, dietPattern = 'omnivore', durationMinutes = null, hybridCircuit = false } = opts;
+  // "Fuel for the work required": los carbohidratos del día escalan con el TIPO y la DURACIÓN
+  // de la sesión (ver carbStrategyForDay) y con el objetivo de carrera.
+  const strat = carbStrategyForDay({ sessionType: day.sessionType, sessionFocus, raceGoal, durationMinutes, hybridCircuit });
   let carbsFactor = strat.factor;
   let fatFactor = 1;
   // Compensa la grasa en sentido inverso para no disparar kcal en días de mucha demanda
@@ -748,6 +748,34 @@ function adjustMacroTargetForDay(baseTarget, day, goal, opts = {}) {
     // Calidad por condición (no altera los macros de arriba).
     dietQuality: buildDietQualityTargets({ calories, comorbidities: comorbidities || {} }),
   };
+}
+
+/**
+ * Objetivo nutricional de UN día a partir de la sesión que REALMENTE tiene (tipo, foco,
+ * duración y formato). Se usa al final de generateWeeklyPlan y cada vez que un cambio de
+ * sesión (studio-swap: convertir, cambiar foco, ampliar, reprogramar) altera el día.
+ * Antes el objetivo se calculaba una vez con la plantilla y se quedaba congelado: un día
+ * convertido a descanso por disponibilidad o una carrera convertida en fuerza conservaban
+ * los hidratos de la sesión original.
+ */
+export function refreshDayNutrition(day, { plan = {}, profile = {} } = {}) {
+  if (!day || !plan?.baseTarget) return day;
+  const goal = resolveGoal(plan.goal || profile.goal);
+  const raceGoal = resolveRaceGoal(plan.raceGoal || profile.runRaceGoal);
+  const comorbidities = detectComorbidities(profile || {});
+  const dietPattern = plan.diet?.pattern || assessDietPreferences(profile || {}).chosen.pattern;
+  const sessionFocus = day.sessionFocus || day.workout?.sessionFocus || null;
+  const nutritionTarget = adjustMacroTargetForDay(plan.baseTarget, { sessionType: day.sessionType }, goal, {
+    sessionFocus,
+    raceGoal,
+    comorbidities,
+    dietPattern,
+    durationMinutes: day.sessionType === 'recovery' ? null : day.workout?.durationMinutes,
+    hybridCircuit: Boolean(day.workout?.hybridCircuit),
+  });
+  day.nutritionTarget = nutritionTarget;
+  day.meals = splitMealsForDay(nutritionTarget, plan.mealsPerDay || profile.mealsPerDay);
+  return day;
 }
 
 function splitMealsForDay(dailyTarget, mealsPerDay) {
@@ -1543,6 +1571,13 @@ export function generateWeeklyPlan({
     });
   }
 
+  // Objetivo nutricional FINAL de cada día, con la sesión ya definitiva (tras el recorte por
+  // disponibilidad, el aplanado de duración y el formato circuito).
+  days.forEach((d) => refreshDayNutrition(d, {
+    plan: { baseTarget, goal, raceGoal, mealsPerDay, diet: { pattern: dietAssessment.chosen.pattern } },
+    profile,
+  }));
+
   const acsmPrescription = buildAcsmPrescription(goal, modality);
   const clinicalAuditTrail = buildClinicalAuditTrail({
     preparticipationScreening,
@@ -1583,6 +1618,8 @@ export function generateWeeklyPlan({
     metabolicProfile,
     mealsPerDay,
     baseTarget,
+    // Hora habitual de entreno: entra en la firma del menú (cambiarla recoloca las comidas).
+    ...(typeof profile.trainingTime === 'string' ? { trainingTime: profile.trainingTime } : {}),
     // Resumen de dieta (entra en la firma del menú semanal: cambiarla invalida el menú).
     diet: {
       pattern: dietAssessment.chosen.pattern,

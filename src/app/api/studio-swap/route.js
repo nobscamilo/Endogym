@@ -4,7 +4,7 @@ import { withTrace, logError } from '../../../lib/logger.js';
 import { getAdminServices } from '../../../lib/firebaseAdmin.js';
 import { getUserProfile, getLatestWeeklyPlan } from '../../../lib/repositories/firestoreRepository.js';
 import { suggestExerciseAlternatives } from '../../../core/exerciseLibrary.js';
-import { buildSessionFocusChange, buildSessionFocusReschedule } from '../../../core/planner.js';
+import { buildSessionFocusChange, buildSessionFocusReschedule, refreshDayNutrition } from '../../../core/planner.js';
 import { resolveRaceGoal, estimate5kPaceSecPerKm, deriveRunPaces, buildRunPrescription } from '../../../core/running.js';
 import { dateKeyInTimeZone } from '../../../lib/appTime.js';
 import { validateBacklogDate } from '../session-for-date/route.js';
@@ -113,6 +113,9 @@ export async function POST(request) {
           if (!resched.ok) return errorResponse(resched.error, resched.status || 400, resched.details);
           plan.days[resched.today.index] = resched.today.day;
           plan.days[resched.neighbor.index] = resched.neighbor.day;
+          // Los macros siguen a la sesión: los dos días intercambiados recalculan su objetivo.
+          refreshDayNutrition(plan.days[resched.today.index], { plan, profile: profile || {} });
+          refreshDayNutrition(plan.days[resched.neighbor.index], { plan, profile: profile || {} });
           const { db } = await getAdminServices();
           await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
             .update({ days: plan.days, updatedAt: new Date().toISOString() });
@@ -146,6 +149,8 @@ export async function POST(request) {
           return errorResponse(change.error, change.status || 400, change.details);
         }
         plan.days[idx] = change.day;
+        // Convertir una carrera en fuerza (o cambiar el foco) cambia la demanda del día.
+        refreshDayNutrition(plan.days[idx], { plan, profile: profile || {} });
         const { db } = await getAdminServices();
         await db.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
           .update({ days: plan.days, updatedAt: new Date().toISOString() });
@@ -208,6 +213,8 @@ export async function POST(request) {
           }
         }
 
+        // Más minutos → más demanda: el objetivo del día se recalcula con la nueva duración.
+        refreshDayNutrition(day, { plan, profile: profile || {} });
         const { db: dbx } = await getAdminServices();
         await dbx.collection('users').doc(user.uid).collection('weeklyPlans').doc(plan.id)
           .update({ days: plan.days, updatedAt: new Date().toISOString() });

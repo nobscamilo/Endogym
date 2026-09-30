@@ -235,3 +235,28 @@ describe('/api/studio-availability — dieta con riesgos', () => {
     expect(mocks.upsertUserProfile.mock.calls[0][1].conditions).toMatchObject({ cardiovascular: true, kidneyDisease: true });
   });
 });
+
+describe('/api/studio-availability — perfil metabólico y hora de entreno', () => {
+  beforeEach(() => {
+    mocks.getAuthenticatedUser.mockReset();
+    mocks.upsertUserProfile.mockReset();
+    mocks.getAuthenticatedUser.mockResolvedValue({ uid: 'user-1' });
+    mocks.upsertUserProfile.mockResolvedValue(undefined);
+  });
+  it('guarda el perfil metabólico y "none" lo borra', async () => {
+    await post({ metabolicProfile: 'prediabetes' });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].metabolicProfile).toBe('prediabetes');
+    await post({ metabolicProfile: 'none' });
+    expect(mocks.upsertUserProfile.mock.calls[1][1].metabolicProfile).toBeNull();
+    await post({ metabolicProfile: 'inventado' });
+    expect('metabolicProfile' in mocks.upsertUserProfile.mock.calls[2][1]).toBe(false);
+  });
+  it('valida la hora de entreno HH:MM; null la borra', async () => {
+    await post({ trainingTime: '18:00' });
+    expect(mocks.upsertUserProfile.mock.calls[0][1].trainingTime).toBe('18:00');
+    await post({ trainingTime: '25:00' });
+    expect('trainingTime' in mocks.upsertUserProfile.mock.calls[1][1]).toBe(false);
+    await post({ trainingTime: null });
+    expect(mocks.upsertUserProfile.mock.calls[2][1].trainingTime).toBeNull();
+  });
+});
