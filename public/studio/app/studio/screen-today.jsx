@@ -1,6 +1,48 @@
 /* ENDOGYM STUDIO — Pantalla HOY (hub) + variaciones de Inicio */
 const { useState: useStateT } = React;
 
+/* #15 — Pausa clínica: un síntoma crítico (dolor torácico, síncope) en un check-in reciente
+   pone el plan en pausa hasta que la persona declara que ya la han valorado. */
+function ClinicalPauseCard() {
+  const D = window.STUDIO;
+  const p = D.clinicalPause;
+  const [confirm, setConfirm] = useStateT(false);
+  const [busy, setBusy] = useStateT(false);
+  const [done, setDone] = useStateT(false);
+  if (!p || !p.active || done) return null;
+  const clear = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const token = await (window.__getIdToken ? window.__getIdToken() : Promise.resolve(null));
+      if (token) {
+        const r = await fetch('/api/studio-availability', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+          body: JSON.stringify({ clinicalClearance: true }),
+        });
+        if (r.ok) { D.clinicalPause = null; setDone(true); }
+      }
+    } catch (e) { /* sigue en pausa si falla */ }
+    setBusy(false);
+  };
+  return (
+    <div className="card" role="alert" style={{ borderColor: 'var(--glu-high)', borderWidth: 2 }}>
+      <strong style={{ color: 'var(--glu-high)' }}>Plan en pausa</strong>
+      <p style={{ margin: '6px 0 0', lineHeight: 1.5 }}>{p.message}</p>
+      {!confirm ? (
+        <button type="button" className="btn soft sm" style={{ marginTop: 10 }} onClick={() => setConfirm(true)}>Ya me ha valorado un médico</button>
+      ) : (
+        <div className="row ac" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <span className="tiny">¿Confirmas que te han valorado y puedes volver a entrenar?</span>
+          <button type="button" className="btn sm" disabled={busy} onClick={clear}>Sí, reanudar</button>
+          <button type="button" className="btn soft sm" onClick={() => setConfirm(false)}>Cancelar</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* FASE 1.3 — Check-in de reentrada (≥7 días sin entrenar): 1 pregunta + sesión puente.
    La respuesta alimenta las reglas REENTRY_* del ajuste adaptativo (server-side). */
 function ReentryCard() {
@@ -84,6 +126,8 @@ function TodayHub({ go, variant }) {
       </div>
 
       {D.dataStatus === 'error' ? <div className="card"><div className="empty">No pudimos cargar tus datos. Reintenta recargando la aplicación; no mostraremos datos de muestra en tu sesión.</div></div> : null}
+
+      <ClinicalPauseCard />
 
       {variant === 'resumen' ? <HeroResumen go={go} /> : variant === 'editorial' ? <HeroEditorial go={go} /> : <HeroAnillos go={go} />}
 

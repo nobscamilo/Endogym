@@ -2,6 +2,7 @@ import { createWorkout, listWorkouts } from '../../../lib/repositories/firestore
 import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js';
 import { errorResponse, jsonResponse } from '../../../lib/http.js';
 import { withTrace } from '../../../lib/logger.js';
+import { LEGACY_SYMPTOM_KEYS, SYMPTOM_KEYS } from '../../../core/clinicalPause.js';
 
 function parseLimit(searchParams) {
   const rawLimit = searchParams.get('limit');
@@ -25,7 +26,8 @@ const ISO_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 // idempotente: reeditar un día reemplaza el doc en vez de crear duplicados). Acotado a un patrón
 // seguro de Firestore. Solo afecta a la subcolección del propio usuario.
 const SAFE_DOC_ID_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
-const DAILY_CHECKIN_SYMPTOM_KEYS = ['dyspnea', 'jointPain', 'dizziness', 'tachycardia'];
+// Las 4 de siempre son obligatorias (clientes antiguos); las nuevas, opcionales pero booleanas.
+const DAILY_CHECKIN_SYMPTOM_KEYS = LEGACY_SYMPTOM_KEYS;
 
 function isValidDateKey(value) {
   if (typeof value !== 'string' || !ISO_DATE_KEY_PATTERN.test(value)) return false;
@@ -35,7 +37,8 @@ function isValidDateKey(value) {
 
 function isValidSymptoms(symptoms) {
   if (!symptoms || typeof symptoms !== 'object' || Array.isArray(symptoms)) return false;
-  return DAILY_CHECKIN_SYMPTOM_KEYS.every((key) => typeof symptoms[key] === 'boolean');
+  if (!DAILY_CHECKIN_SYMPTOM_KEYS.every((key) => typeof symptoms[key] === 'boolean')) return false;
+  return SYMPTOM_KEYS.every((key) => symptoms[key] === undefined || typeof symptoms[key] === 'boolean');
 }
 
 function getLatestAllowedDailyCheckinDate() {

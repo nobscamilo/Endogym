@@ -646,6 +646,8 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const D = window.STUDIO;
   const u = D.user || {};
   const [goal, setGoal] = useStateP(u.goalRaw || '');
+  // Objetivo secundario (#13/#14): p. ej. resistencia + perder grasa. '' = ninguno.
+  const [secondaryGoal, setSecondaryGoal] = useStateP(u.secondaryGoal || '');
   // Comorbilidades estructuradas (checkboxes): adaptan calentamiento, retorno,
   // selección de ejercicios y avisos del coach. Complementan al texto libre.
   const [conds, setConds] = useStateP(u.conditions || { hypertension: false, hypertensionControlled: false, diabetes: false, osteoarthritis: false, osteoporosis: false, hypercholesterolemia: false, asthma: false, pregnant: false, injuryZones: [] });
@@ -654,6 +656,15 @@ function AvailabilitySurvey({ onSaved } = {}) {
   const [metabolic, setMetabolic] = useStateP(u.metabolicProfile || 'none');
   // Hora habitual de entreno (HH:MM) para colocar comidas y timing pre/post. '' = varía.
   const [trainingTime, setTrainingTime] = useStateP(u.trainingTime || '');
+  // #9 — Días no disponibles (guardias, viajes…). El saliente de guardia se deduce solo.
+  const [unavail, setUnavail] = useStateP(Array.isArray(u.unavailableDays) ? u.unavailableDays : []);
+  const [unDate, setUnDate] = useStateP('');
+  const [unKind, setUnKind] = useStateP('guardia');
+  const addUnavail = () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(unDate)) return;
+    setUnavail((l) => [...l.filter((x) => x.date !== unDate), { date: unDate, kind: unKind }].sort((a, b) => a.date.localeCompare(b.date)));
+    setUnDate('');
+  };
   const np = u.nutritionPreferences || {};
   const [dietPattern, setDietPattern] = useStateP(np.dietaryPattern || 'omnivore');
   // Preferencia de carga glucémica baja SIN tener que marcar una enfermedad (30-sep-2026).
@@ -719,7 +730,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
   // o no aconsejada, pedimos confirmación explícita (el servidor también la exige).
   const dietDraft = {
     conditions: conds, medicalConditions: medText, metabolicProfile: metabolic === 'none' ? null : metabolic,
-    goal, runRaceGoal: raceGoal, trainingModality: equip, age: Number(age) || u.age,
+    goal, secondaryGoal, runRaceGoal: raceGoal, trainingModality: equip, age: Number(age) || u.age,
     nutritionPreferences: { dietaryPattern: dietPattern, lowGlycemic, riskAcknowledgement: np.riskAcknowledgement },
   };
   const diet = assessDietPreferences(dietDraft);
@@ -787,6 +798,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
       const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
       const surveyPayload = {
         goal, trainingModality: equip,
+        secondaryGoal: secondaryGoal && secondaryGoal !== goal ? secondaryGoal : null,
         trainingExperience,
         activityLevel,
         sex,
@@ -806,6 +818,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
         medicalConditions: medText,
         metabolicProfile: metabolic,
         trainingTime: trainingTime || null,
+        unavailableDays: unavail,
         nutritionPreferences: {
           dietaryPattern: dietPattern,
           lowGlycemic,
@@ -893,6 +906,21 @@ function AvailabilitySurvey({ onSaved } = {}) {
               </button>
             ))}
           </div>
+          <div className="mb-label" style={{ marginTop: 14, marginBottom: 6 }}>Objetivo secundario <span className="tiny muted">opc.</span></div>
+          <div className="chips">
+            {[['', 'Ninguno'], ['weight_loss', 'Perder grasa'], ['glycemic_control', 'Controlar glucosa']].filter(([v]) => v === '' || v !== goal).map(([v, l]) => (
+              <button key={v || 'none'} type="button" className={`pill ${secondaryGoal === v ? 'accent' : ''}`} aria-pressed={secondaryGoal === v} onClick={() => setSecondaryGoal(v)}>{l}</button>
+            ))}
+          </div>
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>
+            {secondaryGoal === 'weight_loss'
+              ? (goal === 'hypertrophy'
+                ? 'Ganar músculo y perder grasa a la vez exige un déficit pequeño (~150 kcal): el progreso será lento en ambos.'
+                : 'Déficit moderado (~350 kcal/día). Los días exigentes recuperan hidratos y el día de carrera y su víspera van sin déficit.')
+              : secondaryGoal === 'glycemic_control'
+                ? 'Activa la carga glucémica baja en el menú como preferencia (no implica ninguna enfermedad).'
+                : 'El principal manda en el entrenamiento; el secundario ajusta energía o dieta.'}
+          </p>
           {targetEnabled ? (
             <div className="profile-target-panel">
               <div className="field">
@@ -1149,7 +1177,7 @@ function AvailabilitySurvey({ onSaved } = {}) {
           <div className="grid g-4" style={{ gap: 10, marginTop: 10 }}>
             <div className="field"><label>Min/sesión</label><input className="text-input" type="number" min="20" max="150" step="5" placeholder="20–150" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
             <div className="field"><label>Días/semana</label><input className="text-input" type="number" min="1" max="7" value={days} onChange={(e) => setDays(e.target.value)} /></div>
-            <div className="field"><label>Revisión (semanas) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="1" max="26" placeholder="Sin indicar" title="Cada cuántas semanas te volvemos a preguntar por tu disponibilidad" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
+            <div className="field"><label>Revisión (semanas) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="1" max="26" placeholder="Sin indicar" title="Cada cuántas semanas te volvemos a preguntar por tu disponibilidad. Además, siempre te avisamos al acabar cada bloque de 3 semanas" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
             <div className="field"><label>FCmáx (ppm)</label><input className="text-input" type="number" min="120" max="230" placeholder="auto" title="Si la conoces (prueba de esfuerzo o máxima real vista en tu reloj), prevalece sobre la estimación por edad" value={hrMax} onChange={(e) => setHrMax(e.target.value)} /></div>
             <div className="field"><label>Barra (kg) <span className="tiny muted">opc.</span></label><input className="text-input" type="number" min="5" max="35" step="0.5" placeholder="20" title="Peso de la barra de tu gym. Solo afecta al desglose visual de cargas: «barra + discos por lado». Vacío = olímpica de 20 kg" value={barKg} onChange={(e) => setBarKg(e.target.value)} /></div>
           </div>
@@ -1161,6 +1189,26 @@ function AvailabilitySurvey({ onSaved } = {}) {
             {trainingTime && !['07:00', '10:00', '13:30', '18:00', '20:30'].includes(trainingTime) ? <span className="pill accent">{trainingTime}</span> : null}
           </div>
           <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>El menú coloca la comida previa 1,5-3 h antes y la de recuperación en las 2 h siguientes. Si varía, te damos el timing en relativo.</p>
+          <div className="mb-label" style={{ marginTop: 16, marginBottom: 6 }}>Guardias, viajes y días sin entreno <span className="tiny muted">opc.</span></div>
+          <div className="row ac" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <input className="text-input" type="date" value={unDate} onChange={(e) => setUnDate(e.target.value)} style={{ maxWidth: 170 }} aria-label="Fecha no disponible" />
+            <div className="chips">
+              {[['guardia', 'Guardia'], ['viaje', 'Viaje'], ['otro', 'Otro']].map(([v, l]) => (
+                <button key={v} type="button" className={`pill ${unKind === v ? 'accent' : ''}`} aria-pressed={unKind === v} onClick={() => setUnKind(v)}>{l}</button>
+              ))}
+            </div>
+            <button type="button" className="btn soft sm" disabled={!unDate} onClick={addUnavail}>Añadir</button>
+          </div>
+          {unavail.length ? (
+            <div className="chips" style={{ marginTop: 8 }}>
+              {unavail.map((x) => (
+                <button key={x.date} type="button" className="pill" aria-label={`Quitar ${x.date}`} onClick={() => setUnavail((l) => l.filter((y) => y.date !== x.date))}>
+                  {x.date.split('-').reverse().join('/')} · {x.kind === 'guardia' ? 'Guardia' : x.kind === 'viaje' ? 'Viaje' : 'Otro'} ✕
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <p className="tiny muted" style={{ margin: '6px 0 0', lineHeight: 1.45 }}>Ese día no hay entreno; tras una guardia, el saliente solo admite algo suave. Las sesiones clave se mueven al día libre más cercano de la semana.</p>
           <div className="mb-label" style={{ marginTop: 14, marginBottom: 4 }}>Biometría</div>
           <p className="tiny muted" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>Opcional — para tu riesgo cardiometabólico y su evolución en Progreso.</p>
           <div className="grid g-4" style={{ gap: 10 }}>

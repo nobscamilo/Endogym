@@ -1,4 +1,5 @@
 import { getAdminServices } from '../firebaseAdmin.js';
+import { SYMPTOM_KEYS } from '../../core/clinicalPause.js';
 
 const PROFILE_DOC_ID = 'main';
 // TODAS las subcolecciones de users/{uid}. Borrar el documento del usuario NO borra sus
@@ -130,7 +131,8 @@ function sanitizeExercise(exercise) {
   };
 }
 
-const DAILY_CHECKIN_SYMPTOM_KEYS = ['dyspnea', 'jointPain', 'dizziness', 'tachycardia'];
+// Lista completa (incluye los síntomas críticos añadidos el 30-sep-2026); ver core/clinicalPause.js.
+const DAILY_CHECKIN_SYMPTOM_KEYS = SYMPTOM_KEYS;
 
 function safeNumber(value) {
   if (value == null || value === '') return null;

@@ -26,6 +26,7 @@ import { buildGuidedMobilityRoutine, buildGuidedWarmupRoutine } from '../../../c
 import { buildWaistAssessment, estimateBodyFatNavy } from '../../../core/waistRisk.js';
 import { isPrescriptionProfileComplete } from '../../../core/profileCompleteness.js';
 import { addDaysToDateKey, dateKeyBoundsIso, dateKeyInTimeZone, mondayDateKeyFor } from '../../../lib/appTime.js';
+import { buildClinicalPause } from '../../../core/clinicalPause.js';
 
 function paceLabel(secPerKm) {
   const s = Number(secPerKm);
@@ -221,6 +222,21 @@ function initialsFrom(name, last) {
 const GOAL_LABELS = { weight_loss: 'Pérdida de peso', recomposition: 'Recomposición', hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia', glycemic_control: 'Control glucémico' };
 const MODALITY_LABELS = { full_gym: 'Gimnasio', home: 'Casa', trx: 'TRX', mixed: 'Flexible', hybrid_run_gym: 'Correr + Gym', running: 'Carrera', cycling: 'Ciclismo', yoga: 'Yoga', pilates: 'Pilates' };
 
+export function mapPlanNotes(plan) {
+  if (!plan) return [];
+  const notes = [];
+  const rl = plan.runLoad;
+  if (rl?.lowBase) notes.push(`Base de carrera baja: el volumen parte de lo que corres de verdad${rl.chronicWeeklyRunMin ? ` (~${rl.chronicWeeklyRunMin} min/semana)` : ''} y sube ~10 % por semana.`);
+  if (rl && rl.maxQuality === 0) notes.push('Sin series ni umbral hasta consolidar la base: el estímulo de calidad llegará cuando el volumen sea estable.');
+  if (rl?.runWalk) notes.push(`Correr/caminar ${rl.runWalk.run}:${rl.runWalk.walk}. ${rl.runWalk.reason || ''}`.trim());
+  if (plan.frequencyNote) notes.push(plan.frequencyNote);
+  (Array.isArray(plan.blockWeeks) ? plan.blockWeeks : []).forEach((w) => {
+    (w?.unavailable?.moved || []).forEach((m) => notes.push(`${m.title || 'Sesión'} movida del ${m.from} al ${m.to} por guardia/viaje.`));
+    (w?.unavailable?.dropped || []).forEach((m) => notes.push(`${m.title || 'Sesión'} del ${m.date} no cabía en la semana por guardias/viajes y se ha quitado.`));
+  });
+  return notes;
+}
+
 export function mapUser(profile, authUser) {
   // IMPORTANTE: nunca devolvemos null ni dejamos el nombre sin asignar; si lo hiciéramos, el
   // bundle conservaría el usuario de MUESTRA ("Marta García"). Derivamos un nombre real del
@@ -258,6 +274,8 @@ export function mapUser(profile, authUser) {
   if (typeof p.medicalConditions === 'string') out.medicalConditions = p.medicalConditions;
   if (typeof p.metabolicProfile === 'string') out.metabolicProfile = p.metabolicProfile;
   if (typeof p.trainingTime === 'string') out.trainingTime = p.trainingTime;
+  if (typeof p.secondaryGoal === 'string') out.secondaryGoal = p.secondaryGoal;
+  if (Array.isArray(p.unavailableDays)) out.unavailableDays = p.unavailableDays;
   // Objetivo SMART (prefill del formulario de Perfil)
   if (num(p.goalTarget?.value) !== undefined) out.goalTargetValue = num(p.goalTarget.value);
   if (p.goalTarget?.date) out.goalTargetDate = p.goalTarget.date;
@@ -1129,7 +1147,11 @@ export async function GET(request) {
         batch: [],
       };
       // #7 — revisión del mesociclo: solo si hay señales de que conviene regenerar el bloque.
-      const review = buildMesocycleReview({ plan: latestPlan, workouts, today });
+      // Notas del plan para Semana (#10 frecuencia, #9 guardias, política de carga de carrera).
+      overrides.planNotes = mapPlanNotes(displayPlan);
+      // #15 — pausa clínica: síntoma crítico en un check-in reciente sin valoración posterior.
+      overrides.clinicalPause = buildClinicalPause({ workouts, profile });
+      const review = buildMesocycleReview({ plan: latestPlan, workouts, today, profile });
       overrides.mesocycleReview = review && review.status === 'review' ? review : null;
 
       return jsonResponse({ ok: true, overrides });

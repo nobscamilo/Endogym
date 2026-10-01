@@ -147,6 +147,7 @@ function TrainScreen({ initialTab }) {
       </div>
       <SegTabs tabs={TABS} value={tab} onChange={setTab} />
       {D.dataStatus === 'error' ? <div className="empty">No pudimos cargar tus datos de entrenamiento. Recarga para reintentar.</div> : null}
+      {tab === 'sesion' ? <ClinicalPauseCard /> : null}
       {tab === 'sesion' && (D.todaySession ? <TrainSession key={`s-${gen}`} /> : <div className="empty">{D.planStatus === 'stale' ? 'Tu bloque terminó. Crea un bloque nuevo para planificar hoy.' : 'Aún no hay una sesión para hoy. Completa tu perfil o crea un bloque nuevo.'}</div>)}
       {tab === 'semana' && (Array.isArray(D.week) && D.week.length ? <TrainWeek key={`w-${gen}`} /> : <div className="empty">No hay una semana activa que mostrar.</div>)}
       {tab === 'videos' && <TrainVideos key={`v-${gen}`} />}
@@ -156,12 +157,8 @@ function TrainScreen({ initialTab }) {
 }
 
 /* ---- Check-in de la sesión de hoy (alimenta el RAG del Coach IA) ---- */
-const CHECKIN_SYMPTOMS = [
-  { key: 'dyspnea', label: 'Falta de aire' },
-  { key: 'jointPain', label: 'Dolor articular' },
-  { key: 'dizziness', label: 'Mareo' },
-  { key: 'tachycardia', label: 'Palpitaciones' },
-];
+// Lista compartida con el servidor (core/clinicalPause.js): incluye los críticos (#15).
+const CHECKIN_SYMPTOMS = CHECKIN_SYMPTOM_DEFS;
 function Scale10({ value, onChange }) {
   return (
     <div className="scale10">
@@ -488,7 +485,7 @@ function TrainSession() {
   const [completedSession, setCompletedSession] = useStateTr(null);
   const [fatigue, setFatigue] = useStateTr(null);
   const [sleepHours, setSleepHours] = useStateTr('');
-  const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
+  const [symptoms, setSymptoms] = useStateTr(emptySymptoms());
   const toggleSym = (k) => setSymptoms((p) => ({ ...p, [k]: !p[k] }));
   // Rehidratación: si HOY ya hay sesión registrada, mostramos el resumen en vez del formulario.
   const [loggedLocal, setLoggedLocal] = useStateTr(Boolean(s.logged));
@@ -512,6 +509,8 @@ function TrainSession() {
       const o = j && j.ok ? j.overrides : null;
       if (o && o.todaySession) { D.todaySession = o.todaySession; setList(o.todaySession.list); }
       if (o) ['week', 'weekVolumeHours', 'weeks', 'weekIndex', 'library', 'progress', 'glycemic', 'macroTargets'].forEach((k) => { if (o[k] != null) D[k] = o[k]; });
+      // Tras el check-in, la pausa clínica puede activarse (síntoma crítico): se refresca siempre.
+      if (o && Object.prototype.hasOwnProperty.call(o, 'clinicalPause')) D.clinicalPause = o.clinicalPause;
     } catch (e) { /* noop */ }
   }
   async function changeFocus() {
@@ -1167,10 +1166,10 @@ function TrainSession() {
               <div className="mb-label">¿Algún síntoma? (seguridad)</div>
               <div className="chips">
                 {CHECKIN_SYMPTOMS.map((sy) => (
-                  <button key={sy.key} type="button" className={`pill ${symptoms[sy.key] ? 'accent' : ''}`} onClick={() => toggleSym(sy.key)}>{sy.label}</button>
+                  <button key={sy.key} type="button" className={`pill ${symptoms[sy.key] ? 'accent' : ''}`} aria-pressed={!!symptoms[sy.key]} onClick={() => toggleSym(sy.key)}>{sy.label}</button>
                 ))}
               </div>
-              {Object.values(symptoms).some(Boolean) ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0' }}>El coach limitará la intensidad y recomendará valoración médica.</p> : null}
+              {symptomAdvice(symptoms) ? <p className="tiny" role="alert" style={{ color: 'var(--glu-high)', margin: '8px 0 0', fontWeight: symptomAdvice(symptoms).level === 'critical' ? 700 : 400 }}>{symptomAdvice(symptoms).text}</p> : null}
             </div>
             <div className="row ac wrap" style={{ gap: 12 }}>
               <button className="btn" onClick={() => logSession(true)} disabled={logStatus === 'saving' || completedSession == null}>
@@ -1253,7 +1252,7 @@ function PastSessionLogger() {
   const [rpe, setRpe] = useStateTr(null);
   const [fatigue, setFatigue] = useStateTr(null);
   const [sleepHours, setSleepHours] = useStateTr('');
-  const [symptoms, setSymptoms] = useStateTr({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
+  const [symptoms, setSymptoms] = useStateTr(emptySymptoms());
   const [save, setSave] = useStateTr('idle'); // idle|saving|ok|err
   const [err, setErr] = useStateTr('');
   // Editor flexible (colapsado, solo se despliega si el usuario lo pide): cambiar grupo
@@ -1305,10 +1304,10 @@ function PastSessionLogger() {
         setFatigue(j.logged.fatigue != null ? j.logged.fatigue : null);
         setSleepHours(j.logged.sleepHours != null ? j.logged.sleepHours : '');
         const sy = j.logged.symptoms || {};
-        setSymptoms({ dyspnea: !!sy.dyspnea, jointPain: !!sy.jointPain, dizziness: !!sy.dizziness, tachycardia: !!sy.tachycardia });
+        setSymptoms(Object.fromEntries(Object.keys(emptySymptoms()).map((k) => [k, !!sy[k]])));
       } else {
         setCompleted(true); setRpe(null); setFatigue(null); setSleepHours('');
-        setSymptoms({ dyspnea: false, jointPain: false, dizziness: false, tachycardia: false });
+        setSymptoms(emptySymptoms());
       }
       setLoad('loaded');
     } catch (e) { setLoad('err'); setErr('No se pudo cargar la sesión de esa fecha.'); }
@@ -1567,10 +1566,10 @@ function PastSessionLogger() {
                 <div className="mb-label">¿Algún síntoma? (seguridad)</div>
                 <div className="chips">
                   {CHECKIN_SYMPTOMS.map((sy) => (
-                    <button key={sy.key} type="button" className={`pill ${symptoms[sy.key] ? 'accent' : ''}`} onClick={() => toggleSym(sy.key)}>{sy.label}</button>
+                    <button key={sy.key} type="button" className={`pill ${symptoms[sy.key] ? 'accent' : ''}`} aria-pressed={!!symptoms[sy.key]} onClick={() => toggleSym(sy.key)}>{sy.label}</button>
                   ))}
                 </div>
-                {Object.values(symptoms).some(Boolean) ? <p className="tiny" style={{ color: 'var(--glu-high)', margin: '8px 0 0' }}>El coach limitará la intensidad y recomendará valoración médica.</p> : null}
+                {symptomAdvice(symptoms) ? <p className="tiny" role="alert" style={{ color: 'var(--glu-high)', margin: '8px 0 0', fontWeight: symptomAdvice(symptoms).level === 'critical' ? 700 : 400 }}>{symptomAdvice(symptoms).text}</p> : null}
               </div>
 
               <div className="row ac wrap" style={{ gap: 12 }}>
@@ -1806,6 +1805,14 @@ function TrainWeek() {
   return (
     <React.Fragment>
       {review && Array.isArray(review.reasons) && review.reasons.length ? <MesocycleReviewCard review={review} /> : null}
+      {Array.isArray(D.planNotes) && D.planNotes.length ? (
+        <div className="card" style={{ background: 'var(--surface-2)', boxShadow: 'none' }}>
+          <strong style={{ fontSize: '0.9rem' }}>Por qué tu plan es así</strong>
+          <ul className="tiny" style={{ margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.5 }}>
+            {D.planNotes.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
+        </div>
+      ) : null}
       {weeks ? (
         <div className="row ac between" style={{ gap: 8 }}>
           <button type="button" className="btn ghost sm" disabled={idx === 0} onClick={() => goWeek(idx - 1)} aria-label="Semana anterior">‹</button>

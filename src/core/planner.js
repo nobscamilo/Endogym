@@ -35,6 +35,7 @@ import { buildWarmupProtocol, buildCooldownProtocol, detectComorbidities } from 
 import { listActiveRestrictionRules } from './comorbidityRestrictions.js';
 import { assessDietPreferences } from './dietSuitability.js';
 import { buildRunLoadPolicy, capTrainingPhase, applyRunLoadPolicyToWeek, applyRaceWeek } from './runLoadPolicy.js';
+import { applyUnavailableDays, normalizeUnavailableDays } from './availabilityCalendar.js';
 import { getMissingNutritionProfileFields } from './profileCompleteness.js';
 
 const ACTIVITY_FACTORS = {
@@ -565,7 +566,20 @@ function estimateCaloriesFromProfile(profile) {
   const workoutFactor = isHighVolume ? 1.08 : 1.04;
 
   const maintenanceCalories = Math.round(bmr * ACTIVITY_FACTORS[activityLevel] * workoutFactor);
-  return maintenanceCalories + GOAL_CALORIE_DELTA[goal];
+  return maintenanceCalories + goalCalorieDelta(goal, profile.secondaryGoal);
+}
+
+// Objetivo SECUNDARIO (auditoría #13/#14): "perder grasa" como segundo objetivo convierte el
+// superávit/mantenimiento del principal en un déficit MODERADO (−350 kcal; con hipertrofia
+// solo −150, porque ganar músculo y perder grasa a la vez exige un déficit pequeño). Los días
+// exigentes recuperan hidratos por la periodización y el día de carrera y su víspera no llevan
+// déficit (ver refreshDayNutrition).
+export const SECONDARY_WEIGHT_LOSS_DEFICIT = 350;
+export function goalCalorieDelta(goal, secondaryGoal = null) {
+  const base = GOAL_CALORIE_DELTA[goal] ?? 0;
+  if (secondaryGoal !== 'weight_loss' || goal === GoalType.WEIGHT_LOSS) return base;
+  if (goal === GoalType.HYPERTROPHY) return Math.min(base, -150);
+  return Math.min(base, -SECONDARY_WEIGHT_LOSS_DEFICIT);
 }
 
 function resolveMacroStrategy(goal) {
@@ -776,6 +790,14 @@ export function refreshDayNutrition(day, { plan = {}, profile = {} } = {}) {
     hybridCircuit: Boolean(day.workout?.hybridCircuit),
     preRace: day.preRace === true,
   });
+  // Día de carrera y víspera: sin déficit (se devuelve como hidratos).
+  const secondary = plan.secondaryGoal ?? profile.secondaryGoal;
+  if ((day.raceDay || day.preRace) && secondary === 'weight_loss' && goal !== GoalType.WEIGHT_LOSS) {
+    const back = Math.round(SECONDARY_WEIGHT_LOSS_DEFICIT / 4);
+    nutritionTarget.carbsGrams += back;
+    nutritionTarget.calories += back * 4;
+    nutritionTarget.noDeficitReason = day.raceDay ? 'Día de carrera: sin déficit.' : 'Víspera de carrera: sin déficit.';
+  }
   day.nutritionTarget = nutritionTarget;
   day.meals = splitMealsForDay(nutritionTarget, plan.mealsPerDay || profile.mealsPerDay);
   return day;
@@ -1601,10 +1623,13 @@ export function generateWeeklyPlan({
     ? applyRaceWeek(days, { raceDate: profile.raceDate, raceGoal, p5SecPerKm: p5, policy: runLoadPolicy, paces: runPaces })
     : null;
 
+  // #9 — Guardias / viajes / salientes: se aplican al final para que manden sobre todo lo anterior.
+  const unavailableWeek = applyUnavailableDays(days, normalizeUnavailableDays(profile.unavailableDays, { today: null }));
+
   // Objetivo nutricional FINAL de cada día, con la sesión ya definitiva (tras el recorte por
-  // disponibilidad, el aplanado de duración, el formato circuito y la política de carga).
+  // disponibilidad, el aplanado de duración, el formato circuito, la política de carga y las guardias).
   days.forEach((d) => refreshDayNutrition(d, {
-    plan: { baseTarget, goal, raceGoal, mealsPerDay, diet: { pattern: dietAssessment.chosen.pattern } },
+    plan: { baseTarget, goal, raceGoal, mealsPerDay, secondaryGoal: profile.secondaryGoal || null, diet: { pattern: dietAssessment.chosen.pattern } },
     profile,
   }));
 
@@ -1661,6 +1686,20 @@ export function generateWeeklyPlan({
         race: raceWeek,
       },
     } : {}),
+    ...(unavailableWeek ? { unavailableWeek } : {}),
+    // #10 — Si pidió más días de los que el plan prescribe, se explica (no se rellena a ciegas).
+    ...(() => {
+      const asked = Math.round(Number(profile.daysPerWeek));
+      const got = days.filter((d) => d.sessionType !== 'recovery' && d.workout).length;
+      if (!Number.isFinite(asked) || asked <= got) return {};
+      const why = [];
+      if (runLoadPolicy?.lowBase) why.push('tu base de carrera actual no aconseja más sesiones de impacto');
+      if (unavailableWeek?.blocked?.length || unavailableWeek?.saliente?.length) why.push('hay guardias/viajes esta semana');
+      if (!why.length) why.push('la estructura del objetivo deja días de recuperación activa, que también cuentan');
+      return { frequencyNote: `Pediste ${asked} días/semana; esta semana hay ${got} sesiones porque ${why.join(' y ')}. Los días de descanso activo (caminar, movilidad) completan la semana.` };
+    })(),
+    // Objetivo secundario (#13/#14).
+    ...(profile.secondaryGoal ? { secondaryGoal: profile.secondaryGoal } : {}),
     // Hora habitual de entreno: entra en la firma del menú (cambiarla recoloca las comidas).
     ...(typeof profile.trainingTime === 'string' ? { trainingTime: profile.trainingTime } : {}),
     // Resumen de dieta (entra en la firma del menú semanal: cambiarla invalida el menú).
@@ -1728,7 +1767,7 @@ export function generateBlockPlan({
     });
     if (w === 0) base = wp;
     allDays.push(...wp.days);
-    blockWeeks.push({ index: w, startDate: wp.startDate, phase: wp.phase, phaseLabel: wp.phaseLabel, weeksToRace: wp.weeksToRace, runLoadWeek: wp.runLoad?.week || null, raceWeek: wp.runLoad?.race || null });
+    blockWeeks.push({ index: w, startDate: wp.startDate, phase: wp.phase, phaseLabel: wp.phaseLabel, weeksToRace: wp.weeksToRace, runLoadWeek: wp.runLoad?.week || null, raceWeek: wp.runLoad?.race || null, unavailable: wp.unavailableWeek || null });
   }
 
   const days = allDays.slice(0, blockDays);

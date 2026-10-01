@@ -20,11 +20,20 @@ describe('mesocycleReview', () => {
     expect(r.reasons.join(' ')).toMatch(/grupo muscular/i);
   });
 
-  it('marca revisión si el bloque tiene ≥28 días', () => {
-    const plan = planWith([strengthDay('2026-06-01')]);
-    const r = buildMesocycleReview({ plan, workouts: [], today: '2026-07-01' });
+  // Auditoría #11: el aviso llega en los 2 últimos días del bloque de 21 (antes, a los 28).
+  it('marca revisión al final del bloque, no a los 28 días', () => {
+    const plan = planWith([strengthDay('2026-06-01')], { blockEndDate: '2026-06-21' });
+    expect(buildMesocycleReview({ plan, workouts: [], today: '2026-06-18' }).status).toBe('ok');
+    const r = buildMesocycleReview({ plan, workouts: [], today: '2026-06-20' });
     expect(r.status).toBe('review');
-    expect(r.reasons.join(' ')).toMatch(/días activo/i);
+    expect(r.reasons.join(' ')).toMatch(/termina el 2026-06-21/);
+  });
+
+  it('respeta la cadencia de revisión elegida (resurveyWeeks)', () => {
+    const plan = planWith([strengthDay('2026-06-01')], { blockEndDate: '2026-06-30' });
+    const profile = { resurveyWeeks: 2, lastSurveyAt: '2026-06-01T10:00:00Z' };
+    expect(buildMesocycleReview({ plan, workouts: [], today: '2026-06-10', profile }).status).toBe('ok');
+    expect(buildMesocycleReview({ plan, workouts: [], today: '2026-06-16', profile }).reasons.join(' ')).toMatch(/cada 2 semanas/);
   });
 
   it('marca revisión por dolor articular repetido', () => {

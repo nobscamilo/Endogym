@@ -19,6 +19,7 @@ import { retrieveGuidelinesContext } from '../../../services/guidelinesRetriever
 import { COACH_CHAT_PERSONA, buildCoachChatUserContent, sanitizeUserText } from '../../../services/coachPersona.js';
 import { detectRedFlags, redFlagResponse } from '../../../services/coachRedFlags.js';
 import { declaredConditionLabels, dietContextForCoach } from '../../../core/dietSuitability.js';
+import { buildClinicalPause } from '../../../core/clinicalPause.js';
 
 // Presupuesto de RAG para el chat: más pequeño que el del plan semanal (latencia y coste del
 // chat interactivo). Se recorta en el último salto de línea para no cortar a mitad de pasaje.
@@ -114,7 +115,10 @@ async function buildUserContext(uid) {
     // podría fabricar secciones falsas del contexto.
     const name = sanitizeUserText(profile?.firstName || profile?.name || profile?.displayName, 40);
     if (name) parts.push(`Nombre: ${name}.`);
-    if (profile?.goal) parts.push(`Objetivo: ${profile.goal}.`);
+    if (profile?.goal) parts.push(`Objetivo: ${profile.goal}${profile.secondaryGoal ? ` (secundario: ${profile.secondaryGoal})` : ''}.`);
+    // #15 — pausa clínica: con un síntoma crítico reciente sin valoración, no se prescribe.
+    const pause = buildClinicalPause({ workouts, profile });
+    if (pause) parts.push(`${pause.message} REGLA: mientras dure la pausa NO prescribas ni animes a entrenar; recomienda valoración médica (112 si ocurre ahora).`);
     // Objetivo SMART medible (meta + fecha + tendencia real). Se omite si no hay meta.
     try {
       const goalLine = describeGoalProgress(buildGoalProgress({ profile, metrics, workouts }));
@@ -133,6 +137,12 @@ async function buildUserContext(uid) {
     // Dieta: elección, idoneidad para su perfil y sugerencia (motor determinista).
     if (profile) parts.push(dietContextForCoach(profile));
     if (typeof profile?.trainingTime === 'string') parts.push(`Suele entrenar a las ${profile.trainingTime}.`);
+    // #9 — guardias/viajes próximos: el coach no debe proponer entrenar esos días ni duro en salientes.
+    if (Array.isArray(profile?.unavailableDays) && profile.unavailableDays.length) {
+      const horizon = addDaysToDateKey(todayKey, 14);
+      const next = profile.unavailableDays.filter((u) => u?.date >= todayKey && u.date <= horizon).slice(0, 8);
+      if (next.length) parts.push(`No disponible (próximos 14 días): ${next.map((u) => `${u.date} ${u.kind}`).join(', ')}. Tras una guardia, el día siguiente es saliente: solo suave.`);
+    }
     // Contexto de carrera: objetivo, ritmos y entrenamiento concurrente (correr + gimnasio).
     const modality = profile?.trainingModality || profile?.trainingMode || '';
     if (profile?.runRaceGoal && profile.runRaceGoal !== 'health') {

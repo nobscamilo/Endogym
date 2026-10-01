@@ -23,6 +23,10 @@ function normalizeDate(value) {
 }
 
 const ALARM_SYMPTOM_LABELS = {
+  chestPain: 'Dolor u opresión torácica',
+  syncope: 'Síncope o presíncope',
+  hypoglycemia: 'Síntomas de hipoglucemia',
+  worseningPain: 'Dolor creciente o cojera',
   dyspnea: 'Disnea o ahogo inusual',
   jointPain: 'Dolor articular o muscular agudo',
   dizziness: 'Mareo o inestabilidad',

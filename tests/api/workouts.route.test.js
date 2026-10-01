@@ -200,4 +200,15 @@ describe('/api/workouts route', () => {
     expect(response.status).toBe(400);
     expect(mocks.createWorkout).not.toHaveBeenCalled();
   });
+
+  // #15 (30-sep-2026): síntomas críticos nuevos, opcionales para no romper clientes antiguos.
+  it('POST acepta los síntomas nuevos (dolor torácico, síncope…) y rechaza tipos no booleanos', async () => {
+    const ok = dailyCheckinPayload({ symptoms: { dyspnea: false, jointPain: false, dizziness: false, tachycardia: false, chestPain: true, syncope: false } });
+    mocks.createWorkout.mockResolvedValue({ id: 'daily-2026-06-01', ...ok });
+    const r1 = await POST(new Request('http://localhost/api/workouts', { method: 'POST', body: JSON.stringify(ok) }));
+    expect(r1.status).toBe(201);
+    const bad = dailyCheckinPayload({ symptoms: { dyspnea: false, jointPain: false, dizziness: false, tachycardia: false, chestPain: 'sí' } });
+    const r2 = await POST(new Request('http://localhost/api/workouts', { method: 'POST', body: JSON.stringify(bad) }));
+    expect(r2.status).toBe(400);
+  });
 });

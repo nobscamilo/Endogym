@@ -261,7 +261,7 @@ export function assessDietPreferences(profile = {}) {
   const chosenAssessment = byPattern[chosen];
   // El OBJETIVO "controlar glucosa" activa el IG bajo como PREFERENCIA (no bloqueada, no
   // implica enfermedad). Solo una condición declarada lo bloquea.
-  const lowGlycemicPreferred = pref.lowGlycemic === true || profile.goal === 'glycemic_control';
+  const lowGlycemicPreferred = pref.lowGlycemic === true || profile.goal === 'glycemic_control' || profile.secondaryGoal === 'glycemic_control';
   const lowGlycemic = lowGlycemicPreferred || health.lowGlycemicRequired;
   const ack = pref.riskAcknowledgement && typeof pref.riskAcknowledgement === 'object' ? pref.riskAcknowledgement : null;
   const requiresAck = chosenAssessment.level === 'caution' || chosenAssessment.level === 'not_advised';

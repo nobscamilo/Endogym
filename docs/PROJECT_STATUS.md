@@ -1,6 +1,17 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **30 de septiembre de 2026, parte 5 (política de carga de carrera + semana de carrera: auditoría #1 #2 #3 #6 #7 #29)**.
+Ultima actualizacion: **1 de octubre de 2026 (auditoría #9 #10 #11 #13 #14 #15)**.
+
+## Sesión del 1 de octubre de 2026 (auditoría #9 #10 #11 #13 #14 #15)
+
+Hecho en un clon en la nube (la Mac se desconectaba) y aplicado en la Mac como parche.
+
+- **#9 Guardias/viajes (`src/core/availabilityCalendar.js`):** `profile.unavailableDays [{date, kind: guardia|viaje|otro}]` (normalizado: fechas válidas, sin duplicados, ≤90, sin las de hace >7 días). Planner (`applyUnavailableDays`, se aplica al FINAL de cada semana): día marcado → descanso ("Guardia"); saliente (día siguiente a guardia, automático) → solo suave ≤30 min; las sesiones duras (larga, calidad, pierna/full, circuito, mixta) se mueven al día libre más cercano de la semana evitando pegarlas a otra dura, o se quitan si no caben. UI: paso Datos (fecha + tipo, lista con ✕). Coach: guardias de los próximos 14 días. Pendiente: lectura de Google Calendar.
+- **#13/#14 Objetivo secundario:** `profile.secondaryGoal` ∈ {weight_loss, glycemic_control} (≠ principal). `goalCalorieDelta`: perder grasa como secundario → −350 kcal (con hipertrofia −150; si el principal ya es perder grasa, −450 de siempre). Día de carrera y víspera sin déficit (+350 kcal en HC en `refreshDayNutrition`). Controlar glucosa como secundario → IG bajo como preferencia. UI: chips bajo el objetivo principal con explicación.
+- **#15 Síntomas y pausa (`src/core/clinicalPause.js`, compartido con el bundle):** 8 síntomas (nuevos: dolor/opresión torácica, desmayo/casi desmayo, hipoglucemia, dolor que va a más/cojera). Críticos (torácico, síncope) → aviso inmediato con 112 y **plan en pausa** (`buildClinicalPause`: check-in de ≤14 días sin `profile.clinicalClearanceAt` posterior) → tarjeta en Hoy y Entreno con "Ya me ha valorado un médico" (confirmación) → `clinicalClearance:true`. Hipoglucemia → pauta 15-20 g. El coach no prescribe durante la pausa. `/api/workouts` exige las 4 claves antiguas y acepta las nuevas (booleanas); el repositorio ya no las descartaba al guardar (`SYMPTOM_KEYS`). Nota: el aviso de "IMC >30 → médico" que pedía el auditor NO se ha añadido: el algoritmo ACSM 2015 no lo exige; la diabetes/CV/renal ya activan la valoración (parte 2).
+- **#10 Frecuencia:** `plan.frequencyNote` cuando pidió más días de los prescritos (motivo: base baja, guardias o estructura). Semana muestra "Por qué tu plan es así" (`mapPlanNotes`: base baja, sin calidad, correr/caminar, frecuencia, sesiones movidas/quitadas).
+- **#11 Revisión:** `buildMesocycleReview` avisa en los 2 últimos días del bloque (antes a los 28 días con bloques de 21) y respeta `resurveyWeeks` (antes se guardaba y no se usaba).
+- Tests: 665.
 
 ## Sesión del 30 de septiembre de 2026, parte 5 (bloque de entrenamiento de la auditoría)
 
@@ -21,6 +32,7 @@ Ultima actualizacion: **30 de septiembre de 2026, parte 5 (política de carga de
 
 - **Hechas:** #4 (fecha de carrera al chat), #12 (condición glucémica → menú; la "diabetes" de Camilo era falsa), #17 (hora de entreno), #50 (dieta ≠ salud), parte de #15 (diabetes/CV/renal → cribado ACSM), parte de #49 (aria-pressed y ✓ en Salud).
 - **Hechas en la parte 5:** #1, #2, #3, #6, #7, #29.
+- **Hechas el 1-oct:** #9, #10, #11, #13, #14, #15 (sin aviso IMC>30 ni lectura de Google Calendar).
 - **P1 entrenamiento pendiente:** #8 progresión de ritmos, #9 días no disponibles (guardias), #10 días/semana, #11 revisión vs bloque de 21 días, #5 recomendaciones del análisis → ajustes del plan.
 - **P1 salud/nutrición:** #13/#14 objetivo secundario (pérdida de peso) + déficit, #15 síntomas de alarma (dolor torácico, síncope, hipoglucemia, cojera) + pausa del plan + aviso IMC>30, #16 conservación del batch cooking.
 - **P2 datos:** #18 sesión hecha en otro día, #19 sesión parcial, #20 cifras de Progreso incoherentes, #21 peso del perfil, #22 volumen por grupo 110 %, #23 "Vas bien" sin datos.

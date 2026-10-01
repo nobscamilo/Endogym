@@ -3,6 +3,7 @@ import { AuthenticationError, getAuthenticatedUser } from '../../../lib/auth.js'
 import { withTrace, logError } from '../../../lib/logger.js';
 import { getUserProfile, upsertUserProfile } from '../../../lib/repositories/firestoreRepository.js';
 import { assessDietPreferences } from '../../../core/dietSuitability.js';
+import { normalizeUnavailableDays } from '../../../core/availabilityCalendar.js';
 import { sanitizeEquipmentList } from '../../../core/equipmentPreferences.js';
 import { normalizeNutritionPreferencesInput } from '../../../core/nutritionPlanner.js';
 import {
@@ -39,6 +40,11 @@ export async function POST(request) {
 
     const patch = { studioAvailability: true, lastSurveyAt: new Date().toISOString() };
     if (GOALS.has(body?.goal)) patch.goal = body.goal;
+    // Objetivo secundario (#13/#14): solo "perder grasa" o "controlar glucosa", y nunca igual
+    // al principal. null lo borra.
+    const SECONDARY = new Set(['weight_loss', 'glycemic_control']);
+    if (body?.secondaryGoal === null || body?.secondaryGoal === 'none') patch.secondaryGoal = null;
+    else if (SECONDARY.has(body?.secondaryGoal) && body.secondaryGoal !== (body?.goal ?? null)) patch.secondaryGoal = body.secondaryGoal;
     if (MODALITIES.has(body?.trainingModality)) {
       patch.trainingModality = body.trainingModality;
       patch.trainingMode = body.trainingModality === 'full_gym' ? 'gym' : 'home';
@@ -100,6 +106,13 @@ export async function POST(request) {
     if (body?.nutritionPreferences && typeof body.nutritionPreferences === 'object') {
       patch.nutritionPreferences = normalizeNutritionPreferencesInput(body.nutritionPreferences);
     }
+
+    // #9 — Días no disponibles (guardias, viajes…). Se sustituye la lista completa.
+    if (Array.isArray(body?.unavailableDays)) patch.unavailableDays = normalizeUnavailableDays(body.unavailableDays);
+
+    // #15 — "Ya me han valorado": levanta la pausa clínica por síntomas críticos. Es una
+    // declaración de la persona (no verificamos el informe), con fecha.
+    if (body?.clinicalClearance === true) patch.clinicalClearanceAt = new Date().toISOString();
 
     // Hora habitual de entreno (HH:MM, hora local) para colocar las comidas y el timing
     // pre/post del menú. null = varía / no lo sé (el menú da el timing en relativo).
