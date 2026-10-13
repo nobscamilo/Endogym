@@ -1,6 +1,12 @@
 # Estado real del proyecto Endogym
 
-Ultima actualizacion: **1 de octubre de 2026 (auditoría #9 #10 #11 #13 #14 #15)**.
+Ultima actualizacion: **13 de octubre de 2026 (despliegue del lote del 1-oct + parche de seguridad)**.
+
+## 13 de octubre de 2026 — despliegue pendiente cerrado
+
+- El lote del 1-oct (#9 #10 #11 #13 #14 #15) estuvo SIN desplegar del 1 al 13-oct (Mac desconectada; la sesión en la nube no tenía permiso de push). Aplicado hoy con `git am` → `4e86ed4`.
+- `npm audit` bloqueaba: avisos altos nuevos en Next 16.0-16.3.7 (cache poisoning SSG/ISR, SSRF en Image Optimization, etc.), `@fastify/busboy` ≤3.2.1 y `source-map-js` ≤1.2.1. `npm audit fix` (sin --force) → next 16.4.0, busboy 3.2.3, source-map-js 1.2.2 → `ed9d5ae`. 665 tests y build verdes; producción READY en `ed9d5ae`, `/api/health` 200, bundle `v=8ccfb16d87`.
+- **Estado del usuario (Camilo):** guardó Perfil el 30-sep a las 12:14 (antes del despliegue de la política de carga, 22:54) → su bloque activo (30-sep → 20-oct) se generó SIN `runLoad`: fase "peak", sin semana de carrera. Perfil: diabetes desmarcada, mediterránea, hora 20:30, `metabolicProfile=insulin_resistance` (impone IG bajo), sin guardias. Entrenos reales desde el 1-oct: 3 carreras continuas de 52-62 min a 154-159 ppm (~85-87 % FCmáx), HIIT el 7-oct, fuerza el 8-oct; nada desde el 8-oct. Simulación con la lógica actual (bloque desde 14-oct): semana de carrera (movilidad, 20 min correr/caminar 2:1, víspera, "Carrera 10K" ~1 h 36 min 2:1). Requiere que el usuario regenere el bloque.
 
 ## Sesión del 1 de octubre de 2026 (auditoría #9 #10 #11 #13 #14 #15)
 
